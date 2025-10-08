@@ -6,7 +6,7 @@
 >
 > This is the first workable scoreboard generated with this approach.  
 >
-> ![WhatsApp Image 2025-10-08 at 12.23.27_9d59f148](../../../Users/lamyj/AppData/Local/Packages/5319275A.WhatsAppDesktop_cv1g1gvanyjgm/TempState/9DCB6FEACE6C0D8D79CA29DB1BCC5DD2/WhatsApp Image 2025-10-08 at 12.23.27_9d59f148.jpg)
+> ![WhatsApp Image 2025-10-08 at 12 23 27_e98fafa4](https://github.com/user-attachments/assets/2e98bdc8-3ba6-43af-ae7d-85cee68cb11a)
 >
 > There should ultimately be enough capability to implement scoreboards that owlcms does not provide, for example grouping athletes by team and showing team point subtotals
 
