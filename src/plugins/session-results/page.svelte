@@ -108,6 +108,7 @@
 						<th class="col-best">✓</th>
 						<th class="v-spacer v-spacer-total"></th>
 						<th class="col-total-portrait">Total</th>
+						<th class="col-rank-portrait">Rank</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -315,10 +316,21 @@
 	.col-total { min-width: 3.5rem; }
 	.col-rank { min-width: 3rem; }
 
-	/* Hide portrait-only headers in landscape/desktop */
-	.col-name-portrait,
-	.col-total-portrait {
-		display: none !important;
+	/* Hide portrait-only headers in landscape/desktop - completely remove from table flow */
+	thead tr:nth-child(2) th.col-name-portrait,
+	thead tr:nth-child(2) th.col-total-portrait,
+	thead tr:nth-child(2) th.col-rank-portrait,
+	thead tr:nth-child(2) th.v-spacer-snatch,
+	thead tr:nth-child(2) th.v-spacer-middle,
+	thead tr:nth-child(2) th.v-spacer-total {
+		display: none;
+		position: absolute;
+		visibility: hidden;
+		width: 0;
+		height: 0;
+		padding: 0;
+		margin: 0;
+		border: none;
 	}
 	
 	/* Vertical spacer columns */
@@ -608,12 +620,20 @@
 			display: table-row !important;
 		}
 
-		/* Show portrait-only headers (Name and Total) */
-		.scoreboard-table th.col-name-portrait,
-		.scoreboard-table th.col-total-portrait {
+		/* Show portrait-only headers (Name and Total) - override desktop hiding */
+		.scoreboard-table thead tr:nth-child(2) th.col-name-portrait,
+		.scoreboard-table thead tr:nth-child(2) th.col-total-portrait,
+		.scoreboard-table thead tr:nth-child(2) th.col-rank-portrait {
 			display: table-cell !important;
+			position: static !important;
+			visibility: visible !important;
+			width: auto !important;
+			height: auto !important;
 			font-size: 0.5rem;
 			text-align: left;
+			padding: 0.12rem 0.2rem !important;
+			margin: 0 !important;
+			border: 1px solid #555 !important;
 		}
 
 		.scoreboard-table th.col-name-portrait {
@@ -631,8 +651,6 @@
 		.scoreboard-table td.born,
 		.scoreboard-table th.col-team,
 		.scoreboard-table td.team-name,
-		.scoreboard-table th.col-rank,
-		.scoreboard-table td.rank,
 		.scoreboard-table th.col-best,
 		.scoreboard-table td.best {
 			display: none !important;
@@ -653,16 +671,23 @@
 		}
 
 		/* Show the three spacers: before snatch, between Snatch and C&J, before Total */
-		.scoreboard-table th.v-spacer-snatch,
+		.scoreboard-table thead tr:nth-child(2) th.v-spacer-snatch,
 		.scoreboard-table td.v-spacer-snatch,
-		.scoreboard-table th.v-spacer-middle,
+		.scoreboard-table thead tr:nth-child(2) th.v-spacer-middle,
 		.scoreboard-table td.v-spacer-middle,
-		.scoreboard-table th.v-spacer-total,
+		.scoreboard-table thead tr:nth-child(2) th.v-spacer-total,
 		.scoreboard-table td.v-spacer-total {
 			display: table-cell !important;
+			position: static !important;
+			visibility: visible !important;
 			width: 8px !important;
 			min-width: 8px !important;
 			max-width: 8px !important;
+			height: auto !important;
+			padding: 0 !important;
+			margin: 0 !important;
+			background: #000 !important;
+			border: none !important;
 		}
 
 		/* Make Name column take available space */
