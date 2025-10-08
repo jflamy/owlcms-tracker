@@ -1,0 +1,241 @@
+/**
+ * Server-side scoreboard helpers - these run on the server and access the competition hub directly
+ */
+
+import { competitionHub } from '$lib/server/competition-hub.js';
+
+/**
+ * Get the full database state (raw athlete data) - SERVER-SIDE ONLY
+ * @returns {Object|null} Raw database state from OWLCMS
+ */
+export function getDatabaseState() {
+	return competitionHub.getDatabaseState();
+}
+
+/**
+ * Get the latest UPDATE message for a specific FOP - SERVER-SIDE ONLY
+ * This contains precomputed presentation data like liftingOrderAthletes, groupAthletes, etc.
+ * @param {string} fopName - FOP name (default: 'A')
+ * @returns {Object|null} Latest UPDATE message with precomputed data
+ */
+export function getFopUpdate(fopName = 'A') {
+	return competitionHub.getFopUpdate(fopName);
+}
+
+/**
+ * Get formatted scoreboard data for SSR/API (SERVER-SIDE ONLY)
+ * Uses the latest UPDATE message which already has precomputed liftingOrderAthletes
+ * @param {string} fopName - FOP name (default: 'A')
+ * @param {Object} options - User preferences (e.g., { showRecords: true, maxLifters: 8 })
+ * @returns {Object} Formatted data ready for browser consumption
+ */
+export function getScoreboardData(fopName = 'A', options = {}) {
+	const fopUpdate = getFopUpdate(fopName);
+	const databaseState = getDatabaseState();
+	
+	// Extract options with defaults
+	const showRecords = options.showRecords ?? false;
+	const maxLifters = options.maxLifters ?? 8;
+	
+	// Get learning mode from environment
+	const learningMode = process.env.LEARNING_MODE === 'true' ? 'enabled' : 'disabled';
+	
+	if (!fopUpdate && !databaseState) {
+		return {
+			competition: { name: 'No Competition Data', fop: 'unknown' },
+			currentAthlete: null,
+			timer: { state: 'stopped', timeRemaining: 0 },
+			liftingOrderAthletes: [],
+			groupAthletes: [],
+			rankings: [],
+			stats: { totalAthletes: 0, activeAthletes: 0, completedAthletes: 0, categories: [], teams: [] },
+			status: 'waiting',
+			learningMode
+		};
+	}
+
+	// Extract basic competition info
+	const competition = {
+		name: fopUpdate?.competitionName || databaseState?.competition?.name || 'Competition',
+		fop: fopName,
+		state: fopUpdate?.fopState || 'INACTIVE',
+		session: fopUpdate?.groupName || 'A',
+		groupInfo: fopUpdate?.groupInfo || ''
+	};
+
+	// Extract current athlete info from UPDATE message
+	let currentAttempt = null;
+	if (fopUpdate?.fullName) {
+		currentAttempt = {
+			fullName: fopUpdate.fullName,
+			name: fopUpdate.fullName,
+			teamName: fopUpdate.teamName,
+			team: fopUpdate.teamName,
+			startNumber: fopUpdate.startNumber,
+			categoryName: fopUpdate.categoryName,
+			category: fopUpdate.categoryName,
+			attempt: fopUpdate.attempt,
+			attemptNumber: fopUpdate.attemptNumber,
+			weight: fopUpdate.weight,
+			timeAllowed: fopUpdate.timeAllowed,
+			startTime: fopUpdate.athleteTimerEventType === 'Start' ? Date.now() - (fopUpdate.timeAllowed - (fopUpdate.athleteMillisRemaining || 0)) : null
+		};
+	}
+
+	// Extract timer info from UPDATE message or keep previous timer state
+	const timer = {
+		state: fopUpdate?.athleteTimerEventType === 'StartTime' ? 'running' : 
+		       fopUpdate?.athleteTimerEventType === 'StopTime' ? 'stopped' : 
+		       fopUpdate?.athleteTimerEventType === 'SetTime' ? 'set' :
+		       fopUpdate?.athleteTimerEventType ? fopUpdate.athleteTimerEventType.toLowerCase() : 'stopped',
+		timeRemaining: fopUpdate?.athleteMillisRemaining ? parseInt(fopUpdate.athleteMillisRemaining) : 0,
+		duration: fopUpdate?.timeAllowed ? parseInt(fopUpdate.timeAllowed) : 60000,
+		startTime: null // Client will compute this
+	};
+
+	// Get precomputed liftingOrderAthletes from UPDATE message (already JSON-encoded string)
+	let liftingOrderAthletes = [];
+	if (fopUpdate?.liftingOrderAthletes) {
+		try {
+			liftingOrderAthletes = JSON.parse(fopUpdate.liftingOrderAthletes);
+		} catch (err) {
+			console.error('[Scoreboard Helper] Failed to parse liftingOrderAthletes:', err);
+		}
+	}
+
+	// Get precomputed groupAthletes from UPDATE message (already JSON-encoded string)
+	let groupAthletes = [];
+	if (fopUpdate?.groupAthletes) {
+		try {
+			groupAthletes = JSON.parse(fopUpdate.groupAthletes);
+		} catch (err) {
+			console.error('[Scoreboard Helper] Failed to parse groupAthletes:', err);
+		}
+	}
+	
+	// Get top athletes for leaderboard (from database state if needed for custom sorting)
+	const rankings = getTopAthletes(databaseState, 10);
+	
+	// Get competition stats
+	const stats = getCompetitionStats(databaseState);
+
+	return {
+		competition,
+		currentAttempt,
+		timer,
+		liftingOrderAthletes, // Precomputed from OWLCMS UPDATE
+		groupAthletes,         // Precomputed from OWLCMS UPDATE
+		rankings,              // Computed from database
+		stats,
+		displaySettings: fopUpdate?.showTotalRank || fopUpdate?.showSinclair ? {
+			showTotalRank: fopUpdate.showTotalRank === 'true',
+			showSinclair: fopUpdate.showSinclair === 'true',
+			showLiftRanks: fopUpdate.showLiftRanks === 'true',
+			showSinclairRank: fopUpdate.showSinclairRank === 'true'
+		} : {},
+		isBreak: fopUpdate?.break === 'true' || false,
+		breakType: fopUpdate?.breakType,
+		status: (fopUpdate || databaseState) ? 'ready' : 'waiting',
+		lastUpdate: fopUpdate?.lastUpdate || Date.now(),
+		learningMode,
+		options: { showRecords, maxLifters } // Echo back the options used
+	};
+}
+
+/**
+ * Get top athletes from the competition state (SERVER-SIDE ONLY)
+ * @param {Object} competitionState - Full competition state
+ * @param {number} limit - Number of athletes to return
+ * @returns {Array} Top athletes sorted by total
+ */
+export function getTopAthletes(competitionState, limit = 10) {
+	if (!competitionState?.athletes || !Array.isArray(competitionState.athletes)) {
+		return [];
+	}
+
+	return competitionState.athletes
+		.filter(athlete => athlete && (athlete.total > 0 || athlete.bestSnatch > 0 || athlete.bestCleanJerk > 0))
+		.sort((a, b) => {
+			// Sort by total first, then by Sinclair, then by best snatch
+			const totalA = a.total || 0;
+			const totalB = b.total || 0;
+			if (totalA !== totalB) return totalB - totalA;
+			
+			const sinclairA = a.sinclair || 0;
+			const sinclairB = b.sinclair || 0;
+			if (sinclairA !== sinclairB) return sinclairB - sinclairA;
+			
+			const snatchA = a.bestSnatch || 0;
+			const snatchB = b.bestSnatch || 0;
+			return snatchB - snatchA;
+		})
+		.slice(0, limit);
+}
+
+/**
+ * Get team rankings computed from the hub (SERVER-SIDE ONLY)
+ * @returns {Array} Team rankings with scores
+ */
+export function getTeamRankings() {
+	return competitionHub.getTeamRankings();
+}
+
+/**
+ * Get athletes by weight class (SERVER-SIDE ONLY)
+ * @param {string} weightClass - Weight class to filter by (e.g., "73kg")
+ * @param {string} gender - Gender to filter by ("M" or "F")
+ * @returns {Array} Athletes in the specified category
+ */
+export function getAthletesByCategory(weightClass = null, gender = null) {
+	const state = getCompetitionState();
+	if (!state?.athletes) return [];
+
+	return state.athletes.filter(athlete => {
+		if (weightClass && athlete.category !== weightClass) return false;
+		if (gender && athlete.gender !== gender) return false;
+		return true;
+	});
+}
+
+/**
+ * Get lifting order from the competition state (SERVER-SIDE ONLY)
+ * @returns {Array} Current lifting order
+ */
+export function getLiftingOrder() {
+	const state = getCompetitionState();
+	return state?.liftingOrder || [];
+}
+
+/**
+ * Get competition metrics and statistics (SERVER-SIDE ONLY)
+ * @param {Object} competitionState - Competition state (optional, will fetch if not provided)
+ * @returns {Object} Competition statistics
+ */
+export function getCompetitionStats(competitionState = null) {
+	if (!competitionState) {
+		competitionState = getCompetitionState();
+	}
+	
+	if (!competitionState?.athletes) {
+		return {
+			totalAthletes: 0,
+			activeAthletes: 0,
+			completedAthletes: 0,
+			categories: [],
+			teams: []
+		};
+	}
+
+	const athletes = competitionState.athletes;
+	const categories = [...new Set(athletes.map(a => a.categoryName || a.category).filter(Boolean))];
+	const teams = [...new Set(athletes.map(a => a.teamName || a.team).filter(Boolean))];
+
+	return {
+		totalAthletes: athletes.length,
+		activeAthletes: athletes.filter(a => a.total > 0 || a.bestSnatch > 0 || a.bestCleanJerk > 0).length,
+		completedAthletes: athletes.filter(a => a.total > 0).length,
+		categories,
+		teams,
+		averageTotal: athletes.filter(a => a.total > 0).reduce((sum, a, _, arr) => sum + a.total / arr.length, 0) || 0
+	};
+}
