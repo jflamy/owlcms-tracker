@@ -1,34 +1,46 @@
 # OWLCMS Tracker
 
-A SvelteKit application that receives real-time competition updates from OWLCMS and displays them through multiple scoreboard types. **Runs on port 8095**.
+> This project is a proof of concept for using AI-Assisted coding to create customizable owlcms scoreboards.  *Except for this note, everything in this repository has been generated without actual programming, strictly by providing instructions to a coding Agent*.
+>
+> **The idea is that you should be able to open this repository in a development environment, start an LLM Agent like Claude or ChatGPT, and argue with the agent until you get the scoreboard you want.** You can even paste screen shots of existing scoreboards, or of defects in the generated scoreboards to guide the evolution. The author did not write *any* JavaScript and does not know Svelte.
+>
+> This is the first workable scoreboard generated with this approach.  
+>
+> ![WhatsApp Image 2025-10-08 at 12.23.27_9d59f148](../../../Users/lamyj/AppData/Local/Packages/5319275A.WhatsAppDesktop_cv1g1gvanyjgm/TempState/9DCB6FEACE6C0D8D79CA29DB1BCC5DD2/WhatsApp Image 2025-10-08 at 12.23.27_9d59f148.jpg)
+>
+> There should ultimately be enough capability to implement scoreboards that owlcms does not provide, for example grouping athletes by team and showing team point subtotals
 
-## 📚 Documentation
+## Description
 
-- **[CREATE_YOUR_OWN.md](./CREATE_YOUR_OWN.md)** - Create custom scoreboards ✨
+A SvelteKit application that receives real-time competition updates from OWLCMS and displays them through multiple scoreboard types. Runs on port 8096 (default).
+
+## Documentation
+
+- **[CREATE_YOUR_OWN.md](./CREATE_YOUR_OWN.md)** - Create custom scoreboards
 - **[docs/SCOREBOARD_ARCHITECTURE.md](./docs/SCOREBOARD_ARCHITECTURE.md)** - Complete system architecture
 - **[Plugin README](./src/plugins/lifting-order/README.md)** - Example scoreboard with AI prompts
 
-## ⚙️ OWLCMS Configuration Required
+## OWLCMS Configuration Required
 
 **Before using this tracker**, you must configure OWLCMS to send data here:
 
 In OWLCMS: **Prepare Competition → Language and System Settings → Connections → URL for Video Data**
 
-Set to: `http://localhost:8095` (or your tracker's address)
+Set to: `http://localhost:8096` (or your tracker's address)
 
 **That's it!** No code changes to OWLCMS needed - just this URL setting.
 
-## 🎯 Features
+## Features
 
-✅ **Multiple Scoreboard Types** - Lifting order, results, team rankings, and more  
-✅ **Multi-FOP Support** - Display up to 6 FOPs simultaneously  
-✅ **Simple OWLCMS Setup** - One URL configuration, no code changes  
-✅ **AI-Assisted Development** - Create new scoreboards with AI help  
-✅ **URL-Based Options** - Configure each scoreboard via query parameters  
-✅ **Real-Time SSE Updates** - Instant display of decisions and timer events  
-✅ **Server-Side Processing** - Process once, serve hundreds of browsers
+- **Multiple Scoreboard Types** - Lifting order, results, team rankings, and more  
+- **Multi-FOP Support** - Display up to 6 FOPs simultaneously  
+- **Simple OWLCMS Setup** - One URL configuration, no code changes  
+- **AI-Assisted Development** - Create new scoreboards with AI help  
+- **URL-Based Options** - Configure each scoreboard via query parameters  
+- **Real-Time SSE Updates** - Instant display of decisions and timer events  
+- **Server-Side Processing** - Process once, serve hundreds of browsers
 
-## 🏗️ Architecture
+## Architecture
 
 **Real-time SSE push architecture** - Competition data flows from OWLCMS through the Competition Hub to browsers via Server-Sent Events, triggering instant updates on decisions and timer events.
 
@@ -38,7 +50,7 @@ OWLCMS → Competition Hub → SSE Broadcast → Browsers
 
 **For complete architecture details**, see **[docs/SCOREBOARD_ARCHITECTURE.md](./docs/SCOREBOARD_ARCHITECTURE.md)**
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 
@@ -62,7 +74,7 @@ OWLCMS → Competition Hub → SSE Broadcast → Browsers
 ### Method 2: Command Line
 
 ```bash
-# Normal mode (port 8095)
+# Normal mode (port 8096)
 npm run dev
 
 # Learning mode - captures all OWLCMS messages to samples/ directory
@@ -75,9 +87,9 @@ $env:LEARNING_MODE="true"; npm run dev
 set LEARNING_MODE=true && npm run dev
 ```
 
-The app will be available at **http://localhost:8095**
+The app will be available at **http://localhost:8096**
 
-## 🔬 Learning Mode
+## Learning Mode
 
 **Learning mode is essential for the first runs** to understand what OWLCMS actually sends.
 
@@ -110,7 +122,7 @@ npm run dev
 ### 2. Open a Scoreboard
 
 ```
-http://localhost:8095/lifting-order?fop=A
+http://localhost:8096/lifting-order?fop=A
 ```
 
 Change `fop=A` to match your FOP name (e.g., `Platform_A`, `Platform_B`).
@@ -123,13 +135,13 @@ In OWLCMS, go to:
 
 **Prepare Competition → Language and System Settings → Connections → URL for Video Data**
 
-Set to: `http://localhost:8095` (or your tracker host)
+Set to: `http://localhost:8096` (or your tracker host)
 
 OWLCMS will then send to these endpoints:
-- `http://localhost:8095/database` - Full competition data
-- `http://localhost:8095/update` - Lifting order updates
-- `http://localhost:8095/timer` - Timer events
-- `http://localhost:8095/decision` - Referee decisions
+- `http://localhost:8096/database` - Full competition data
+- `http://localhost:8096/update` - Lifting order updates
+- `http://localhost:8096/timer` - Timer events
+- `http://localhost:8096/decision` - Referee decisions
 
 **No code changes to OWLCMS are needed** - just this one configuration setting.
 
@@ -137,7 +149,7 @@ OWLCMS will then send to these endpoints:
 
 See **[QUICKSTART.md](./QUICKSTART.md)** for step-by-step instructions.
 
-## 📊 Available Scoreboards
+## Available Scoreboards
 
 ### Lifting Order (`/lifting-order`)
 
@@ -150,7 +162,7 @@ Shows current lifter and upcoming attempts with countdown timer.
 - `showRecords` (optional) - Show competition records (true/false)
 - `maxLifters` (optional) - Number of upcoming lifters (default: 8)
 
-## 🎨 Creating Custom Scoreboards
+## Creating Custom Scoreboards
 
 Want to create your own scoreboard types? See **[CREATE_YOUR_OWN.md](./CREATE_YOUR_OWN.md)** for step-by-step instructions.
 
@@ -164,7 +176,7 @@ The plugin system makes it easy to create custom displays - whether you're a pro
 
 In OWLCMS, configure the EventForwarder settings:
 
-- **URL**: `http://your-tracker-host:8095/api/update`
+- **URL**: `http://your-tracker-host:8096/api/update`
 - **Update Key**: Set `UPDATE_KEY` environment variable (default: "development-key")
 
 ### 3. View Competition Data
@@ -175,7 +187,7 @@ Open http://localhost:5173 to see available views:
 - **Current Lifter**: Live attempt display with timer
 - **Team Standings**: Team-based scores
 
-## 📊 API Endpoints
+## API Endpoints
 
 ### `/api/update` (POST)
 Receives form-encoded updates from OWLCMS EventForwarder
@@ -198,7 +210,7 @@ Manual refresh endpoint
 - Forces re-sync with OWLCMS
 - Useful for troubleshooting
 
-## 🔧 Configuration
+## Configuration
 
 ### Environment Variables
 
@@ -217,7 +229,7 @@ In OWLCMS configuration:
 2. Set "Update Key" to match your `UPDATE_KEY`
 3. Enable "Public Results" in competition settings
 
-## 🎨 Creating Custom Plugins
+## Creating Custom Plugins
 
 Plugins are Svelte components in `src/plugins/[name]/page.svelte`.
 
@@ -255,7 +267,7 @@ import {
 } from '$lib/stores';
 ```
 
-## 🛠️ Development
+## Development
 
 ### Project Structure
 
@@ -298,11 +310,11 @@ src/
 - Use `/api/refresh` to force OWLCMS resync
 - Verify `UPDATE_KEY` matches between systems
 
-## 📝 License
+## License
 
 MIT License - see LICENSE file for details.
 
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch
@@ -310,7 +322,7 @@ MIT License - see LICENSE file for details.
 4. Test with real OWLCMS data
 5. Submit a pull request
 
-## 📞 Support
+## Support
 
 For issues related to:
 - **OWLCMS integration**: Check OWLCMS documentation
