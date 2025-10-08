@@ -4,8 +4,6 @@
 	
 	// Props passed from parent route
 	export let data = {};
-	export let config = {};
-	export let options = {};
 	
 	// Timer state using reusable timer logic
 	let timerState = { seconds: 0, isRunning: false, isWarning: false, display: '0:00' };
@@ -504,32 +502,21 @@
 		.start-number {
 			font-size: 1.125rem; /* Match athlete info size */
 			padding: 0.15rem 0.25rem;
-			min-width: 2.25rem;
-		}
+		min-width: 2.25rem;
+	}
 
-		/* Current athlete info - more compact */
-		.current-athlete {
-			padding: 0.2rem;
-			font-size: 0.45rem;
-			line-height: 1.1;
-		}
+	/* Current athlete info - more compact */
+	.current-athlete {
+		padding: 0.2rem;
+		font-size: 0.45rem;
+		line-height: 1.1;
+	}
 
-		.current-athlete h2 {
-			font-size: 0.6rem;
-			margin: 0 0 0.1rem 0;
-		}
-
-		.current-athlete .info-row {
-			margin: 0.05rem 0;
-		}
-
-		.scoreboard-table {
-			font-size: 0.8rem;
-			line-height: 1.3;
-			font-weight: normal;
-		}
-
-		.scoreboard-table th,
+	.scoreboard-table {
+		font-size: 0.8rem;
+		line-height: 1.3;
+		font-weight: normal;
+	}		.scoreboard-table th,
 		.scoreboard-table td {
 			padding: 0.08rem 0.17rem;
 			line-height: 1.3;
