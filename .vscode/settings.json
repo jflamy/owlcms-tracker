@@ -1,0 +1,16 @@
+{
+  // Use Git Bash as the default terminal shell on Windows
+  "terminal.integrated.defaultProfile.windows": "Git Bash",
+  "terminal.integrated.profiles.windows": {
+    "Git Bash": {
+      "path": "C:\\Program Files\\Git\\bin\\bash.exe",
+      "args": ["--login"],
+      "icon": "terminal-bash"
+    },
+    "PowerShell": null,
+    "Command Prompt": null
+  },
+  
+  // Dock the debug control bar instead of floating
+  "debug.toolBarLocation": "commandCenter"
+}

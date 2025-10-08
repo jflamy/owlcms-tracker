@@ -1,0 +1,15 @@
+{
+  "decisionEventType": "RESET",
+  "updateKey": "mapetitevacheamalauxpattes",
+  "mode": "CURRENT_ATHLETE",
+  "competitionName": "Spring Equinox Open",
+  "fop": "A",
+  "fopState": "DECISION_VISIBLE",
+  "break": "false",
+  "fullName": "BROWN, Larry",
+  "attemptNumber": "2",
+  "liftTypeKey": "Snatch",
+  "decisionsVisible": "false",
+  "down": "false",
+  "recordKind": "none"
+}

@@ -1,0 +1,13 @@
+{
+  "updateKey": "mapetitevacheamalauxpattes",
+  "fopName": "A",
+  "fopState": "TIME_STOPPED",
+  "mode": "CURRENT_ATHLETE",
+  "fullName": "WILLIAMS, David",
+  "attemptNumber": "1",
+  "liftTypeKey": "Snatch",
+  "serverLocalTime": "10:53:19.293972800",
+  "athleteTimerEventType": "StopTime",
+  "athleteStartTimeMillis": "1759935199293",
+  "athleteMillisRemaining": "56570"
+}

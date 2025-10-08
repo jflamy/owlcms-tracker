@@ -1,0 +1,13 @@
+{
+  "updateKey": "mapetitevacheamalauxpattes",
+  "fopName": "A",
+  "fopState": "TIME_RUNNING",
+  "mode": "CURRENT_ATHLETE",
+  "fullName": "JACKSON, Ronald",
+  "attemptNumber": "2",
+  "liftTypeKey": "Snatch",
+  "serverLocalTime": "11:39:13.384138200",
+  "athleteTimerEventType": "StartTime",
+  "athleteStartTimeMillis": "1759937953385",
+  "athleteMillisRemaining": "60000"
+}

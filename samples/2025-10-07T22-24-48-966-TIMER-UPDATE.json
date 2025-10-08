@@ -1,0 +1,13 @@
+{
+  "updateKey": "mapetitevacheamalauxpattes",
+  "fopName": "A",
+  "fopState": "TIME_RUNNING",
+  "mode": "CURRENT_ATHLETE",
+  "fullName": "BROWN, Larry",
+  "attemptNumber": "3",
+  "liftTypeKey": "Snatch",
+  "serverLocalTime": "22:24:48.933956200",
+  "athleteTimerEventType": "StartTime",
+  "athleteStartTimeMillis": "1759890288933",
+  "athleteMillisRemaining": "120000"
+}
