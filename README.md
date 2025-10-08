@@ -180,7 +180,8 @@ Open http://localhost:5173 to see available views:
 ### `/api/update` (POST)
 Receives form-encoded updates from OWLCMS EventForwarder
 - Authentication via `updateKey` parameter
-- Returns 412 when configuration is needed
+- Returns 428 when database is required before accepting updates
+- Returns 412 when icons/pictures/configuration is needed *(reserved for future use)*
 - Returns 200 when update is accepted
 
 ### `/api/config` (POST) 

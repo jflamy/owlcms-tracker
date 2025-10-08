@@ -98,6 +98,12 @@ src/
 
 OWLCMS already sends data to these endpoints:
 
+**Status Codes:**
+- `200 OK` - Data accepted and stored
+- `428 Precondition Required` - Hub needs database before accepting updates
+- `412 Precondition Failed` - Hub needs icons/pictures/configuration *(reserved for future use)*
+- `500 Internal Server Error` - Processing error
+
 ### POST /database
 Receives full competition database (athletes, categories, FOPs, etc.)
 

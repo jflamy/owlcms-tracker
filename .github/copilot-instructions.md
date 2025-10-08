@@ -73,7 +73,8 @@ Set to: `http://localhost:8095` (or your tracker host)
 
 **Status Codes:**
 - `200 OK` - Data accepted and stored
-- `412 Precondition Failed` - Hub needs database before accepting updates
+- `428 Precondition Required` - Hub needs database before accepting updates
+- `412 Precondition Failed` - Hub needs icons/pictures/configuration *(reserved for future use)*
 - `500 Internal Server Error` - Processing error
 
 ------

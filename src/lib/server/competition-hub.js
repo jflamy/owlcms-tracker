@@ -5,7 +5,8 @@
  * 
  * Responsibilities:
  * - Cache competition state from OWLCMS updates
- * - Return 412 when config is needed (triggers OWLCMS to upload config)
+ * - Return 428 when database is needed (triggers OWLCMS to send /database)
+ * - Return 412 when icons/pictures/config is needed (reserved for future use)
  * - Convert OWLCMS form data to JSON format for browsers
  * - Broadcast changes to all connected browsers via SSE
  */
