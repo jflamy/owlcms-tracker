@@ -579,18 +579,76 @@ const timer = {
 };
 ```
 
-**Client-Side Countdown (page.svelte):**
+**Shared Timer Module (src/lib/timer-logic.js):**
+
+Timer logic is **refactored into a reusable module** shared by all scoreboards:
+
 ```javascript
-// Browser calculates elapsed time locally (no SSE spam)
-if (data.timer.state === 'running') {
-  if (timerStartTime === null) {
-    timerStartTime = Date.now();
-    timerInitialRemaining = data.timer.timeRemaining;
+// Creates timer manager with subscribe pattern
+export function createTimer() {
+  let timerStartTime = null;
+  let timerInitialRemaining = 0;
+  let lastState = null;
+  let subscribers = [];
+  
+  // Detects server state changes and resyncs
+  function syncWithServer(timerData) {
+    if (timerData.state !== lastState) {
+      console.log(`[Timer] Syncing with server: state=${timerData.state}, timeRemaining=${timerData.timeRemaining}ms`);
+      timerStartTime = null; // Reset on state change
+      lastState = timerData.state;
+    }
   }
-  const elapsed = Date.now() - timerStartTime;
-  const remaining = Math.max(0, timerInitialRemaining - elapsed);
-  timerSeconds = Math.ceil(remaining / 1000);
+  
+  // Updates timer and notifies subscribers
+  function updateTimer(timerData) {
+    let seconds, isRunning, isWarning;
+    
+    if (timerData.state === 'stopped' || timerData.state === 'set') {
+      seconds = Math.max(0, Math.ceil((timerData.timeRemaining || 0) / 1000));
+      isRunning = false;
+    } else if (timerData.state === 'running') {
+      if (timerStartTime === null) {
+        timerStartTime = Date.now();
+        timerInitialRemaining = Math.max(0, timerData.timeRemaining || 0);
+      }
+      const elapsed = Date.now() - timerStartTime;
+      const remaining = Math.max(0, timerInitialRemaining - elapsed);
+      seconds = Math.max(0, Math.ceil(remaining / 1000));
+      isRunning = true;
+    }
+    
+    isWarning = seconds <= 30;
+    const display = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+    
+    subscribers.forEach(callback => callback({ seconds, isRunning, isWarning, display }));
+  }
+  
+  return {
+    subscribe: (callback) => { subscribers.push(callback); return () => {...}; },
+    syncWithServer,
+    start: (timerData) => { /* setup interval */ },
+    stop: () => { /* cleanup */ },
+    getState: () => ({ seconds, isRunning, isWarning, display })
+  };
 }
+```
+
+**Usage in Scoreboards (page.svelte):**
+
+```javascript
+import { createTimer } from '$lib/timer-logic';
+
+const timer = createTimer();
+let timerState = { seconds: 0, isRunning: false, isWarning: false, display: '0:00' };
+
+const unsubscribe = timer.subscribe(state => { timerState = state; });
+
+onMount(() => timer.start(data.timer));
+onDestroy(() => { timer.stop(); unsubscribe(); });
+
+// Reactive sync on server updates
+$: if (data.timer) timer.syncWithServer(data.timer);
 ```
 
 **Benefits:**
@@ -598,3 +656,6 @@ if (data.timer.state === 'running') {
 - ✅ **Zero server load** during countdown
 - ✅ **Supports hundreds of browsers** with minimal traffic
 - ✅ **Accurate countdown** using client system time
+- ✅ **Reusable across all scoreboards** - no code duplication
+- ✅ **Automatic sync detection** - resets when state changes
+- ✅ **Negative value protection** - never shows -1:-1

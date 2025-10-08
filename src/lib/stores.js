@@ -4,12 +4,18 @@ import { browser } from '$app/environment';
 /**
  * Competition state store with SSE connection to SvelteKit hub
  * Receives updates from OWLCMS via the hub
+ * 
+ * NOTE: This legacy store system is deprecated.
+ * New scoreboards should use the plugin system with individual SSE connections.
+ * SSE connection disabled to prevent duplicate connections.
  */
 function createCompetitionStore() {
   const state = writable({});
   const status = writable('connecting');
   
-  if (browser) {
+  // LEGACY SYSTEM - SSE connection disabled
+  // New scoreboard system uses per-component SSE in [scoreboard]/+page.svelte
+  if (browser && false) { // Disabled
     const eventSource = new EventSource('/api/client-stream');
 
     eventSource.onopen = () => {

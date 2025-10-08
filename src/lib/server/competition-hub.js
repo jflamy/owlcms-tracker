@@ -35,6 +35,10 @@ class CompetitionHub {
       messagesBroadcast: 0
     };
     
+    // Debounce state for broadcasts - per FOP and event type
+    this.lastBroadcastTime = {};  // Structure: { 'fopName-eventType': timestamp }
+    this.broadcastDebounceMs = 100; // Minimum time between identical broadcasts
+    
     // Log learning mode status on startup
     logLearningModeStatus();
     
@@ -370,10 +374,28 @@ class CompetitionHub {
   }
 
   /**
-   * Broadcast message to all subscribers
+   * Broadcast message to all subscribers (with debouncing per FOP and event type)
    */
   broadcast(message) {
+    // Debounce only identical event types for same FOP
+    // Example: stop-stop can be debounced, but stop-start-stop should all go through
+    const fopName = message.fop || 'global';
+    const eventType = message.data?.athleteTimerEventType || message.data?.uiEvent || message.type || 'unknown';
+    const debounceKey = `${fopName}-${eventType}`;
+    
+    const now = Date.now();
+    const lastBroadcast = this.lastBroadcastTime[debounceKey] || 0;
+    const timeSinceLastBroadcast = now - lastBroadcast;
+    
+    // Skip broadcast if same event type for same FOP occurred too recently
+    if (timeSinceLastBroadcast < this.broadcastDebounceMs) {
+      console.log(`[Hub] Debouncing ${eventType} for ${fopName} (${timeSinceLastBroadcast}ms since last)`);
+      return;
+    }
+    
+    this.lastBroadcastTime[debounceKey] = now;
     this.metrics.messagesBroadcast++;
+    
     for (const callback of this.subscribers) {
       try {
         callback(message);

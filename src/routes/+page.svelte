@@ -22,7 +22,7 @@
         <h2>📊 Available Scoreboards</h2>
         <p class="description">
           {data.scoreboards.length} scoreboard type{data.scoreboards.length !== 1 ? 's' : ''} available
-          across {data.fops.length} FOP{data.fops.length !== 1 ? 's' : ''}
+          across {data.fops.length} Platform{data.fops.length !== 1 ? 's' : ''}
         </p>
       </section>
 
@@ -33,14 +33,14 @@
             <p class="description">{scoreboard.description}</p>
             
             <div class="fop-links">
-              <h4>Select FOP:</h4>
+              <h4>Select Platform:</h4>
               <div class="links">
                 {#each data.fops as fop}
                   <a 
                     href={getScoreboardUrl(scoreboard.type, fop)}
                     class="fop-link"
                   >
-                    FOP {fop}
+                    Platform {fop}
                   </a>
                 {/each}
               </div>

@@ -52,7 +52,7 @@
 </script>
 
 <svelte:head>
-	<title>Lifting Order - {data.competition?.name || 'OWLCMS'}</title>
+	<title>Session Scoreboard - {data.competition?.name || 'OWLCMS'}</title>
 </svelte:head>
 
 <div class="scoreboard">
@@ -67,7 +67,7 @@
 			<span class="timer" class:running={timerState.isRunning} class:warning={timerState.isWarning}>{timerState.display}</span>
 		</div>
 		<div class="session-info">
-			Lifting Order - {data.competition?.groupInfo || 'Session'} - {allAthletes.filter(a => a.snatch1 || a.snatch2 || a.snatch3 || a.cleanJerk1 || a.cleanJerk2 || a.cleanJerk3).length} attempts done.
+			Session Scoreboard - {data.competition?.groupInfo || 'Session'} - {allAthletes.filter(a => a.snatch1 || a.snatch2 || a.snatch3 || a.cleanJerk1 || a.cleanJerk2 || a.cleanJerk3).length} attempts done.
 		</div>
 	</header>
 
@@ -75,7 +75,7 @@
 	<main class="main">
 		{#if data.status === 'waiting'}
 			<div class="waiting">
-				<p>Waiting for competition data...</p>
+				<p>{data.message || 'Waiting for competition data...'}</p>
 			</div>
 		{:else}
 			<table class="scoreboard-table">
@@ -466,7 +466,7 @@
 	@media (max-width: 932px) {
 		.header {
 			padding: 0.19rem;
-			font-size: 0.42rem;
+			font-size: 0.49rem;
 		}
 
 		/* Hide the session info line on mobile */

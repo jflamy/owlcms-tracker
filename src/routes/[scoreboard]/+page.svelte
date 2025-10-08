@@ -39,7 +39,8 @@
 			
 			// Refresh data on any competition update
 			if (message.type === 'fop_update' || message.type === 'state_update' || message.type === 'competition_update') {
-				console.log('[Scoreboard] SSE update received, fetching fresh data');
+				const eventType = message.data?.athleteTimerEventType || message.data?.uiEvent || message.type;
+				console.log(`[Scoreboard] SSE update received (${eventType}), fetching fresh data`);
 				fetchData();
 			}
 		};

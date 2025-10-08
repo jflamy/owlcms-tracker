@@ -1,5 +1,4 @@
 <script>
-	import { createTimer } from '$lib/timer-logic.js';
 	import { onMount, onDestroy } from 'svelte';
 	
 	// Props passed from parent route
@@ -7,31 +6,82 @@
 	export let config = {};
 	export let options = {};
 	
-	// Timer state using reusable timer logic
-	let timerState = { seconds: 0, isRunning: false, isWarning: false, display: '0:00' };
+	// Timer state for countdown
+	let timerSeconds = 0;
+	let timerInterval;
+	let timerStartTime = null; // When timer was started (client time)
+	let timerInitialRemaining = 0; // Initial time remaining from server
+	let lastTimerState = null; // Track last known timer state to detect changes
 	
-	// Create timer instance
-	const timer = createTimer();
-	const unsubscribe = timer.subscribe(state => {
-		timerState = state;
-	});
+	// Update timer display - countdown from start time
+	function updateTimer() {
+		if (!data.timer) {
+			timerSeconds = 0;
+			return;
+		}
+		
+		// If timer is stopped, show the time without counting down
+		if (data.timer.state === 'stopped') {
+			timerSeconds = Math.ceil((data.timer.timeRemaining || 0) / 1000);
+			return;
+		}
+		
+		// If timer is set (but not running), show the time without counting down
+		if (data.timer.state === 'set') {
+			timerSeconds = Math.ceil((data.timer.timeRemaining || 0) / 1000);
+			return;
+		}
+		
+		// Timer is running - count down
+		if (data.timer.state === 'running') {
+			// If timer just started, record the start time
+			if (timerStartTime === null) {
+				timerStartTime = Date.now();
+				timerInitialRemaining = data.timer.timeRemaining || 60000;
+			}
+			
+			// Calculate elapsed time and remaining time (client-side only, no server needed)
+			const elapsed = Date.now() - timerStartTime;
+			const remaining = Math.max(0, timerInitialRemaining - elapsed);
+			timerSeconds = Math.ceil(remaining / 1000);
+		}
+	}
 	
 	onMount(() => {
-		timer.start(data.timer);
+		// Update timer every 100ms
+		timerInterval = setInterval(updateTimer, 100);
+		updateTimer(); // Initial update
 	});
 	
 	onDestroy(() => {
-		timer.stop();
-		unsubscribe();
+		if (timerInterval) clearInterval(timerInterval);
 	});
 	
 	$: currentAttempt = data.currentAttempt;
 	$: allAthletes = data.liftingOrderAthletes || [];  // Use lifting order, not start number order
 	
-	// Sync timer with server when data changes
+	// Only update timer when state actually changes (not on every data refresh)
 	$: if (data.timer) {
-		timer.syncWithServer(data.timer);
+		const currentState = `${data.timer.state}-${data.timer.timeRemaining}`;
+		if (currentState !== lastTimerState) {
+			lastTimerState = currentState;
+			
+			// Timer state changed - reset start time
+			if (data.timer.state === 'running') {
+				timerStartTime = null; // Force recalculation with new time
+			} else {
+				timerStartTime = null;
+			}
+			
+			updateTimer();
+		}
 	}
+	
+	$: isRunning = data.timer?.state === 'running' && timerSeconds > 0;
+	$: isWarning = timerSeconds > 0 && timerSeconds <= 30;
+	
+	// Format timer display
+	$: timerDisplay = Math.floor(timerSeconds / 60) + ':' + String(timerSeconds % 60).padStart(2, '0');
 	
 	// Helper to get attempt status color from OWLCMS liftStatus
 	function getAttemptClass(attempt) {
@@ -64,7 +114,7 @@
 			<span class="team">{currentAttempt?.teamName || ''}</span>
 			<span class="attempt-label">{@html currentAttempt?.attempt || ''}</span>
 			<span class="weight">{currentAttempt?.weight || '-'} kg</span>
-			<span class="timer" class:running={timerState.isRunning} class:warning={timerState.isWarning}>{timerState.display}</span>
+			<span class="timer" class:running={isRunning} class:warning={isWarning}>{timerDisplay}</span>
 		</div>
 		<div class="session-info">
 			Lifting Order - {data.competition?.groupInfo || 'Session'} - {allAthletes.filter(a => a.snatch1 || a.snatch2 || a.snatch3 || a.cleanJerk1 || a.cleanJerk2 || a.cleanJerk3).length} attempts done.
@@ -87,27 +137,22 @@
 						<th class="col-born" rowspan="2">Born</th>
 						<th class="col-team" rowspan="2">Team</th>
 						<th class="v-spacer" rowspan="2"></th>
-						<th class="col-lift-group snatch-header" colspan="4">Snatch</th>
+						<th class="col-lift-group" colspan="4">Snatch</th>
 						<th class="v-spacer" rowspan="2"></th>
-						<th class="col-lift-group cj-header" colspan="4">Clean&Jerk</th>
+						<th class="col-lift-group" colspan="4">Clean&Jerk</th>
 						<th class="v-spacer" rowspan="2"></th>
 						<th class="col-total" rowspan="2">Total</th>
 						<th class="col-rank" rowspan="2">Rank</th>
 					</tr>
 					<tr>
-						<th class="col-attempt col-name-portrait">Name</th>
-						<th class="v-spacer v-spacer-snatch"></th>
 						<th class="col-attempt">1</th>
 						<th class="col-attempt">2</th>
 						<th class="col-attempt">3</th>
 						<th class="col-best">✓</th>
-						<th class="v-spacer v-spacer-middle"></th>
 						<th class="col-attempt">1</th>
 						<th class="col-attempt">2</th>
 						<th class="col-attempt">3</th>
 						<th class="col-best">✓</th>
-						<th class="v-spacer v-spacer-total"></th>
-						<th class="col-total-portrait">Total</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -129,7 +174,7 @@
 								<td class="team-name">{athlete.teamName || ''}</td>
 								
 								<!-- Vertical spacer before Snatch -->
-								<td class="v-spacer v-spacer-snatch"></td>
+								<td class="v-spacer"></td>
 								
 								<!-- Snatch attempts -->
 								<td class="attempt {getAttemptClass(athlete.sattempts?.[0])}">{displayAttempt(athlete.sattempts?.[0])}</td>
@@ -138,7 +183,7 @@
 								<td class="best">{athlete.bestSnatch || '-'}</td>
 								
 								<!-- Vertical spacer before Clean & Jerk -->
-								<td class="v-spacer v-spacer-middle"></td>
+								<td class="v-spacer"></td>
 								
 								<!-- Clean & Jerk attempts -->
 								<td class="attempt {getAttemptClass(athlete.cattempts?.[0])}">{displayAttempt(athlete.cattempts?.[0])}</td>
@@ -147,7 +192,7 @@
 								<td class="best">{athlete.bestCleanJerk || '-'}</td>
 								
 								<!-- Vertical spacer before Total -->
-								<td class="v-spacer v-spacer-total"></td>
+								<td class="v-spacer"></td>
 								
 								<td class="total">{athlete.total || '-'}</td>
 								<td class="rank">{athlete.totalRank || '-'}</td>
@@ -247,6 +292,12 @@
 	
 	.timer.warning {
 		color: #fbbf24;
+		animation: pulse 0.5s infinite;
+	}
+	
+	@keyframes pulse {
+		0%, 100% { opacity: 1; }
+		50% { opacity: 0.7; }
 	}
 	
 	.session-info {
@@ -314,12 +365,6 @@
 	.col-best { min-width: 2.75rem; }
 	.col-total { min-width: 3.5rem; }
 	.col-rank { min-width: 3rem; }
-
-	/* Hide portrait-only headers in landscape/desktop */
-	.col-name-portrait,
-	.col-total-portrait {
-		display: none !important;
-	}
 	
 	/* Vertical spacer columns */
 	.v-spacer {
@@ -458,222 +503,5 @@
 	
 	.main::-webkit-scrollbar-thumb:hover {
 		background: #555;
-	}
-
-	/* Mobile responsive styles */
-	
-	/* Small screens - tablet and phone */
-	@media (max-width: 932px) {
-		.header {
-			padding: 0.19rem;
-			font-size: 0.42rem;
-		}
-
-		/* Hide the session info line on mobile */
-		.session-info {
-			display: none;
-		}
-
-		/* Current attempt section - reduce athlete info by 25% */
-		.lifter-name,
-		.team,
-		.attempt-label,
-		.weight {
-			font-size: 1.125rem; /* 25% smaller than 1.5rem */
-		}
-
-		/* Make timer and start number match the new size */
-		.timer {
-			font-size: 1.125rem; /* Match athlete info size */
-			padding: 0.3rem 0.75rem;
-			min-width: 3.75rem;
-		}
-
-		.start-number {
-			font-size: 1.125rem; /* Match athlete info size */
-			padding: 0.15rem 0.25rem;
-			min-width: 2.25rem;
-		}
-
-		/* Current athlete info - more compact */
-		.current-athlete {
-			padding: 0.2rem;
-			font-size: 0.45rem;
-			line-height: 1.1;
-		}
-
-		.current-athlete h2 {
-			font-size: 0.6rem;
-			margin: 0 0 0.1rem 0;
-		}
-
-		.current-athlete .info-row {
-			margin: 0.05rem 0;
-		}
-
-		.scoreboard-table {
-			font-size: 0.8rem;
-			line-height: 1.3;
-			font-weight: normal;
-		}
-
-		.scoreboard-table th,
-		.scoreboard-table td {
-			padding: 0.08rem 0.17rem;
-			line-height: 1.3;
-			font-weight: normal;
-		}
-
-		/* Apply font size to all table body cells */
-		.scoreboard-table tbody td {
-			font-size: 0.8rem;
-		}
-
-		.scoreboard-table th {
-			font-size: 0.44rem;
-			padding: 0.13rem 0.17rem;
-			font-weight: normal;
-		}
-
-		.scoreboard-table tbody tr {
-			height: auto;
-		}
-
-		/* Make start number use same font size as rest of table */
-		.scoreboard-table td.start-num {
-			font-size: 0.8rem;
-			padding: 0.05rem 0.15rem;
-		}
-
-		/* Hide born column on mobile - both header and data */
-		.scoreboard-table th.col-born,
-		.scoreboard-table td.born {
-			display: none;
-		}
-	}
-
-	/* Portrait phone - hide category, born, team, and rank columns */
-	@media (max-width: 932px) and (orientation: portrait) {
-		/* Larger fonts for portrait since we have more vertical space */
-		.header {
-			font-size: 0.75rem;
-		}
-
-		/* Hide team from current lifter info */
-		.lifter-info .team {
-			display: none;
-		}
-
-		/* Reduce spacing in lifter info */
-		.lifter-info {
-			gap: 0.3rem;
-			line-height: 1.1;
-		}
-
-		.timer {
-			font-size: 1.4rem;
-		}
-
-		.start-number {
-			font-size: 0.75rem;
-			padding: 0.2rem 0.3rem;
-		}
-
-		.scoreboard-table {
-			font-size: 0.35rem;
-			width: 100%;
-			table-layout: auto;
-		}
-
-		.scoreboard-table th {
-			font-size: 0.5rem;
-		}
-
-		.scoreboard-table th,
-		.scoreboard-table td {
-			padding: 0.12rem 0.2rem;
-		}
-
-		.scoreboard-table td.start-num {
-			font-size: 0.65rem;
-		}
-
-		/* Hide the entire first header row (has colspan issues) */
-		.scoreboard-table thead tr:first-child {
-			display: none !important;
-		}
-
-		/* Show only the second header row with attempt numbers */
-		.scoreboard-table thead tr:nth-child(2) {
-			display: table-row !important;
-		}
-
-		/* Show portrait-only headers (Name and Total) */
-		.scoreboard-table th.col-name-portrait,
-		.scoreboard-table th.col-total-portrait {
-			display: table-cell !important;
-			font-size: 0.5rem;
-			text-align: left;
-		}
-
-		.scoreboard-table th.col-name-portrait {
-			min-width: 25%;
-		}
-
-		/* Adjust table for portrait - hide best columns which effectively changes colspan */
-		
-		/* Hide columns to save horizontal space */
-		.scoreboard-table th.col-start,
-		.scoreboard-table td.start-num,
-		.scoreboard-table th.col-cat,
-		.scoreboard-table td.cat,
-		.scoreboard-table th.col-born,
-		.scoreboard-table td.born,
-		.scoreboard-table th.col-team,
-		.scoreboard-table td.team-name,
-		.scoreboard-table th.col-rank,
-		.scoreboard-table td.rank,
-		.scoreboard-table th.col-best,
-		.scoreboard-table td.best {
-			display: none !important;
-			width: 0 !important;
-			padding: 0 !important;
-			margin: 0 !important;
-			border: none !important;
-		}
-
-		/* Hide ALL spacer columns except the three we want to show */
-		.scoreboard-table th.v-spacer:not(.v-spacer-snatch):not(.v-spacer-middle):not(.v-spacer-total),
-		.scoreboard-table td.v-spacer:not(.v-spacer-snatch):not(.v-spacer-middle):not(.v-spacer-total) {
-			display: none !important;
-			width: 0 !important;
-			padding: 0 !important;
-			margin: 0 !important;
-			border: none !important;
-		}
-
-		/* Show the three spacers: before snatch, between Snatch and C&J, before Total */
-		.scoreboard-table th.v-spacer-snatch,
-		.scoreboard-table td.v-spacer-snatch,
-		.scoreboard-table th.v-spacer-middle,
-		.scoreboard-table td.v-spacer-middle,
-		.scoreboard-table th.v-spacer-total,
-		.scoreboard-table td.v-spacer-total {
-			display: table-cell !important;
-			width: 8px !important;
-			min-width: 8px !important;
-			max-width: 8px !important;
-		}
-
-		/* Make Name column take available space */
-		.scoreboard-table th.col-name,
-		.scoreboard-table td.name {
-			width: auto;
-			min-width: 25%;
-			max-width: 40%;
-			overflow: hidden;
-			text-overflow: ellipsis;
-			white-space: nowrap;
-		}
 	}
 </style>
