@@ -5,6 +5,37 @@
 import { competitionHub } from '$lib/server/competition-hub.js';
 
 /**
+ * Parse a formatted number that may be a string with decimal comma or point
+ * Handles: "96.520", "96,520", "-", null, undefined, 0
+ * @param {*} value - Value to parse (can be string, number, null, undefined)
+ * @returns {number} Parsed number or 0 if invalid
+ */
+function parseFormattedNumber(value) {
+	if (value === null || value === undefined || value === '' || value === '-') {
+		return 0;
+	}
+	if (typeof value === 'number') {
+		return value;
+	}
+	// Convert string: replace comma with period, then parse
+	const normalized = String(value).replace(',', '.');
+	const parsed = parseFloat(normalized);
+	return isNaN(parsed) ? 0 : parsed;
+}
+
+/**
+ * Get score from athlete (tries globalScore first, then sinclair)
+ * @param {Object} athlete - Athlete object
+ * @returns {number} Score value or 0
+ */
+function getAthleteScore(athlete) {
+	if (!athlete) return 0;
+	const globalScore = parseFormattedNumber(athlete.globalScore);
+	if (globalScore > 0) return globalScore;
+	return parseFormattedNumber(athlete.sinclair);
+}
+
+/**
  * Get the full database state (raw athlete data) - SERVER-SIDE ONLY
  * @returns {Object|null} Raw database state from OWLCMS
  */
@@ -24,9 +55,10 @@ export function getFopUpdate(fopName = 'A') {
 
 /**
  * Get formatted scoreboard data for SSR/API (SERVER-SIDE ONLY)
- * Uses groupAthletes from UPDATE message (standard order: category, lot number)
+ * For team scoreboard: combines current group athletes with all other athletes from database
+ * Groups by team and adds spacers between teams
  * @param {string} fopName - FOP name (default: 'A')
- * @param {Object} options - User preferences (e.g., { showRecords: true })
+ * @param {Object} options - User preferences (e.g., { showRecords: true, sortBy: 'total' })
  * @returns {Object} Formatted data ready for browser consumption
  */
 export function getScoreboardData(fopName = 'A', options = {}) {
@@ -35,6 +67,10 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	
 	// Extract options with defaults
 	const showRecords = options.showRecords ?? false;
+	const sortBy = options.sortBy ?? 'total';
+	const gender = options.gender ?? 'MF';
+	const currentAttemptInfo = options.currentAttemptInfo ?? false;
+	const topN = options.topN ?? 0;
 	
 	// Get learning mode from environment
 	const learningMode = process.env.LEARNING_MODE === 'true' ? 'enabled' : 'disabled';
@@ -44,10 +80,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			competition: { name: 'No Competition Data', fop: 'unknown' },
 			currentAthlete: null,
 			timer: { state: 'stopped', timeRemaining: 0 },
-			liftingOrderAthletes: [],
-			groupAthletes: [],
-			rankings: [],
-			stats: { totalAthletes: 0, activeAthletes: 0, completedAthletes: 0, categories: [], teams: [] },
+			teams: [],
 			status: 'waiting',
 			learningMode
 		};
@@ -92,38 +125,183 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		startTime: null // Client will compute this
 	};
 
-	// Get precomputed groupAthletes from UPDATE message (already JSON-encoded string)
-	// This contains all athletes in standard order (sorted by category, lot number)
+	// Get precomputed groupAthletes from UPDATE message (athletes in current group)
 	let groupAthletes = [];
 	if (fopUpdate?.groupAthletes) {
 		try {
 			groupAthletes = JSON.parse(fopUpdate.groupAthletes);
+			
+			// Find the current athlete (has 'current' in classname)
+			const currentAthlete = groupAthletes.find(a => a.classname && a.classname.includes('current'));
+			if (currentAthlete) {
+				console.log(`[Team] ✓ Found current athlete: ${currentAthlete.fullName} (lot ${currentAthlete.lotNumber}, start ${currentAthlete.startNumber})`);
+			} else if (groupAthletes.length > 0) {
+				console.log(`[Team] Have ${groupAthletes.length} athletes in current group, but no current athlete lifting`);
+			}
 		} catch (err) {
-			console.error('[Scoreboard Helper] Failed to parse groupAthletes:', err);
+			console.error('[Team Scoreboard] Failed to parse groupAthletes:', err);
 		}
 	}
 	
-	// If no groupAthletes available, return waiting status
-	// We need the UPDATE message from OWLCMS with precomputed presentation data
-	if (groupAthletes.length === 0) {
-		console.log('[Session Results] No groupAthletes in UPDATE yet, waiting for UI update from OWLCMS');
-		return {
-			competition,
-			currentAttempt,
-			timer,
-			liftingOrderAthletes: [],
-			groupAthletes: [],
-			stats,
-			status: 'waiting',
-			message: 'Waiting for competition update from OWLCMS...',
-			lastUpdate: fopUpdate?.lastUpdate || Date.now(),
-			learningMode,
-			options: { showRecords }
-		};
+	// Get all athletes from database
+	let allAthletes = [];
+	if (databaseState?.athletes && Array.isArray(databaseState.athletes)) {
+		// Extract lot numbers from current group to identify who's in the group
+		// groupAthletes now has lotNumber field (as of latest OWLCMS version)
+		// IMPORTANT: Convert to strings for comparison - groupAthletes has strings, database has numbers
+		const currentGroupLotNumbers = new Set(groupAthletes.map(a => String(a.lotNumber)).filter(Boolean));
+		
+		// STRATEGY: Use groupAthletes data FIRST (they have computed fields), 
+		// then add database-only athletes (those not in current group)
+		
+		// Step 1: Start with all groupAthletes (they have all the computed OWLCMS data)
+		allAthletes = groupAthletes.map(ga => ga);
+		
+		// Step 2: Add athletes from database that are NOT in the current group
+		const databaseOnlyAthletes = databaseState.athletes
+			.filter(dbAthlete => !currentGroupLotNumbers.has(String(dbAthlete.lotNumber)))
+			.map(dbAthlete => {
+				// Format database athlete to match groupAthlete structure
+				const categoryName = dbAthlete.categoryName || getCategoryName(dbAthlete.category, databaseState);
+				
+				return {
+					fullName: `${dbAthlete.firstName || ''} ${dbAthlete.lastName || ''}`.trim(),
+					firstName: dbAthlete.firstName,
+					lastName: dbAthlete.lastName,
+					teamName: dbAthlete.team || dbAthlete.club,
+					team: dbAthlete.team || dbAthlete.club,
+					startNumber: dbAthlete.startNumber,
+					lotNumber: dbAthlete.lotNumber,
+					categoryName: categoryName,
+					category: categoryName,
+					gender: dbAthlete.gender,
+					bodyWeight: dbAthlete.bodyWeight,
+					yearOfBirth: dbAthlete.fullBirthDate?.[0] || '',
+					
+					// Format snatch attempts in OWLCMS display format
+					sattempts: [
+						formatAttempt(dbAthlete.snatch1Declaration, dbAthlete.snatch1Change1, dbAthlete.snatch1Change2, dbAthlete.snatch1ActualLift, dbAthlete.snatch1AutomaticProgression),
+						formatAttempt(dbAthlete.snatch2Declaration, dbAthlete.snatch2Change1, dbAthlete.snatch2Change2, dbAthlete.snatch2ActualLift, dbAthlete.snatch2AutomaticProgression),
+						formatAttempt(dbAthlete.snatch3Declaration, dbAthlete.snatch3Change1, dbAthlete.snatch3Change2, dbAthlete.snatch3ActualLift, dbAthlete.snatch3AutomaticProgression)
+					],
+					
+					// Format clean & jerk attempts in OWLCMS display format
+					cattempts: [
+						formatAttempt(dbAthlete.cleanJerk1Declaration, dbAthlete.cleanJerk1Change1, dbAthlete.cleanJerk1Change2, dbAthlete.cleanJerk1ActualLift, dbAthlete.cleanJerk1AutomaticProgression),
+						formatAttempt(dbAthlete.cleanJerk2Declaration, dbAthlete.cleanJerk2Change1, dbAthlete.cleanJerk2Change2, dbAthlete.cleanJerk2ActualLift, dbAthlete.cleanJerk2AutomaticProgression),
+						formatAttempt(dbAthlete.cleanJerk3Declaration, dbAthlete.cleanJerk3Change1, dbAthlete.cleanJerk3Change2, dbAthlete.cleanJerk3ActualLift, dbAthlete.cleanJerk3AutomaticProgression)
+					],
+					
+					// Totals
+					total: dbAthlete.total || 0,
+					bestSnatch: computeBestLift([
+						dbAthlete.snatch1ActualLift,
+						dbAthlete.snatch2ActualLift,
+						dbAthlete.snatch3ActualLift
+					]),
+					bestCleanJerk: computeBestLift([
+						dbAthlete.cleanJerk1ActualLift,
+						dbAthlete.cleanJerk2ActualLift,
+						dbAthlete.cleanJerk3ActualLift
+					]),
+					
+					// Scoring fields from OWLCMS
+					totalRank: 0,
+					sinclair: dbAthlete.sinclair || 0,
+					globalScore: dbAthlete.globalScore || null,
+					
+					// No classname (not in current group)
+					inCurrentGroup: false
+				};
+			});
+		
+		// Step 3: Combine groupAthletes + database-only athletes
+		allAthletes = [...allAthletes, ...databaseOnlyAthletes];
+		
+	} else {
+		// No database available, use only groupAthletes
+		allAthletes = groupAthletes.map(a => ({ ...a, inCurrentGroup: true }));
 	}
 	
-	// For session results, we use groupAthletes (standard order) instead of liftingOrderAthletes
-	// groupAthletes is already sorted by category and lot number from OWLCMS
+	// Filter athletes by gender if not 'MF'
+	if (gender !== 'MF') {
+		allAthletes = allAthletes.filter(athlete => athlete.gender === gender);
+	}
+	
+	// Group athletes by team
+	const teamMap = new Map();
+	allAthletes.forEach(athlete => {
+		const teamName = athlete.teamName || athlete.team || 'No Team';
+		if (!teamMap.has(teamName)) {
+			teamMap.set(teamName, []);
+		}
+		teamMap.get(teamName).push(athlete);
+	});
+	
+	// Convert to array and sort teams
+	let teams = Array.from(teamMap.entries()).map(([teamName, athletes]) => {
+		// Apply Top N filter per team if specified (keep top N men and top N women per team)
+		if (topN > 0) {
+			// Separate by gender within this team
+			const maleAthletes = athletes.filter(a => a.gender === 'M');
+			const femaleAthletes = athletes.filter(a => a.gender === 'F');
+			
+			// Sort each by score (globalScore or sinclair)
+			maleAthletes.sort((a, b) => {
+				const scoreA = getAthleteScore(a);
+				const scoreB = getAthleteScore(b);
+				return scoreB - scoreA;
+			});
+			
+			femaleAthletes.sort((a, b) => {
+				const scoreA = getAthleteScore(a);
+				const scoreB = getAthleteScore(b);
+				return scoreB - scoreA;
+			});
+			
+			// Take top N from each gender in this team
+			const topMales = maleAthletes.slice(0, topN);
+			const topFemales = femaleAthletes.slice(0, topN);
+			
+			// Combine back together
+			athletes = [...topMales, ...topFemales];
+		}
+		
+		// Sort athletes within team
+		// If topN is active, sort by score (already done above, just preserve it)
+		// Otherwise, sort by total
+		if (topN === 0) {
+			athletes.sort((a, b) => (b.total || 0) - (a.total || 0));
+		} else {
+			// Re-sort the combined list by score (since we combined males and females)
+			athletes.sort((a, b) => {
+				const scoreA = getAthleteScore(a);
+				const scoreB = getAthleteScore(b);
+				return scoreB - scoreA;
+			});
+		}
+		
+		// Calculate team total (sum of all athlete totals)
+		const teamTotal = athletes.reduce((sum, a) => sum + (a.total || 0), 0);
+		
+		// Calculate team score (sum of all athlete scores - globalScore or sinclair)
+		const teamScore = athletes.reduce((sum, a) => sum + getAthleteScore(a), 0);
+		
+		return {
+			teamName,
+			athletes,
+			teamTotal,
+			teamScore,
+			athleteCount: athletes.length
+		};
+	});
+	
+	// Sort teams by total score or name
+	if (sortBy === 'total') {
+		teams.sort((a, b) => b.teamTotal - a.teamTotal);
+	} else {
+		teams.sort((a, b) => a.teamName.localeCompare(b.teamName));
+	}
 	
 	// Get competition stats
 	const stats = getCompetitionStats(databaseState);
@@ -132,8 +310,8 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		competition,
 		currentAttempt,
 		timer,
-		liftingOrderAthletes: groupAthletes, // Use groupAthletes for standard order display
-		groupAthletes,                        // Also keep raw groupAthletes
+		teams, // Array of team objects with athletes
+		allAthletes, // Flat list if needed
 		stats,
 		displaySettings: fopUpdate?.showTotalRank || fopUpdate?.showSinclair ? {
 			showTotalRank: fopUpdate.showTotalRank === 'true',
@@ -146,8 +324,131 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		status: (fopUpdate || databaseState) ? 'ready' : 'waiting',
 		lastUpdate: fopUpdate?.lastUpdate || Date.now(),
 		learningMode,
-		options: { showRecords } // Echo back the options used
+		options: { showRecords, sortBy, gender, currentAttemptInfo, topN } // Echo back the options used
 	};
+}
+
+/**
+ * Get category name by ID from database state
+ * @param {number} categoryId - Category ID
+ * @param {Object} databaseState - Database state
+ * @returns {string} Category name
+ */
+function getCategoryName(categoryId, databaseState) {
+	if (!categoryId || !databaseState?.ageGroups) {
+		return '';
+	}
+	
+	for (const ageGroup of databaseState.ageGroups) {
+		if (ageGroup.categories) {
+			const category = ageGroup.categories.find(c => c.id === categoryId);
+			if (category) {
+				return category.name || category.code || '';
+			}
+		}
+	}
+	return '';
+}
+
+/**
+ * Compute best lift from attempt strings
+ * @param {Array<string>} attempts - Array of attempt strings (e.g., "120", "-125", "")
+ * @returns {number} Best successful lift or 0
+ */
+function computeBestLift(attempts) {
+	let best = 0;
+	attempts.forEach(attempt => {
+		if (attempt && !attempt.startsWith('-')) {
+			const weight = parseInt(attempt);
+			if (!isNaN(weight) && weight > best) {
+				best = weight;
+			}
+		}
+	});
+	return best;
+}
+
+/**
+ * Format attempt for display in OWLCMS style
+ * @param {string} declaration - Declared weight (e.g., "120")
+ * @param {string} actualLift - Actual lift result (e.g., "120", "-120", "")
+ * @returns {Object} Formatted attempt object with liftStatus and stringValue
+ */
+/**
+ * Format attempt for display using OWLCMS priority order
+ * Priority: actualLift > change2 > change1 > declaration > automaticProgression
+ * @param {string} declaration - Initial declared weight
+ * @param {string} change1 - First change
+ * @param {string} change2 - Second change  
+ * @param {string} actualLift - Actual lift result (with '-' prefix for fails)
+ * @param {string} automaticProgression - Calculated automatic progression weight
+ * @returns {Object} { liftStatus: 'empty'|'request'|'fail'|'good', stringValue: '120' }
+ */
+function formatAttempt(declaration, change1, change2, actualLift, automaticProgression) {
+	// Determine the displayed weight using OWLCMS priority order
+	let displayWeight = null;
+	
+	// Priority 1: actualLift (if lift has been attempted)
+	if (actualLift && actualLift !== '' && actualLift !== '0') {
+		if (actualLift.startsWith('-')) {
+			// Failed lift
+			const weight = actualLift.substring(1);
+			return { liftStatus: 'fail', stringValue: `(${weight})` };
+		} else {
+			// Good lift
+			return { liftStatus: 'good', stringValue: actualLift };
+		}
+	}
+	
+	// Priority 2: change2 (most recent change)
+	if (change2 && change2 !== '' && change2 !== '0') {
+		displayWeight = change2;
+	}
+	// Priority 3: change1 (earlier change)
+	else if (change1 && change1 !== '' && change1 !== '0') {
+		displayWeight = change1;
+	}
+	// Priority 4: declaration (original weight)
+	else if (declaration && declaration !== '' && declaration !== '0') {
+		displayWeight = declaration;
+	}
+	// Priority 5: automaticProgression (calculated default)
+	else if (automaticProgression && automaticProgression !== '' && automaticProgression !== '0' && automaticProgression !== '-') {
+		displayWeight = automaticProgression;
+	}
+	
+	// If we have a display weight (request not yet attempted)
+	if (displayWeight) {
+		return { liftStatus: 'request', stringValue: displayWeight };
+	}
+	
+	// No weight declared or attempted = empty
+	return { liftStatus: 'empty', stringValue: '' };
+}
+
+/**
+ * Compute Sinclair coefficient (simplified version - should match OWLCMS)
+ * Note: This is a basic approximation. OWLCMS has the authoritative calculation.
+ * @param {number} total - Total lifted
+ * @param {number} bodyWeight - Body weight in kg
+ * @param {string} gender - "M" or "F"
+ * @returns {number} Sinclair score
+ */
+function computeSinclair(total, bodyWeight, gender) {
+	if (!total || total === 0 || !bodyWeight) return 0;
+	
+	// Simplified Sinclair calculation using 2020+ coefficients
+	// For accurate results, should use OWLCMS precomputed values
+	const maxBodyWeight = gender === 'M' ? 175.508 : 153.757;
+	const coeffA = gender === 'M' ? 0.751945030 : 0.783497476;
+	const coeffB = gender === 'M' ? 175.508 : 153.757;
+	
+	if (bodyWeight >= maxBodyWeight) {
+		return total; // No coefficient for super-heavyweights
+	}
+	
+	const sinclairCoeff = Math.pow(10, coeffA * Math.pow(Math.log10(bodyWeight / coeffB), 2));
+	return total * sinclairCoeff;
 }
 
 /**

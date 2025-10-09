@@ -103,6 +103,9 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		}
 	}
 	
+	// Get competition stats (needed even for waiting status)
+	const stats = getCompetitionStats(databaseState);
+	
 	// If no groupAthletes available, return waiting status
 	// We need the UPDATE message from OWLCMS with precomputed presentation data
 	if (groupAthletes.length === 0) {
@@ -124,9 +127,6 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	
 	// For session results, we use groupAthletes (standard order) instead of liftingOrderAthletes
 	// groupAthletes is already sorted by category and lot number from OWLCMS
-	
-	// Get competition stats
-	const stats = getCompetitionStats(databaseState);
 
 	return {
 		competition,

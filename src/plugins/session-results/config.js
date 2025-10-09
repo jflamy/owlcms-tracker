@@ -12,15 +12,7 @@ export default {
 	description: 'Shows all athletes in session sorted by standard order (category, lot number)',
 	
 	// User-configurable options
-	options: [
-		{
-			key: 'showRecords',
-			label: 'Show Records',
-			type: 'boolean',
-			default: false,
-			description: 'Display competition records alongside athlete attempts'
-		}
-	],
+	options: [],
 	
 	// Required FOP data fields
 	requiredFields: [

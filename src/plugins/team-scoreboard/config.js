@@ -14,19 +14,28 @@ export default {
 	// User-configurable options
 	options: [
 		{
-			key: 'showRecords',
-			label: 'Show Records',
-			type: 'boolean',
-			default: false,
-			description: 'Display competition records alongside athlete attempts'
+			key: 'gender',
+			label: 'Gender',
+			type: 'select',
+			options: ['MF', 'M', 'F'],
+			default: 'MF',
+			description: 'Filter athletes by gender'
 		},
 		{
-			key: 'sortBy',
-			label: 'Sort Teams By',
-			type: 'select',
-			options: ['total', 'name'],
-			default: 'total',
-			description: 'How to sort teams (by total score or alphabetically)'
+			key: 'currentAttemptInfo',
+			label: 'Show Current Attempt Info',
+			type: 'boolean',
+			default: false,
+			description: 'Display current lifter information at the top'
+		},
+		{
+			key: 'topN',
+			label: 'Top N Athletes',
+			type: 'number',
+			default: 0,
+			min: 0,
+			max: 50,
+			description: 'Show only top N men and top N women per team by score (0 = show all)'
 		}
 	],
 	

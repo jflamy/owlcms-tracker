@@ -68,25 +68,18 @@ class CompetitionHub {
         return { accepted: false, reason: 'waiting_for_database', retry: true };
       }
       
-      // Check if we have initialized database state
-      if (!this.databaseState || !this.databaseState.athletes || this.databaseState.athletes.length === 0) {
-        console.log('[Hub] No database state yet, requesting full database from OWLCMS');
-        this.databaseRequested = Date.now(); // Record that we're requesting the database
-        return { accepted: false, needsData: true, reason: 'no_database_state' };
-      }
-
-      // Extract FOP name
+      // Extract FOP name early so we can process the update even if we need database
       const fopName = params.fop || params.fopName || 'A';
       
-      // Merge the raw UPDATE message for this FOP (preserve previous data like liftingOrderAthletes)
-      // Timer updates don't include athlete data, so we need to merge not replace
+      // Store/merge the update data regardless of database state
+      // This ensures we have current athlete, timer, etc. even while waiting for database
       this.fopUpdates[fopName] = {
         ...(this.fopUpdates[fopName] || {}), // Keep previous data
         ...params,                             // Merge new data
         lastUpdate: Date.now(),
         fop: fopName
       };
-
+      
       // Also update legacy state for backward compatibility
       const competitionState = this.parseOwlcmsUpdate(params);
       this.state = {
@@ -94,15 +87,29 @@ class CompetitionHub {
         ...competitionState,
         lastUpdate: Date.now()
       };
-
-      // Broadcast to browsers - include all raw FOP params
-      // Note: Individual plugins will process this data client-side or via their API endpoints
+      
+      // Broadcast to browsers - even if we're requesting database
       this.broadcast({
         type: 'fop_update',
         fop: fopName,
-        data: params,  // Raw FOP update with all fields
+        data: params,
         timestamp: Date.now()
       });
+      
+      // Check if we have initialized database state
+      if (!this.databaseState || !this.databaseState.athletes || this.databaseState.athletes.length === 0) {
+        console.log('[Hub] No database state yet, requesting full database from OWLCMS (update was still processed)');
+        this.databaseRequested = Date.now();
+        return { accepted: false, needsData: true, reason: 'no_database_state' };
+      }
+      
+      // DISABLED: SwitchGroup refresh - causes issues with category display
+      // Request fresh database on SwitchGroup events (new group = new athletes)
+      // if (params.uiEvent === 'SwitchGroup') {
+      //   console.log('[Hub] SwitchGroup event detected, requesting fresh database from OWLCMS (update was still processed)');
+      //   this.databaseRequested = Date.now();
+      //   return { accepted: false, needsData: true, reason: 'switch_group_refresh' };
+      // }
 
       console.log(`[Hub] Update processed: ${params.uiEvent || params.decisionEventType || params.athleteTimerEventType || 'unknown'} for FOP ${fopName}`);
       return { accepted: true };
@@ -522,6 +529,24 @@ class CompetitionHub {
   parseFullCompetitionData(params) {
     console.log('[Hub] Parsing full competition database');
     
+    // If params is already the full database structure (with athletes, ageGroups, etc.),
+    // just return it directly with minimal processing
+    if (params.athletes && Array.isArray(params.athletes)) {
+      console.log(`[Hub] Received full database structure with ${params.athletes.length} athletes`);
+      console.log(`[Hub] Database has ageGroups:`, !!params.ageGroups, 'count:', params.ageGroups?.length || 0);
+      console.log(`[Hub] Database has competition:`, !!params.competition);
+      console.log(`[Hub] Database has platforms:`, !!params.platforms, 'count:', params.platforms?.length || 0);
+      
+      // Return the entire database structure as-is
+      return {
+        ...params,
+        initialized: true,
+        lastUpdate: Date.now()
+      };
+    }
+    
+    // Otherwise, parse from groupAthletes (legacy format)
+    console.log('[Hub] Parsing from groupAthletes format (legacy)');
     const result = {};
 
     // Basic competition info

@@ -24,7 +24,27 @@
 	});
 	
 	$: currentAttempt = data.currentAttempt;
-	$: allAthletes = data.liftingOrderAthletes || [];  // Use lifting order, not start number order
+	$: teams = data.teams || [];  // Array of team objects
+	
+	// Helper to parse formatted numbers (handles decimal comma and dash)
+	function parseFormattedNumber(value) {
+		if (value === null || value === undefined || value === '' || value === '-') {
+			return 0;
+		}
+		if (typeof value === 'number') {
+			return value;
+		}
+		// Convert string: replace comma with period, then parse
+		const normalized = String(value).replace(',', '.');
+		const parsed = parseFloat(normalized);
+		return isNaN(parsed) ? 0 : parsed;
+	}
+	
+	// Helper to format score for display
+	function formatScore(value) {
+		const num = parseFormattedNumber(value);
+		return num > 0 ? num.toFixed(2) : '-';
+	}
 	
 	// Sync timer with server when data changes
 	$: if (data.timer) {
@@ -33,9 +53,10 @@
 	
 	// Helper to get attempt status color from OWLCMS liftStatus
 	function getAttemptClass(attempt) {
-		if (!attempt || !attempt.liftStatus || attempt.liftStatus === 'empty' || attempt.liftStatus === 'request') {
+		if (!attempt || !attempt.liftStatus || attempt.liftStatus === 'empty') {
 			return 'empty';
 		}
+		if (attempt.liftStatus === 'request') return 'request';
 		if (attempt.liftStatus === 'fail') return 'failed';
 		if (attempt.liftStatus === 'good') return 'success';
 		return 'empty';
@@ -50,24 +71,23 @@
 </script>
 
 <svelte:head>
-	<title>Session Scoreboard - {data.competition?.name || 'OWLCMS'}</title>
+	<title>Team Scoreboard - {data.competition?.name || 'OWLCMS'}</title>
 </svelte:head>
 
 <div class="scoreboard">
-	<!-- Current Lifter Header -->
-	<header class="header">
-		<div class="lifter-info">
-			<span class="start-number">{currentAttempt?.startNumber || '-'}</span>
-			<span class="lifter-name">{currentAttempt?.fullName || 'No athlete currently lifting'}</span>
-			<span class="team">{currentAttempt?.teamName || ''}</span>
-			<span class="attempt-label">{@html currentAttempt?.attempt || ''}</span>
-			<span class="weight">{currentAttempt?.weight || '-'} kg</span>
-			<span class="timer" class:running={timerState.isRunning} class:warning={timerState.isWarning}>{timerState.display}</span>
-		</div>
-		<div class="session-info">
-			Session Scoreboard - {data.competition?.groupInfo || 'Session'} - {allAthletes.filter(a => a.snatch1 || a.snatch2 || a.snatch3 || a.cleanJerk1 || a.cleanJerk2 || a.cleanJerk3).length} attempts done.
-		</div>
-	</header>
+	<!-- Current Lifter Header (conditionally shown) -->
+	{#if data.options?.currentAttemptInfo}
+		<header class="header">
+			<div class="lifter-info">
+				<span class="start-number">{currentAttempt?.startNumber || '-'}</span>
+				<span class="lifter-name">{currentAttempt?.fullName || 'No athlete currently lifting'}</span>
+				<span class="team">{currentAttempt?.teamName || ''}</span>
+				<span class="attempt-label">{@html currentAttempt?.attempt || ''}</span>
+				<span class="weight">{currentAttempt?.weight || '-'} kg</span>
+				<span class="timer" class:running={timerState.isRunning} class:warning={timerState.isWarning}>{timerState.display}</span>
+			</div>
+		</header>
+	{/if}
 
 	<!-- Main Scoreboard Table -->
 	<main class="main">
@@ -90,7 +110,7 @@
 						<th class="col-lift-group cj-header" colspan="4">Clean&Jerk</th>
 						<th class="v-spacer" rowspan="2"></th>
 						<th class="col-total" rowspan="2">Total</th>
-						<th class="col-rank" rowspan="2">Rank</th>
+						<th class="col-score" rowspan="2">Score</th>
 					</tr>
 					<tr>
 						<th class="col-attempt col-name-portrait">Name</th>
@@ -106,18 +126,33 @@
 						<th class="col-best">✓</th>
 						<th class="v-spacer v-spacer-total"></th>
 						<th class="col-total-portrait">Total</th>
-						<th class="col-rank-portrait">Rank</th>
+						<th class="col-score-portrait">Score</th>
 					</tr>
 				</thead>
 				<tbody>
-					{#each allAthletes as athlete}
-						{#if athlete.isSpacer}
-							<!-- Spacer row for category separation -->
-							<tr class="spacer">
+					{#each teams as team, teamIndex}
+						<!-- Spacer row before first team -->
+						{#if teamIndex === 0}
+							<tr class="team-spacer">
 								<td colspan="18">&nbsp;</td>
 							</tr>
-						{:else}
+						{/if}
+						
+						<!-- Team header row -->
+						<tr class="team-header">
+							<td colspan="2" class="team-name-header">{team.teamName}</td>
+							<td colspan="3" class="team-stats">{team.athleteCount} athletes</td>
+							<td class="v-spacer v-spacer-snatch"></td>
+						<td colspan="4"></td>
+						<td class="v-spacer v-spacer-middle"></td>
+						<td colspan="4"></td>
+						<td class="v-spacer v-spacer-total"></td>
+						<td></td>
+						<td class="team-score">{formatScore(team.teamScore)}</td>
+					</tr>						<!-- Athletes in this team -->
+						{#each team.athletes as athlete}
 							<tr 
+								class="team-athlete"
 								class:current={athlete.classname && athlete.classname.includes('current')}
 								class:next={athlete.classname && athlete.classname.includes('next')}
 							>
@@ -131,27 +166,32 @@
 								<td class="v-spacer v-spacer-snatch"></td>
 								
 								<!-- Snatch attempts -->
-								<td class="attempt {getAttemptClass(athlete.sattempts?.[0])}">{displayAttempt(athlete.sattempts?.[0])}</td>
-								<td class="attempt {getAttemptClass(athlete.sattempts?.[1])}">{displayAttempt(athlete.sattempts?.[1])}</td>
-								<td class="attempt {getAttemptClass(athlete.sattempts?.[2])}">{displayAttempt(athlete.sattempts?.[2])}</td>
+								<td class="attempt {getAttemptClass(athlete.sattempts?.[0])} {athlete.sattempts?.[0]?.className || ''}">{displayAttempt(athlete.sattempts?.[0])}</td>
+								<td class="attempt {getAttemptClass(athlete.sattempts?.[1])} {athlete.sattempts?.[1]?.className || ''}">{displayAttempt(athlete.sattempts?.[1])}</td>
+								<td class="attempt {getAttemptClass(athlete.sattempts?.[2])} {athlete.sattempts?.[2]?.className || ''}">{displayAttempt(athlete.sattempts?.[2])}</td>
 								<td class="best">{athlete.bestSnatch || '-'}</td>
 								
 								<!-- Vertical spacer before Clean & Jerk -->
 								<td class="v-spacer v-spacer-middle"></td>
 								
 								<!-- Clean & Jerk attempts -->
-								<td class="attempt {getAttemptClass(athlete.cattempts?.[0])}">{displayAttempt(athlete.cattempts?.[0])}</td>
-								<td class="attempt {getAttemptClass(athlete.cattempts?.[1])}">{displayAttempt(athlete.cattempts?.[1])}</td>
-								<td class="attempt {getAttemptClass(athlete.cattempts?.[2])}">{displayAttempt(athlete.cattempts?.[2])}</td>
+								<td class="attempt {getAttemptClass(athlete.cattempts?.[0])} {athlete.cattempts?.[0]?.className || ''}">{displayAttempt(athlete.cattempts?.[0])}</td>
+								<td class="attempt {getAttemptClass(athlete.cattempts?.[1])} {athlete.cattempts?.[1]?.className || ''}">{displayAttempt(athlete.cattempts?.[1])}</td>
+								<td class="attempt {getAttemptClass(athlete.cattempts?.[2])} {athlete.cattempts?.[2]?.className || ''}">{displayAttempt(athlete.cattempts?.[2])}</td>
 								<td class="best">{athlete.bestCleanJerk || '-'}</td>
 								
-								<!-- Vertical spacer before Total -->
-								<td class="v-spacer v-spacer-total"></td>
-								
-								<td class="total">{athlete.total || '-'}</td>
-								<td class="rank">{athlete.totalRank || '-'}</td>
-							</tr>
-						{/if}
+							<!-- Vertical spacer before Total -->
+							<td class="v-spacer v-spacer-total"></td>
+							
+							<td class="total">{athlete.total || '-'}</td>
+							<td class="score">
+								{formatScore(athlete.globalScore || athlete.sinclair)}
+							</td>
+						</tr>
+					{/each}						<!-- Spacer row after each team (including last) -->
+						<tr class="team-spacer">
+							<td colspan="18">&nbsp;</td>
+						</tr>
 					{/each}
 				</tbody>
 			</table>
@@ -257,7 +297,7 @@
 	.main {
 		flex: 1;
 		overflow-y: auto;
-		padding: 8px; /* Fixed black margin around table */
+		padding: 32px; /* Increased padding around scoreboard */
 		background: #000; /* Black background for margin */
 	}
 	
@@ -312,12 +352,12 @@
 	.col-attempt { min-width: 2.5rem; }
 	.col-best { min-width: 2.75rem; }
 	.col-total { min-width: 3.5rem; }
-	.col-rank { min-width: 3rem; }
+	.col-score { min-width: 3rem; }
 
 	/* Hide portrait-only headers in landscape/desktop - completely remove from table flow */
 	thead tr:nth-child(2) th.col-name-portrait,
 	thead tr:nth-child(2) th.col-total-portrait,
-	thead tr:nth-child(2) th.col-rank-portrait,
+	thead tr:nth-child(2) th.col-score-portrait,
 	thead tr:nth-child(2) th.v-spacer-snatch,
 	thead tr:nth-child(2) th.v-spacer-middle,
 	thead tr:nth-child(2) th.v-spacer-total {
@@ -346,19 +386,85 @@
 		background: #000 !important;
 	}
 	
-	/* Spacer rows for category separation */
-	.scoreboard-table tbody tr.spacer {
-		height: 8px;
-		background: #000 !important;
+	/* Team header row */
+	.scoreboard-table tbody tr.team-header {
+		background: #4a5568 !important; /* Medium gray background */
+		border-top: 4px solid #4a5568; /* Thick border same color as header */
+		border-bottom: 4px solid #4a5568; /* Thick border same color as header */
+		border-left: 4px solid #4a5568; /* Thick border same color as header */
+		border-right: 4px solid #4a5568; /* Thick border same color as header */
+		box-shadow: 0 2px 4px rgba(0,0,0,0.3);
 	}
 	
-	.scoreboard-table tbody tr.spacer td {
+	.scoreboard-table tbody tr.team-header td {
+		padding: 0.2rem 0.5rem;
+		font-weight: bold;
+		font-size: 1.2rem;
+		color: #fff;
+		background: inherit !important; /* Inherit the lighter gray from the row */
+		border-color: #4a5568 !important; /* Match header color for unified look */
+	}
+	
+	.scoreboard-table tbody tr.team-header td.team-name-header {
+		font-size: 1.6rem;
+		color: #fff; /* White color for team name */
+		text-shadow: 1px 1px 2px rgba(0,0,0,0.7);
+	}
+	
+	.scoreboard-table tbody tr.team-header td.team-stats {
+		font-size: 0.95rem;
+		color: #cbd5e0; /* Light gray for stats */
+	}
+	
+	.scoreboard-table tbody tr.team-header td.team-score {
+		font-size: 1.6rem;
+		color: #fff; /* White for team score total */
+		text-align: center;
+		font-weight: bold;
+	}
+	
+	/* Team athlete rows - add side borders to complete team block */
+	.scoreboard-table tbody tr.team-athlete {
+		border-left: 8px solid #4a5568; /* Extra thick side border */
+		border-right: 8px solid #4a5568; /* Extra thick side border */
+	}
+	
+	/* Apply thick borders to first and last cells in athlete rows */
+	.scoreboard-table tbody tr.team-athlete td:first-child {
+		border-left: 8px solid #4a5568 !important;
+	}
+	
+	.scoreboard-table tbody tr.team-athlete td:last-child {
+		border-right: 8px solid #4a5568 !important;
+	}
+	
+	/* Team spacer row - thick border on top closes the team block */
+	.scoreboard-table tbody tr.team-spacer {
+		height: 48px;
+		background: #000 !important;
+		border-top: 8px solid #4a5568; /* Thick top border to close team block */
+	}
+	
+	/* First spacer (before first team) should not have top border */
+	.scoreboard-table tbody tr.team-spacer:first-child {
+		border-top: none;
+	}
+	
+	.scoreboard-table tbody tr.team-spacer td {
 		padding: 0;
-		height: 8px;
+		height: 48px;
 		line-height: 0;
 		font-size: 0;
 		background: #000 !important;
-		border: none;
+		border-left: none;
+		border-right: none;
+		border-bottom: none;
+		border-top: 8px solid #4a5568 !important; /* Thick top border to close team block */
+	}
+	
+	/* First spacer td should not have top border */
+	.scoreboard-table tbody tr.team-spacer:first-child td {
+		border-top: none !important;
 	}
 	
 	/* Current lifter highlight (green) */
@@ -366,14 +472,11 @@
 		background: inherit !important;
 	}
 	
-	/* Only highlight the athlete info columns (Start, Name, Cat, Born, Team) */
+	/* Only highlight start number and name for current athlete */
 	.scoreboard-table tbody tr.current td.start-num,
-	.scoreboard-table tbody tr.current td.name,
-	.scoreboard-table tbody tr.current td.cat,
-	.scoreboard-table tbody tr.current td.born,
-	.scoreboard-table tbody tr.current td.team-name {
-		background: #22c55e !important;
-		color: #000 !important;
+	.scoreboard-table tbody tr.current td.name {
+		background: #1a1a1a !important; /* Same as normal cells */
+		color: #fbbf24 !important; /* Yellow font */
 		font-weight: bold !important;
 	}
 	
@@ -382,14 +485,20 @@
 		background: inherit !important;
 	}
 	
+	/* Only highlight start number and name for next athlete */
 	.scoreboard-table tbody tr.next td.start-num,
-	.scoreboard-table tbody tr.next td.name,
-	.scoreboard-table tbody tr.next td.cat,
-	.scoreboard-table tbody tr.next td.born,
-	.scoreboard-table tbody tr.next td.team-name {
-		background: #f97316 !important;
-		color: #000 !important;
+	.scoreboard-table tbody tr.next td.name {
+		background: #1a1a1a !important; /* Same as normal cells */
+		color: #f97316 !important; /* Bright orange font */
 		font-weight: bold !important;
+	}
+	
+	/* Highlight current athlete's CURRENT requested weight (has className with "current") */
+	.scoreboard-table tbody tr.current td.attempt.request.current,
+	.scoreboard-table tbody tr.current td.attempt.request.blink {
+		color: #fbbf24 !important; /* Yellow for current requested weight */
+		font-weight: bold !important;
+		font-size: 1.3rem !important;
 	}
 	
 	/* Attempt cells */
@@ -400,6 +509,11 @@
 	.attempt.empty {
 		background: #4a4a4a !important;
 		color: #aaa;
+	}
+	
+	.attempt.request {
+		background: #4a4a4a !important;
+		color: #ddd; /* Default color for request */
 	}
 	
 	.attempt.success {
@@ -425,9 +539,10 @@
 		color: #fff !important;
 	}
 	
-	.rank {
+	.score {
 		background: #2a2a2a !important;
-		color: #fff !important;
+		color: #fff !important; /* White for score */
+		font-weight: bold;
 	}
 	
 	/* Name column - left aligned */
@@ -607,10 +722,10 @@
 			display: table-row !important;
 		}
 
-		/* Show portrait-only headers (Name and Total) - override desktop hiding */
+		/* Show portrait-only headers (Name, Total, Score) - override desktop hiding */
 		.scoreboard-table thead tr:nth-child(2) th.col-name-portrait,
 		.scoreboard-table thead tr:nth-child(2) th.col-total-portrait,
-		.scoreboard-table thead tr:nth-child(2) th.col-rank-portrait {
+		.scoreboard-table thead tr:nth-child(2) th.col-score-portrait {
 			display: table-cell !important;
 			position: static !important;
 			visibility: visible !important;
@@ -626,7 +741,6 @@
 		.scoreboard-table th.col-name-portrait {
 			min-width: 25%;
 		}
-
 		/* Adjust table for portrait - hide best columns which effectively changes colspan */
 		
 		/* Hide columns to save horizontal space */

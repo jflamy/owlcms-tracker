@@ -14,13 +14,15 @@ export async function POST({ request }) {
     // Capture message in learning mode
     captureMessage(params, rawBody, 'timer');
     
-    // TIMER endpoint specific logging - uses 'athleteTimerEventType' field
-    const eventType = params.athleteTimerEventType || 'unknown';
+    // TIMER endpoint specific logging - uses 'athleteTimerEventType' or 'breakTimerEventType' field
+    const eventType = params.athleteTimerEventType || params.breakTimerEventType || 'unknown';
     const fopName = params.fopName || params.fop || 'unknown';
-    const timeRemaining = params.athleteMillisRemaining ? `${params.athleteMillisRemaining}ms` : 'unknown';
+    const timeRemaining = params.athleteMillisRemaining ? `${params.athleteMillisRemaining}ms` : 
+                         params.breakMillisRemaining ? `${params.breakMillisRemaining}ms` : 'unknown';
     console.log(`[TIMER] Event: ${eventType} | FOP: ${fopName} | Time: ${timeRemaining}`);
     if (params.fullName) console.log(`[TIMER] Athlete: ${params.fullName} | Mode: ${params.mode || 'unknown'}`);
     if (params.fopState) console.log(`[TIMER] FOP State: ${params.fopState}`);
+    if (params.break) console.log(`[TIMER] Break: ${params.break} | Break Type: ${params.breakType || 'unknown'}`);
     
     // Reject messages that contain full competition data - those belong to /database
     if (params.fullCompetitionData) {
@@ -34,11 +36,11 @@ export async function POST({ request }) {
     }
     
     // Require actual timer event
-    if (!params.athleteTimerEventType) {
-      console.log(`[TIMER] ❌ Rejecting non-timer message - missing athleteTimerEventType`);
+    if (!params.athleteTimerEventType && !params.breakTimerEventType) {
+      console.log(`[TIMER] ❌ Rejecting non-timer message - missing timer event type`);
       return json({
         error: 'invalid_message',
-        message: 'Timer endpoint requires athleteTimerEventType field',
+        message: 'Timer endpoint requires athleteTimerEventType or breakTimerEventType field',
         timestamp: Date.now(),
         learningMode: LEARNING_MODE
       }, { status: 400 });

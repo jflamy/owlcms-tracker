@@ -12,24 +12,7 @@ export default {
 	description: 'Shows current lifter and upcoming lifting order with timer',
 	
 	// User-configurable options
-	options: [
-		{
-			key: 'showRecords',
-			label: 'Show Records',
-			type: 'boolean',
-			default: false,
-			description: 'Display competition records alongside athlete attempts'
-		},
-		{
-			key: 'maxLifters',
-			label: 'Max Lifters',
-			type: 'number',
-			default: 8,
-			min: 3,
-			max: 15,
-			description: 'Number of upcoming lifters to display'
-		}
-	],
+	options: [],
 	
 	// Required FOP data fields
 	requiredFields: [
