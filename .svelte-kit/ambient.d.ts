@@ -58,7 +58,6 @@ declare module '$env/static/private' {
 	export const INIT_CWD: string;
 	export const JAVA_HOME: string;
 	export const LANG: string;
-	export const LEARNING_MODE: string;
 	export const LOCALAPPDATA: string;
 	export const LOGONSERVER: string;
 	export const MANPATH: string;
@@ -211,7 +210,6 @@ declare module '$env/dynamic/private' {
 		INIT_CWD: string;
 		JAVA_HOME: string;
 		LANG: string;
-		LEARNING_MODE: string;
 		LOCALAPPDATA: string;
 		LOGONSERVER: string;
 		MANPATH: string;
