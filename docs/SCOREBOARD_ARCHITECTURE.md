@@ -1,8 +1,8 @@
-# Scoreboard Architecture - Multi-FOP, Multi-Type System
+# Scoreboard Architecture - Multi-FOP, Multi-Scoreboard-types System
 
 ## Overview
 
-This system supports **15+ different scoreboard types** with **up to 6 simultaneous FOPs** for each scoreboard type. 
+This system targts **15+ different scoreboard types** with **up to 6 simultaneous FOPs** for each scoreboard type. 
 
 **OWLCMS Integration:**
 - OWLCMS sends data via WebSocket connection to `ws://localhost:8096/ws`
