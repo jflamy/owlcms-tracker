@@ -8,7 +8,9 @@
 >
 > ![WhatsApp Image 2025-10-08 at 12 23 27_e98fafa4](https://github.com/user-attachments/assets/2e98bdc8-3ba6-43af-ae7d-85cee68cb11a)
 >
-> There should ultimately be enough capability to implement scoreboards that owlcms does not provide, for example grouping athletes by team and showing team point subtotals
+> Since the tracker has the full database available + the current group, it can do team scoreboards.  Because there is full
+> javascript processing and a backend layer, you could add your own scoring grids and algorithms.  And the same layer could
+> serve to publish CSV output.
 
 ## Description
 
