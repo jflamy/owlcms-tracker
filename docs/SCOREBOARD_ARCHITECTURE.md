@@ -1,4 +1,4 @@
-# Scoreboard Architecture - Multi-FOP, Multi-Scoreboard-types System
+# Scoreboard Architecture - Multi-FOP, Multi-Scoreboard System
 
 ## Overview
 
