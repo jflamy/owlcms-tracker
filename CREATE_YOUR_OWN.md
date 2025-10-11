@@ -14,27 +14,30 @@ In OWLCMS, navigate to:
 
 Set the URL to:
 ```
-http://localhost:8095
+ws://localhost:8096/ws
 ```
 
 Or if running on a separate machine:
 ```
-http://your-tracker-host:8095
+ws://your-tracker-host:8096/ws
 ```
+
+(Use `wss://` for secure WebSocket connections)
 
 ### What OWLCMS Sends
 
-OWLCMS will automatically send data to these endpoints:
+OWLCMS sends data via WebSocket:
 
 ```
-OWLCMS → POST /database       (full competition data)
-      → POST /update         (lifting order updates, UI events)
-      → POST /timer          (timer start/stop)
-      → POST /decision       (referee decisions)
+OWLCMS → WebSocket ws://localhost:8096/ws
+      → type="database"  (full competition data)
+      → type="update"    (lifting order updates, UI events)
+      → type="timer"     (timer start/stop)
+      → type="decision"  (referee decisions)
 ```
 
-✅ **All of these endpoints already exist** in `src/routes/`  
-✅ **Competition Hub already stores** per-FOP data from these endpoints  
+✅ **WebSocket server already running** in `src/hooks.server.js`
+✅ **Competition Hub stores** per-FOP data from WebSocket messages
 ✅ **No code changes needed** in OWLCMS - just the URL configuration above
 
 ### What's New - The Scoreboard System
@@ -42,7 +45,7 @@ OWLCMS → POST /database       (full competition data)
 The new system **pulls** data from the Competition Hub and formats it for different display types:
 
 ```
-Competition Hub (has data from OWLCMS)
+Competition Hub (has data from OWLCMS via WebSocket)
        ↓
 Scoreboard Registry (discovers plugins)
        ↓
@@ -59,23 +62,11 @@ Browser displays scoreboard
 npm run dev
 ```
 
-### 2. Send Test Data (Learning Mode)
+### 2. Connect OWLCMS
 
-If you have sample OWLCMS data files:
+**Important:** You must configure OWLCMS to send data to the tracker (see OWLCMS configuration section above).
 
-```bash
-# Send database
-curl -X POST http://localhost:5173/database \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  --data-binary @samples/2025-10-07T21-49-57-557-DATABASE-FULL_STATE.json
-
-# Send lifting order update
-curl -X POST http://localhost:5173/update \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  --data-binary @samples/2025-10-07T21-49-55-092-UPDATE-LIFTING_ORDER.json
-```
-
-Or use your test script:
+Alternatively, use your test script with sample data files:
 
 ```bash
 ./test-sample-data.sh
@@ -86,21 +77,21 @@ Or use your test script:
 Open these URLs in your browser:
 
 ```
-http://localhost:5173/lifting-order?fop=A
+http://localhost:8096/lifting-order?fop=A
 ```
 
 Change the FOP parameter to match your competition:
 
 ```
-http://localhost:5173/lifting-order?fop=Platform_A
-http://localhost:5173/lifting-order?fop=Platform_B
-http://localhost:5173/lifting-order?fop=Platform_C
+http://localhost:8096/lifting-order?fop=Platform_A
+http://localhost:8096/lifting-order?fop=Platform_B
+http://localhost:8096/lifting-order?fop=Platform_C
 ```
 
 ### 4. Check Available FOPs
 
 ```bash
-curl -X POST http://localhost:5173/api/scoreboard \
+curl -X POST http://localhost:8096/api/scoreboard \
   -H "Content-Type: application/json" \
   -d '{"action": "list_fops"}'
 ```
@@ -116,7 +107,7 @@ Response:
 ### 5. Check Available Scoreboards
 
 ```bash
-curl -X POST http://localhost:5173/api/scoreboard \
+curl -X POST http://localhost:8096/api/scoreboard \
   -H "Content-Type: application/json" \
   -d '{"action": "list_scoreboards"}'
 ```
@@ -155,11 +146,17 @@ The system extracts these FOP names automatically.
 
 ### Option 2: From Update Messages (Fallback)
 
-If the database doesn't include FOP list, the system discovers FOPs from the `fopName` field in `/update` messages:
+If the database doesn't include FOP list, the system discovers FOPs from the `fopName` field in type="update" messages:
 
-```
-POST /update
-fopName=Platform_A&fullName=John+Doe&...
+```json
+{
+  "type": "update",
+  "payload": {
+    "fopName": "Platform_A",
+    "fullName": "John Doe",
+    ...
+  }
+}
 ```
 
 The system adds "Platform_A" to the available FOPs list.
@@ -169,7 +166,7 @@ The system adds "Platform_A" to the available FOPs list.
 If no database and no updates yet, defaults to FOP "A":
 
 ```
-http://localhost:5173/lifting-order?fop=A
+http://localhost:8096/lifting-order?fop=A
 ```
 
 ## Creating Your First Custom Scoreboard
@@ -227,10 +224,11 @@ export function getScoreboardData(fopName, options = {}) {
 	const sortBy = options.sortBy || 'total';
 	const showTop = options.showTop || 10;
 	
-	// Parse athletes from OWLCMS precomputed data
+	// Parse athletes from OWLCMS precomputed data (from WebSocket type="update")
+	// For field mappings, see docs/FIELD_MAPPING_OVERVIEW.md
 	let athletes = [];
 	if (fopUpdate?.groupAthletes) {
-		athletes = JSON.parse(fopUpdate.groupAthletes);
+		athletes = fopUpdate.groupAthletes; // Already parsed as nested object
 	}
 	
 	// Sort
@@ -327,7 +325,7 @@ export function getScoreboardData(fopName, options = {}) {
 
 **5. Restart server and test:**
 ```
-http://localhost:5173/results?fop=Platform_A&sortBy=sinclair&showTop=15
+http://localhost:8096/results?fop=Platform_A&sortBy=sinclair&showTop=15
 ```
 
 ## Troubleshooting
@@ -338,7 +336,7 @@ http://localhost:5173/results?fop=Platform_A&sortBy=sinclair&showTop=15
 
 **Solution:** Always include FOP in URL:
 ```
-http://localhost:5173/lifting-order?fop=A
+http://localhost:8096/lifting-order?fop=A
 ```
 
 ### "No competition data"
@@ -369,7 +367,7 @@ http://localhost:5173/lifting-order?fop=A
 ## Summary
 
 **What you DON'T need to do:**
-- ❌ Change OWLCMS configuration
+- ❌ Change OWLCMS code
 - ❌ Modify OWLCMS endpoints
 - ❌ Update OWLCMS data format
 

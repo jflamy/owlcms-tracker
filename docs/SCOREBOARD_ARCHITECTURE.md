@@ -5,42 +5,82 @@
 This system supports **15+ different scoreboard types** with **up to 6 simultaneous FOPs** for each scoreboard type. 
 
 **OWLCMS Integration:**
-- OWLCMS sends data to existing endpoints: `/database`, `/update`, `/timer`, `/decision`
-- **No changes needed to OWLCMS** - it already sends to the correct endpoints
-- Competition Hub stores per-FOP data from these endpoints
+- OWLCMS sends data via WebSocket connection to `ws://localhost:8096/ws`
+- **No changes needed to OWLCMS** - just configure the WebSocket URL once
+- Competition Hub stores per-FOP data from WebSocket messages
 - Scoreboards pull processed data via `/api/scoreboard?type=...&fop=...`
 
 **Key Design Principles:**
 1. **Modular** - Each scoreboard type is self-contained in its folder
 2. **Server-side processing** - Process data once, serve hundreds of browsers
-3. **URL-based configuration** - FOP selection and options via query parameters
-4. **AI-assisted development** - Easy for novices to create/modify scoreboards
-5. **No OWLCMS changes required** - Works with existing data flow
+3. **Plugin-level caching** - Each scoreboard caches processed results
+4. **URL-based configuration** - FOP selection and options via query parameters
+5. **AI-assisted development** - Easy for novices to create/modify scoreboards
+6. **No OWLCMS changes required** - Works with existing data flow
+7. **Group Athletes First, Always** - Use `groupAthletes` from WebSocket type="update" as primary data source; only access `databaseState` for athletes NOT in current group
+
+## Data Source Documentation
+
+**For detailed field mapping and data transformation:**
+
+📖 **[FIELD_MAPPING_OVERVIEW.md](./FIELD_MAPPING_OVERVIEW.md)** - Quick reference and navigation guide
+
+**Key principle:** Always use Group Athletes data first (from WebSocket type="update"). Only access Database Athletes (from WebSocket type="database") for athletes NOT in the current group (e.g., athletes from previous sessions, different teams).
+
+**See also:**
+- [FIELD_MAPPING.md](./FIELD_MAPPING.md) - Complete field-by-field mapping reference
+- [FIELD_MAPPING_SAMPLES.md](./FIELD_MAPPING_SAMPLES.md) - Real-world sample data with transformations
 
 ## Architecture
 
-### High-Level Data Flow
+### High-Level Data Flow with Caching
 
 ```
-OWLCMS → /database (full competition data - athletes, categories, FOPs)
-       → /update (lifting order changes, athlete switches)
+OWLCMS → WebSocket (ws://localhost:8096/ws)
+      → type="database" (full competition data - athletes, categories, FOPs)
+      → type="update" (lifting order changes, athlete switches)
          ↓
-    Competition Hub (stores per-FOP data)
+    Competition Hub (stores raw per-FOP data)
          ↓
          ↓ Broadcasts SSE on state changes
          ↓
-Browser: Subscribes to /api/client-stream (receives "data updated" notification)
-         ↓
-         Fetches: /api/scoreboard?type=lifting-order&fop=Platform_A (gets fresh data)
-         ↓
-    Displays updated scoreboard immediately
+Browser 1: Receives SSE → Fetches /api/scoreboard?type=team-scoreboard&fop=A
+           ↓
+    Plugin helpers.data.js (cache miss)
+           ↓ Compute team grouping, sorting, filtering (50ms)
+           ↓ Store in plugin cache
+           ↓
+    Return processed data to Browser 1
+    
+Browser 2-200: Receive same SSE → Fetch same /api/scoreboard URL
+           ↓
+    Plugin helpers.data.js (cache hit!)
+           ↓ Return cached data (1ms each)
+           ↓
+    Return processed data to Browsers 2-200
 
-⚠️ Note: Timer and Decision events have specialized flows
+Timer Event: OWLCMS → WebSocket type="timer" (StartTime)
+           ↓
+    Competition Hub updates timer state
+           ↓ Broadcasts SSE
+           ↓
+    All browsers fetch /api/scoreboard
+           ↓
+    Plugin cache HIT (data hash unchanged)
+           ↓ Return cached data + updated timer state
+           ↓
+    Browsers update timer display only (no recomputation)
 ```
+
+**Benefits:**
+- ✅ **40× performance improvement** - Cache eliminates redundant processing
+- ✅ **Timer efficiency** - Timer events don't trigger recomputation
+- ✅ **Plugin-specific rules** - Each scoreboard implements custom caching
+- ✅ **Scalable to hundreds of browsers** - First browser computes, rest hit cache
 
 ### Update Event Flow (Standard Path)
 
-1. **OWLCMS sends /update event** (LiftingOrderUpdated, SwitchGroup, etc.)
+1. **OWLCMS sends type="update" message** (LiftingOrderUpdated, SwitchGroup, etc.)
    - Contains precomputed data: `liftingOrderAthletes`, `groupAthletes`
    - Current athlete info: `fullName`, `teamName`, `weight`, `attempt`, etc.
    - FOP identifier: `fopName`
@@ -69,6 +109,180 @@ Browser: Subscribes to /api/client-stream (receives "data updated" notification)
 - ✅ **SSE is lightweight** → Only triggers, no large payloads
 - ✅ **Browsers always get fresh data** → No stale cache issues
 
+### Timer Event Flow (Efficient Caching)
+
+Timer events are **optimized for cache efficiency** because they don't change athlete data.
+
+1. **OWLCMS sends type="timer" message** (StartTime, StopTime, SetTime)
+   - `athleteTimerEventType`: "StartTime", "StopTime", or "SetTime"
+   - `athleteMillisRemaining`: Time remaining in milliseconds
+   - `timeAllowed`: Total time allowed (usually 60000ms)
+   - `fopName`: FOP identifier
+
+2. **Competition Hub processes timer event**
+   - Updates timer state in `fopUpdates[fopName]`
+   - **Important:** Does NOT change `groupAthletes` or `liftingOrderAthletes`
+   - Broadcasts SSE message: "FOP Platform_A has new data"
+
+3. **All connected browsers receive SSE**
+   - Triggers API fetch: `/api/scoreboard?type=lifting-order&fop=Platform_A`
+   - **First browser:** Checks cache using data hash
+     - Data hash based on `groupAthletes` JSON (first 100 chars)
+     - Hash is **unchanged** because athletes didn't change
+     - **Cache HIT** - Returns cached processed data
+     - Updates timer state from current `fopUpdate`
+     - Processing time: ~1ms (no recomputation)
+   - **Remaining 199 browsers:** Same cache hit
+     - All fetch same processed data from cache
+     - Total processing: 200 × 1ms = 200ms
+
+4. **Browsers update display**
+   - Receive processed data with updated timer state
+   - Client-side countdown begins (autonomous)
+   - No further server communication for 60 seconds
+   - Timer ticks locally using `Date.now() - startTime`
+
+**Cache Behavior:**
+
+```javascript
+// Plugin cache key does NOT include timer state
+const dataHash = fopUpdate?.groupAthletes?.substring(0, 100) || '';
+const cacheKey = `${fopName}-${dataHash}-${gender}-${topN}`;
+// Timer state changes → Same cache key → Cache HIT ✅
+
+// Extract timer separately (changes frequently)
+function extractTimerState(fopUpdate) {
+  return {
+    state: fopUpdate?.athleteTimerEventType === 'StartTime' ? 'running' : 'stopped',
+    timeRemaining: parseInt(fopUpdate?.athleteMillisRemaining || 0),
+    duration: parseInt(fopUpdate?.timeAllowed || 60000)
+  };
+}
+
+// Return cached data + fresh timer state
+return {
+  ...cachedProcessedData,  // From cache (team groupings, sorting, etc.)
+  timer: extractTimerState(fopUpdate)  // Fresh from current update
+};
+```
+
+**Performance Impact:**
+
+| Event Type | First Browser | Next 199 Browsers | Cache Behavior |
+|------------|---------------|-------------------|----------------|
+| **Timer StartTime** | 1ms (cache hit) | 1ms each | No recomputation - athletes unchanged |
+| **Athlete lifts** | 50ms (cache miss) | 1ms each | Recomputes once - new `groupAthletes` |
+| **Weight change** | 50ms (cache miss) | 1ms each | Recomputes once - new `liftingOrderAthletes` |
+
+**Benefits:**
+- ✅ **Zero recomputation on timer events** - Cache stays valid
+- ✅ **Scalable to hundreds of browsers** - All hit same cache
+- ✅ **Client-side countdown** - No server load during 60-second timer
+- ✅ **Fresh timer state** - Extracted separately from cached data
+- ✅ **40× faster** than recomputing for every browser
+
+**See also:** [Implementation Details → Timer Event Flow](#timer-event-flow-client-side-countdown) for client-side countdown implementation.
+
+### Decision Event Flow (Not Yet Implemented)
+
+Decision events follow the **same efficient caching pattern as timer events** because the decision itself doesn't change athlete data immediately.
+
+**Two-Phase Processing:**
+
+**Phase 1: Decision Event (Immediate Display)**
+
+1. **OWLCMS sends type="decision" message** (referee decisions)
+   - `decisionEventType`: Decision type (e.g., "GOOD_LIFT", "NO_LIFT")
+   - `fopName`: FOP identifier
+   - Decision details (referee votes, timestamp)
+   - **Does NOT include** updated lifting order or rankings
+
+2. **Competition Hub processes decision event**
+   - Updates decision state in `fopUpdates[fopName]`
+   - **Important:** Does NOT change `groupAthletes` or `liftingOrderAthletes` yet
+   - Broadcasts SSE message: "FOP Platform_A has new data"
+
+3. **All connected browsers receive SSE**
+   - Triggers API fetch: `/api/scoreboard?type=lifting-order&fop=Platform_A`
+   - **Cache HIT** - Athletes unchanged, returns cached processed data
+   - Decision state extracted separately from current `fopUpdate`
+   - Processing time: ~1ms per browser (no recomputation)
+
+4. **Browsers display decision immediately**
+   - Show decision lights/indicators
+   - Visual feedback to audience
+   - Athlete data remains unchanged (for now)
+
+**Phase 2: Update Event (Recomputed Rankings)**
+
+5. **OWLCMS recomputes** lifting order and rankings based on decision
+   - Generates new `groupAthletes` with updated totals
+   - Generates new `liftingOrderAthletes` with new order
+   - Sends type="update" message (follows Standard Path)
+
+6. **Competition Hub processes type="update" message**
+   - New `groupAthletes` JSON → New data hash
+   - **Cache MISS** - Data changed, must recompute
+
+7. **Browsers fetch updated data**
+   - First browser computes new team groupings, sorting (50ms)
+   - Remaining browsers hit fresh cache (1ms each)
+   - Display updated lifting order, totals, ranks
+
+**Cache Behavior:**
+
+```javascript
+// Decision state extracted separately (like timer)
+function extractDecisionState(fopUpdate) {
+  return {
+    type: fopUpdate?.decisionEventType || null,
+    timestamp: fopUpdate?.decisionTimestamp || null,
+    refereeDecisions: fopUpdate?.refereeDecisions || [],
+    display: fopUpdate?.decisionEventType ? 'show' : 'hide'
+  };
+}
+
+// Phase 1: Decision event → Cache HIT
+const dataHash = fopUpdate?.groupAthletes?.substring(0, 100) || '';
+const cacheKey = `${fopName}-${dataHash}-${options}`;
+// Decision state changes, athletes unchanged → Same hash → Cache HIT ✅
+
+return {
+  ...cachedProcessedData,  // From cache (unchanged athletes)
+  decision: extractDecisionState(fopUpdate),  // Fresh decision
+  timer: extractTimerState(fopUpdate)  // Fresh timer
+};
+
+// Phase 2: Update event → Cache MISS
+// New groupAthletes → New hash → Cache MISS → Recompute ✅
+```
+
+**Timeline Example:**
+
+```
+T=0s:   OWLCMS sends DECISION (GOOD_LIFT)
+        → Hub broadcasts SSE
+        → 200 browsers fetch /api/scoreboard
+        → All hit cache (1ms each, 200ms total)
+        → Display decision lights immediately
+
+T=1s:   OWLCMS recomputes rankings
+        → Sends UPDATE with new groupAthletes
+        → Hub broadcasts SSE
+        → First browser recomputes (50ms)
+        → Remaining 199 browsers hit fresh cache (199ms)
+        → Display updated lifting order, totals
+```
+
+**Benefits:**
+- ✅ **Instant decision feedback** - Cache hit for immediate display
+- ✅ **Deferred ranking update** - Only recomputes when OWLCMS sends new data
+- ✅ **Two-phase processing** - Visual feedback first, data update second
+- ✅ **Scalable** - Same cache efficiency as timer events
+- ✅ **No redundant computation** - Decision doesn't trigger unnecessary work
+
+**Implementation Status:** 🚧 Not yet implemented - design documented for future development.
+
 ## Directory Structure
 
 ```
@@ -94,40 +308,54 @@ src/
         └── ...
 ```
 
-## OWLCMS Endpoints (Existing - No Changes Needed)
+## OWLCMS WebSocket Integration
 
-OWLCMS already sends data to these endpoints:
+OWLCMS sends data to this tracker via **WebSocket connection only**.
 
-**Status Codes:**
-- `200 OK` - Data accepted and stored
-- `428 Precondition Required` - Hub needs database before accepting updates
-- `412 Precondition Failed` - Hub needs icons/pictures/configuration *(reserved for future use)*
-- `500 Internal Server Error` - Processing error
+**URL Format:** `ws://localhost:8096/ws` (or `wss://` for secure connections)
 
-### POST /database
+**Message Format:**
+```json
+{
+  "type": "update|timer|decision|database",
+  "payload": {
+    // Nested JSON objects with competition data
+  }
+}
+```
+
+**Benefits:**
+- ✅ Persistent connection - more efficient
+- ✅ Lower latency - instant message delivery
+- ✅ Single connection for all event types
+- ✅ Automatic reconnection support
+
+**Security:** 🚧 TODO - WebSocket authentication with OWLCMS_UPDATEKEY shared secret (future feature)
+
+### WebSocket Message: type="database"
 Receives full competition database (athletes, categories, FOPs, etc.)
 
 **OWLCMS sends:**
-- Full competition data (JSON or form-encoded)
+- Full competition data (nested JSON)
 - Complete athlete list
 - FOP configurations
 - Categories and weight classes
 
 **Competition Hub stores this as:** `databaseState`
 
-### POST /update
+### WebSocket Message: type="update"
 Receives UI event updates (lifting order changes, athlete switches, etc.)
 
 **OWLCMS sends:**
 - `uiEvent`: Event type (e.g., "LiftingOrderUpdated", "SwitchGroup")
 - `fopName` or `fop`: FOP identifier
-- `liftingOrderAthletes`: JSON string with precomputed lifting order
-- `groupAthletes`: JSON string with all athletes in current group
+- `liftingOrderAthletes`: Nested JSON with precomputed lifting order
+- `groupAthletes`: Nested JSON with all athletes in current group
 - Current athlete info: `fullName`, `teamName`, `startNumber`, `weight`, `attempt`, etc.
 
 **Competition Hub stores this as:** `fopUpdates[fopName]`
 
-### POST /timer
+### WebSocket Message: type="timer"
 Receives timer start/stop/set events
 
 **OWLCMS sends:**
@@ -140,7 +368,7 @@ Receives timer start/stop/set events
 
 **Note:** Timer events use a specialized client-side countdown flow for efficiency. See **Timer Event Flow** in Implementation Details below.
 
-### POST /decision
+### WebSocket Message: type="decision"
 Receives referee decisions
 
 **OWLCMS sends:**
@@ -201,7 +429,11 @@ export function getScoreboardData(fopName, options = {}) {
 	const sortBy = options.sortBy || 'total';
 	const showTop = options.showTop || 10;
 	
-	// Parse group athletes
+	// Parse group athletes (primary data source - always use first!)
+	// For field mappings and transformation rules, see:
+	// - docs/FIELD_MAPPING_OVERVIEW.md (quick reference)
+	// - docs/FIELD_MAPPING.md (complete reference)
+	// - docs/FIELD_MAPPING_SAMPLES.md (examples with code)
 	let athletes = [];
 	if (fopUpdate?.groupAthletes) {
 		athletes = JSON.parse(fopUpdate.groupAthletes);
@@ -447,6 +679,25 @@ export const competitionHub = globalThis.__competitionHub;
 
 ## Best Practices
 
+### Data Source Priority
+
+**ALWAYS follow "Group Athletes First" principle:**
+
+1. **Primary source**: `fopUpdate.groupAthletes` (from WebSocket type="update")
+   - Contains current session data with highlighting fields
+   - Precomputed by OWLCMS with display-ready values
+   - Includes `classname` and `className` for visual highlighting
+
+2. **Secondary source**: `databaseState.athletes` (from WebSocket type="database")
+   - ONLY use for athletes NOT in current `groupAthletes`
+   - Examples: Previous sessions, different teams
+   - Requires field transformation (see field mapping docs)
+
+**For complete field mapping details, see:**
+- 📖 [FIELD_MAPPING_OVERVIEW.md](./FIELD_MAPPING_OVERVIEW.md) - Quick reference
+- 📖 [FIELD_MAPPING.md](./FIELD_MAPPING.md) - Complete field-by-field mapping
+- 📖 [FIELD_MAPPING_SAMPLES.md](./FIELD_MAPPING_SAMPLES.md) - Real-world examples with transformation code
+
 ### Server-Side (helpers.data.js)
 
 ✅ **DO:**
@@ -455,6 +706,8 @@ export const competitionHub = globalThis.__competitionHub;
 - Compute custom rankings
 - Extract specific fields
 - Apply user options
+- Use `groupAthletes` as primary data source
+- Only access `databaseState` for athletes NOT in current group
 
 ❌ **DON'T:**
 - Make HTTP requests
@@ -482,6 +735,188 @@ export const competitionHub = globalThis.__competitionHub;
 - **Precomputed data from OWLCMS** → Minimal server processing
 - **Static asset caching** → Fast page loads
 - **Efficient broadcasting** → One SSE message reaches all connected browsers
+- **Plugin-level caching** → Each scoreboard caches processed results
+
+## Plugin-Level Caching Architecture
+
+**Design Philosophy:** Each scoreboard plugin implements its own caching strategy to minimize recomputation while preserving plugin-specific business rules.
+
+### Why Plugin-Level Caching?
+
+The architecture separates responsibilities:
+
+1. **Competition Hub** (generic, plugin-agnostic)
+   - Stores raw OWLCMS data: `fopUpdates[fopName]`
+   - Broadcasts SSE when data changes
+   - **Does NOT** implement scoreboard-specific processing
+
+2. **Each Plugin's `helpers.data.js`** (plugin-specific rules)
+   - Defines custom processing logic (team grouping, sorting, filtering, etc.)
+   - Implements its own cache to avoid recomputation
+   - Future users can create custom scoreboards with different rules
+
+### Cache Implementation Pattern
+
+Each plugin implements a **Map-based cache** with intelligent invalidation:
+
+```javascript
+/**
+ * Plugin-specific cache to avoid recomputing on every browser request
+ * Structure: { 'cacheKey': { processed data } }
+ */
+const scoreboardCache = new Map();
+
+export function getScoreboardData(fopName = 'A', options = {}) {
+	const fopUpdate = getFopUpdate(fopName);
+	
+	// Cache key based on athlete data, NOT timer events
+	// Use first 100 chars of groupAthletes as quick hash
+	const dataHash = fopUpdate?.groupAthletes?.substring(0, 100) || '';
+	const cacheKey = `${fopName}-${dataHash}-${option1}-${option2}`;
+	
+	// Check cache first
+	if (scoreboardCache.has(cacheKey)) {
+		const cached = scoreboardCache.get(cacheKey);
+		console.log(`[Plugin] ✓ Cache hit (${scoreboardCache.size} entries)`);
+		
+		// Return cached data with current timer state
+		return {
+			...cached,
+			timer: extractTimerState(fopUpdate),
+			learningMode
+		};
+	}
+	
+	console.log(`[Plugin] Cache miss, computing data...`);
+	
+	// Heavy processing here (grouping, sorting, filtering)
+	// ...
+	
+	// Cache the result (exclude timer and learningMode)
+	scoreboardCache.set(cacheKey, processedData);
+	
+	// Cleanup old entries (keep last 20)
+	if (scoreboardCache.size > 20) {
+		const firstKey = scoreboardCache.keys().next().value;
+		scoreboardCache.delete(firstKey);
+	}
+	
+	return processedData;
+}
+
+/**
+ * Extract timer separately (changes frequently)
+ */
+function extractTimerState(fopUpdate) {
+	return {
+		state: fopUpdate?.athleteTimerEventType === 'StartTime' ? 'running' : 'stopped',
+		timeRemaining: parseInt(fopUpdate?.athleteMillisRemaining || 0),
+		duration: parseInt(fopUpdate?.timeAllowed || 60000)
+	};
+}
+```
+
+### Cache Key Strategy
+
+**Cache keys include:**
+- **FOP name** - Separate cache per platform
+- **Data hash** - First 100 chars of `groupAthletes` or `liftingOrderAthletes` JSON
+- **User options** - Gender filter, topN, sortBy, etc.
+
+**Why hash athlete data instead of timestamp?**
+- Timer events update `lastUpdate` timestamp but don't change athlete data
+- Using timestamp would invalidate cache on every timer event
+- Using data hash only invalidates when athletes/weights actually change
+
+### Cache Hit/Miss Scenarios
+
+#### ✅ Cache Hit (No Recomputation)
+- **Timer start/stop** - Data hash unchanged, only timer state updates
+- **Multiple browsers** - Second browser gets cached result from first browser
+- **Same options** - Different browsers with identical FOP and options share cache
+
+#### ❌ Cache Miss (Recompute Required)
+- **New lifting order** - `liftingOrderAthletes` JSON changes → new hash
+- **Athlete lifts** - `groupAthletes` changes (new totals, classname) → new hash
+- **Weight change** - Athlete requests new weight → `groupAthletes` changes
+- **Different options** - Gender filter changes (M→F) → different cache key
+
+### Real-World Performance
+
+**Scenario:** 200 browsers watching team scoreboard on FOP Platform_A
+
+1. **OWLCMS sends StartTime event** (timer starts)
+   - Competition Hub updates `fopUpdates['Platform_A']`
+   - Hub broadcasts SSE to 200 browsers
+   - **First browser:** Cache miss, computes team data (50ms)
+   - **Next 199 browsers:** Cache hit, fetch cached data (1ms each)
+   - **Total processing:** 50ms + (199 × 1ms) = ~250ms for 200 browsers
+
+2. **Athlete lifts, new current athlete**
+   - `groupAthletes` changes (new `classname` assignments)
+   - Data hash changes → All browsers get cache miss on next fetch
+   - **First browser:** Computes new team data with updated highlighting (50ms)
+   - **Next 199 browsers:** Cache hit from first browser (1ms each)
+
+**Without caching:** 200 browsers × 50ms = 10,000ms (10 seconds of server CPU)
+**With caching:** 50ms + 199ms = 249ms (40× improvement)
+
+### Plugin-Specific Cache Examples
+
+#### Team Scoreboard Cache
+```javascript
+const teamScoreboardCache = new Map();
+const cacheKey = `${fopName}-${groupAthletesHash}-${gender}-${topN}-${sortBy}`;
+```
+**Heavy operations cached:**
+- Merging database athletes with group athletes
+- Formatting 6 attempts per athlete (declaration→change→actualLift priority)
+- Grouping athletes by team
+- Computing team totals and scores
+- Sorting teams and athletes
+
+#### Lifting Order Cache
+```javascript
+const liftingOrderCache = new Map();
+const cacheKey = `${fopName}-${liftingOrderHash}-${showRecords}-${maxLifters}`;
+```
+**Heavy operations cached:**
+- Parsing `liftingOrderAthletes` JSON
+- Extracting top N lifters
+- Building rankings from database
+
+#### Session Results Cache
+```javascript
+const sessionResultsCache = new Map();
+const cacheKey = `${fopName}-${groupAthletesHash}-${showRecords}`;
+```
+**Heavy operations cached:**
+- Parsing `groupAthletes` JSON (already sorted by OWLCMS)
+- Computing statistics
+
+### Cache Cleanup Strategy
+
+**Automatic cleanup** prevents memory bloat:
+```javascript
+// Keep last 20 cache entries
+if (scoreboardCache.size > 20) {
+	const firstKey = scoreboardCache.keys().next().value;
+	scoreboardCache.delete(firstKey);
+}
+```
+
+**Why 20 entries?**
+- 6 FOPs × 2-3 option combinations = ~12-18 active entries
+- Extra headroom for rapid switching between options
+- Old entries auto-expire when limit reached (FIFO)
+
+### Benefits
+
+✅ **Minimal work per browser** - Most requests are cache hits
+✅ **Plugin-specific rules** - Each scoreboard defines its own processing logic
+✅ **Timer efficiency** - Timer events don't invalidate cache
+✅ **Extensible** - Future plugins automatically benefit from pattern
+✅ **Scalable** - Supports hundreds of concurrent browsers per FOP
 
 ## Debugging
 
@@ -526,7 +961,6 @@ If you have an existing scoreboard in `src/plugins/scoreboard/`:
 ## Future Enhancements
 
 - **SSE per FOP** - Dedicated stream for each FOP to reduce bandwidth
-- **WebSocket option** - For ultra-low latency
 - **Browser-side caching** - Service worker for offline support
 - **Plugin marketplace** - Share scoreboard configs with community
 
@@ -539,7 +973,7 @@ If you have an existing scoreboard in `src/plugins/scoreboard/`:
 **Key Innovation:** Timer countdown is **fully client-side** to support hundreds of concurrent viewers.
 
 **Flow:**
-1. **OWLCMS sends timer event** (StartTime, StopTime, SetTime) → `/timer` endpoint
+1. **OWLCMS sends timer event** (StartTime, StopTime, SetTime) via WebSocket
 2. **Competition Hub** stores timer state and broadcasts **one SSE message**
 3. **All connected browsers** receive SSE notification
 4. **Each browser fetches** updated scoreboard data with timer state

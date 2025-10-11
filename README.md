@@ -18,6 +18,8 @@ A SvelteKit application that receives real-time competition updates from OWLCMS 
 
 - **[CREATE_YOUR_OWN.md](./CREATE_YOUR_OWN.md)** - Create custom scoreboards
 - **[docs/SCOREBOARD_ARCHITECTURE.md](./docs/SCOREBOARD_ARCHITECTURE.md)** - Complete system architecture
+- **[docs/CACHING_IMPLEMENTATION.md](./docs/CACHING_IMPLEMENTATION.md)** - Performance optimization guide
+- **[docs/FIELD_MAPPING_INDEX.md](./docs/FIELD_MAPPING_INDEX.md)** - Data source mapping reference
 - **[Plugin README](./src/plugins/lifting-order/README.md)** - Example scoreboard with AI prompts
 
 ## OWLCMS Configuration Required
