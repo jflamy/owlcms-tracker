@@ -26,10 +26,11 @@ This instructions file provides **AI context only**. For detailed architecture, 
 
 ```
 OWLCMS (Java Backend)
-  ↓ POST /database (full competition data)
-  ↓ POST /update (UI events, lifting order)
-  ↓ POST /timer (timer start/stop)
-  ↓ POST /decision (referee decisions)
+  ↓ WebSocket (ws:// or wss://)
+  ↓   • type: "database" (full competition data)
+  ↓   • type: "update" (UI events, lifting order)
+  ↓   • type: "timer" (timer start/stop)
+  ↓   • type: "decision" (referee decisions)
   ↓
 Competition Hub (src/lib/server/competition-hub.js)
   • Stores databaseState (full competition data)
@@ -58,23 +59,24 @@ Browsers
 
 In OWLCMS: **Prepare Competition → Language and System Settings → Connections → URL for Video Data**
 
-Set to: `http://localhost:8095` (or your tracker host)
+Set to: `ws://localhost:8095/ws` (or your tracker host with `ws://` or `wss://` scheme)
 
-**These endpoints already exist in `src/routes/` and receive OWLCMS data:**
+**WebSocket message types the tracker receives:**
 
-| Endpoint | Purpose | OWLCMS Sends |
+| Message Type | Purpose | OWLCMS Sends |
 |----------|---------|--------------|
-| `POST /database` | Full competition data | Athletes, FOPs, categories |
-| `POST /update` | UI events | LiftingOrderUpdated, current athlete, precomputed JSON |
-| `POST /timer` | Timer events | Start/stop, time remaining, FOP name |
-| `POST /decision` | Referee decisions | Decision type, athlete, FOP |
+| `type: "database"` | Full competition data | Athletes, FOPs, categories, databaseChecksum |
+| `type: "update"` | UI events | LiftingOrderUpdated, current athlete, precomputed JSON |
+| `type: "timer"` | Timer events | Start/stop, time remaining, FOP name |
+| `type: "decision"` | Referee decisions | Decision type, athlete, FOP |
 
 **No code changes to OWLCMS needed** - only the URL configuration above.
+
+**Security:** 🚧 TODO - WebSocket authentication with OWLCMS_UPDATEKEY shared secret (future feature)
 
 **Status Codes:**
 - `200 OK` - Data accepted and stored
 - `428 Precondition Required` - Hub needs database before accepting updates
-- `412 Precondition Failed` - Hub needs icons/pictures/configuration *(reserved for future use)*
 - `500 Internal Server Error` - Processing error
 
 ------
@@ -86,16 +88,14 @@ src/
 ├── lib/
 │   ├── server/
 │   │   ├── competition-hub.js         # Central state storage
+│   │   ├── websocket-server.js        # WebSocket message handler
+│   │   ├── embedded-database.js       # Parse bundled database payloads
 │   │   └── scoreboard-registry.js     # Auto-discovers scoreboard plugins
 │   ├── components/
 │   │   ├── Timer.svelte               # Autonomous countdown timer
 │   │   └── SystemStatus.svelte        # Connection status
 │   └── stores.js                      # Client-side reactive stores
 ├── routes/
-│   ├── database/+server.js            # POST /database endpoint
-│   ├── update/+server.js              # POST /update endpoint
-│   ├── timer/+server.js               # POST /timer endpoint
-│   ├── decision/+server.js            # POST /decision endpoint
 │   ├── [scoreboard]/                  # Dynamic scoreboard routes
 │   │   ├── +page.server.js            # Route handler
 │   │   └── +page.svelte               # Generic wrapper
@@ -147,6 +147,7 @@ For complete examples and patterns, see [docs/SCOREBOARD_ARCHITECTURE.md](../doc
 - ✅ Precomputed display data in `/update` messages
 
 ### SvelteKit Hub (Cache & Scoreboard Server)
+- ✅ Receives WebSocket messages from OWLCMS
 - ✅ Stores per-FOP data from OWLCMS
 - ✅ Auto-discovers scoreboard plugins
 - ✅ Processes data once, serves hundreds of browsers

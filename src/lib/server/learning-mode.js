@@ -59,8 +59,9 @@ function detectMessageType(formData) {
  * @param {Object} formData - The parsed form data from OWLCMS
  * @param {string} rawBody - The raw request body
  * @param {string} endpoint - The endpoint that received the message (optional)
+ * @param {string} overrideType - Optional explicit message type label
  */
-export function captureMessage(formData, rawBody, endpoint = '') {
+export function captureMessage(formData, rawBody, endpoint = '', overrideType = '') {
 	if (!LEARNING_MODE) return;
 
 	try {
@@ -75,7 +76,7 @@ export function captureMessage(formData, rawBody, endpoint = '') {
 		const ms = String(now.getMilliseconds()).padStart(3, '0');
 		const timestamp = `${year}-${month}-${day}T${hours}-${minutes}-${seconds}-${ms}`;
 		
-		const messageType = detectMessageType(formData);
+		const messageType = overrideType || detectMessageType(formData);
 		const endpointPrefix = endpoint ? `${endpoint.toUpperCase()}-` : '';
 		const filename = `${timestamp}-${endpointPrefix}${messageType}.json`;
 		const filepath = join(SAMPLES_DIR, filename);
@@ -125,13 +126,7 @@ export function captureMessage(formData, rawBody, endpoint = '') {
 export function logLearningModeStatus() {
 	if (LEARNING_MODE) {
 		console.log('');
-		console.log('🔬 =============== LEARNING MODE ACTIVE ===============');
-		console.log('📁 Messages will be saved to: samples/');
-		console.log('🕐 Each message includes ISO8601 timestamp');
-		console.log('📝 To disable: Remove LEARNING_MODE environment variable');
-		console.log('💡 To start: LEARNING_MODE=true npm run dev');
-		console.log('================================================');
-		console.log('');
+		console.log('🔬 Learning mode: capturing requests to samples/ (ISO8601 filenames)');
 	} else {
 		console.log('🚀 Production mode - No message capturing');
 		console.log('💡 To enable learning mode: LEARNING_MODE=true npm run dev');

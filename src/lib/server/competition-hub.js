@@ -1,13 +1,12 @@
 /**
  * Competition Hub - Server-side state cache and message broadcaster
  * 
- * Handles real OWLCMS UpdateEvent form data and converts to browser-friendly format
+ * Handles OWLCMS WebSocket messages and converts to browser-friendly format
  * 
  * Responsibilities:
- * - Cache competition state from OWLCMS updates
- * - Return 428 when database is needed (triggers OWLCMS to send /database)
- * - Return 412 when icons/pictures/config is needed (reserved for future use)
- * - Convert OWLCMS form data to JSON format for browsers
+ * - Cache competition state from OWLCMS WebSocket updates
+ * - Return 428 when database is needed (WebSocket response)
+ * - Convert OWLCMS data to JSON format for browsers
  * - Broadcast changes to all connected browsers via SSE
  */
 
@@ -34,6 +33,8 @@ class CompetitionHub {
       messagesReceived: 0,
       messagesBroadcast: 0
     };
+
+    this.lastDatabaseChecksum = null;
     
     // Debounce state for broadcasts - per FOP and event type
     this.lastBroadcastTime = {};  // Structure: { 'fopName-eventType': timestamp }
@@ -44,14 +45,14 @@ class CompetitionHub {
     
     // Indicate system is ready
     console.log('🎯 [Hub] Competition Hub initialized and ready to receive OWLCMS messages');
-    console.log('📡 [Hub] Listening for updates at POST /update');
+    console.log('📡 [Hub] Listening for WebSocket connections at /ws');
     console.log('🌐 [Hub] Browser clients can connect to SSE /api/client-stream');
   }
 
   /**
-   * Main handler for OWLCMS form-encoded updates
+   * Main handler for OWLCMS WebSocket messages
    */
-  handleOwlcmsUpdate(params) {
+  handleOwlcmsMessage(params) {
     this.metrics.messagesReceived++;
     
     try {
@@ -111,7 +112,12 @@ class CompetitionHub {
       //   return { accepted: false, needsData: true, reason: 'switch_group_refresh' };
       // }
 
-      console.log(`[Hub] Update processed: ${params.uiEvent || params.decisionEventType || params.athleteTimerEventType || 'unknown'} for FOP ${fopName}`);
+      const eventType = params.uiEvent 
+        || params.decisionEventType 
+        || params.athleteTimerEventType 
+        || params.breakTimerEventType 
+        || 'unknown';
+      console.log(`[Hub] Update processed: ${eventType} for FOP ${fopName}`);
       return { accepted: true };
 
     } catch (error) {
@@ -127,6 +133,14 @@ class CompetitionHub {
     this.metrics.messagesReceived++;
     
     try {
+      const incomingChecksum = params?.databaseChecksum || params?.checksum || null;
+      if (incomingChecksum && this.lastDatabaseChecksum && incomingChecksum === this.lastDatabaseChecksum) {
+        console.log(`[Hub] Database checksum ${incomingChecksum} matches current state, skipping reload`);
+        this.databaseRequested = 0;
+        this.lastDatabaseLoad = Date.now();
+        return { accepted: true, reason: 'duplicate_checksum', cached: true };
+      }
+      
       // Check if already loading to prevent concurrent loads
       if (this.isLoadingDatabase) {
         const timeSinceStart = Date.now() - this.isLoadingDatabase;
@@ -134,13 +148,14 @@ class CompetitionHub {
         return { accepted: false, reason: 'already_loading' };
       }
       
-      // Check if we loaded recently (within last 2 seconds) - accept but skip reprocessing
-      const timeSinceLastLoad = Date.now() - this.lastDatabaseLoad;
-      if (this.lastDatabaseLoad > 0 && timeSinceLastLoad < 2000) {
-        console.log(`[Hub] Database was loaded ${Math.round(timeSinceLastLoad)}ms ago, accepting but skipping duplicate load`);
-        return { accepted: true, reason: 'duplicate_skipped', cached: true };
+      if (!incomingChecksum) {
+        const timeSinceLastLoad = Date.now() - this.lastDatabaseLoad;
+        if (this.lastDatabaseLoad > 0 && timeSinceLastLoad < 2000) {
+          console.log(`[Hub] Database was loaded ${Math.round(timeSinceLastLoad)}ms ago (no checksum provided), accepting but skipping duplicate load`);
+          return { accepted: true, reason: 'duplicate_skipped', cached: true };
+        }
       }
-      
+
       // Set loading latch with timestamp
       this.isLoadingDatabase = Date.now();
       console.log('[Hub] Processing full competition data');
@@ -168,7 +183,8 @@ class CompetitionHub {
       this.databaseState = {
         ...fullState,
         lastUpdate: Date.now(),
-        initialized: true
+        initialized: true,
+        databaseChecksum: incomingChecksum || fullState?.databaseChecksum || null
       };
       
       // Also update legacy state for backward compatibility
@@ -188,6 +204,7 @@ class CompetitionHub {
       this.isLoadingDatabase = false;
       this.lastDatabaseLoad = Date.now();
       this.databaseRequested = 0; // Reset request flag since database has arrived
+      this.lastDatabaseChecksum = this.databaseState.databaseChecksum;
       
       return { accepted: true };
 
@@ -237,29 +254,21 @@ class CompetitionHub {
       result.timer = timerState;
     }
 
-    // Athletes data (parse JSON strings from OWLCMS)
-    if (params.groupAthletes) {
-      try {
-        result.athletes = JSON.parse(params.groupAthletes);
-      } catch (e) {
-        console.warn('[Hub] Failed to parse groupAthletes JSON:', e.message);
-      }
+    // Athletes data (nested objects from OWLCMS WebSocket)
+    if (params.groupAthletes && typeof params.groupAthletes === 'object') {
+      result.athletes = params.groupAthletes;
     }
 
-    if (params.liftingOrderAthletes) {
-      try {
-        result.liftingOrder = JSON.parse(params.liftingOrderAthletes);
-      } catch (e) {
-        console.warn('[Hub] Failed to parse liftingOrderAthletes JSON:', e.message);
-      }
+    if (params.liftingOrderAthletes && typeof params.liftingOrderAthletes === 'object') {
+      result.liftingOrder = params.liftingOrderAthletes;
     }
 
-    if (params.leaders) {
-      try {
-        result.leaders = JSON.parse(params.leaders);
-      } catch (e) {
-        console.warn('[Hub] Failed to parse leaders JSON:', e.message);
-      }
+    if (params.leaders && typeof params.leaders === 'object') {
+      result.leaders = params.leaders;
+    }
+
+    if (params.translationMap && typeof params.translationMap === 'object') {
+      result.translationMap = params.translationMap;
     }
 
     // Break/ceremony state
@@ -529,6 +538,8 @@ class CompetitionHub {
   parseFullCompetitionData(params) {
     console.log('[Hub] Parsing full competition database');
     
+    const providedChecksum = params?.databaseChecksum || params?.checksum || null;
+
     // If params is already the full database structure (with athletes, ageGroups, etc.),
     // just return it directly with minimal processing
     if (params.athletes && Array.isArray(params.athletes)) {
@@ -541,7 +552,8 @@ class CompetitionHub {
       return {
         ...params,
         initialized: true,
-        lastUpdate: Date.now()
+        lastUpdate: Date.now(),
+        databaseChecksum: providedChecksum || params.databaseChecksum || null
       };
     }
     
@@ -558,135 +570,96 @@ class CompetitionHub {
       date: new Date().toISOString().split('T')[0] // Default to today
     };
 
-    // Parse athletes data - handle both parsed objects and JSON strings
-    if (params.groupAthletes) {
-      try {
-        // If it's already an object/array, use it directly; otherwise parse as JSON
-        const rawAthletes = typeof params.groupAthletes === 'string' 
-          ? JSON.parse(params.groupAthletes)
-          : params.groupAthletes;
-        result.athletes = rawAthletes
-          .filter(athlete => !athlete.isSpacer) // Remove spacer rows
-          .map(athlete => ({
-            id: athlete.startNumber,
-            startNumber: parseInt(athlete.startNumber),
-            fullName: athlete.fullName,
-            name: athlete.fullName,
-            teamName: athlete.teamName,
-            team: athlete.teamName,
-            yearOfBirth: athlete.yearOfBirth,
-            category: athlete.category,
-            categoryName: athlete.category,
-            group: athlete.group,
-            
-            // Snatch attempts
-            snatch1Weight: athlete.sattempts?.[0]?.stringValue ? parseInt(athlete.sattempts[0].stringValue) : null,
-            snatch1Result: athlete.sattempts?.[0]?.liftStatus === 'good' ? 'good' : 
-                          athlete.sattempts?.[0]?.liftStatus === 'fail' ? 'no' : null,
-            snatch2Weight: athlete.sattempts?.[1]?.stringValue ? parseInt(athlete.sattempts[1].stringValue) : null,
-            snatch2Result: athlete.sattempts?.[1]?.liftStatus === 'good' ? 'good' : 
-                          athlete.sattempts?.[1]?.liftStatus === 'fail' ? 'no' : null,
-            snatch3Weight: athlete.sattempts?.[2]?.stringValue ? parseInt(athlete.sattempts[2].stringValue) : null,
-            snatch3Result: athlete.sattempts?.[2]?.liftStatus === 'good' ? 'good' : 
-                          athlete.sattempts?.[2]?.liftStatus === 'fail' ? 'no' : null,
-            
-            // Clean & Jerk attempts
-            cleanJerk1Weight: athlete.cattempts?.[0]?.stringValue ? parseInt(athlete.cattempts[0].stringValue) : null,
-            cleanJerk1Result: athlete.cattempts?.[0]?.liftStatus === 'good' ? 'good' : 
-                             athlete.cattempts?.[0]?.liftStatus === 'fail' ? 'no' : null,
-            cleanJerk2Weight: athlete.cattempts?.[1]?.stringValue ? parseInt(athlete.cattempts[1].stringValue) : null,
-            cleanJerk2Result: athlete.cattempts?.[1]?.liftStatus === 'good' ? 'good' : 
-                             athlete.cattempts?.[1]?.liftStatus === 'fail' ? 'no' : null,
-            cleanJerk3Weight: athlete.cattempts?.[2]?.stringValue ? parseInt(athlete.cattempts[2].stringValue) : null,
-            cleanJerk3Result: athlete.cattempts?.[2]?.liftStatus === 'good' ? 'good' : 
-                             athlete.cattempts?.[2]?.liftStatus === 'fail' ? 'no' : null,
-            
-            // Computed totals (from OWLCMS)
-            bestSnatch: athlete.bestSnatch !== '-' ? parseInt(athlete.bestSnatch) : 0,
-            bestCleanJerk: athlete.bestCleanJerk !== '-' ? parseInt(athlete.bestCleanJerk) : 0,
-            total: athlete.total !== '-' ? parseInt(athlete.total) : 0,
-            sinclair: athlete.sinclair !== '-' ? parseFloat(athlete.sinclair) : 0,
-            
-            // Rankings
-            snatchRank: athlete.snatchRank !== '-' ? parseInt(athlete.snatchRank) : null,
-            cleanJerkRank: athlete.cleanJerkRank !== '-' ? parseInt(athlete.cleanJerkRank) : null,
-            totalRank: athlete.totalRank !== '-' ? parseInt(athlete.totalRank) : null,
-            sinclairRank: athlete.sinclairRank !== '-' ? parseInt(athlete.sinclairRank) : null,
-            
-            // UI state
-            classname: athlete.classname,
-            isCurrent: athlete.classname?.includes('current'),
-            isNext: athlete.classname?.includes('next')
-          }));
-        
-        console.log(`[Hub] Loaded ${result.athletes.length} athletes from groupAthletes`);
-      } catch (e) {
-        console.warn('[Hub] Failed to parse groupAthletes:', e.message);
-        result.athletes = [];
-      }
-    } else if (params.athletes) {
-      try {
-        // If it's already an object/array, use it directly; otherwise parse as JSON
-        result.athletes = typeof params.athletes === 'string'
-          ? JSON.parse(params.athletes)
-          : params.athletes;
-        console.log(`[Hub] Loaded ${result.athletes.length} athletes from athletes field`);
-      } catch (e) {
-        console.warn('[Hub] Failed to parse athletes:', e.message);
-        result.athletes = [];
-      }
+    // Parse athletes data - expect nested objects from WebSocket
+    if (params.groupAthletes && Array.isArray(params.groupAthletes)) {
+      result.athletes = params.groupAthletes
+        .filter(athlete => !athlete.isSpacer) // Remove spacer rows
+        .map(athlete => ({
+          id: athlete.startNumber,
+          startNumber: parseInt(athlete.startNumber),
+          fullName: athlete.fullName,
+          name: athlete.fullName,
+          teamName: athlete.teamName,
+          team: athlete.teamName,
+          yearOfBirth: athlete.yearOfBirth,
+          category: athlete.category,
+          categoryName: athlete.category,
+          group: athlete.group,
+          
+          // Snatch attempts
+          snatch1Weight: athlete.sattempts?.[0]?.stringValue ? parseInt(athlete.sattempts[0].stringValue) : null,
+          snatch1Result: athlete.sattempts?.[0]?.liftStatus === 'good' ? 'good' : 
+                        athlete.sattempts?.[0]?.liftStatus === 'fail' ? 'no' : null,
+          snatch2Weight: athlete.sattempts?.[1]?.stringValue ? parseInt(athlete.sattempts[1].stringValue) : null,
+          snatch2Result: athlete.sattempts?.[1]?.liftStatus === 'good' ? 'good' : 
+                        athlete.sattempts?.[1]?.liftStatus === 'fail' ? 'no' : null,
+          snatch3Weight: athlete.sattempts?.[2]?.stringValue ? parseInt(athlete.sattempts[2].stringValue) : null,
+          snatch3Result: athlete.sattempts?.[2]?.liftStatus === 'good' ? 'good' : 
+                        athlete.sattempts?.[2]?.liftStatus === 'fail' ? 'no' : null,
+          
+          // Clean & Jerk attempts
+          cleanJerk1Weight: athlete.cattempts?.[0]?.stringValue ? parseInt(athlete.cattempts[0].stringValue) : null,
+          cleanJerk1Result: athlete.cattempts?.[0]?.liftStatus === 'good' ? 'good' : 
+                           athlete.cattempts?.[0]?.liftStatus === 'fail' ? 'no' : null,
+          cleanJerk2Weight: athlete.cattempts?.[1]?.stringValue ? parseInt(athlete.cattempts[1].stringValue) : null,
+          cleanJerk2Result: athlete.cattempts?.[1]?.liftStatus === 'good' ? 'good' : 
+                           athlete.cattempts?.[1]?.liftStatus === 'fail' ? 'no' : null,
+          cleanJerk3Weight: athlete.cattempts?.[2]?.stringValue ? parseInt(athlete.cattempts[2].stringValue) : null,
+          cleanJerk3Result: athlete.cattempts?.[2]?.liftStatus === 'good' ? 'good' : 
+                           athlete.cattempts?.[2]?.liftStatus === 'fail' ? 'no' : null,
+          
+          // Computed totals (from OWLCMS)
+          bestSnatch: athlete.bestSnatch !== '-' ? parseInt(athlete.bestSnatch) : 0,
+          bestCleanJerk: athlete.bestCleanJerk !== '-' ? parseInt(athlete.bestCleanJerk) : 0,
+          total: athlete.total !== '-' ? parseInt(athlete.total) : 0,
+          sinclair: athlete.sinclair !== '-' ? parseFloat(athlete.sinclair) : 0,
+          
+          // Rankings
+          snatchRank: athlete.snatchRank !== '-' ? parseInt(athlete.snatchRank) : null,
+          cleanJerkRank: athlete.cleanJerkRank !== '-' ? parseInt(athlete.cleanJerkRank) : null,
+          totalRank: athlete.totalRank !== '-' ? parseInt(athlete.totalRank) : null,
+          sinclairRank: athlete.sinclairRank !== '-' ? parseInt(athlete.sinclairRank) : null,
+          
+          // UI state
+          classname: athlete.classname,
+          isCurrent: athlete.classname?.includes('current'),
+          isNext: athlete.classname?.includes('next')
+        }));
+      
+      console.log(`[Hub] Loaded ${result.athletes.length} athletes from groupAthletes`);
+    } else if (params.athletes && Array.isArray(params.athletes)) {
+      result.athletes = params.athletes;
+      console.log(`[Hub] Loaded ${result.athletes.length} athletes from athletes field`);
     } else {
       result.athletes = [];
     }
 
     // Parse lifting order if provided
-    if (params.liftingOrderAthletes) {
-      try {
-        const rawLiftingOrder = typeof params.liftingOrderAthletes === 'string'
-          ? JSON.parse(params.liftingOrderAthletes)
-          : params.liftingOrderAthletes;
-        result.liftingOrder = rawLiftingOrder
-          .filter(athlete => !athlete.isSpacer)
-          .map((athlete, index) => ({
-            athleteId: athlete.startNumber,
-            athleteName: athlete.fullName,
-            teamName: athlete.teamName,
-            position: index + 1,
-            weight: athlete.sattempts?.[0]?.stringValue ? parseInt(athlete.sattempts[0].stringValue) : null,
-            lift: 'snatch', // Default, could be determined from competition state
-            attemptNumber: 1, // Default, could be computed
-            isCurrent: athlete.classname?.includes('current'),
-            isNext: athlete.classname?.includes('next')
-          }));
-        
-        console.log(`[Hub] Loaded ${result.liftingOrder.length} athletes in lifting order`);
-      } catch (e) {
-        console.warn('[Hub] Failed to parse liftingOrderAthletes:', e.message);
-        result.liftingOrder = [];
-      }
-    } else if (params.liftingOrder) {
-      try {
-        result.liftingOrder = typeof params.liftingOrder === 'string'
-          ? JSON.parse(params.liftingOrder)
-          : params.liftingOrder;
-      } catch (e) {
-        console.warn('[Hub] Failed to parse liftingOrder:', e.message);
-        result.liftingOrder = [];
-      }
+    if (params.liftingOrderAthletes && Array.isArray(params.liftingOrderAthletes)) {
+      result.liftingOrder = params.liftingOrderAthletes
+        .filter(athlete => !athlete.isSpacer)
+        .map((athlete, index) => ({
+          athleteId: athlete.startNumber,
+          athleteName: athlete.fullName,
+          teamName: athlete.teamName,
+          position: index + 1,
+          weight: athlete.sattempts?.[0]?.stringValue ? parseInt(athlete.sattempts[0].stringValue) : null,
+          lift: 'snatch', // Default, could be determined from competition state
+          attemptNumber: 1, // Default, could be computed
+          isCurrent: athlete.classname?.includes('current'),
+          isNext: athlete.classname?.includes('next')
+        }));
+      
+      console.log(`[Hub] Loaded ${result.liftingOrder.length} athletes in lifting order`);
+    } else if (params.liftingOrder && Array.isArray(params.liftingOrder)) {
+      result.liftingOrder = params.liftingOrder;
     } else {
       result.liftingOrder = [];
     }
 
     // Current attempt info
-    if (params.currentAthlete) {
-      try {
-        result.currentAttempt = typeof params.currentAthlete === 'string'
-          ? JSON.parse(params.currentAthlete)
-          : params.currentAthlete;
-      } catch (e) {
-        console.warn('[Hub] Failed to parse currentAthlete:', e.message);
-        result.currentAttempt = null;
-      }
+    if (params.currentAthlete && typeof params.currentAthlete === 'object') {
+      result.currentAttempt = params.currentAthlete;
     } else if (params.fullName) {
       // Fallback to individual fields
       result.currentAttempt = {
@@ -709,27 +682,13 @@ class CompetitionHub {
     };
 
     // Group and session info
-    if (params.groups) {
-      try {
-        result.groups = typeof params.groups === 'string'
-          ? JSON.parse(params.groups)
-          : params.groups;
-      } catch (e) {
-        console.warn('[Hub] Failed to parse groups:', e.message);
-        result.groups = [];
-      }
+    if (params.groups && Array.isArray(params.groups)) {
+      result.groups = params.groups;
     }
 
     // Categories info
-    if (params.categories) {
-      try {
-        result.categories = typeof params.categories === 'string'
-          ? JSON.parse(params.categories)
-          : params.categories;
-      } catch (e) {
-        console.warn('[Hub] Failed to parse categories:', e.message);
-        result.categories = [];
-      }
+    if (params.categories && Array.isArray(params.categories)) {
+      result.categories = params.categories;
     }
 
     // Display settings
@@ -744,7 +703,10 @@ class CompetitionHub {
       mode: params.mode
     };
 
-    return result;
+    return {
+      ...result,
+      databaseChecksum: providedChecksum || null
+    };
   }
 }
 

@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { competitionHub } from '$lib/server/competition-hub.js';
 import { captureMessage, LEARNING_MODE } from '$lib/server/learning-mode.js';
+import { extractEmbeddedDatabase } from '$lib/server/embedded-database.js';
 
 export async function POST({ request }) {
   try {
@@ -38,18 +39,40 @@ export async function POST({ request }) {
       console.log(`[DATABASE] Received form data | Size: ${Math.round(rawBody.length / 1024)}KB`);
     }
     
-    // Capture message in learning mode
+    // Capture message in learning mode (before mutating params)
     captureMessage(params, rawBody, 'database');
+
+    // Handle embedded database envelopes (same as WebSocket / other endpoints)
+    const embeddedDatabase = extractEmbeddedDatabase(params);
+    if (embeddedDatabase.error) {
+      return json({
+        error: 'invalid_database_payload',
+        message: 'Failed to parse embedded database payload',
+        timestamp: Date.now(),
+        learningMode: LEARNING_MODE
+      }, { status: 400 });
+    }
+
+    const payloadToProcess = embeddedDatabase.hasDatabase ? embeddedDatabase.payload : params;
+    if (embeddedDatabase.hasDatabase) {
+      console.log(`[DATABASE] Embedded database payload detected (checksum ${embeddedDatabase.checksum || 'none'})`);
+    }
     
     // DATABASE endpoint specific logging
     console.log(`[DATABASE] Fields available: ${Object.keys(params).length} total`);
-    if (params.competitionName || params.config?.competitionName) {
-      console.log(`[DATABASE] Competition: ${params.competitionName || params.config?.competitionName}`);
+    if (payloadToProcess.competitionName || payloadToProcess.config?.competitionName || payloadToProcess.competition?.competitionName) {
+      const competitionName = payloadToProcess.competitionName
+        || payloadToProcess.config?.competitionName
+        || payloadToProcess.competition?.competitionName
+        || payloadToProcess.competition?.name;
+      if (competitionName) {
+        console.log(`[DATABASE] Competition: ${competitionName}`);
+      }
     }
 
     // Skip authentication for now - focus on message capture
     // Handle full competition state data
-    const result = competitionHub.handleFullCompetitionData(params);
+    const result = competitionHub.handleFullCompetitionData(payloadToProcess);
     
     if (result.accepted) {
       console.log('✅ Full competition data accepted and loaded');

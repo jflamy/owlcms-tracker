@@ -20,6 +20,7 @@ console.log('   • /timer     - Timer events (StartTime, StopTime, etc.)');
 console.log('   • /decision  - Referee decisions');
 console.log('   • /update    - UI events (LiftingOrderUpdated, etc.)');
 console.log('   • /database  - Full competition data');
+console.log('   • ws://...   - WebSocket connection (preferred method)');
 console.log('');
 console.log('🌐 Web interface: http://localhost:8096/scoreboard');
 console.log('');
@@ -36,7 +37,7 @@ let hasShownFirstRequest = false;
 export async function handle({ event, resolve }) {
   if (!hasShownFirstRequest) {
     hasShownFirstRequest = true;
-    console.log('� First HTTP request received - server is processing traffic');
+    console.log('🌐 First HTTP request received - server is processing traffic');
     console.log('');
   }
   

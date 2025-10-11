@@ -23,20 +23,11 @@
 	"/database": [
 		"src/routes/database/+server.js"
 	],
-	"/decision": [
-		"src/routes/decision/+server.js"
-	],
 	"/favicon.png": [
 		"src/routes/favicon.png/+server.js"
 	],
 	"/robots.txt": [
 		"src/routes/robots.txt/+server.js"
-	],
-	"/timer": [
-		"src/routes/timer/+server.js"
-	],
-	"/update": [
-		"src/routes/update/+server.js"
 	],
 	"/[scoreboard]": [
 		"src/routes/[scoreboard]/+page.server.js"

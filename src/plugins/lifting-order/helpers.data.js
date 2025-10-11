@@ -5,6 +5,12 @@
 import { competitionHub } from '$lib/server/competition-hub.js';
 
 /**
+ * Plugin-specific cache to avoid recomputing lifting order on every browser request
+ * Structure: { 'cacheKey': { competition, currentAttempt, liftingOrderAthletes, ... } }
+ */
+const liftingOrderCache = new Map();
+
+/**
  * Get the full database state (raw athlete data) - SERVER-SIDE ONLY
  * @returns {Object|null} Raw database state from OWLCMS
  */
@@ -54,6 +60,27 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		};
 	}
 
+	// Check cache first - cache key based on lifting order data, NOT timer events
+	// Use a hash of liftingOrderAthletes to detect when athlete data actually changes
+	// liftingOrderAthletes is now a parsed object, so stringify it first for hashing
+	const liftingOrderHash = fopUpdate?.liftingOrderAthletes ? 
+		JSON.stringify(fopUpdate.liftingOrderAthletes).substring(0, 100) : ''; // First 100 chars as quick hash
+	const cacheKey = `${fopName}-${liftingOrderHash}-${showRecords}-${maxLifters}`;
+	
+	if (liftingOrderCache.has(cacheKey)) {
+		const cached = liftingOrderCache.get(cacheKey);
+		console.log(`[Lifting Order] ✓ Cache hit for ${fopName} (${liftingOrderCache.size} entries cached)`);
+		
+		// Return cached data with current timer state (timer can change without full update)
+		return {
+			...cached,
+			timer: extractTimerState(fopUpdate),
+			learningMode
+		};
+	}
+	
+	console.log(`[Lifting Order] Cache miss for ${fopName}, computing lifting order data...`);
+
 	// Extract basic competition info
 	const competition = {
 		name: fopUpdate?.competitionName || databaseState?.competition?.name || 'Competition',
@@ -93,24 +120,16 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		startTime: null // Client will compute this
 	};
 
-	// Get precomputed liftingOrderAthletes from UPDATE message (already JSON-encoded string)
+	// Get precomputed liftingOrderAthletes from UPDATE message (already parsed as nested object)
 	let liftingOrderAthletes = [];
 	if (fopUpdate?.liftingOrderAthletes) {
-		try {
-			liftingOrderAthletes = JSON.parse(fopUpdate.liftingOrderAthletes);
-		} catch (err) {
-			console.error('[Scoreboard Helper] Failed to parse liftingOrderAthletes:', err);
-		}
+		liftingOrderAthletes = fopUpdate.liftingOrderAthletes;
 	}
 
-	// Get precomputed groupAthletes from UPDATE message (already JSON-encoded string)
+	// Get precomputed groupAthletes from UPDATE message (already parsed as nested object)
 	let groupAthletes = [];
 	if (fopUpdate?.groupAthletes) {
-		try {
-			groupAthletes = JSON.parse(fopUpdate.groupAthletes);
-		} catch (err) {
-			console.error('[Scoreboard Helper] Failed to parse groupAthletes:', err);
-		}
+		groupAthletes = fopUpdate.groupAthletes;
 	}
 	
 	// Get top athletes for leaderboard (from database state if needed for custom sorting)
@@ -119,7 +138,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// Get competition stats
 	const stats = getCompetitionStats(databaseState);
 
-	return {
+	const result = {
 		competition,
 		currentAttempt,
 		timer,
@@ -137,8 +156,53 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		breakType: fopUpdate?.breakType,
 		status: (fopUpdate || databaseState) ? 'ready' : 'waiting',
 		lastUpdate: fopUpdate?.lastUpdate || Date.now(),
-		learningMode,
 		options: { showRecords, maxLifters } // Echo back the options used
+	};
+	
+	// Cache the result (excluding timer which changes frequently and learningMode)
+	liftingOrderCache.set(cacheKey, {
+		competition: result.competition,
+		currentAttempt: result.currentAttempt,
+		liftingOrderAthletes: result.liftingOrderAthletes,
+		groupAthletes: result.groupAthletes,
+		rankings: result.rankings,
+		stats: result.stats,
+		displaySettings: result.displaySettings,
+		isBreak: result.isBreak,
+		breakType: result.breakType,
+		status: result.status,
+		lastUpdate: result.lastUpdate,
+		options: result.options
+	});
+	
+	// Cleanup old cache entries (keep last 20)
+	if (liftingOrderCache.size > 20) {
+		const firstKey = liftingOrderCache.keys().next().value;
+		liftingOrderCache.delete(firstKey);
+	}
+	
+	console.log(`[Lifting Order] Cached result for ${cacheKey} (${liftingOrderCache.size} entries)`);
+
+	return {
+		...result,
+		learningMode
+	};
+}
+
+/**
+ * Extract timer state from FOP update (called separately since timer changes frequently)
+ * @param {Object} fopUpdate - FOP update data
+ * @returns {Object} Timer state
+ */
+function extractTimerState(fopUpdate) {
+	return {
+		state: fopUpdate?.athleteTimerEventType === 'StartTime' ? 'running' : 
+		       fopUpdate?.athleteTimerEventType === 'StopTime' ? 'stopped' : 
+		       fopUpdate?.athleteTimerEventType === 'SetTime' ? 'set' :
+		       fopUpdate?.athleteTimerEventType ? fopUpdate.athleteTimerEventType.toLowerCase() : 'stopped',
+		timeRemaining: fopUpdate?.athleteMillisRemaining ? parseInt(fopUpdate.athleteMillisRemaining) : 0,
+		duration: fopUpdate?.timeAllowed ? parseInt(fopUpdate.timeAllowed) : 60000,
+		startTime: null // Client will compute this
 	};
 }
 

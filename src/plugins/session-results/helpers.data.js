@@ -5,6 +5,12 @@
 import { competitionHub } from '$lib/server/competition-hub.js';
 
 /**
+ * Plugin-specific cache to avoid recomputing session results on every browser request
+ * Structure: { 'cacheKey': { competition, groupAthletes, rankings, ... } }
+ */
+const sessionResultsCache = new Map();
+
+/**
  * Get the full database state (raw athlete data) - SERVER-SIDE ONLY
  * @returns {Object|null} Raw database state from OWLCMS
  */
@@ -53,6 +59,27 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		};
 	}
 
+	// Check cache first - cache key based on group athletes data, NOT timer events
+	// Use a hash of groupAthletes to detect when athlete data actually changes
+	// groupAthletes is now a parsed object, so stringify it first for hashing
+	const groupAthletesHash = fopUpdate?.groupAthletes ? 
+		JSON.stringify(fopUpdate.groupAthletes).substring(0, 100) : ''; // First 100 chars as quick hash
+	const cacheKey = `${fopName}-${groupAthletesHash}-${showRecords}`;
+	
+	if (sessionResultsCache.has(cacheKey)) {
+		const cached = sessionResultsCache.get(cacheKey);
+		console.log(`[Session Results] ✓ Cache hit for ${fopName} (${sessionResultsCache.size} entries cached)`);
+		
+		// Return cached data with current timer state (timer can change without full update)
+		return {
+			...cached,
+			timer: extractTimerState(fopUpdate),
+			learningMode
+		};
+	}
+	
+	console.log(`[Session Results] Cache miss for ${fopName}, computing results data...`);
+
 	// Extract basic competition info
 	const competition = {
 		name: fopUpdate?.competitionName || databaseState?.competition?.name || 'Competition',
@@ -96,11 +123,8 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// This contains all athletes in standard order (sorted by category, lot number)
 	let groupAthletes = [];
 	if (fopUpdate?.groupAthletes) {
-		try {
-			groupAthletes = JSON.parse(fopUpdate.groupAthletes);
-		} catch (err) {
-			console.error('[Scoreboard Helper] Failed to parse groupAthletes:', err);
-		}
+		// groupAthletes is already a parsed object (nested JSON from WebSocket)
+		groupAthletes = fopUpdate.groupAthletes;
 	}
 	
 	// Get competition stats (needed even for waiting status)
@@ -128,7 +152,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// For session results, we use groupAthletes (standard order) instead of liftingOrderAthletes
 	// groupAthletes is already sorted by category and lot number from OWLCMS
 
-	return {
+	const result = {
 		competition,
 		currentAttempt,
 		timer,
@@ -145,8 +169,52 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		breakType: fopUpdate?.breakType,
 		status: (fopUpdate || databaseState) ? 'ready' : 'waiting',
 		lastUpdate: fopUpdate?.lastUpdate || Date.now(),
-		learningMode,
 		options: { showRecords } // Echo back the options used
+	};
+	
+	// Cache the result (excluding timer which changes frequently and learningMode)
+	sessionResultsCache.set(cacheKey, {
+		competition: result.competition,
+		currentAttempt: result.currentAttempt,
+		liftingOrderAthletes: result.liftingOrderAthletes,
+		groupAthletes: result.groupAthletes,
+		stats: result.stats,
+		displaySettings: result.displaySettings,
+		isBreak: result.isBreak,
+		breakType: result.breakType,
+		status: result.status,
+		lastUpdate: result.lastUpdate,
+		options: result.options
+	});
+	
+	// Cleanup old cache entries (keep last 20)
+	if (sessionResultsCache.size > 20) {
+		const firstKey = sessionResultsCache.keys().next().value;
+		sessionResultsCache.delete(firstKey);
+	}
+	
+	console.log(`[Session Results] Cached result for ${cacheKey} (${sessionResultsCache.size} entries)`);
+
+	return {
+		...result,
+		learningMode
+	};
+}
+
+/**
+ * Extract timer state from FOP update (called separately since timer changes frequently)
+ * @param {Object} fopUpdate - FOP update data
+ * @returns {Object} Timer state
+ */
+function extractTimerState(fopUpdate) {
+	return {
+		state: fopUpdate?.athleteTimerEventType === 'StartTime' ? 'running' : 
+		       fopUpdate?.athleteTimerEventType === 'StopTime' ? 'stopped' : 
+		       fopUpdate?.athleteTimerEventType === 'SetTime' ? 'set' :
+		       fopUpdate?.athleteTimerEventType ? fopUpdate.athleteTimerEventType.toLowerCase() : 'stopped',
+		timeRemaining: fopUpdate?.athleteMillisRemaining ? parseInt(fopUpdate.athleteMillisRemaining) : 0,
+		duration: fopUpdate?.timeAllowed ? parseInt(fopUpdate.timeAllowed) : 60000,
+		startTime: null // Client will compute this
 	};
 }
 

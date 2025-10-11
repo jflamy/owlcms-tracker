@@ -24,13 +24,32 @@ A SvelteKit application that receives real-time competition updates from OWLCMS 
 
 ## OWLCMS Configuration Required
 
-**Before using this tracker**, you must configure OWLCMS to send data here:
+**Before using this tracker**, you must configure OWLCMS to send data via WebSocket:
 
 In OWLCMS: **Prepare Competition → Language and System Settings → Connections → URL for Video Data**
 
-Set to: `http://localhost:8096` (or your tracker's address)
+Set to: `ws://localhost:8096/ws` (or `wss://your-tracker-host:8096/ws` for secure connections)
 
 **That's it!** No code changes to OWLCMS needed - just this URL setting.
+
+### WebSocket Message Format
+
+OWLCMS sends messages in this format:
+
+```json
+{
+  "type": "update|timer|decision|database",
+  "payload": {
+    // Nested JSON objects with competition data
+  }
+}
+```
+
+**Message Types:**
+- **`database`** - Full competition data synchronization (athletes, FOPs, categories, databaseChecksum)
+- **`update`** - Lifting order changes, athlete switches, UI events
+- **`timer`** - Timer start/stop/set events
+- **`decision`** - Referee decisions and down signals
 
 ## Features
 
@@ -101,9 +120,9 @@ The app will be available at **http://localhost:8096**
 - Environment Variable: `LEARNING_MODE=true`
 
 **What it captures:**
-- Every HTTP POST from OWLCMS with ISO8601 timestamp
-- Raw form data and parsed fields
-- Message size and content type
+- Every WebSocket message from OWLCMS with ISO8601 timestamp
+- Message type and parsed payload fields
+- Message size and content
 - Saves to `samples/message-[timestamp].json`
 
 **Startup logs in learning mode:**
@@ -137,13 +156,7 @@ In OWLCMS, go to:
 
 **Prepare Competition → Language and System Settings → Connections → URL for Video Data**
 
-Set to: `http://localhost:8096` (or your tracker host)
-
-OWLCMS will then send to these endpoints:
-- `http://localhost:8096/database` - Full competition data
-- `http://localhost:8096/update` - Lifting order updates
-- `http://localhost:8096/timer` - Timer events
-- `http://localhost:8096/decision` - Referee decisions
+Set to: `ws://localhost:8096/ws` (or `ws://your-tracker-host:8096/ws`)
 
 **No code changes to OWLCMS are needed** - just this one configuration setting.
 
@@ -170,66 +183,47 @@ Want to create your own scoreboard types? See **[CREATE_YOUR_OWN.md](./CREATE_YO
 
 The plugin system makes it easy to create custom displays - whether you're a programmer or using AI assistance.
 
-## 🔬 Learning Mode
-
-**Learning mode captures all OWLCMS messages** to understand the data format.
-
-**Enable:**
-
-In OWLCMS, configure the EventForwarder settings:
-
-- **URL**: `http://your-tracker-host:8096/api/update`
-- **Update Key**: Set `UPDATE_KEY` environment variable (default: "development-key")
-
-### 3. View Competition Data
-
-Open http://localhost:5173 to see available views:
-
-- **Leaderboard**: Overall competition rankings
-- **Current Lifter**: Live attempt display with timer
-- **Team Standings**: Team-based scores
-
 ## API Endpoints
 
-### `/api/update` (POST)
-Receives form-encoded updates from OWLCMS EventForwarder
-- Authentication via `updateKey` parameter
-- Returns 428 when database is required before accepting updates
-- Returns 412 when icons/pictures/configuration is needed *(reserved for future use)*
-- Returns 200 when update is accepted
+### `/api/scoreboard` (GET)
+Get processed data for any scoreboard type.
 
-### `/api/config` (POST) 
-Receives configuration uploads from OWLCMS
-- Handles multipart uploads with local.zip
+**Parameters:**
+- `type` - Scoreboard type (e.g., `lifting-order`)
+- `fop` - FOP name (required)
+- Any other options defined in the scoreboard's config
+
+**Example:**
+```
+GET /api/scoreboard?type=lifting-order&fop=Platform_A&maxLifters=10
+```
+
+### `/api/scoreboard` (POST)
+Get metadata about available scoreboards and FOPs.
+
+**Actions:**
+- `list_scoreboards` - Get all registered scoreboard types
+- `list_fops` - Get available FOP names from current competition
 
 ### `/api/client-stream` (GET)
 Server-Sent Events stream for browsers
 - Real-time updates to all connected clients
 - No authentication required (read-only)
 
-### `/api/refresh` (POST)
-Manual refresh endpoint
-- Forces re-sync with OWLCMS
-- Useful for troubleshooting
-
 ## Configuration
 
 ### Environment Variables
 
 ```bash
-# Required: Authentication key matching OWLCMS
-UPDATE_KEY=your-secret-key-here
-
 # Optional: Logging level
 LOG_LEVEL=info
+
+# Optional: Enable learning mode
+LEARNING_MODE=true
+
+# TODO: Authentication key for OWLCMS connection (future feature)
+# OWLCMS_UPDATEKEY=your-secret-key-here
 ```
-
-### OWLCMS Settings
-
-In OWLCMS configuration:
-1. Set "Public Results URL" to your tracker's `/api/update` endpoint
-2. Set "Update Key" to match your `UPDATE_KEY`
-3. Enable "Public Results" in competition settings
 
 ## Creating Custom Plugins
 
@@ -292,7 +286,7 @@ src/
 
 ### Data Flow
 
-1. **OWLCMS** sends form-encoded POST to `/api/update`
+1. **OWLCMS** sends WebSocket messages to `ws://localhost:8096/ws`
 2. **Competition Hub** parses OWLCMS data and caches state
 3. **Hub** broadcasts updates via Server-Sent Events
 4. **Browser stores** receive SSE messages and update reactively
@@ -308,9 +302,9 @@ src/
 ### Debugging
 
 - Check browser console for SSE connection status
-- Monitor `/api/update` endpoint for OWLCMS posts
-- Use `/api/refresh` to force OWLCMS resync
-- Verify `UPDATE_KEY` matches between systems
+- Verify OWLCMS WebSocket configuration is correct (`ws://localhost:8096/ws`)
+- Use learning mode to capture incoming messages
+- Check server console for WebSocket connection logs
 
 ## License
 

@@ -27,7 +27,7 @@ export {};
 
 declare module "$app/types" {
 	export interface AppTypes {
-		RouteId(): "/" | "/api" | "/api/client-stream" | "/api/config" | "/api/refresh" | "/api/scoreboard" | "/api/status" | "/config" | "/database" | "/decision" | "/favicon.png" | "/robots.txt" | "/timer" | "/update" | "/[scoreboard]";
+		RouteId(): "/" | "/api" | "/api/client-stream" | "/api/config" | "/api/refresh" | "/api/scoreboard" | "/api/status" | "/config" | "/database" | "/favicon.png" | "/robots.txt" | "/[scoreboard]";
 		RouteParams(): {
 			"/[scoreboard]": { scoreboard: string }
 		};
@@ -41,14 +41,11 @@ declare module "$app/types" {
 			"/api/status": Record<string, never>;
 			"/config": Record<string, never>;
 			"/database": Record<string, never>;
-			"/decision": Record<string, never>;
 			"/favicon.png": Record<string, never>;
 			"/robots.txt": Record<string, never>;
-			"/timer": Record<string, never>;
-			"/update": Record<string, never>;
 			"/[scoreboard]": { scoreboard: string }
 		};
-		Pathname(): "/" | "/api" | "/api/" | "/api/client-stream" | "/api/client-stream/" | "/api/config" | "/api/config/" | "/api/refresh" | "/api/refresh/" | "/api/scoreboard" | "/api/scoreboard/" | "/api/status" | "/api/status/" | "/config" | "/config/" | "/database" | "/database/" | "/decision" | "/decision/" | "/favicon.png" | "/favicon.png/" | "/robots.txt" | "/robots.txt/" | "/timer" | "/timer/" | "/update" | "/update/" | `/${string}` & {} | `/${string}/` & {};
+		Pathname(): "/" | "/api" | "/api/" | "/api/client-stream" | "/api/client-stream/" | "/api/config" | "/api/config/" | "/api/refresh" | "/api/refresh/" | "/api/scoreboard" | "/api/scoreboard/" | "/api/status" | "/api/status/" | "/config" | "/config/" | "/database" | "/database/" | "/favicon.png" | "/favicon.png/" | "/robots.txt" | "/robots.txt/" | `/${string}` & {} | `/${string}/` & {};
 		ResolvedPathname(): `${"" | `/${string}`}${ReturnType<AppTypes['Pathname']>}`;
 		Asset(): "/favicon.svg" | string & {};
 	}
