@@ -54,20 +54,30 @@
 </svelte:head>
 
 <div class="scoreboard">
-	<!-- Current Lifter Header -->
+	<!-- Current Lifter Header (only show when we have data) -->
+	{#if data.status !== 'waiting'}
 	<header class="header">
 		<div class="lifter-info">
+			{#if data.sessionStatus?.isDone}
+			<span class="lifter-name">{data.sessionStatusMessage || 'Session Done.'}</span>
+			{:else}
 			<span class="start-number">{currentAttempt?.startNumber || '-'}</span>
 			<span class="lifter-name">{currentAttempt?.fullName || 'No athlete currently lifting'}</span>
 			<span class="team">{currentAttempt?.teamName || ''}</span>
 			<span class="attempt-label">{@html currentAttempt?.attempt || ''}</span>
 			<span class="weight">{currentAttempt?.weight || '-'} kg</span>
 			<span class="timer" class:running={timerState.isRunning} class:warning={timerState.isWarning}>{timerState.display}</span>
+			{/if}
 		</div>
 		<div class="session-info">
-			Session Scoreboard - {data.competition?.groupInfo || 'Session'} - {allAthletes.filter(a => a.snatch1 || a.snatch2 || a.snatch3 || a.cleanJerk1 || a.cleanJerk2 || a.cleanJerk3).length} attempts done.
+			{#if data.sessionStatus?.isDone}
+				{@html '&nbsp;'}
+			{:else}
+				Session Scoreboard - {@html data.competition?.groupInfo || 'Session'} - {allAthletes.filter(a => a.snatch1 || a.snatch2 || a.snatch3 || a.cleanJerk1 || a.cleanJerk2 || a.cleanJerk3).length} attempts done.
+			{/if}
 		</div>
 	</header>
+	{/if}
 
 	<!-- Main Scoreboard Table -->
 	<main class="main">
@@ -251,6 +261,19 @@
 	.session-info {
 		font-size: 0.9rem;
 		color: #888;
+	}
+	
+	/* Session complete header styling */
+	.header.session-complete {
+		background: #1a3a1a; /* Dark green background */
+		padding: 1.5rem;
+	}
+	
+	.header.session-complete .session-info {
+		font-size: 1.2rem;
+		color: #4ade80; /* Bright green text */
+		text-align: center;
+		font-weight: bold;
 	}
 	
 	/* Main Table */

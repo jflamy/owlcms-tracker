@@ -76,15 +76,26 @@
 
 <div class="scoreboard">
 	<!-- Current Lifter Header (conditionally shown) -->
-	{#if data.options?.currentAttemptInfo}
+	{#if data.options?.currentAttemptInfo && data.status !== 'waiting'}
 		<header class="header">
 			<div class="lifter-info">
+				{#if data.sessionStatus?.isDone}
+				<span class="lifter-name">{data.sessionStatusMessage || 'Session Done.'}</span>
+				{:else}
 				<span class="start-number">{currentAttempt?.startNumber || '-'}</span>
 				<span class="lifter-name">{currentAttempt?.fullName || 'No athlete currently lifting'}</span>
 				<span class="team">{currentAttempt?.teamName || ''}</span>
 				<span class="attempt-label">{@html currentAttempt?.attempt || ''}</span>
 				<span class="weight">{currentAttempt?.weight || '-'} kg</span>
 				<span class="timer" class:running={timerState.isRunning} class:warning={timerState.isWarning}>{timerState.display}</span>
+				{/if}
+			</div>
+			<div class="session-info">
+				{#if data.sessionStatus?.isDone}
+					{@html '&nbsp;'}
+				{:else}
+					Team Scoreboard - {data.competition?.groupInfo || 'Session'} - {allAthletes.filter(a => a.snatch1 || a.snatch2 || a.snatch3 || a.cleanJerk1 || a.cleanJerk2 || a.cleanJerk3).length} attempts done.
+				{/if}
 			</div>
 		</header>
 	{/if}

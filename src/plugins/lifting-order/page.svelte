@@ -54,20 +54,30 @@
 </svelte:head>
 
 <div class="scoreboard">
-	<!-- Current Lifter Header -->
+	<!-- Current Lifter Header (only show when we have data) -->
+	{#if data.status !== 'waiting'}
 	<header class="header">
 		<div class="lifter-info">
+			{#if data.sessionStatus?.isDone}
+			<span class="lifter-name">{data.sessionStatusMessage || 'Session Done.'}</span>
+			{:else}
 			<span class="start-number">{currentAttempt?.startNumber || '-'}</span>
 			<span class="lifter-name">{currentAttempt?.fullName || 'No athlete currently lifting'}</span>
 			<span class="team">{currentAttempt?.teamName || ''}</span>
 			<span class="attempt-label">{@html currentAttempt?.attempt || ''}</span>
 			<span class="weight">{currentAttempt?.weight || '-'} kg</span>
 			<span class="timer" class:running={timerState.isRunning} class:warning={timerState.isWarning}>{timerState.display}</span>
+			{/if}
 		</div>
 		<div class="session-info">
-			Lifting Order - {data.competition?.groupInfo || 'Session'} - {allAthletes.filter(a => a.snatch1 || a.snatch2 || a.snatch3 || a.cleanJerk1 || a.cleanJerk2 || a.cleanJerk3).length} attempts done.
+			{#if data.sessionStatus?.isDone}
+				{@html '&nbsp;'}
+			{:else}
+				Lifting Order - {data.competition?.groupInfo || 'Session'} - {allAthletes.filter(a => a.snatch1 || a.snatch2 || a.snatch3 || a.cleanJerk1 || a.cleanJerk2 || a.cleanJerk3).length} attempts done.
+			{/if}
 		</div>
 	</header>
+	{/if}
 
 	<!-- Main Scoreboard Table -->
 	<main class="main">
