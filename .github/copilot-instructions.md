@@ -1,16 +1,27 @@
-# ��� Context for GitHub Copilot: Olympic Weightlifting Competition Display
+# 📋 Context for GitHub Copilot: Olympic Weightlifting Competition Display
 
 You are helping build a **SvelteKit application** that displays the state of an Olympic weightlifting competition in real time.
 
-## ��� Primary Documentation
+## 📚 Primary Documentation
 
 **READ THESE FIRST** when working on this project:
 
 1. **[README.md](../README.md)** - Project overview & setup
 2. **[CREATE_YOUR_OWN.md](../CREATE_YOUR_OWN.md)** - Create custom scoreboards
 3. **[docs/SCOREBOARD_ARCHITECTURE.md](../docs/SCOREBOARD_ARCHITECTURE.md)** - Complete system architecture
+4. **[docs/WEBSOCKET_MESSAGE_SPEC.md](../docs/WEBSOCKET_MESSAGE_SPEC.md)** - WebSocket message format & responses
+5. **[docs/FIELD_MAPPING.md](../docs/FIELD_MAPPING.md)** - Complete field-by-field data mapping
+6. **[docs/FIELD_MAPPING_OVERVIEW.md](../docs/FIELD_MAPPING_OVERVIEW.md)** - Quick reference for data sources
+7. **[docs/CACHING_IMPLEMENTATION.md](../docs/CACHING_IMPLEMENTATION.md)** - Performance & caching strategies
 
-This instructions file provides **AI context only**. For detailed architecture, see the docs above.
+**⚠️ IMPORTANT:** Before making any significant changes to the codebase:
+- Read ALL documentation files in the `/docs` folder
+- Understand the complete architecture and data flow
+- Check existing patterns and conventions
+- Consult the field mapping to understand data structures
+
+
+This instructions file provides **AI context only**. For detailed technical information, always refer to the comprehensive documentation in the `/docs` folder.
 
 ## ���️ Development Environment
 
@@ -21,8 +32,6 @@ This instructions file provides **AI context only**. For detailed architecture, 
 ------
 
 ## 🏗️ Architecture Summary
-
-**Full details in [docs/SCOREBOARD_ARCHITECTURE.md](../docs/SCOREBOARD_ARCHITECTURE.md)**
 
 ```
 OWLCMS (Java Backend)
@@ -76,7 +85,9 @@ Set to: `ws://localhost:8095/ws` (or your tracker host with `ws://` or `wss://` 
 
 **Status Codes:**
 - `200 OK` - Data accepted and stored
-- `428 Precondition Required` - Hub needs database before accepting updates
+- `428 Precondition Required` - Hub needs data before accepting updates (includes `missing` array with list of required data types)
+  - Currently implemented: `database`
+  - Future: `flags`, `styles`, `pictures`
 - `500 Internal Server Error` - Processing error
 
 ------
@@ -110,6 +121,14 @@ src/
     │   └── README.md                  # AI prompts
     ├── results/            # (Future) Results board
     └── team-rankings/      # (Future) Team rankings
+
+tests/                      # Test scripts and utilities
+├── test-428-response.js    # Tests 428 status with missing preconditions
+├── check-websocket.js      # WebSocket connection verification
+├── test-load-sample.js     # Sample data loader
+├── send-test-update.js     # Send test messages
+├── test-sample-data.sh     # Shell script for integration testing
+└── README.md               # Test documentation
 ```
 
 ------
@@ -122,7 +141,7 @@ src/
 
    > "Create a scoreboard that shows the athletes grouped by team, sorted by descending QPoints score, with a team total at the bottom of each group, including the athletes that have not lifted yet. The information on each athlete line is the same as in the standard scoreboard, plus the QPoints and the QPoints rank within their gender."
 
-2. **AI generates the plugin** using scoreboard pattern (see [docs/SCOREBOARD_ARCHITECTURE.md](../docs/SCOREBOARD_ARCHITECTURE.md))
+2. **AI generates the plugin** using scoreboard pattern 
 
 3. **Iterate with natural language:**
 
@@ -135,8 +154,6 @@ src/
 - **Client-side (page-simple.svelte):** Map data to screen, apply styles
 - **No business logic in browser:** OWLCMS computes rankings, lifts, etc.
 - **URL-based options:** Every preference as query parameter
-
-For complete examples and patterns, see [docs/SCOREBOARD_ARCHITECTURE.md](../docs/SCOREBOARD_ARCHITECTURE.md).
 
 ------
 
@@ -168,7 +185,6 @@ For complete examples and patterns, see [docs/SCOREBOARD_ARCHITECTURE.md](../doc
 - Architecture guides, API specifications, field mapping
 - Performance guides, caching strategies
 - **These are committed to the repository** and available to all developers
-- Start here: [docs/README.md](../docs/README.md)
 
 ### `/compliance` - Temporary Working Files (Gitignored)
 - Change logs, compliance checks, refactoring notes
@@ -177,9 +193,17 @@ For complete examples and patterns, see [docs/SCOREBOARD_ARCHITECTURE.md](../doc
 - Each developer maintains their own local working files
 - Can be deleted when work is complete
 
+### `/tests` - Test Scripts and Utilities (Committed)
+- WebSocket connection tests, response validation
+- Sample data loading and sending utilities
+- Shell scripts for integration testing
+- **All test files go here** - see `tests/README.md` for details
+- Run tests from project root: `node tests/test-name.js`
+
 **When to use each:**
 - ✅ Permanent reference → `/docs` (e.g., SCOREBOARD_ARCHITECTURE.md)
 - ✅ Temporary change log → `/compliance` (e.g., TERMINOLOGY_UPDATE.md)
+- ✅ Test scripts → `/tests` (e.g., test-428-response.js)
 
 ------
 
@@ -191,4 +215,3 @@ This architecture is **designed for AI pair programming**. A novice programmer u
 2. Modify existing scoreboards without understanding SSE/WebSocket internals
 3. Add custom scoring rules (team rankings, bonus points, etc.) via helpers
 
-For detailed examples of AI conversations and plugin creation patterns, see [docs/SCOREBOARD_ARCHITECTURE.md](../docs/SCOREBOARD_ARCHITECTURE.md).

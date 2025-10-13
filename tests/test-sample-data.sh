@@ -4,8 +4,8 @@
 
 echo "Loading sample database into OWLCMS tracker..."
 
-# Read the sample database file
-SAMPLE_FILE="samples/2025-10-07T23-06-04-943Z-DATABASE-SWITCHGROUP.json"
+# Read the sample database file (relative to project root)
+SAMPLE_FILE="../samples/2025-10-07T23-06-04-943Z-DATABASE-SWITCHGROUP.json"
 
 if [ ! -f "$SAMPLE_FILE" ]; then
     echo "Sample file not found: $SAMPLE_FILE"

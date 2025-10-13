@@ -12,5 +12,8 @@
   },
   
   // Dock the debug control bar instead of floating
-  "debug.toolBarLocation": "commandCenter"
+  "debug.toolBarLocation": "commandCenter",
+  
+  // Disable markdown link validation to prevent false positives
+  "markdown.validate.enabled": false
 }
