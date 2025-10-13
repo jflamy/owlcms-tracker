@@ -256,4 +256,4 @@ console.log('Database category (legacy ID):', dbAthlete.category);  // 15 (don't
 - `samples/2025-10-*-UPDATE-*.json` - Update endpoint samples with groupAthletes
 
 **Tests:**
-- `test-sample-data.sh` - Script to send sample data to hub
+- `tests/test-sample-data.sh` - Script to send sample data to hub

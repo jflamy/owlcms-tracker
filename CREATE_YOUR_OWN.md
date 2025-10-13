@@ -69,7 +69,7 @@ npm run dev
 Alternatively, use your test script with sample data files:
 
 ```bash
-./test-sample-data.sh
+./tests/test-sample-data.sh
 ```
 
 ### 3. View Scoreboards
@@ -345,7 +345,7 @@ http://localhost:8096/lifting-order?fop=A
 
 **Solutions:**
 1. Check OWLCMS is sending to correct URL
-2. Send test data: `./test-sample-data.sh`
+2. Send test data: `./tests/test-sample-data.sh`
 3. Check hub has data: Look for `[Hub] Update processed` in console
 
 ### "Scoreboard type not found"

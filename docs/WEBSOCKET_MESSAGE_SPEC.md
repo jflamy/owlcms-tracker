@@ -23,17 +23,31 @@ All messages follow this JSON structure:
 **Purpose:** General competition state updates including athlete changes, lifting order, group information
 
 **Key Payload Fields:**
-- `uiEvent` - Event class name that triggered the update
+- `uiEvent` - Event class name that triggered the update (e.g., "LiftingOrderUpdated", "SwitchGroup", "GroupDone")
 - `updateKey` - Validation key
 - `competitionName` - Name of the competition
 - `fop` - Field of play name
-- `break` - Boolean indicating if in break
-- `breakType` - Type of break if applicable
+- `fopState` - Current FOP state (e.g., "BREAK", "CURRENT_ATHLETE", etc.)
+- `break` - Boolean string indicating if in break ("true"/"false")
+- `breakType` - Type of break if applicable (e.g., "GROUP_DONE", "BEFORE_INTRODUCTION", etc.)
+- `groupName` - Name of the current group (empty when session is done)
 - `fullName` - Current athlete's full name
 - `teamName` - Current athlete's team
 - `attemptNumber` - Current attempt number (1-6)
 - `weight` - Requested weight
 - Plus additional athlete, group, and competition data
+
+**Special Events:**
+- **`uiEvent: "GroupDone"`** - Indicates the current session/group has completed
+  - `fopState` will be "BREAK"
+  - `breakType` will be "GROUP_DONE"
+  - `groupName` will be empty string
+  - This signals scoreboards to show final results or session complete message
+  - **Session returns to "in progress" when ANY of the following is received:**
+    - Timer event (type="timer" with any athleteTimerEventType)
+    - Decision event (type="decision" with any decisionEventType)
+    - Any other update event (type="update" with uiEvent that is not "GroupDone")
+  - Tracker automatically detects session reopening and logs: "🔄 Session reopened for FOP X"
 
 **Frequency:** Sent on most UI events + keepalive every 15 seconds
 
@@ -175,4 +189,52 @@ The tracker **only** supports WebSocket connections from OWLCMS. Legacy HTTP POS
 - `type="update"` - Lifting order changes, athlete switches, UI events
 - `type="timer"` - Timer start/stop/set events
 - `type="decision"` - Referee decisions
+
+---
+
+## Response Format
+
+The tracker sends JSON responses back to OWLCMS over the WebSocket connection:
+
+### Success Response (200 OK)
+```json
+{
+  "status": 200,
+  "message": "Update processed"
+}
+```
+
+### Missing Preconditions (428 Precondition Required)
+
+When the tracker needs additional data before processing messages, it returns a 428 status with a list of missing preconditions:
+
+```json
+{
+  "status": 428,
+  "message": "Precondition Required: Missing required data",
+  "reason": "missing_preconditions",
+  "missing": ["database"]
+}
+```
+
+**Preconditions:**
+- `"database"` - Full competition data (athletes, categories, FOPs) - **Currently implemented**
+- `"flags"` - Country/team flag images - **Future**
+- `"styles"` - Custom CSS stylesheets - **Future**
+- `"pictures"` - Athlete photos - **Future**
+
+**OWLCMS Response:** When receiving a 428 status, OWLCMS should send the missing data types. The `missing` array indicates which data types are needed. For example:
+- If `missing: ["database"]`, send a `type="database"` message
+- If `missing: ["database", "flags"]`, send both `type="database"` and `type="flags"` messages
+
+**Note:** The WebSocket connection remains open after a 428 response - this is NOT a termination code.
+
+### Error Response (500 Internal Server Error)
+```json
+{
+  "status": 500,
+  "message": "Unable to process update",
+  "reason": "database_parsing_error"
+}
+```
 
