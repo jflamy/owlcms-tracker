@@ -61,8 +61,9 @@ export function getFopUpdate(fopName = 'A') {
 
 /**
  * Get formatted scoreboard data for SSR/API (SERVER-SIDE ONLY)
- * For team scoreboard: combines current group athletes with all other athletes from database
+ * For team scoreboard: combines current session athletes with all other athletes from database
  * Groups by team and adds spacers between teams
+ * Note: Session athletes are stored in the groupAthletes key (historical name)
  * @param {string} fopName - FOP name (default: 'A')
  * @param {Object} options - User preferences (e.g., { showRecords: true, sortBy: 'total' })
  * @returns {Object} Formatted data ready for browser consumption
@@ -152,40 +153,40 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		startTime: null // Client will compute this
 	};
 
-	// Get precomputed groupAthletes from UPDATE message (athletes in current group)
-	// groupAthletes is already a parsed object (nested JSON from WebSocket)
-	let groupAthletes = [];
+	// Get precomputed session athletes from UPDATE message (stored in groupAthletes key)
+	// Note: groupAthletes is already a parsed object (nested JSON from WebSocket)
+	let sessionAthletes = [];
 	if (fopUpdate?.groupAthletes) {
-		groupAthletes = fopUpdate.groupAthletes;
+		sessionAthletes = fopUpdate.groupAthletes;
 		
 		// Find the current athlete (has 'current' in classname)
-		const currentAthlete = groupAthletes.find(a => a.classname && a.classname.includes('current'));
+		const currentAthlete = sessionAthletes.find(a => a.classname && a.classname.includes('current'));
 		if (currentAthlete) {
 			console.log(`[Team] ✓ Found current athlete: ${currentAthlete.fullName} (lot ${currentAthlete.lotNumber}, start ${currentAthlete.startNumber})`);
-		} else if (groupAthletes.length > 0) {
-			console.log(`[Team] Have ${groupAthletes.length} athletes in current group, but no current athlete lifting`);
+		} else if (sessionAthletes.length > 0) {
+			console.log(`[Team] Have ${sessionAthletes.length} athletes in current session, but no current athlete lifting`);
 		}
 	}
 	
 	// Get all athletes from database
 	let allAthletes = [];
 	if (databaseState?.athletes && Array.isArray(databaseState.athletes)) {
-		// Extract lot numbers from current group to identify who's in the group
-		// groupAthletes now has lotNumber field (as of latest OWLCMS version)
-		// IMPORTANT: Convert to strings for comparison - groupAthletes has strings, database has numbers
-		const currentGroupLotNumbers = new Set(groupAthletes.map(a => String(a.lotNumber)).filter(Boolean));
+		// Extract lot numbers from current session to identify who's in the session
+		// Note: sessionAthletes now has lotNumber field (as of latest OWLCMS version)
+		// IMPORTANT: Convert to strings for comparison - sessionAthletes has strings, database has numbers
+		const currentSessionLotNumbers = new Set(sessionAthletes.map(a => String(a.lotNumber)).filter(Boolean));
 		
-		// STRATEGY: Use groupAthletes data FIRST (they have computed fields), 
-		// then add database-only athletes (those not in current group)
+		// STRATEGY: Use session athletes data FIRST (they have computed fields), 
+		// then add database-only athletes (those not in current session)
 		
-		// Step 1: Start with all groupAthletes (they have all the computed OWLCMS data)
-		allAthletes = groupAthletes.map(ga => ga);
+		// Step 1: Start with all session athletes (they have all the computed OWLCMS data)
+		allAthletes = sessionAthletes.map(sa => sa);
 		
-		// Step 2: Add athletes from database that are NOT in the current group
+		// Step 2: Add athletes from database that are NOT in the current session
 		const databaseOnlyAthletes = databaseState.athletes
-			.filter(dbAthlete => !currentGroupLotNumbers.has(String(dbAthlete.lotNumber)))
+			.filter(dbAthlete => !currentSessionLotNumbers.has(String(dbAthlete.lotNumber)))
 			.map(dbAthlete => {
-				// Format database athlete to match groupAthlete structure
+				// Format database athlete to match session athlete structure
 				const categoryName = dbAthlete.categoryName || getCategoryName(dbAthlete.category, databaseState);
 				
 				return {
@@ -234,17 +235,17 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 					sinclair: dbAthlete.sinclair || 0,
 					globalScore: dbAthlete.globalScore || null,
 					
-					// No classname (not in current group)
-					inCurrentGroup: false
+					// No classname (not in current session)
+					inCurrentSession: false
 				};
 			});
 		
-		// Step 3: Combine groupAthletes + database-only athletes
+		// Step 3: Combine session athletes + database-only athletes
 		allAthletes = [...allAthletes, ...databaseOnlyAthletes];
 		
 	} else {
-		// No database available, use only groupAthletes
-		allAthletes = groupAthletes.map(a => ({ ...a, inCurrentGroup: true }));
+		// No database available, use only session athletes
+		allAthletes = sessionAthletes.map(a => ({ ...a, inCurrentSession: true }));
 	}
 	
 	// Filter athletes by gender if not 'MF'

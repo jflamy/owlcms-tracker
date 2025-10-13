@@ -17,7 +17,7 @@ This system targts **15+ different scoreboard types** with **up to 6 simultaneou
 4. **URL-based configuration** - FOP selection and options via query parameters
 5. **AI-assisted development** - Easy for novices to create/modify scoreboards
 6. **No OWLCMS changes required** - Works with existing data flow
-7. **Group Athletes First, Always** - Use `groupAthletes` from WebSocket type="update" as primary data source; only access `databaseState` for athletes NOT in current group
+7. **Session Athletes First, Always** - Use `groupAthletes` from WebSocket type="update" as primary data source; only access `databaseState` for athletes NOT in current session
 
 ## Data Source Documentation
 
@@ -25,7 +25,7 @@ This system targts **15+ different scoreboard types** with **up to 6 simultaneou
 
 📖 **[FIELD_MAPPING_OVERVIEW.md](./FIELD_MAPPING_OVERVIEW.md)** - Quick reference and navigation guide
 
-**Key principle:** Always use Group Athletes data first (from WebSocket type="update"). Only access Database Athletes (from WebSocket type="database") for athletes NOT in the current group (e.g., athletes from previous sessions, different teams).
+**Key principle:** Always use session athletes data first (from WebSocket type="update", stored in the `groupAthletes` key). Only access Database Athletes (from WebSocket type="database") for athletes NOT in the current session (e.g., athletes from previous sessions, different teams).
 
 **See also:**
 - [FIELD_MAPPING.md](./FIELD_MAPPING.md) - Complete field-by-field mapping reference
@@ -350,7 +350,7 @@ Receives UI event updates (lifting order changes, athlete switches, etc.)
 - `uiEvent`: Event type (e.g., "LiftingOrderUpdated", "SwitchGroup")
 - `fopName` or `fop`: FOP identifier
 - `liftingOrderAthletes`: Nested JSON with precomputed lifting order
-- `groupAthletes`: Nested JSON with all athletes in current group
+- `groupAthletes`: Nested JSON with all athletes in current session
 - Current athlete info: `fullName`, `teamName`, `startNumber`, `weight`, `attempt`, etc.
 
 **Competition Hub stores this as:** `fopUpdates[fopName]`
@@ -429,7 +429,8 @@ export function getScoreboardData(fopName, options = {}) {
 	const sortBy = options.sortBy || 'total';
 	const showTop = options.showTop || 10;
 	
-	// Parse group athletes (primary data source - always use first!)
+	// Parse session athletes (primary data source - always use first!)
+	// Note: The variable is called groupAthletes for historical reasons, but refers to the current lifting session
 	// For field mappings and transformation rules, see:
 	// - docs/FIELD_MAPPING_OVERVIEW.md (quick reference)
 	// - docs/FIELD_MAPPING.md (complete reference)
@@ -681,15 +682,16 @@ export const competitionHub = globalThis.__competitionHub;
 
 ### Data Source Priority
 
-**ALWAYS follow "Group Athletes First" principle:**
+**ALWAYS follow "Session Athletes First" principle:**
 
 1. **Primary source**: `fopUpdate.groupAthletes` (from WebSocket type="update")
    - Contains current session data with highlighting fields
    - Precomputed by OWLCMS with display-ready values
    - Includes `classname` and `className` for visual highlighting
+   - Note: The variable is called `groupAthletes` for historical reasons, but refers to the current lifting session
 
 2. **Secondary source**: `databaseState.athletes` (from WebSocket type="database")
-   - ONLY use for athletes NOT in current `groupAthletes`
+   - ONLY use for athletes NOT in current session (i.e., NOT in `groupAthletes`)
    - Examples: Previous sessions, different teams
    - Requires field transformation (see field mapping docs)
 
@@ -706,8 +708,8 @@ export const competitionHub = globalThis.__competitionHub;
 - Compute custom rankings
 - Extract specific fields
 - Apply user options
-- Use `groupAthletes` as primary data source
-- Only access `databaseState` for athletes NOT in current group
+- Use `groupAthletes` as primary data source for session athletes
+- Only access `databaseState` for athletes NOT in current session
 
 ❌ **DON'T:**
 - Make HTTP requests

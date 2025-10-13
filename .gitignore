@@ -9,3 +9,7 @@ dist-ssr
 !.env.example
 vite.config.js.timestamp-*
 samples/
+
+# Compliance folder - ignore all files except README.md
+compliance/*
+!compliance/README.md

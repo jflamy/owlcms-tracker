@@ -8,7 +8,7 @@
 >
 > ![WhatsApp Image 2025-10-08 at 12 23 27_e98fafa4](https://github.com/user-attachments/assets/2e98bdc8-3ba6-43af-ae7d-85cee68cb11a)
 >
-> Since the tracker has the full database available + the current group, it can do team scoreboards.  In this example, the AI assistant was asked to implement grouping, filtering and score totals.
+> Since the tracker has the full database available + the current session, it can do team scoreboards.  In this example, the AI assistant was asked to implement grouping, filtering and score totals.
 > Additional queries would allow creating buttons to export the data.
 ><img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/b61be0a7-650e-4c28-bdcf-3480bade0e0d" />
 
@@ -19,10 +19,17 @@ A SvelteKit application that receives real-time competition updates from OWLCMS 
 
 ## Documentation
 
-- **[CREATE_YOUR_OWN.md](./CREATE_YOUR_OWN.md)** - Create custom scoreboards
+### Getting Started
+- **[CREATE_YOUR_OWN.md](./CREATE_YOUR_OWN.md)** - Create custom scoreboards (step-by-step guide)
+- **[docs/README.md](./docs/README.md)** - Documentation index and navigation
+
+### Core Reference
 - **[docs/SCOREBOARD_ARCHITECTURE.md](./docs/SCOREBOARD_ARCHITECTURE.md)** - Complete system architecture
+- **[docs/FIELD_MAPPING_OVERVIEW.md](./docs/FIELD_MAPPING_OVERVIEW.md)** - Data source quick reference
 - **[docs/CACHING_IMPLEMENTATION.md](./docs/CACHING_IMPLEMENTATION.md)** - Performance optimization guide
-- **[docs/FIELD_MAPPING_INDEX.md](./docs/FIELD_MAPPING_INDEX.md)** - Data source mapping reference
+- **[docs/WEBSOCKET_MESSAGE_SPEC.md](./docs/WEBSOCKET_MESSAGE_SPEC.md)** - OWLCMS message formats
+
+### Examples
 - **[Plugin README](./src/plugins/lifting-order/README.md)** - Example scoreboard with AI prompts
 
 ## OWLCMS Configuration Required
@@ -50,9 +57,11 @@ OWLCMS sends messages in this format:
 
 **Message Types:**
 - **`database`** - Full competition data synchronization (athletes, FOPs, categories, databaseChecksum)
-- **`update`** - Lifting order changes, athlete switches, UI events
+- **`update`** - Lifting order changes, athlete switches, UI events (includes session athletes in `groupAthletes` field)
 - **`timer`** - Timer start/stop/set events
 - **`decision`** - Referee decisions and down signals
+
+**See [docs/WEBSOCKET_MESSAGE_SPEC.md](./docs/WEBSOCKET_MESSAGE_SPEC.md) for complete message format details.**
 
 ## Features
 
@@ -165,7 +174,7 @@ Set to: `ws://localhost:8096/ws` (or `ws://your-tracker-host:8096/ws`)
 
 ### 4. Create More Scoreboard Types
 
-See **[QUICKSTART.md](./QUICKSTART.md)** for step-by-step instructions.
+See **[CREATE_YOUR_OWN.md](./CREATE_YOUR_OWN.md)** for step-by-step instructions on creating custom scoreboards.
 
 ## Available Scoreboards
 
@@ -321,9 +330,15 @@ MIT License - see LICENSE file for details.
 4. Test with real OWLCMS data
 5. Submit a pull request
 
+**Documentation:**
+- Keep permanent reference docs in `/docs` folder (committed to repo)
+- Use `/compliance` folder for temporary change logs (local only - files are gitignored except README.md)
+- See [docs/README.md](./docs/README.md) for documentation guidelines
+
 ## Support
 
 For issues related to:
 - **OWLCMS integration**: Check OWLCMS documentation
 - **SvelteKit tracker**: Open GitHub issue
 - **Plugin development**: See plugin examples in `src/plugins/`
+- **Documentation**: Start with [docs/README.md](./docs/README.md)

@@ -14,7 +14,7 @@ const cacheKey = `${fopName}-${groupAthletesHash}-${gender}-${topN}-${sortBy}`;
 ```
 
 **Heavy operations cached:**
-- Merging database athletes with group athletes
+- Merging database athletes with session athletes
 - Formatting 6 attempts per athlete (declaration→change→actualLift priority)
 - Grouping athletes by team
 - Computing team totals and scores
@@ -64,7 +64,7 @@ const cacheKey = `${fopName}-${groupAthletesHash}-${showRecords}`;
 **Cache misses (recompute):**
 - ❌ New lifting order (different athletes)
 - ❌ Athlete lifts (classname changes)
-- ❌ Weight change (groupAthletes changes)
+- ❌ Weight change (session data changes in groupAthletes)
 - ❌ Update after decision (new totals/rankings from OWLCMS)
 - ❌ Different user options
 
@@ -108,13 +108,13 @@ function extractDecisionState(fopUpdate) {
 - OWLCMS sends decision (e.g., "GOOD_LIFT", "NO_LIFT")
 - Hub updates `fopUpdates[fopName]` with decision state
 - Hub broadcasts SSE
-- **All browsers hit cache** (groupAthletes unchanged)
+- **All browsers hit cache** (session data in groupAthletes unchanged)
 - Decision state extracted separately and merged with cached data
 - **Result:** Instant decision display with zero recomputation
 
 **Phase 2: Update Event**
 - OWLCMS recomputes rankings/totals based on decision
-- Sends new `groupAthletes` with updated data
+- Sends new `groupAthletes` with updated session data
 - Hub broadcasts SSE
 - **Cache miss** (new data hash)
 - First browser recomputes, remaining browsers hit fresh cache

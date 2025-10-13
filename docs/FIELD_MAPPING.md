@@ -3,10 +3,12 @@
 ## Overview
 
 The team scoreboard merges data from two sources:
-1. **Group Athletes** - From OWLCMS `/update` endpoint (`fopUpdate.groupAthletes`)
+1. **Session Athletes** - From OWLCMS `/update` endpoint (stored in `fopUpdate.groupAthletes` key)
 2. **Database Athletes** - From OWLCMS `/database` endpoint (`databaseState.athletes`)
 
-**Strategy:** Use Group Athletes first (they have computed fields), then add Database-only athletes.
+**Note:** The key is called `groupAthletes` for historical reasons, but it contains the athletes from the current lifting session.
+
+**Strategy:** Use Session Athletes first (they have computed fields), then add Database-only athletes.
 
 ## Data Flow
 
@@ -100,16 +102,16 @@ OWLCMS /update   → Competition Hub → fopUpdates[fopName].groupAthletes (JSON
 | `sinclair` | `groupAthlete.sinclair` | `dbAthlete.sinclair \|\| 0` | Sinclair coefficient score |
 | `globalScore` | `groupAthlete.globalScore` | `dbAthlete.globalScore \|\| null` | Competition-specific score |
 
-### Current Lifting State (Group Athletes ONLY)
+### Current Lifting State (Session Athletes ONLY)
 
-| Display Field | Group Athlete Source | Database Athlete Source | Notes |
+| Display Field | Session Athlete Source | Database Athlete Source | Notes |
 |--------------|---------------------|------------------------|-------|
-| `classname` | **✓ `groupAthlete.classname`** | ❌ Not available | `"current"`, `"current blink"`, `"next"`, `"NONE"` |
-| `inCurrentGroup` | Derived (in group) | `false` | Flag to identify group membership |
+| `classname` | **✓ `sessionAthlete.classname`** | ❌ Not available | `"current"`, `"current blink"`, `"next"`, `"NONE"` |
+| `inCurrentSession` | Derived (in session) | `false` | Flag to identify session membership |
 
 ### Attempt Object Structure
 
-#### From Group Athletes (Precomputed by OWLCMS)
+#### From Session Athletes (Precomputed by OWLCMS)
 ```javascript
 {
   liftStatus: 'request',        // 'empty' | 'request' | 'fail' | 'good'
@@ -131,7 +133,7 @@ formatAttempt(declaration, change1, change2, actualLift, automaticProgression)
 
 ## Key Differences
 
-### Group Athletes (Current Session)
+### Session Athletes (Current Session from groupAthletes key)
 ✅ **Have:**
 - Precomputed attempt objects with `liftStatus` and `stringValue`
 - **`className` field on attempts** (critical for highlighting!)
@@ -182,12 +184,12 @@ const databaseOnlyAthletes = databaseState.athletes
         formatAttempt(snatch3Declaration, snatch3Change1, ...)
       ],
       // ... etc
-      inCurrentGroup: false // ✓ Flag for identification
+      inCurrentSession: false // ✓ Flag for identification
     };
   });
 
 // Step 4: Combine
-allAthletes = [...groupAthletes, ...databaseOnlyAthletes];
+allAthletes = [...sessionAthletes, ...databaseOnlyAthletes];
 ```
 
 ## Why This Strategy?
@@ -548,8 +550,8 @@ This table shows the complete mapping for a sample athlete (GARCIA, Steven) from
 | `sinclair` | `0.0` ✓ | `0.0` ✓ | Sinclair coefficient calculation | Equal |
 | `globalScore` | `null` ✓ | `null` ✓ | Competition-specific score | Equal |
 | **State (Current Lifting)** |
-| `classname` | **⭐ `"current blink"`** | ❌ Not available | N/A - not in database | **Group ONLY!** |
-| `inCurrentGroup` | `true` (implicit) | `false` (set by code) | Flag added during merge | Derived |
+| `classname` | **⭐ `"current blink"`** | ❌ Not available | N/A - not in database | **Session ONLY!** |
+| `inCurrentSession` | `true` (implicit) | `false` (set by code) | Flag added during merge | Derived |
 
 ### Legend
 

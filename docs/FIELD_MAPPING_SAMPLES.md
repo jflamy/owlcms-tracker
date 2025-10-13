@@ -226,7 +226,7 @@ Since JONES finished in a previous session, we transform Database format:
   sinclair: 196.52,
   
   // ❌ NO classname field (not in current session)
-  inCurrentGroup: false                 // ← From previous session
+  inCurrentSession: false                 // ← From previous session
 }
 ```
 
@@ -366,7 +366,7 @@ Since BROWN is not in `groupAthletes`, we transform Database format to match Gro
   total: 133,
   
   // ❌ NO classname field (not in current group)
-  inCurrentGroup: false                 // ← Flag added during merge
+  inCurrentSession: false                 // ← Flag added during merge
 }
 ```
 
@@ -376,7 +376,7 @@ Since BROWN is not in `groupAthletes`, we transform Database format to match Gro
 3. **category** - Use `categoryName` field (Database now has formatted name!)
 4. **sattempts/cattempts** - Must call `formatAttempt()` for each of 6 attempts
 5. **bestSnatch/bestCleanJerk** - Must compute from actualLift fields
-6. **inCurrentGroup** - Must add flag to indicate source
+6. **inCurrentSession** - Must add flag to indicate source
 
 **Transformation Code Example:**
 ```javascript
@@ -401,7 +401,7 @@ function transformDatabaseAthlete(dbAthlete) {
     
     // ❌ No classname - not in current session
     // ❌ No className in attempts - Database doesn't track highlighting
-    inCurrentGroup: false
+    inCurrentSession: false
   };
 }
 ```
@@ -444,7 +444,7 @@ teams = [
             className: " current blink"  // ⭐ Current weight
           }
         ],
-        inCurrentGroup: true            // ✓ From groupAthletes
+        inCurrentSession: true            // ✓ From groupAthletes
       },
       {
         fullName: "BROWN, Alice",
@@ -457,7 +457,7 @@ teams = [
             // ❌ No className
           }
         ],
-        inCurrentGroup: false            // From database only
+        inCurrentSession: false            // From database only
       }
     ]
   },
@@ -476,7 +476,7 @@ teams = [
           { liftStatus: "fail", stringValue: "(68)" },
           { liftStatus: "good", stringValue: "68" }
         ],
-        inCurrentGroup: false            // From previous session (Database only)
+        inCurrentSession: false            // From previous session (Database only)
       }
     ]
   }
@@ -516,7 +516,7 @@ teams = [
 | `sattempts[0].stringValue` | "71" ✓ | "71" (computed) | "65" (computed) |
 | `bestSnatch` | 0 ✓ | 0 ✓ | 68 (computed) |
 | `total` | 0 ✓ | 0 ✓ | 158 ✓ |
-| `inCurrentGroup` | true (implicit) | false (set by us) | false (previous session) |
+| `inCurrentSession` | true (implicit) | false (set by us) | false (previous session) |
 
 ✓ = Used as-is
 ⭐ = Critical for highlighting

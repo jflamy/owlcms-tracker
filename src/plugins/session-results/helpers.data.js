@@ -59,12 +59,12 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		};
 	}
 
-	// Check cache first - cache key based on group athletes data, NOT timer events
-	// Use a hash of groupAthletes to detect when athlete data actually changes
-	// groupAthletes is now a parsed object, so stringify it first for hashing
-	const groupAthletesHash = fopUpdate?.groupAthletes ? 
+	// Check cache first - cache key based on session athletes data, NOT timer events
+	// Use a hash of groupAthletes (which contains session athletes) to detect when data actually changes
+	// Note: groupAthletes is now a parsed object, so stringify it first for hashing
+	const sessionAthletesHash = fopUpdate?.groupAthletes ? 
 		JSON.stringify(fopUpdate.groupAthletes).substring(0, 100) : ''; // First 100 chars as quick hash
-	const cacheKey = `${fopName}-${groupAthletesHash}-${showRecords}`;
+	const cacheKey = `${fopName}-${sessionAthletesHash}-${showRecords}`;
 	
 	if (sessionResultsCache.has(cacheKey)) {
 		const cached = sessionResultsCache.get(cacheKey);
@@ -130,10 +130,10 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// Get competition stats (needed even for waiting status)
 	const stats = getCompetitionStats(databaseState);
 	
-	// If no groupAthletes available, return waiting status
-	// We need the UPDATE message from OWLCMS with precomputed presentation data
+	// If no session athletes available, return waiting status
+	// We need the UPDATE message from OWLCMS with precomputed presentation data (stored in groupAthletes key)
 	if (groupAthletes.length === 0) {
-		console.log('[Session Results] No groupAthletes in UPDATE yet, waiting for UI update from OWLCMS');
+		console.log('[Session Results] No session athletes in UPDATE yet, waiting for UI update from OWLCMS');
 		return {
 			competition,
 			currentAttempt,

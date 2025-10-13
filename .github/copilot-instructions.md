@@ -162,6 +162,27 @@ For complete examples and patterns, see [docs/SCOREBOARD_ARCHITECTURE.md](../doc
 
 ------
 
+## 📁 Documentation Structure
+
+### `/docs` - Permanent Reference Documentation (Committed)
+- Architecture guides, API specifications, field mapping
+- Performance guides, caching strategies
+- **These are committed to the repository** and available to all developers
+- Start here: [docs/README.md](../docs/README.md)
+
+### `/compliance` - Temporary Working Files (Gitignored)
+- Change logs, compliance checks, refactoring notes
+- **Only README.md is committed** - all other files are gitignored
+- Use for temporary AI context during long coding sessions
+- Each developer maintains their own local working files
+- Can be deleted when work is complete
+
+**When to use each:**
+- ✅ Permanent reference → `/docs` (e.g., SCOREBOARD_ARCHITECTURE.md)
+- ✅ Temporary change log → `/compliance` (e.g., TERMINOLOGY_UPDATE.md)
+
+------
+
 ## ��� AI-Assisted Development Target
 
 This architecture is **designed for AI pair programming**. A novice programmer using GitHub Copilot should be able to:
