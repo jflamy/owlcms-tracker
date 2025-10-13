@@ -135,10 +135,12 @@ async function handleUpdateMessage(payload, hasBundledDatabase = false) {
 	if (!competitionHub.getDatabaseState() && !isDatabaseComing && !hasBundledDatabase) {
 		console.log(`[WebSocket] Update received (${uiEvent}) but no database - requesting database`);
 		const interimResult = competitionHub.handleOwlcmsMessage(payload);
+		const missing = competitionHub.getMissingPreconditions();
 		return {
 			status: 428,
-			message: 'Precondition Required: Database needed before accepting updates',
-			reason: interimResult?.reason || 'no_database_state'
+			message: 'Precondition Required: Missing required data',
+			reason: interimResult?.reason || 'no_database_state',
+			missing: missing
 		};
 	}
 	
@@ -162,10 +164,12 @@ async function handleTimerMessage(payload, hasBundledDatabase = false) {
 	if (!competitionHub.getDatabaseState() && !hasBundledDatabase) {
 		console.log('[WebSocket] Timer received but no database - requesting database');
 		const interimResult = competitionHub.handleOwlcmsMessage(payload);
+		const missing = competitionHub.getMissingPreconditions();
 		return {
 			status: 428,
-			message: 'Precondition Required: Database needed before accepting timer events',
-			reason: interimResult?.reason || 'no_database_state'
+			message: 'Precondition Required: Missing required data',
+			reason: interimResult?.reason || 'no_database_state',
+			missing: missing
 		};
 	}
 
@@ -180,10 +184,12 @@ async function handleDecisionMessage(payload, hasBundledDatabase = false) {
 	if (!competitionHub.getDatabaseState() && !hasBundledDatabase) {
 		console.log('[WebSocket] Decision received but no database - requesting database');
 		const interimResult = competitionHub.handleOwlcmsMessage(payload);
+		const missing = competitionHub.getMissingPreconditions();
 		return {
 			status: 428,
-			message: 'Precondition Required: Database needed before accepting decisions',
-			reason: interimResult?.reason || 'no_database_state'
+			message: 'Precondition Required: Missing required data',
+			reason: interimResult?.reason || 'no_database_state',
+			missing: missing
 		};
 	}
 
@@ -228,7 +234,12 @@ function mapHubResultToResponse(result, messageType) {
 	}
 
 	if (result.needsData) {
-		return { status: 428, message: 'Precondition Required: Database needed before accepting updates' };
+		const missing = competitionHub.getMissingPreconditions();
+		return { 
+			status: 428, 
+			message: 'Precondition Required: Missing required data',
+			missing: missing
+		};
 	}
 
 	return { status: 500, message: result.reason || `Unable to process ${messageType}` };
@@ -242,10 +253,12 @@ async function handleGenericMessage(payload, hasBundledDatabase, type) {
 	if (!competitionHub.getDatabaseState() && !hasBundledDatabase) {
 		console.log(`[WebSocket] ${type} message received but no database - requesting database`);
 		const interimResult = competitionHub.handleOwlcmsMessage(payload);
+		const missing = competitionHub.getMissingPreconditions();
 		return {
 			status: 428,
-			message: 'Precondition Required: Database needed before accepting messages',
-			reason: interimResult?.reason || 'no_database_state'
+			message: 'Precondition Required: Missing required data',
+			reason: interimResult?.reason || 'no_database_state',
+			missing: missing
 		};
 	}
 

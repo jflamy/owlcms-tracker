@@ -21,6 +21,10 @@ class CompetitionHub {
     // Structure: { 'A': { liftingOrderAthletes, groupAthletes, fullName, weight, etc. }, 'B': {...}, ... }
     this.fopUpdates = {};
     
+    // Per-FOP session status tracking
+    // Structure: { 'A': { isDone: true/false, groupName: 'M1', lastActivity: timestamp }, ... }
+    this.fopSessionStatus = {};
+    
     // Legacy state property (deprecated, will migrate to fopUpdates)
     this.state = null;
     
@@ -81,6 +85,9 @@ class CompetitionHub {
         fop: fopName
       };
       
+      // Update session status tracking
+      this.updateSessionStatus(fopName, params);
+      
       // Also update legacy state for backward compatibility
       const competitionState = this.parseOwlcmsUpdate(params);
       this.state = {
@@ -99,9 +106,15 @@ class CompetitionHub {
       
       // Check if we have initialized database state
       if (!this.databaseState || !this.databaseState.athletes || this.databaseState.athletes.length === 0) {
-        console.log('[Hub] No database state yet, requesting full database from OWLCMS (update was still processed)');
+        const missing = this.getMissingPreconditions();
+        console.log(`[Hub] Missing preconditions: ${missing.join(', ')}, requesting from OWLCMS (update was still processed)`);
         this.databaseRequested = Date.now();
-        return { accepted: false, needsData: true, reason: 'no_database_state' };
+        return { 
+          accepted: false, 
+          needsData: true, 
+          reason: 'missing_preconditions',
+          missing: missing
+        };
       }
       
       // DISABLED: SwitchGroup refresh - causes issues with category display
@@ -445,6 +458,21 @@ class CompetitionHub {
   }
   
   /**
+   * Check which preconditions are missing
+   * @returns {string[]} Array of missing precondition names (currently only 'database')
+   */
+  getMissingPreconditions() {
+    const missing = [];
+    
+    // Check database
+    if (!this.databaseState || !this.databaseState.athletes || this.databaseState.athletes.length === 0) {
+      missing.push('database');
+    }
+    
+    return missing;
+  }
+  
+  /**
    * Get the latest UPDATE message for a specific FOP
    * @param {string} fopName - Name of the FOP (e.g., 'A', 'B')
    * @returns {Object|null} Latest update data with precomputed liftingOrderAthletes, groupAthletes, etc.
@@ -459,6 +487,85 @@ class CompetitionHub {
    */
   getAllFopUpdates() {
     return this.fopUpdates;
+  }
+  
+  /**
+   * Update session status tracking based on incoming message
+   * Detects when a session is done (GroupDone event) and when it's reopened
+   * 
+   * A session returns to "in progress" (not done) when ANY of the following is received:
+   * - Timer event (athleteTimerEventType)
+   * - Decision event (decisionEventType)
+   * - Any other update event (uiEvent that is not GroupDone)
+   * 
+   * @param {string} fopName - Name of the FOP
+   * @param {Object} params - Message parameters
+   */
+  updateSessionStatus(fopName, params) {
+    const uiEvent = params.uiEvent;
+    const groupName = params.groupName || '';
+    const breakType = params.breakType || '';
+    
+    // Initialize status if not exists
+    if (!this.fopSessionStatus[fopName]) {
+      this.fopSessionStatus[fopName] = {
+        isDone: false,
+        groupName: '',
+        lastActivity: Date.now()
+      };
+    }
+    
+    const status = this.fopSessionStatus[fopName];
+    const wasSessionDone = status.isDone;
+    
+    // Check if session is done
+    if (uiEvent === 'GroupDone' || breakType === 'GROUP_DONE') {
+      status.isDone = true;
+      status.groupName = groupName;
+      status.lastActivity = Date.now();
+      
+      if (!wasSessionDone) {
+        console.log(`[Hub] 🏁 Session completed for FOP ${fopName} (group: ${groupName || 'none'})`);
+      }
+    }
+    // Check if session was reopened (any activity other than GroupDone while marked as done)
+    else if (status.isDone && (uiEvent || params.athleteTimerEventType || params.decisionEventType)) {
+      // Session is active again - could be timer, decision, or any other update
+      const previousGroupName = status.groupName;
+      status.isDone = false;
+      status.groupName = groupName;
+      status.lastActivity = Date.now();
+      
+      console.log(`[Hub] 🔄 Session reopened for FOP ${fopName} (was: ${previousGroupName}, now: ${groupName || 'active'})`);
+    }
+    // Normal activity update
+    else if (!status.isDone) {
+      status.groupName = groupName;
+      status.lastActivity = Date.now();
+    }
+  }
+  
+  /**
+   * Get session status for a specific FOP
+   * @param {string} fopName - Name of the FOP
+   * @returns {Object} Session status { isDone, groupName, lastActivity }
+   */
+  getSessionStatus(fopName = 'A') {
+    return this.fopSessionStatus[fopName] || { 
+      isDone: false, 
+      groupName: '', 
+      lastActivity: 0 
+    };
+  }
+  
+  /**
+   * Check if a session is done for a specific FOP
+   * @param {string} fopName - Name of the FOP
+   * @returns {boolean} True if session is complete
+   */
+  isSessionDone(fopName = 'A') {
+    const status = this.fopSessionStatus[fopName];
+    return status ? status.isDone : false;
   }
   
   /**

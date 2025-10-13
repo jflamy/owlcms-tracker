@@ -59,6 +59,9 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		};
 	}
 
+	// Get session status early (before cache check, so it's always fresh)
+	const sessionStatus = competitionHub.getSessionStatus(fopName);
+
 	// Check cache first - cache key based on session athletes data, NOT timer events
 	// Use a hash of groupAthletes (which contains session athletes) to detect when data actually changes
 	// Note: groupAthletes is now a parsed object, so stringify it first for hashing
@@ -70,10 +73,18 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		const cached = sessionResultsCache.get(cacheKey);
 		console.log(`[Session Results] ✓ Cache hit for ${fopName} (${sessionResultsCache.size} entries cached)`);
 		
-		// Return cached data with current timer state (timer can change without full update)
+		// Compute sessionStatusMessage from current fopUpdate (even on cache hit)
+		let sessionStatusMessage = null;
+		if (sessionStatus.isDone && fopUpdate?.fullName) {
+			sessionStatusMessage = (fopUpdate.fullName || '').replace(/&ndash;/g, '–').replace(/&mdash;/g, '—');
+		}
+		
+		// Return cached data with current timer state, session status, and status message
 		return {
 			...cached,
 			timer: extractTimerState(fopUpdate),
+			sessionStatus,  // Fresh session status
+			sessionStatusMessage,  // Fresh status message
 			learningMode
 		};
 	}
@@ -86,15 +97,21 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		fop: fopName,
 		state: fopUpdate?.fopState || 'INACTIVE',
 		session: fopUpdate?.groupName || 'A',
-		groupInfo: fopUpdate?.groupInfo || ''
+		// Replace HTML entities with Unicode characters
+		groupInfo: (fopUpdate?.groupInfo || '').replace(/&ndash;/g, '–').replace(/&mdash;/g, '—')
 	};
 
 	// Extract current athlete info from UPDATE message
 	let currentAttempt = null;
+	let sessionStatusMessage = null;  // For displaying when session is done
+	
 	if (fopUpdate?.fullName) {
+		// Clean up HTML entities in fullName (OWLCMS sends session status here when done)
+		const cleanFullName = (fopUpdate.fullName || '').replace(/&ndash;/g, '–').replace(/&mdash;/g, '—');
+		
 		currentAttempt = {
-			fullName: fopUpdate.fullName,
-			name: fopUpdate.fullName,
+			fullName: cleanFullName,
+			name: cleanFullName,
 			teamName: fopUpdate.teamName,
 			team: fopUpdate.teamName,
 			startNumber: fopUpdate.startNumber,
@@ -106,6 +123,11 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			timeAllowed: fopUpdate.timeAllowed,
 			startTime: fopUpdate.athleteTimerEventType === 'Start' ? Date.now() - (fopUpdate.timeAllowed - (fopUpdate.athleteMillisRemaining || 0)) : null
 		};
+		
+		// If session is done, save the cleaned message separately
+		if (sessionStatus.isDone) {
+			sessionStatusMessage = cleanFullName;
+		}
 	}
 
 	// Extract timer info from UPDATE message or keep previous timer state
@@ -138,6 +160,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			competition,
 			currentAttempt,
 			timer,
+			sessionStatus,  // Include session status even in waiting state
 			liftingOrderAthletes: [],
 			groupAthletes: [],
 			stats,
@@ -156,6 +179,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		competition,
 		currentAttempt,
 		timer,
+		sessionStatusMessage,  // Cleaned message for when session is done
 		liftingOrderAthletes: groupAthletes, // Use groupAthletes for standard order display
 		groupAthletes,                        // Also keep raw groupAthletes
 		stats,
@@ -167,12 +191,13 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		} : {},
 		isBreak: fopUpdate?.break === 'true' || false,
 		breakType: fopUpdate?.breakType,
+		sessionStatus,  // Include session status (isDone, groupName, lastActivity)
 		status: (fopUpdate || databaseState) ? 'ready' : 'waiting',
 		lastUpdate: fopUpdate?.lastUpdate || Date.now(),
 		options: { showRecords } // Echo back the options used
 	};
 	
-	// Cache the result (excluding timer which changes frequently and learningMode)
+	// Cache the result (excluding timer, learningMode, sessionStatus, and sessionStatusMessage which change frequently)
 	sessionResultsCache.set(cacheKey, {
 		competition: result.competition,
 		currentAttempt: result.currentAttempt,
@@ -197,6 +222,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 
 	return {
 		...result,
+		sessionStatus,  // Always include fresh session status
 		learningMode
 	};
 }
