@@ -192,6 +192,73 @@
 					{/each}
 				</tbody>
 			</table>
+
+			<!-- Leaders from Previous Sessions -->
+			{#if data.leaders && data.leaders.length > 0}
+				<div class="leaders-section">
+					<h2 class="leaders-title">Leaders from Previous Sessions {data.competition?.groupInfo ? data.competition.groupInfo.split('–')[0].trim() : ''}</h2>
+					<table class="leaders-table">
+						<thead>
+							<tr>
+								<th class="col-name">Name</th>
+								<th class="col-cat">Cat.</th>
+								<th class="col-born">Born</th>
+								<th class="col-team">Team</th>
+								<th class="v-spacer"></th>
+								<th class="col-attempt">1</th>
+								<th class="col-attempt">2</th>
+								<th class="col-attempt">3</th>
+								<th class="col-best">✓</th>
+								<th class="v-spacer"></th>
+								<th class="col-attempt">1</th>
+								<th class="col-attempt">2</th>
+								<th class="col-attempt">3</th>
+								<th class="col-best">✓</th>
+								<th class="v-spacer"></th>
+								<th class="col-total">Total</th>
+								<th class="col-rank">Rank</th>
+							</tr>
+						</thead>
+						<tbody>
+							{#each data.leaders as leader}
+								<tr>
+									<td class="name">{leader.fullName || ''}</td>
+									<td class="cat">{leader.category || ''}</td>
+									<td class="born">{leader.yearOfBirth || ''}</td>
+									<td class="team">{leader.teamName || ''}</td>
+									<td class="v-spacer"></td>
+									<!-- Snatch attempts -->
+									<td class="attempt {getAttemptClass(leader.sattempts?.[0])}">
+										{displayAttempt(leader.sattempts?.[0])}
+									</td>
+									<td class="attempt {getAttemptClass(leader.sattempts?.[1])}">
+										{displayAttempt(leader.sattempts?.[1])}
+									</td>
+									<td class="attempt {getAttemptClass(leader.sattempts?.[2])}">
+										{displayAttempt(leader.sattempts?.[2])}
+									</td>
+									<td class="best">{leader.bestSnatch || '-'}</td>
+									<td class="v-spacer"></td>
+									<!-- Clean & Jerk attempts -->
+									<td class="attempt {getAttemptClass(leader.cattempts?.[0])}">
+										{displayAttempt(leader.cattempts?.[0])}
+									</td>
+									<td class="attempt {getAttemptClass(leader.cattempts?.[1])}">
+										{displayAttempt(leader.cattempts?.[1])}
+									</td>
+									<td class="attempt {getAttemptClass(leader.cattempts?.[2])}">
+										{displayAttempt(leader.cattempts?.[2])}
+									</td>
+									<td class="best">{leader.bestCleanJerk || '-'}</td>
+									<td class="v-spacer"></td>
+									<td class="total">{leader.total || '-'}</td>
+									<td class="rank">{leader.totalRank || '-'}</td>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+				</div>
+			{/if}
 		{/if}
 	</main>
 </div>
@@ -794,5 +861,62 @@
 			text-overflow: ellipsis;
 			white-space: nowrap;
 		}
+	}
+
+	/* Leaders Section Styles */
+	.leaders-section {
+		margin-top: 2rem;
+		padding-top: 1.5rem;
+		border-top: 3px solid #555;
+	}
+
+	.leaders-title {
+		font-size: 1.5rem;
+		font-weight: bold;
+		color: #ccc;
+		margin-bottom: 1rem;
+		padding-left: 0.5rem;
+	}
+
+	.leaders-table {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: 1rem;
+	}
+
+	.leaders-table thead {
+		background: #1a1a1a;
+		font-weight: bold;
+	}
+
+	.leaders-table th {
+		padding: 0.5rem;
+		text-align: center;
+		border: 1px solid #555;
+		font-size: 0.9rem;
+	}
+
+	.leaders-table tbody tr {
+		background: #222;
+	}
+
+	.leaders-table tbody tr:nth-child(even) {
+		background: #2a2a2a;
+	}
+
+	.leaders-table td {
+		padding: 0.4rem;
+		text-align: center;
+		border: 1px solid #444;
+		font-size: 0.9rem;
+	}
+
+	.leaders-table td.name {
+		text-align: left;
+		font-weight: bold;
+	}
+
+	.leaders-table td.team {
+		text-align: left;
 	}
 </style>

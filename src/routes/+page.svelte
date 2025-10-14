@@ -449,20 +449,6 @@
     color: #667eea;
   }
   
-  .scoreboard-card.placeholder {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-  
-  .scoreboard-card.placeholder h3 {
-    color: #a0aec0;
-  }
-  
-  .scoreboard-card.placeholder:hover {
-    transform: none;
-    box-shadow: none;
-  }
-  
   .scoreboard-card .description {
     font-size: 0.95rem;
     margin-bottom: 1.5rem;
@@ -498,14 +484,6 @@
   .fop-link:hover {
     transform: scale(1.02);
     box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-  }
-  
-  .fop-link.disabled,
-  .fop-links.disabled .fop-link {
-    background: rgba(255, 255, 255, 0.1);
-    color: #718096;
-    cursor: not-allowed;
-    pointer-events: none;
   }
   
   .options-btn {

@@ -161,6 +161,13 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// Get competition stats (needed even for waiting status)
 	const stats = getCompetitionStats(databaseState);
 	
+	// Extract leaders from fopUpdate (now a proper JSON array from OWLCMS)
+	let leaders = [];
+	if (fopUpdate?.leaders && Array.isArray(fopUpdate.leaders)) {
+		// Filter out spacers and take only athlete objects
+		leaders = fopUpdate.leaders.filter(leader => !leader.isSpacer);
+	}
+	
 	// Compute sessionStatusMessage from current fopUpdate
 	let sessionStatusMessage = null;
 	if (sessionStatus.isDone && fopUpdate?.fullName) {
@@ -191,6 +198,11 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// For session results, we use groupAthletes (standard order) instead of liftingOrderAthletes
 	// groupAthletes is already sorted by category and lot number from OWLCMS
 
+	// Determine status and message
+	const hasData = !!(fopUpdate || databaseState);
+	const status = hasData ? 'ready' : 'waiting';
+	const message = hasData ? null : `⏳ Waiting for competition data for platform "${fopName}"...`;
+
 	const result = {
 		scoreboardName: 'Session Results',  // Scoreboard display name
 		competition,
@@ -201,6 +213,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		sortedAthletes: groupAthletes,        // Standardized field name (OWLCMS standard order)
 		liftingOrderAthletes: groupAthletes, // Keep for backwards compatibility
 		groupAthletes,                        // Also keep raw groupAthletes
+		leaders,                              // Leaders from previous sessions (from OWLCMS)
 		stats,
 		displaySettings: fopUpdate?.showTotalRank || fopUpdate?.showSinclair ? {
 			showTotalRank: fopUpdate.showTotalRank === 'true',
@@ -211,7 +224,8 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		isBreak: fopUpdate?.break === 'true' || false,
 		breakType: fopUpdate?.breakType,
 		sessionStatus,  // Include session status (isDone, groupName, lastActivity)
-		status: (fopUpdate || databaseState) ? 'ready' : 'waiting',
+		status,
+		message,  // Add helpful waiting message
 		lastUpdate: fopUpdate?.lastUpdate || Date.now(),
 		options: { showRecords } // Echo back the options used
 	};
@@ -224,11 +238,13 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		sortedAthletes: result.sortedAthletes,
 		liftingOrderAthletes: result.liftingOrderAthletes,
 		groupAthletes: result.groupAthletes,
+		leaders: result.leaders,  // Include leaders in cache
 		stats: result.stats,
 		displaySettings: result.displaySettings,
 		isBreak: result.isBreak,
 		breakType: result.breakType,
 		status: result.status,
+		message: result.message,  // Include waiting message in cache
 		lastUpdate: result.lastUpdate,
 		options: result.options
 	});
