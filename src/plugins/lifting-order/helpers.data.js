@@ -11,6 +11,12 @@ import { competitionHub } from '$lib/server/competition-hub.js';
 const liftingOrderCache = new Map();
 
 /**
+ * Per-FOP timer state tracking (persistent across requests)
+ * Structure: { 'fopName': { active: boolean|null, running: boolean } }
+ */
+const timerStateMap = new Map();
+
+/**
  * Get the full database state (raw athlete data) - SERVER-SIDE ONLY
  * @returns {Object|null} Raw database state from OWLCMS
  */
@@ -80,10 +86,11 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			sessionStatusMessage = (fopUpdate.fullName || '').replace(/&ndash;/g, '–').replace(/&mdash;/g, '—');
 		}
 		
-		// Return cached data with current timer state, session status, and status message
+		// Return cached data with current timer state, decision state, session status, and status message
 		return {
 			...cached,
-			timer: extractTimerState(fopUpdate),
+			timer: extractTimerState(fopUpdate, fopName),
+			decision: extractDecisionState(fopUpdate),
 			sessionStatus,  // Fresh session status
 			sessionStatusMessage,  // Fresh status message
 			learningMode
@@ -97,7 +104,8 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		state: fopUpdate?.fopState || 'INACTIVE',
 		session: fopUpdate?.groupName || 'A',
 		// Replace HTML entities with Unicode characters
-		groupInfo: (fopUpdate?.groupInfo || '').replace(/&ndash;/g, '–').replace(/&mdash;/g, '—')
+		groupInfo: (fopUpdate?.groupInfo || '').replace(/&ndash;/g, '–').replace(/&mdash;/g, '—'),
+		liftsDone: fopUpdate?.liftsDone || ''  // Pre-formatted string from OWLCMS
 	};
 
 	// Extract current athlete info from UPDATE message
@@ -130,15 +138,9 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	}
 
 	// Extract timer info from UPDATE message or keep previous timer state
-	const timer = {
-		state: fopUpdate?.athleteTimerEventType === 'StartTime' ? 'running' : 
-		       fopUpdate?.athleteTimerEventType === 'StopTime' ? 'stopped' : 
-		       fopUpdate?.athleteTimerEventType === 'SetTime' ? 'set' :
-		       fopUpdate?.athleteTimerEventType ? fopUpdate.athleteTimerEventType.toLowerCase() : 'stopped',
-		timeRemaining: fopUpdate?.athleteMillisRemaining ? parseInt(fopUpdate.athleteMillisRemaining) : 0,
-		duration: fopUpdate?.timeAllowed ? parseInt(fopUpdate.timeAllowed) : 60000,
-		startTime: null // Client will compute this
-	};
+	// Extract timer state and decision state
+	const timer = extractTimerState(fopUpdate, fopName);
+	const decision = extractDecisionState(fopUpdate);
 
 	// Get precomputed liftingOrderAthletes from UPDATE message (already parsed as nested object)
 	let liftingOrderAthletes = [];
@@ -159,11 +161,14 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	const stats = getCompetitionStats(databaseState);
 
 	const result = {
+		scoreboardName: 'Lifting Order',  // Scoreboard display name
 		competition,
 		currentAttempt,
 		timer,
+		decision,  // Decision state (lights, down signal)
 		sessionStatusMessage,  // Cleaned message for when session is done
-		liftingOrderAthletes, // Precomputed from OWLCMS UPDATE
+		sortedAthletes: liftingOrderAthletes, // Standardized field name (lifting order)
+		liftingOrderAthletes, // Keep for backwards compatibility
 		groupAthletes,         // Precomputed from OWLCMS UPDATE
 		rankings,              // Computed from database
 		stats,
@@ -183,8 +188,10 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	
 	// Cache the result (excluding timer, learningMode, sessionStatus, and sessionStatusMessage which change frequently)
 	liftingOrderCache.set(cacheKey, {
+		scoreboardName: result.scoreboardName,
 		competition: result.competition,
 		currentAttempt: result.currentAttempt,
+		sortedAthletes: result.sortedAthletes,
 		liftingOrderAthletes: result.liftingOrderAthletes,
 		groupAthletes: result.groupAthletes,
 		rankings: result.rankings,
@@ -215,15 +222,127 @@ export function getScoreboardData(fopName = 'A', options = {}) {
  * @param {Object} fopUpdate - FOP update data
  * @returns {Object} Timer state
  */
-function extractTimerState(fopUpdate) {
+/**
+ * Extract timer state from FOP update (called separately since timer changes frequently)
+ * Timer visibility rules (same as session-results):
+ * - Show when SetTime or StartTime is received
+ * - Timer stays visible even after StopTime (until decision shown)
+ * - On page load, initialize from current timer event type
+ * @param {Object} fopUpdate - FOP update data
+ * @param {string} fopName - FOP name for state tracking
+ * @returns {Object} Timer state with isActive flag
+ */
+function extractTimerState(fopUpdate, fopName = 'A') {
+	if (!timerStateMap.has(fopName)) {
+		timerStateMap.set(fopName, { active: null, running: false });
+	}
+
+	const stateRef = timerStateMap.get(fopName);
+	let { active, running } = stateRef;
+
+	const eventType = fopUpdate?.athleteTimerEventType;
+	const timeRemaining = parseInt(fopUpdate?.athleteMillisRemaining || 0);
+
+	// Initialize state on first call from current fopUpdate data
+	if (active === null) {
+		if (eventType === 'StartTime') {
+			active = true;
+			running = true;
+		} else if (eventType === 'SetTime') {
+			active = true;
+			running = false;
+		} else if (eventType === 'StopTime') {
+			active = false;
+			running = false;
+		} else if (timeRemaining > 0) {
+			active = true;
+			running = false;
+		} else {
+			active = false;
+			running = false;
+		}
+	}
+
+	// State machine for timer visibility and running state
+	// For lifting order scoreboard: timer stays visible until decision is shown
+	if (eventType === 'SetTime') {
+		active = true;
+		running = false;
+	} else if (eventType === 'StartTime') {
+		active = true;
+		running = true;
+	} else if (eventType === 'StopTime') {
+		// StopTime keeps timer visible (just stops counting)
+		// Decision display will hide it when referee decisions come
+		active = true;
+		running = false;
+	}
+
+	timerStateMap.set(fopName, { active, running });
+
+	let state = 'stopped';
+	if (active && running) {
+		state = 'running';
+	} else if (active) {
+		state = 'set';
+	}
+
 	return {
-		state: fopUpdate?.athleteTimerEventType === 'StartTime' ? 'running' : 
-		       fopUpdate?.athleteTimerEventType === 'StopTime' ? 'stopped' : 
-		       fopUpdate?.athleteTimerEventType === 'SetTime' ? 'set' :
-		       fopUpdate?.athleteTimerEventType ? fopUpdate.athleteTimerEventType.toLowerCase() : 'stopped',
-		timeRemaining: fopUpdate?.athleteMillisRemaining ? parseInt(fopUpdate.athleteMillisRemaining) : 0,
-		duration: fopUpdate?.timeAllowed ? parseInt(fopUpdate.timeAllowed) : 60000,
-		startTime: null // Client will compute this
+		state,
+		isActive: active,  // Key flag: should timer be visible?
+		timeRemaining,
+		duration: parseInt(fopUpdate?.timeAllowed || 60000),
+		startTime: null
+	};
+}
+
+/**
+ * Extract decision state from FOP update
+ * @param {Object} fopUpdate - FOP update data
+ * @returns {Object} Decision state with visibility and referee decisions
+ */
+function extractDecisionState(fopUpdate) {
+	// Clear decisions when timer starts (new lift beginning)
+	const eventType = fopUpdate?.athleteTimerEventType;
+	if (eventType === 'StartTime') {
+		return {
+			visible: false,
+			type: null,
+			isSingleReferee: false,
+			ref1: null,
+			ref2: null,
+			ref3: null,
+			down: false
+		};
+	}
+	
+	// Decision is visible when:
+	// 1. decisionsVisible flag is true (referee decisions)
+	// 2. decisionEventType is FULL_DECISION (all refs decided)
+	// 3. down signal is true (bar lowered)
+	const isVisible = fopUpdate?.decisionsVisible === 'true' || 
+	                  fopUpdate?.decisionEventType === 'FULL_DECISION' ||
+	                  fopUpdate?.down === 'true';
+	const isSingleReferee = fopUpdate?.singleReferee === 'true' || fopUpdate?.singleReferee === true;
+
+	const mapDecision = (value) => {
+		if (value === 'true') return 'good';
+		if (value === 'false') return 'bad';
+		return null;
+	};
+
+	// If down signal is true but no decisions yet, show pending (null) lights
+	// Otherwise use the actual referee decisions
+	const isDownOnly = fopUpdate?.down === 'true' && fopUpdate?.decisionEventType !== 'FULL_DECISION';
+	
+	return {
+		visible: isVisible,
+		type: fopUpdate?.decisionEventType || null,
+		isSingleReferee,
+		ref1: isDownOnly ? null : mapDecision(fopUpdate?.d1),
+		ref2: isDownOnly ? null : mapDecision(fopUpdate?.d2),
+		ref3: isDownOnly ? null : mapDecision(fopUpdate?.d3),
+		down: fopUpdate?.down === 'true'
 	};
 }
 

@@ -13,9 +13,11 @@
   let expandedCategory = 'standard'; // Start with standard expanded
   
   // Categorize scoreboards
-  $: standardScoreboards = data.scoreboards.filter(s => 
-    s.type === 'lifting-order' || s.type === 'session-results' || s.type === 'rankings'
-  );
+  $: standardScoreboards = [
+    data.scoreboards.find(s => s.type === 'lifting-order'),
+    data.scoreboards.find(s => s.type === 'session-results'),
+    data.scoreboards.find(s => s.type === 'rankings')
+  ].filter(Boolean); // Remove any undefined entries
   
   $: lowerThirdScoreboards = data.scoreboards.filter(s => 
     s.type === 'lower-third'
@@ -148,22 +150,6 @@
                 </div>
               </div>
             {/each}
-            
-            <!-- Placeholder for Rankings -->
-            <div class="scoreboard-card placeholder">
-              <h3>Rankings (Coming Soon)</h3>
-              <p class="description">Competition rankings and leaderboards</p>
-              <div class="fop-links disabled">
-                <h4>Select Platform:</h4>
-                <div class="fop-list">
-                  {#each data.fops as fop}
-                    <div class="fop-row">
-                      <span class="fop-link disabled">Platform {fop}</span>
-                    </div>
-                  {/each}
-                </div>
-              </div>
-            </div>
           </div>
         {/if}
       </section>

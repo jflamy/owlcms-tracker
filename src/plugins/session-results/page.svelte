@@ -24,7 +24,8 @@
 	});
 	
 	$: currentAttempt = data.currentAttempt;
-	$: allAthletes = data.liftingOrderAthletes || [];  // Use lifting order, not start number order
+	$: allAthletes = data.sortedAthletes || [];  // Standardized field name across all scoreboards
+	$: decisionState = data.decision || {};
 	
 	// Sync timer with server when data changes
 	$: if (data.timer) {
@@ -40,6 +41,12 @@
 		if (attempt.liftStatus === 'good') return 'success';
 		return 'empty';
 	}
+
+	function getRefereeClass(value) {
+		if (value === 'good') return 'good';
+		if (value === 'bad') return 'bad';
+		return 'pending';
+	}
 	
 	// Helper to display attempt value from OWLCMS stringValue
 	function displayAttempt(attempt) {
@@ -50,7 +57,7 @@
 </script>
 
 <svelte:head>
-	<title>Session Scoreboard - {data.competition?.name || 'OWLCMS'}</title>
+	<title>{data.scoreboardName || 'Scoreboard'} - {data.competition?.name || 'OWLCMS'}</title>
 </svelte:head>
 
 <div class="scoreboard">
@@ -66,14 +73,34 @@
 			<span class="team">{currentAttempt?.teamName || ''}</span>
 			<span class="attempt-label">{@html currentAttempt?.attempt || ''}</span>
 			<span class="weight">{currentAttempt?.weight || '-'} kg</span>
-			<span class="timer" class:running={timerState.isRunning} class:warning={timerState.isWarning}>{timerState.display}</span>
+			<div class="timer-decision-container">
+				<div 
+					class="timer-slot"
+					class:visible={!decisionState?.visible && data.timer?.isActive}
+					class:running={timerState.isRunning}
+					class:warning={timerState.isWarning}
+				>
+					<span class="timer-display">{timerState.display}</span>
+				</div>
+				<div class="decision-slot" class:visible={decisionState?.visible}>
+					<div class="decision-lights" aria-label="Referee decisions">
+						{#if !decisionState?.isSingleReferee}
+							<div class="referee-light {getRefereeClass(decisionState?.ref1)}"></div>
+						{/if}
+						<div class="referee-light {getRefereeClass(decisionState?.ref2)}"></div>
+						{#if !decisionState?.isSingleReferee}
+							<div class="referee-light {getRefereeClass(decisionState?.ref3)}"></div>
+						{/if}
+					</div>
+				</div>
+			</div>
 			{/if}
 		</div>
 		<div class="session-info">
 			{#if data.sessionStatus?.isDone}
 				{@html '&nbsp;'}
 			{:else}
-				Session Scoreboard - {@html data.competition?.groupInfo || 'Session'} - {allAthletes.filter(a => a.snatch1 || a.snatch2 || a.snatch3 || a.cleanJerk1 || a.cleanJerk2 || a.cleanJerk3).length} attempts done.
+				{data.scoreboardName || 'Scoreboard'} - {@html data.competition?.groupInfo || 'Session'} - {data.competition?.liftsDone || ''}
 			{/if}
 		</div>
 	</header>
@@ -239,28 +266,96 @@
 		color: #4ade80;
 	}
 	
-	.timer {
-		font-size: 1.8rem;
-		font-weight: bold;
-		color: #fbbf24;
-		background: #1a1a1a;
-		padding: 0.4rem 1rem;
-		border-radius: 0.25rem;
-		min-width: 5rem;
-		text-align: center;
+
+	.timer-decision-container {
+		display: flex;
+		align-items: center;
+		justify-content: flex-end;
+		width: 9rem;
+		min-width: 9rem;
+		height: 2.5rem;
+		gap: 0.5rem;
+		flex-shrink: 0;
 	}
-	
-	.timer.running {
+
+	.timer-slot,
+	.decision-slot {
+		display: none;
+		align-items: center;
+		justify-content: center;
+		width: 100%;
+		height: 100%;
+		border-radius: 0.25rem;
+		padding: 0.35rem 0.75rem;
+	}
+
+	.timer-slot {
+		background: #1a1a1a;
+		color: #fbbf24;
+		font-weight: bold;
+	}
+
+	.timer-slot.visible {
+		display: flex;
+	}
+
+	.timer-slot.running {
 		color: #4ade80;
 	}
-	
-	.timer.warning {
+
+	.timer-slot.warning {
 		color: #fbbf24;
+		background: rgba(239, 68, 68, 0.2);
+	}
+
+	.timer-display {
+		font-size: 1.5rem;
+		font-family: 'Courier New', monospace;
+		letter-spacing: 2px;
+	}
+
+	.decision-slot {
+		background: rgba(26, 26, 26, 0.95);
+	}
+
+	.decision-slot.visible {
+		display: flex;
+	}
+
+	.decision-lights {
+		display: flex;
+		gap: 0.5rem;
+		align-items: center;
+	}
+
+	.referee-light {
+		width: 2.2rem;
+		height: 2.2rem;
+		border-radius: 50%;
+		background: rgba(255, 255, 255, 0.1);
+		border: 2px solid rgba(255, 255, 255, 0.2);
+	}
+
+	.referee-light.good {
+		background: #ffffff;
+		border-color: #ffffff;
+	}
+
+	.referee-light.bad {
+		background: #dc2626;
+		border-color: #dc2626;
+	}
+
+	.referee-light.pending {
+		background: rgba(255, 255, 255, 0.1);
+		border-color: rgba(255, 255, 255, 0.2);
 	}
 	
 	.session-info {
-		font-size: 0.9rem;
-		color: #888;
+		font-size: 1.2rem;
+		color: #ccc;
+		font-weight: bold;
+		padding: 0.25rem 0;
 	}
 	
 	/* Main Table */
@@ -503,10 +598,12 @@
 		}
 
 		/* Make timer and start number match the new size */
-		.timer {
-			font-size: 1.125rem; /* Match athlete info size */
-			padding: 0.3rem 0.75rem;
+		.timer-slot {
 			min-width: 3.75rem;
+		}
+
+		.timer-display {
+			font-size: 1.125rem; /* Match athlete info size */
 		}
 
 		.start-number {
@@ -579,7 +676,7 @@
 			line-height: 1.1;
 		}
 
-		.timer {
+		.timer-display {
 			font-size: 1.4rem;
 		}
 

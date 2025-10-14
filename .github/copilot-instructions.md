@@ -150,10 +150,13 @@ tests/                      # Test scripts and utilities
 
 ### Key Principles
 
-- **Server-side (helpers.data.js):** Parse JSON, filter/sort, extract fields
-- **Client-side (page-simple.svelte):** Map data to screen, apply styles
+- **Server-side (helpers.data.js):** Parse JSON, filter/sort, extract fields, compute ALL data transformations
+- **Client-side (page-simple.svelte):** Map data to screen, apply styles - **ZERO data manipulation**
 - **No business logic in browser:** OWLCMS computes rankings, lifts, etc.
 - **URL-based options:** Every preference as query parameter
+- **Caching for scale:** Server processes once, caches result, serves hundreds of browsers
+
+**CRITICAL:** All sorting, filtering, grouping, and data transformations happen in `helpers.data.js` and are cached. Svelte components only display pre-processed data. This ensures hundreds of browsers can connect without redundant computation.
 
 ------
 

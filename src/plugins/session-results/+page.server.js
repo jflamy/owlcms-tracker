@@ -28,6 +28,7 @@ export async function load() {
 				competition: { name: 'Error Loading Data', fop: 'unknown' },
 				currentAthlete: null,
 				timer: { state: 'stopped', timeRemaining: 0 },
+				decision: { visible: false, isSingleReferee: false },
 				liftingOrderAthletes: [],
 				rankings: [],
 				stats: { totalAthletes: 0, activeAthletes: 0, completedAthletes: 0, categories: [], teams: [] },

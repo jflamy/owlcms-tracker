@@ -710,6 +710,9 @@ export const competitionHub = globalThis.__competitionHub;
 - Apply user options
 - Use `groupAthletes` as primary data source for session athletes
 - Only access `databaseState` for athletes NOT in current session
+- **ALL data transformations** (grouping, sorting, spacer insertion, display value computation)
+- Add computed display fields (e.g., `displayRank`, `isSpacer`)
+- Process once, cache result, serve hundreds of browsers
 
 ❌ **DON'T:**
 - Make HTTP requests
@@ -722,13 +725,18 @@ export const competitionHub = globalThis.__competitionHub;
 - Map data to screen positions
 - Apply CSS styles
 - Handle timer countdowns
-- Show/hide elements based on options
+- Show/hide elements based on pre-computed flags from server
+- Render pre-processed data fields (e.g., `athlete.displayRank`)
 
 ❌ **DON'T:**
 - Parse JSON
 - Sort/filter data
 - Compute rankings
 - Implement business logic
+- **ANY data manipulation** (conditional logic, calculations, transformations)
+- Access raw data fields for computation (use pre-computed display fields instead)
+
+**CRITICAL RULE:** All data processing happens server-side in `helpers.data.js` and is cached. Svelte components are pure display - no conditional logic, no calculations. This architectural separation ensures hundreds of browsers can connect without redundant computation.
 
 ## Performance Considerations
 
