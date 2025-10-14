@@ -533,6 +533,8 @@
     display: flex;
     flex-direction: column;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    /* Ensure native form controls (selects, inputs) render in dark mode */
+    color-scheme: dark;
   }
   
   .modal-header {
@@ -653,6 +655,16 @@
     border-radius: 8px;
     color: white;
     font-size: 0.95rem;
+  }
+
+  /* Fix: readable dropdown list items in dark modal (Windows/Chromium/Firefox) */
+  .option-field select option {
+    background-color: #0f172a; /* slate-900 */
+    color: #e5e7eb;            /* slate-200 */
+  }
+  .option-field select option:checked {
+    background-color: #4f46e5; /* indigo-600 */
+    color: #ffffff;
   }
   
   .option-field select:focus,

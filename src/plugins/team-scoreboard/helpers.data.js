@@ -74,7 +74,8 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	
 	// Extract options with defaults
 	const showRecords = options.showRecords ?? false;
-	const sortBy = options.sortBy ?? 'total';
+	// Always sort teams by total score (sum of athlete scores: globalScore→sinclair)
+	const sortBy = 'score';
 	const gender = options.gender ?? 'MF';
 	const currentAttemptInfo = options.currentAttemptInfo ?? false;
 	const topN = options.topN ?? 0;
@@ -273,11 +274,18 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	if (gender !== 'MF') {
 		allAthletes = allAthletes.filter(athlete => athlete.gender === gender);
 	}
+
+	// Always ignore athletes with no team (drop before grouping)
+	allAthletes = allAthletes.filter((athlete) => {
+		const teamRaw = (athlete.teamName ?? athlete.team ?? '').toString().trim();
+		return teamRaw.length > 0;
+	});
 	
 	// Group athletes by team
 	const teamMap = new Map();
 	allAthletes.forEach(athlete => {
-		const teamName = athlete.teamName || athlete.team || 'No Team';
+		const teamName = (athlete.teamName ?? athlete.team ?? '').toString().trim();
+		if (!teamName) return; // skip empty teams entirely
 		if (!teamMap.has(teamName)) {
 			teamMap.set(teamName, []);
 		}
@@ -342,12 +350,8 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		};
 	});
 	
-	// Sort teams by total score or name
-	if (sortBy === 'total') {
-		teams.sort((a, b) => b.teamTotal - a.teamTotal);
-	} else {
-		teams.sort((a, b) => a.teamName.localeCompare(b.teamName));
-	}
+	// Sort teams by total score (highest first)
+	teams.sort((a, b) => b.teamScore - a.teamScore);
 	
 	// Get competition stats
 	const stats = getCompetitionStats(databaseState);
