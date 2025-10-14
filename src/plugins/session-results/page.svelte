@@ -193,15 +193,17 @@
 			</div>
 			{#if data.leaders && data.leaders.length > 0}
 				<div class="leaders-block">
-					<div class="leaders-flex-spacer" aria-hidden="true"></div>
+					<div class="leaders-title">
+						Leaders from Previous Sessions {data.competition?.groupInfo ? data.competition.groupInfo.split('–')[0].trim() : ''}
+					</div>
 					<div class="scoreboard-grid leaders-grid" role="grid">
-						<div class="grid-row leaders-title-row" role="row">
-							<div class="cell leaders-title span-all" role="gridcell">
-								Leaders from Previous Sessions {data.competition?.groupInfo ? data.competition.groupInfo.split('–')[0].trim() : ''}
-							</div>
-						</div>
 						{#each data.leaders as leader}
-							<div class="grid-row leader-row" role="row">
+							{#if leader.isSpacer}
+								<div class="grid-row spacer category-spacer" aria-hidden="true">
+									<div class="cell span-all"></div>
+								</div>
+							{:else}
+								<div class="grid-row leader-row" role="row">
 								<div class="cell start-num" role="gridcell">{leader.subCategory || ''}</div>
 								<div class="cell name" role="gridcell">{leader.fullName || ''}</div>
 								<div class="cell cat" role="gridcell">{leader.category || ''}</div>
@@ -233,6 +235,7 @@
 								<div class="cell total" role="gridcell">{leader.total || '-'}</div>
 								<div class="cell rank" role="gridcell">{leader.totalRank || '-'}</div>
 							</div>
+							{/if}
 						{/each}
 					</div>
 				</div>

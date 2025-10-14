@@ -160,13 +160,14 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// Get competition stats
 	const stats = getCompetitionStats(databaseState);
 
+	
 	// Extract leaders from fopUpdate (now a proper JSON array from OWLCMS)
+	// Filter out OWLCMS spacers (isSpacer flag)
 	let leaders = [];
 	if (fopUpdate?.leaders && Array.isArray(fopUpdate.leaders)) {
-		leaders = fopUpdate.leaders;
+		leaders = fopUpdate.leaders.filter(leader => !leader.isSpacer);
 	}
-
-	const result = {
+		const result = {
 		scoreboardName: 'Lifting Order',  // Scoreboard display name
 		competition,
 		currentAttempt,

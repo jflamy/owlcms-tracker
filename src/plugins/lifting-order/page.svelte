@@ -193,14 +193,16 @@
 			</div>
 			{#if data.leaders && data.leaders.length > 0}
 				<div class="leaders-block">
-					<div class="leaders-flex-spacer" aria-hidden="true"></div>
+					<div class="leaders-title">
+						Leaders from Previous Sessions {data.competition?.groupInfo ? data.competition.groupInfo.split('–')[0].trim() : ''}
+					</div>
 					<div class="scoreboard-grid leaders-grid" role="grid">
-						<div class="grid-row leaders-title-row" role="row">
-							<div class="cell leaders-title span-all" role="gridcell">
-								Leaders from Previous Sessions {data.competition?.groupInfo ? data.competition.groupInfo.split('–')[0].trim() : ''}
-							</div>
-						</div>
 						{#each data.leaders as leader}
+							{#if leader.isSpacer}
+								<div class="grid-row spacer-row" role="row">
+									<div class="cell span-all spacer" aria-hidden="true"></div>
+								</div>
+							{:else}
 							<div class="grid-row leader-row" role="row">
 								<div class="cell start-num" role="gridcell">{leader.subCategory || ''}</div>
 								<div class="cell name" role="gridcell">{leader.fullName || ''}</div>
@@ -233,6 +235,7 @@
 								<div class="cell total" role="gridcell">{leader.total || '-'}</div>
 								<div class="cell rank" role="gridcell">{leader.totalRank || '-'}</div>
 							</div>
+							{/if}
 						{/each}
 					</div>
 				</div>
@@ -618,17 +621,6 @@
 		min-height: var(--col-gap);
 	}
 
-	.leaders-title-row > .leaders-title {
-		grid-column: 1 / -1;
-		background: transparent;
-		border: none;
-		color: #ccc;
-		font-size: 1.2rem;
-		font-weight: bold;
-		justify-content: flex-start;
-		padding: 0.25rem 0;
-	}
-
 	.leaders-block {
 		margin-top: auto;
 		display: flex;
@@ -639,6 +631,17 @@
 	.leaders-flex-spacer {
 		flex: 1 1 auto;
 		min-height: var(--grid-gap-size);
+	}
+
+	.leaders-title {
+		background: transparent;
+		border: none;
+		color: #ccc;
+		font-size: 1.2rem;
+		font-weight: bold;
+		padding: 0.25rem 0;
+		margin-bottom: var(--grid-gap-size);
+		text-align: left;
 	}
 
 	.leaders-grid {

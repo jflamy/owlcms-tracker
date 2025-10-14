@@ -128,7 +128,8 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// Get groupAthletes from UPDATE message (already parsed as nested object)
 	let groupAthletes = [];
 	if (fopUpdate?.groupAthletes) {
-		groupAthletes = fopUpdate.groupAthletes;
+		// Filter out any spacers that OWLCMS might have included
+		groupAthletes = fopUpdate.groupAthletes.filter(a => !a.isSpacer);
 	}
 
 	// Extract current athlete from groupAthletes
@@ -222,11 +223,11 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	const categories = [...new Set(groupAthletes.map(a => a.category).filter(Boolean))];
 	if (categories.length > 1) {
 		const athletesWithSpacers = [];
-		let lastCategory = null;
+		let lastCategory = ''; // Start with empty string instead of null to avoid false match
 		
 		rankedAthletes.forEach(athlete => {
-			// Add spacer before new category (except first)
-			if (athlete.category && athlete.category !== lastCategory && lastCategory !== null) {
+			// Add spacer before new category (including first for visual consistency)
+			if (athlete.category && athlete.category !== lastCategory) {
 				athletesWithSpacers.push({ 
 					isSpacer: true,
 					displayRank: '',
@@ -262,13 +263,14 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	const timer = extractTimerState(fopUpdate, fopName);
 	const decision = extractDecisionState(fopUpdate);
 
+	
 	// Extract leaders from fopUpdate (now a proper JSON array from OWLCMS)
+	// Filter out OWLCMS spacers (isSpacer flag)
 	let leaders = [];
 	if (fopUpdate?.leaders && Array.isArray(fopUpdate.leaders)) {
-		leaders = fopUpdate.leaders;
+		leaders = fopUpdate.leaders.filter(leader => !leader.isSpacer);
 	}
-
-	const result = {
+		const result = {
 		scoreboardName: 'Rankings',  // Scoreboard display name
 		competition,
 		currentAttempt,

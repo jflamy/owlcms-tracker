@@ -162,9 +162,10 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	const stats = getCompetitionStats(databaseState);
 	
 	// Extract leaders from fopUpdate (now a proper JSON array from OWLCMS)
+	// Filter out OWLCMS spacers (isSpacer flag)
 	let leaders = [];
 	if (fopUpdate?.leaders && Array.isArray(fopUpdate.leaders)) {
-		leaders = fopUpdate.leaders;
+		leaders = fopUpdate.leaders.filter(leader => !leader.isSpacer);
 	}
 	
 	// Compute sessionStatusMessage from current fopUpdate
