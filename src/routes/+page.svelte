@@ -9,6 +9,27 @@
   let modalScoreboard = null;
   let modalFop = null;
   
+  // Collapse state for categories (accordion behavior - only one open at a time)
+  let expandedCategory = 'standard'; // Start with standard expanded
+  
+  // Categorize scoreboards
+  $: standardScoreboards = data.scoreboards.filter(s => 
+    s.type === 'lifting-order' || s.type === 'session-results' || s.type === 'rankings'
+  );
+  
+  $: lowerThirdScoreboards = data.scoreboards.filter(s => 
+    s.type === 'lower-third'
+  );
+  
+  $: teamScoreboards = data.scoreboards.filter(s => 
+    s.type === 'team-scoreboard'
+  );
+  
+  // Toggle function for accordion behavior
+  function toggleCategory(category) {
+    expandedCategory = expandedCategory === category ? null : category;
+  }
+  
   // Initialize default options for each scoreboard
   $: {
     data.scoreboards.forEach(scoreboard => {
@@ -80,54 +101,170 @@
 <div class="container">
   <header class="header">
     <h1>🏋️ OWLCMS Tracker</h1>
-    <p class="competition-name">{data.competitionName}</p>
   </header>
 
   {#if data.hasData}
     <main class="main">
-      <section class="info-section">
-        <h2>📊 Available Scoreboards</h2>
-        <p class="description">
-          {data.scoreboards.length} scoreboard type{data.scoreboards.length !== 1 ? 's' : ''} available
-          across {data.fops.length} Platform{data.fops.length !== 1 ? 's' : ''}
-        </p>
-      </section>
-
-      <section class="scoreboards-grid">
-        {#each data.scoreboards as scoreboard}
-          <div class="scoreboard-card">
-            <h3>{scoreboard.name}</h3>
-            <p class="description">{scoreboard.description}</p>
-            
-            <div class="fop-links">
-              <h4>Select Platform:</h4>
-              <div class="fop-list">
-                {#each data.fops as fop}
-                  <div class="fop-row">
-                    <a 
-                      href={getScoreboardUrl(scoreboard.type, fop)}
-                      class="fop-link"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      Platform {fop}
-                    </a>
-                    {#if scoreboard.options && scoreboard.options.length > 0}
-                      <button
-                        class="options-btn"
-                        on:click={() => openOptionsModal(scoreboard, fop)}
-                        title="Configure options for Platform {fop}"
-                      >
-                        ⚙️
-                      </button>
-                    {/if}
+      <!-- Standard Scoreboards -->
+      <section class="scoreboard-category collapsible">
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
+        <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+        <h2 class="category-title clickable" on:click={() => toggleCategory('standard')}>
+          <span class="toggle-icon">{expandedCategory === 'standard' ? '▼' : '▶'}</span>
+          Standard Scoreboards
+        </h2>
+        {#if expandedCategory === 'standard'}
+          <div class="scoreboards-grid">
+            {#each standardScoreboards as scoreboard}
+              <div class="scoreboard-card">
+                <h3>{scoreboard.name}</h3>
+                <p class="description">{scoreboard.description}</p>
+                
+                <div class="fop-links">
+                  <h4>Select Platform:</h4>
+                  <div class="fop-list">
+                    {#each data.fops as fop}
+                      <div class="fop-row">
+                        <a 
+                          href={getScoreboardUrl(scoreboard.type, fop)}
+                          class="fop-link"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Platform {fop}
+                        </a>
+                        {#if scoreboard.options && scoreboard.options.length > 0}
+                          <button
+                            class="options-btn"
+                            on:click={() => openOptionsModal(scoreboard, fop)}
+                            title="Configure options for Platform {fop}"
+                          >
+                            ⚙️
+                          </button>
+                        {/if}
+                      </div>
+                    {/each}
                   </div>
-                {/each}
+                </div>
+              </div>
+            {/each}
+            
+            <!-- Placeholder for Rankings -->
+            <div class="scoreboard-card placeholder">
+              <h3>Rankings (Coming Soon)</h3>
+              <p class="description">Competition rankings and leaderboards</p>
+              <div class="fop-links disabled">
+                <h4>Select Platform:</h4>
+                <div class="fop-list">
+                  {#each data.fops as fop}
+                    <div class="fop-row">
+                      <span class="fop-link disabled">Platform {fop}</span>
+                    </div>
+                  {/each}
+                </div>
               </div>
             </div>
           </div>
-        {/each}
+        {/if}
       </section>
+
+      <!-- Lower Third Overlays -->
+      {#if lowerThirdScoreboards.length > 0}
+        <section class="scoreboard-category collapsible">
+          <!-- svelte-ignore a11y-click-events-have-key-events -->
+          <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+          <h2 class="category-title clickable" on:click={() => toggleCategory('lower-thirds')}>
+            <span class="toggle-icon">{expandedCategory === 'lower-thirds' ? '▼' : '▶'}</span>
+            Lower Third Overlays
+          </h2>
+          {#if expandedCategory === 'lower-thirds'}
+            <div class="scoreboards-grid">
+              {#each lowerThirdScoreboards as scoreboard}
+                <div class="scoreboard-card">
+                  <h3>{scoreboard.name}</h3>
+                  <p class="description">{scoreboard.description}</p>
+                  
+                  <div class="fop-links">
+                    <h4>Select Platform:</h4>
+                    <div class="fop-list">
+                      {#each data.fops as fop}
+                        <div class="fop-row">
+                          <a 
+                            href={getScoreboardUrl(scoreboard.type, fop)}
+                            class="fop-link"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            Platform {fop}
+                          </a>
+                          {#if scoreboard.options && scoreboard.options.length > 0}
+                            <button
+                              class="options-btn"
+                              on:click={() => openOptionsModal(scoreboard, fop)}
+                              title="Configure options for Platform {fop}"
+                            >
+                              ⚙️
+                            </button>
+                          {/if}
+                        </div>
+                      {/each}
+                    </div>
+                  </div>
+                </div>
+              {/each}
+            </div>
+          {/if}
+        </section>
+      {/if}
+
+      <!-- Team Scoreboards -->
+      {#if teamScoreboards.length > 0}
+        <section class="scoreboard-category collapsible">
+          <!-- svelte-ignore a11y-click-events-have-key-events -->
+          <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+          <h2 class="category-title clickable" on:click={() => toggleCategory('teams')}>
+            <span class="toggle-icon">{expandedCategory === 'teams' ? '▼' : '▶'}</span>
+            Team Scoreboards
+          </h2>
+          {#if expandedCategory === 'teams'}
+            <div class="scoreboards-grid">
+              {#each teamScoreboards as scoreboard}
+                <div class="scoreboard-card">
+                  <h3>{scoreboard.name}</h3>
+                  <p class="description">{scoreboard.description}</p>
+                  
+                  <div class="fop-links">
+                    <h4>Select Platform:</h4>
+                    <div class="fop-list">
+                      {#each data.fops as fop}
+                        <div class="fop-row">
+                          <a 
+                            href={getScoreboardUrl(scoreboard.type, fop)}
+                            class="fop-link"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            Platform {fop}
+                          </a>
+                          {#if scoreboard.options && scoreboard.options.length > 0}
+                            <button
+                              class="options-btn"
+                              on:click={() => openOptionsModal(scoreboard, fop)}
+                              title="Configure options for Platform {fop}"
+                            >
+                              ⚙️
+                            </button>
+                          {/if}
+                        </div>
+                      {/each}
+                    </div>
+                  </div>
+                </div>
+              {/each}
+            </div>
+          {/if}
+        </section>
+      {/if}
     </main>
   {:else}
     <div class="waiting">
@@ -148,12 +285,6 @@
       </div>
     </div>
   {/if}
-
-  <footer class="footer">
-    <div class="footer-links">
-      <a href="https://github.com/owlcms/owlcms4" target="_blank" class="footer-link">OWLCMS</a>
-    </div>
-  </footer>
 </div>
 
 <!-- Options Modal -->
@@ -243,7 +374,7 @@
   }
   
   .container {
-    max-width: 1200px;
+    max-width: 1600px;
     margin: 0 auto;
     padding: 2rem;
     min-height: 100vh;
@@ -255,7 +386,6 @@
     text-align: center;
     margin-bottom: 3rem;
     padding: 2rem 0;
-    border-bottom: 2px solid rgba(255, 255, 255, 0.1);
   }
   
   .header h1 {
@@ -267,24 +397,8 @@
     background-clip: text;
   }
   
-  .competition-name {
-    font-size: 1.5rem;
-    color: #a0aec0;
-    margin: 0;
-  }
-  
   .main {
     flex: 1;
-  }
-  
-  .info-section {
-    text-align: center;
-    margin-bottom: 2rem;
-  }
-  
-  .info-section h2 {
-    font-size: 2rem;
-    margin-bottom: 0.5rem;
   }
   
   .description {
@@ -292,10 +406,40 @@
     font-size: 1.1rem;
   }
   
+  .scoreboard-category {
+    margin-bottom: 3rem;
+  }
+  
+  .category-title {
+    font-size: 1.8rem;
+    margin-bottom: 1rem;
+    color: #e2e8f0;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid rgba(102, 126, 234, 0.3);
+  }
+  
+  .category-title.clickable {
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    transition: color 0.2s;
+  }
+  
+  .category-title.clickable:hover {
+    color: #667eea;
+  }
+  
+  .toggle-icon {
+    font-size: 1.2rem;
+    transition: transform 0.3s;
+  }
+  
   .scoreboards-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-    gap: 2rem;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1.5rem;
     margin-top: 2rem;
   }
   
@@ -317,6 +461,20 @@
     font-size: 1.5rem;
     margin: 0 0 0.5rem 0;
     color: #667eea;
+  }
+  
+  .scoreboard-card.placeholder {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+  
+  .scoreboard-card.placeholder h3 {
+    color: #a0aec0;
+  }
+  
+  .scoreboard-card.placeholder:hover {
+    transform: none;
+    box-shadow: none;
   }
   
   .scoreboard-card .description {
@@ -354,6 +512,14 @@
   .fop-link:hover {
     transform: scale(1.02);
     box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  }
+  
+  .fop-link.disabled,
+  .fop-links.disabled .fop-link {
+    background: rgba(255, 255, 255, 0.1);
+    color: #718096;
+    cursor: not-allowed;
+    pointer-events: none;
   }
   
   .options-btn {
@@ -618,38 +784,12 @@
     font-style: italic;
   }
   
-  .footer {
-    margin-top: 4rem;
-    padding-top: 2rem;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-    text-align: center;
-  }
-  
-  .footer-links {
-    display: flex;
-    justify-content: center;
-    gap: 2rem;
-  }
-  
-  .footer-link {
-    color: #a0aec0;
-    text-decoration: none;
-    transition: color 0.2s;
-  }
-  
-  .footer-link:hover {
-    color: #667eea;
-  }
-  
   @media (max-width: 768px) {
     .container {
       padding: 1rem;
     }
     .header h1 {
       font-size: 2rem;
-    }
-    .competition-name {
-      font-size: 1.2rem;
     }
     .scoreboards-grid {
       grid-template-columns: 1fr;

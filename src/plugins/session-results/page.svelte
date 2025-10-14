@@ -263,19 +263,6 @@
 		color: #888;
 	}
 	
-	/* Session complete header styling */
-	.header.session-complete {
-		background: #1a3a1a; /* Dark green background */
-		padding: 1.5rem;
-	}
-	
-	.header.session-complete .session-info {
-		font-size: 1.2rem;
-		color: #4ade80; /* Bright green text */
-		text-align: center;
-		font-weight: bold;
-	}
-	
 	/* Main Table */
 	.main {
 		flex: 1;
