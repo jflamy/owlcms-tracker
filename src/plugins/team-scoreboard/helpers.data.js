@@ -106,7 +106,6 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	
 	if (teamScoreboardCache.has(cacheKey)) {
 		const cached = teamScoreboardCache.get(cacheKey);
-		console.log(`[Team Scoreboard] ✓ Cache hit for ${fopName} (${teamScoreboardCache.size} entries cached)`);
 		
 		// Compute sessionStatusMessage from current fopUpdate (even on cache hit)
 		let sessionStatusMessage = null;
@@ -123,8 +122,6 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			learningMode
 		};
 	}
-	
-	console.log(`[Team Scoreboard] Cache miss for ${fopName}, computing team data...`);
 
 	// Extract basic competition info
 	const competition = {
@@ -184,11 +181,6 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		
 		// Find the current athlete (has 'current' in classname)
 		const currentAthlete = sessionAthletes.find(a => a.classname && a.classname.includes('current'));
-		if (currentAthlete) {
-			console.log(`[Team] ✓ Found current athlete: ${currentAthlete.fullName} (lot ${currentAthlete.lotNumber}, start ${currentAthlete.startNumber})`);
-		} else if (sessionAthletes.length > 0) {
-			console.log(`[Team] Have ${sessionAthletes.length} athletes in current session, but no current athlete lifting`);
-		}
 	}
 	
 	// Get all athletes from database
@@ -212,8 +204,14 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 				// Format database athlete to match session athlete structure
 				const categoryName = dbAthlete.categoryName || getCategoryName(dbAthlete.category, databaseState);
 				
+				// Format name as "LASTNAME, Firstname" to match OWLCMS format
+				const lastName = (dbAthlete.lastName || '').toUpperCase();
+				const firstName = dbAthlete.firstName || '';
+				const fullName = lastName && firstName ? `${lastName}, ${firstName}` : 
+				                 lastName || firstName || '';
+				
 				return {
-					fullName: `${dbAthlete.firstName || ''} ${dbAthlete.lastName || ''}`.trim(),
+					fullName,
 					firstName: dbAthlete.firstName,
 					lastName: dbAthlete.lastName,
 					teamName: dbAthlete.team || dbAthlete.club,
@@ -398,8 +396,6 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		const firstKey = teamScoreboardCache.keys().next().value;
 		teamScoreboardCache.delete(firstKey);
 	}
-	
-	console.log(`[Team Scoreboard] Cached result for ${cacheKey} (${teamScoreboardCache.size} entries)`);
 
 	return {
 		...result,

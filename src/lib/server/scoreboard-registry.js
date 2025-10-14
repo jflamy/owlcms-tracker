@@ -30,7 +30,6 @@ class ScoreboardRegistry {
 		if (this.initialized) return;
 
 		const pluginsDir = join(__dirname, '../../plugins');
-		console.log('[ScoreboardRegistry] Scanning for scoreboards in:', pluginsDir);
 
 		if (!existsSync(pluginsDir)) {
 			console.warn('[ScoreboardRegistry] Plugins directory not found:', pluginsDir);
@@ -88,7 +87,6 @@ class ScoreboardRegistry {
 				path: pluginPath
 			});
 
-			console.log(`[ScoreboardRegistry] Registered: ${type}`, config);
 		} catch (err) {
 			console.error(`[ScoreboardRegistry] Failed to register ${folderName}:`, err);
 		}

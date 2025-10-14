@@ -73,7 +73,6 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	
 	if (liftingOrderCache.has(cacheKey)) {
 		const cached = liftingOrderCache.get(cacheKey);
-		console.log(`[Lifting Order] ✓ Cache hit for ${fopName} (${liftingOrderCache.size} entries cached)`);
 		
 		// Compute sessionStatusMessage from current fopUpdate (even on cache hit)
 		let sessionStatusMessage = null;
@@ -90,8 +89,6 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			learningMode
 		};
 	}
-	
-	console.log(`[Lifting Order] Cache miss for ${fopName}, computing lifting order data...`);
 
 	// Extract basic competition info
 	const competition = {
@@ -205,8 +202,6 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		const firstKey = liftingOrderCache.keys().next().value;
 		liftingOrderCache.delete(firstKey);
 	}
-	
-	console.log(`[Lifting Order] Cached result for ${cacheKey} (${liftingOrderCache.size} entries)`);
 
 	return {
 		...result,

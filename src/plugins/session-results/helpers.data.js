@@ -71,7 +71,6 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	
 	if (sessionResultsCache.has(cacheKey)) {
 		const cached = sessionResultsCache.get(cacheKey);
-		console.log(`[Session Results] ✓ Cache hit for ${fopName} (${sessionResultsCache.size} entries cached)`);
 		
 		// Compute sessionStatusMessage from current fopUpdate (even on cache hit)
 		let sessionStatusMessage = null;
@@ -88,8 +87,6 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			learningMode
 		};
 	}
-	
-	console.log(`[Session Results] Cache miss for ${fopName}, computing results data...`);
 
 	// Extract basic competition info
 	const competition = {
@@ -155,7 +152,6 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// If no session athletes available, return waiting status
 	// We need the UPDATE message from OWLCMS with precomputed presentation data (stored in groupAthletes key)
 	if (groupAthletes.length === 0) {
-		console.log('[Session Results] No session athletes in UPDATE yet, waiting for UI update from OWLCMS');
 		return {
 			competition,
 			currentAttempt,
@@ -217,8 +213,6 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		const firstKey = sessionResultsCache.keys().next().value;
 		sessionResultsCache.delete(firstKey);
 	}
-	
-	console.log(`[Session Results] Cached result for ${cacheKey} (${sessionResultsCache.size} entries)`);
 
 	return {
 		...result,
