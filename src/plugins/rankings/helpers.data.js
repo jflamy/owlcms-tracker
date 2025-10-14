@@ -262,6 +262,12 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	const timer = extractTimerState(fopUpdate, fopName);
 	const decision = extractDecisionState(fopUpdate);
 
+	// Extract leaders from fopUpdate (now a proper JSON array from OWLCMS)
+	let leaders = [];
+	if (fopUpdate?.leaders && Array.isArray(fopUpdate.leaders)) {
+		leaders = fopUpdate.leaders;
+	}
+
 	const result = {
 		scoreboardName: 'Rankings',  // Scoreboard display name
 		competition,
@@ -272,6 +278,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		sortedAthletes: rankedAthletes,  // Standardized field name (sorted by category + rank)
 		rankedAthletes,  // Keep for backwards compatibility
 		groupAthletes,   // Original groupAthletes for reference
+		leaders,         // Leaders from previous sessions (from OWLCMS)
 		stats,
 		displaySettings: fopUpdate?.showTotalRank || fopUpdate?.showSinclair ? {
 			showTotalRank: fopUpdate.showTotalRank === 'true',
@@ -294,6 +301,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		sortedAthletes: result.sortedAthletes,
 		rankedAthletes: result.rankedAthletes,
 		groupAthletes: result.groupAthletes,
+		leaders: result.leaders,  // Include leaders in cache
 		stats: result.stats,
 		displaySettings: result.displaySettings,
 		isBreak: result.isBreak,

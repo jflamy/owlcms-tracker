@@ -618,17 +618,6 @@
 		min-height: var(--col-gap);
 	}
 
-	.leaders-title-row > .leaders-title {
-		grid-column: 1 / -1;
-		background: transparent;
-		border: none;
-		color: #ccc;
-		font-size: 1.2rem;
-		font-weight: bold;
-		justify-content: flex-start;
-		padding: 0.25rem 0;
-	}
-
 	.leaders-block {
 		margin-top: auto;
 		display: flex;
@@ -639,6 +628,16 @@
 	.leaders-flex-spacer {
 		flex: 1 1 auto;
 		min-height: var(--grid-gap-size);
+	}
+
+	.leaders-title {
+		background: transparent;
+		border: none;
+		color: #ccc;
+		font-size: 1.2rem;
+		font-weight: bold;
+		padding: 0.25rem 0;
+		margin-bottom: var(--grid-gap-size);
 	}
 
 	.leaders-grid {

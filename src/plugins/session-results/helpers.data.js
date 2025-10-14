@@ -164,8 +164,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// Extract leaders from fopUpdate (now a proper JSON array from OWLCMS)
 	let leaders = [];
 	if (fopUpdate?.leaders && Array.isArray(fopUpdate.leaders)) {
-		// Filter out spacers and take only athlete objects
-		leaders = fopUpdate.leaders.filter(leader => !leader.isSpacer);
+		leaders = fopUpdate.leaders;
 	}
 	
 	// Compute sessionStatusMessage from current fopUpdate

@@ -160,6 +160,12 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// Get competition stats
 	const stats = getCompetitionStats(databaseState);
 
+	// Extract leaders from fopUpdate (now a proper JSON array from OWLCMS)
+	let leaders = [];
+	if (fopUpdate?.leaders && Array.isArray(fopUpdate.leaders)) {
+		leaders = fopUpdate.leaders;
+	}
+
 	const result = {
 		scoreboardName: 'Lifting Order',  // Scoreboard display name
 		competition,
@@ -170,6 +176,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		sortedAthletes: liftingOrderAthletes, // Standardized field name (lifting order)
 		liftingOrderAthletes, // Keep for backwards compatibility
 		groupAthletes,         // Precomputed from OWLCMS UPDATE
+		leaders,               // Leaders from previous sessions (from OWLCMS)
 		rankings,              // Computed from database
 		stats,
 		displaySettings: fopUpdate?.showTotalRank || fopUpdate?.showSinclair ? {
@@ -194,6 +201,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		sortedAthletes: result.sortedAthletes,
 		liftingOrderAthletes: result.liftingOrderAthletes,
 		groupAthletes: result.groupAthletes,
+		leaders: result.leaders,  // Include leaders in cache
 		rankings: result.rankings,
 		stats: result.stats,
 		displaySettings: result.displaySettings,
