@@ -88,7 +88,7 @@
 		{#if data.status === 'waiting'}
 			<div class="waiting"><p>{data.message || 'Waiting for competition data...'}</p></div>
 		{:else}
-			<div class="scoreboard-grid" role="grid">
+			<div class="scoreboard-grid" class:compact-team-column={data.compactTeamColumn} role="grid">
 				<div class="grid-row header header-primary" role="row">
 					<div class="cell header col-start span-two" role="columnheader">Start</div>
 					<div class="cell header col-name span-two" role="columnheader">Name</div>
@@ -128,7 +128,12 @@
 
 				{#each teams as team}
 					<div class="grid-row team-header" role="row">
-						<div class="cell team-name-header" role="gridcell">{team.teamName}</div>
+						<div class="cell team-name-header" role="gridcell">
+							{#if team.flagUrl}
+								<img src={team.flagUrl} alt={team.teamName} class="team-flag" />
+							{/if}
+							{team.teamName}
+						</div>
 						<div class="cell team-stats" role="gridcell">{team.athleteCount} athletes</div>
 						<div class="cell team-score" role="gridcell">{formatScore(team.teamScore)}</div>
 					</div>
@@ -276,7 +281,9 @@
 		--col-name: minmax(14rem, 2.5fr);
 		--col-cat: 14ch;
 		--col-born: 14ch;
-		--col-team: minmax(8rem, 1.8fr);
+		--col-team-min: 8rem;
+		--col-team-max: 1.8fr;
+		--col-team: minmax(var(--col-team-min), var(--col-team-max));
 		--col-gap: var(--grid-gap-size);
 		--col-attempt: 4.4rem;
 		--col-best: 4.4rem;
@@ -305,6 +312,12 @@
 		grid-auto-rows: minmax(0, auto);
 		row-gap: 0;
 		font-size: 1.1rem;
+	}
+
+	.scoreboard-grid.compact-team-column {
+		--col-team-min: 5rem;
+		--col-team-max: 5rem;
+		--col-team: 5rem;
 	}
 
 	.grid-row { display: contents; }
@@ -392,7 +405,8 @@
 		border-top: 4px solid #4a5568;
 		border-bottom: 4px solid #4a5568;
 	}
-	.grid-row.team-header > .team-name-header { grid-column: 1 / span 5; justify-content: flex-start; font-size: 1.6rem; text-shadow: 1px 1px 2px rgba(0,0,0,0.7); border-left: 8px solid #4a5568; }
+	.grid-row.team-header > .team-name-header { grid-column: 1 / span 5; justify-content: flex-start; font-size: 1.6rem; text-shadow: 1px 1px 2px rgba(0,0,0,0.7); border-left: 8px solid #4a5568; display: flex; align-items: center; gap: 0.75rem; }
+	.grid-row.team-header > .team-name-header .team-flag { height: 1.5rem; max-width: 2rem; object-fit: contain; }
 	.grid-row.team-header > .team-stats { grid-column: 6 / 18; justify-content: flex-start; font-size: 0.95rem; color: #cbd5e0; }
 	.grid-row.team-header > .team-score { grid-column: 18; justify-content: center; font-size: 1.6rem; border-right: 8px solid #4a5568; }
 
@@ -448,13 +462,18 @@
 		.main { --grid-gap-size: 0.55rem; }
 		.scoreboard-grid {
 			--col-name: minmax(12rem, 2.2fr);
-			--col-team: minmax(7rem, 1.6fr);
+			--col-team-min: 7rem;
+			--col-team-max: 1.6fr;
 			--col-cat: 12ch;
 			--col-born: 12ch;
 			--col-attempt: 3.8rem;
 			--col-best: 3.8rem;
 			--col-total: 4.5rem;
 			--col-score: 12ch;
+		}
+		.scoreboard-grid.compact-team-column {
+			--col-team-min: 5rem;
+			--col-team-max: 5rem;
 		}
 	}
 
@@ -467,12 +486,17 @@
 		.start-number { font-size: 1.125rem; padding: 0.15rem 0.25rem; min-width: 2.25rem; }
 		.scoreboard-grid {
 			--col-name: minmax(10.5rem, 2fr);
-			--col-team: minmax(6rem, 1.4fr);
+			--col-team-min: 6rem;
+			--col-team-max: 1.4fr;
 			--col-attempt: 3.4rem;
 			--col-best: 3.4rem;
 			--col-born: 0;
 			--col-score: 12ch;
 			--header-primary-height: 2.5rem;
+		}
+		.scoreboard-grid.compact-team-column {
+			--col-team-min: 5rem;
+			--col-team-max: 5rem;
 		}
 		.cell { font-size: 0.95rem; padding: 0.25rem 0.2rem; }
 		.header-secondary > .cell { font-size: 0.9rem; }
@@ -488,6 +512,7 @@
 		.start-number { font-size: 0.75rem; padding: 0.2rem 0.3rem; }
 		.main { --grid-gap-size: 0.3rem; }
 		.scoreboard-grid { --col-start: 0; --col-cat: 0; --col-team: 0; --col-best: 0; --col-attempt: 2.75rem; --header-primary-height: 2.3rem; }
+		.scoreboard-grid.compact-team-column { --col-team: 5rem; }
 		.header-primary .col-start,
 		.grid-row.data-row > .start-num,
 		.header-primary .col-cat,
@@ -505,4 +530,22 @@
 		.grid-row.team-athlete > .cell:first-of-type { border-left-width: 4px !important; }
 		.grid-row.team-athlete > .cell:last-of-type { border-right-width: 4px !important; }
 	}
+	
+	/* Compact team column for small team sizes (< 7 athletes) */
+	.scoreboard-grid.compact-team-column .grid-row.team-header > .team-name-header {
+		grid-column: 1 / span 3;
+		font-size: 1.4rem;
+	}
+	
+	.scoreboard-grid.compact-team-column .grid-row.team-header > .team-stats {
+		grid-column: 4 / 18;
+	}
+	
+	.scoreboard-grid.compact-team-column .grid-row.team-athlete > .team-name {
+		max-width: 3rem;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
 </style>
+ 

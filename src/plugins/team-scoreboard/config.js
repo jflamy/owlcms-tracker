@@ -11,6 +11,9 @@ export default {
 	// Description for AI assistants
 	description: 'Shows team competition results with athletes grouped by team',
 	
+	// Whether this scoreboard requires athlete pictures
+	requiresPictures: false,
+	
 	// User-configurable options
 	options: [
 		{

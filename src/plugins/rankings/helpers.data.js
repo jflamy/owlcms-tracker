@@ -4,6 +4,7 @@
  */
 
 import { competitionHub } from '$lib/server/competition-hub.js';
+import { getFlagUrl } from '$lib/server/flag-resolver.js';
 
 /**
  * Plugin-specific cache to avoid recomputing rankings on every browser request
@@ -141,6 +142,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			name: currentAthlete.fullName,
 			teamName: currentAthlete.teamName,
 			team: currentAthlete.teamName,
+			flagUrl: getFlagUrl(currentAthlete.teamName),
 			startNumber: currentAthlete.startNumber,
 			categoryName: currentAthlete.category,
 			category: currentAthlete.category,
@@ -237,12 +239,13 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 					category: ''
 				});
 			}
-			// Add display rank to athlete (use appropriate rank based on competition phase)
+			// Add display rank and flag URL to athlete (use appropriate rank based on competition phase)
 			const athleteWithDisplay = {
 				...athlete,
 				displayRank: cjStarted 
 					? (athlete.totalRank !== '-' ? athlete.totalRank : '-')
-					: (athlete.snatchRank !== '-' ? athlete.snatchRank : '-')
+					: (athlete.snatchRank !== '-' ? athlete.snatchRank : '-'),
+				flagUrl: getFlagUrl(athlete.teamName)
 			};
 			athletesWithSpacers.push(athleteWithDisplay);
 			lastCategory = athlete.category;
@@ -250,12 +253,13 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		
 		rankedAthletes = athletesWithSpacers;
 	} else {
-		// Single category - just add displayRank to each athlete
+		// Single category - just add displayRank and flagUrl to each athlete
 		rankedAthletes = rankedAthletes.map(athlete => ({
 			...athlete,
 			displayRank: cjStarted 
 				? (athlete.totalRank !== '-' ? athlete.totalRank : '-')
-				: (athlete.snatchRank !== '-' ? athlete.snatchRank : '-')
+				: (athlete.snatchRank !== '-' ? athlete.snatchRank : '-'),
+			flagUrl: getFlagUrl(athlete.teamName)
 		}));
 	}
 
@@ -268,9 +272,23 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// Filter out OWLCMS spacers (isSpacer flag)
 	let leaders = [];
 	if (fopUpdate?.leaders && Array.isArray(fopUpdate.leaders)) {
-		leaders = fopUpdate.leaders.filter(leader => !leader.isSpacer);
+		leaders = fopUpdate.leaders
+			.filter(leader => !leader.isSpacer)
+			.map(leader => ({
+				...leader,
+				flagUrl: leader.teamName ? getFlagUrl(leader.teamName) : null
+			}));
 	}
-		const result = {
+	
+	// Calculate max team name length (for responsive layout)
+	// Narrow team column if longest team name is short (< 7 characters)
+	const maxTeamNameLength = Math.max(0, ...rankedAthletes
+		.filter(athlete => !athlete.isSpacer)
+		.map(athlete => (athlete.teamName || '').length)
+	);
+	const compactTeamColumn = maxTeamNameLength < 7; // Narrow team column if max name length < 7
+	
+	const result = {
 		scoreboardName: 'Rankings',  // Scoreboard display name
 		competition,
 		currentAttempt,
@@ -291,6 +309,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		isBreak: fopUpdate?.break === 'true' || false,
 		breakType: fopUpdate?.breakType,
 		sessionStatus,
+		compactTeamColumn,  // Narrow team column if max team size < 7
 		status: (fopUpdate || databaseState) ? 'ready' : 'waiting',
 		lastUpdate: fopUpdate?.lastUpdate || Date.now(),
 		options: { showRecords }

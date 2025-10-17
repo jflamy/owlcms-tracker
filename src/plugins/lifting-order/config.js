@@ -11,6 +11,9 @@ export default {
 	// Description for AI assistants
 	description: 'Shows current lifter and upcoming lifting order with timer',
 	
+	// Whether this scoreboard requires athlete pictures
+	requiresPictures: false,
+	
 	// User-configurable options
 	options: [],
 	

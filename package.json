@@ -21,6 +21,7 @@
   },
   "type": "module",
   "dependencies": {
+    "adm-zip": "^0.5.10",
     "ws": "^8.18.3"
   }
 }

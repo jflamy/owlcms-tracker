@@ -11,6 +11,9 @@ export default {
 	// Description for AI assistants
 	description: 'Shows all athletes in session sorted by standard order (category, lot number)',
 	
+	// Whether this scoreboard requires athlete pictures
+	requiresPictures: false,
+	
 	// User-configurable options
 	options: [],
 	

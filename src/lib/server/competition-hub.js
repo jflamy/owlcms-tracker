@@ -11,7 +11,6 @@
  */
 
 import { logLearningModeStatus } from './learning-mode.js';
-
 class CompetitionHub {
   constructor() {
     // Full database state (raw athlete data from /database)
@@ -459,7 +458,7 @@ class CompetitionHub {
   
   /**
    * Check which preconditions are missing
-   * @returns {string[]} Array of missing precondition names (currently only 'database')
+   * @returns {string[]} Array of missing precondition names: 'database', 'flags'
    */
   getMissingPreconditions() {
     const missing = [];
@@ -467,6 +466,12 @@ class CompetitionHub {
     // Check database
     if (!this.databaseState || !this.databaseState.athletes || this.databaseState.athletes.length === 0) {
       missing.push('database');
+    }
+    
+    // Always request flags (used in all scoreboards for team identification)
+    // OWLCMS will respond with binary frames if needed
+    if (!missing.includes('flags')) {
+      missing.push('flags');
     }
     
     return missing;

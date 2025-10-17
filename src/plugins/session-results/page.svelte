@@ -27,6 +27,9 @@
 	$: allAthletes = data.sortedAthletes || [];  // Standardized field name across all scoreboards
 	$: decisionState = data.decision || {};
 	
+	// Debug: log compactTeamColumn value
+	$: console.log('[SessionResults] compactTeamColumn:', data.compactTeamColumn);
+	
 	// Sync timer with server when data changes
 	$: if (data.timer) {
 		timer.syncWithServer(data.timer);
@@ -113,7 +116,7 @@
 				<p>{data.message || 'Waiting for competition data...'}</p>
 			</div>
 		{:else}
-			<div class="scoreboard-grid" role="grid">
+			<div class="scoreboard-grid" class:compact-team-column={data.compactTeamColumn} role="grid">
 				<div class="grid-row header header-primary" role="row">
 					<div class="cell header col-start span-two" role="columnheader">Start</div>
 					<div class="cell header col-name span-two" role="columnheader">Name</div>
@@ -161,7 +164,12 @@
 							<div class="cell name" role="gridcell">{athlete.fullName}</div>
 							<div class="cell cat" role="gridcell">{athlete.category || ''}</div>
 							<div class="cell born" role="gridcell">{athlete.yearOfBirth || ''}</div>
-							<div class="cell team-name" role="gridcell">{athlete.teamName || ''}</div>
+							<div class="cell team-name" role="gridcell">
+								{#if athlete.flagUrl}
+									<img src={athlete.flagUrl} alt={athlete.teamName} class="team-flag" />
+								{/if}
+								{athlete.teamName || ''}
+							</div>
 							<div class="cell v-spacer" aria-hidden="true"></div>
 							<div class="cell attempt {getAttemptClass(athlete.sattempts?.[0])}" role="gridcell">
 								{displayAttempt(athlete.sattempts?.[0])}
@@ -196,7 +204,7 @@
 					<div class="leaders-title">
 						Leaders from Previous Sessions {data.competition?.groupInfo ? data.competition.groupInfo.split('–')[0].trim() : ''}
 					</div>
-					<div class="scoreboard-grid leaders-grid" role="grid">
+					<div class="scoreboard-grid leaders-grid" class:compact-team-column={data.compactTeamColumn} role="grid">
 						{#each data.leaders as leader}
 							{#if leader.isSpacer}
 								<div class="grid-row spacer category-spacer" aria-hidden="true">
@@ -208,7 +216,12 @@
 								<div class="cell name" role="gridcell">{leader.fullName || ''}</div>
 								<div class="cell cat" role="gridcell">{leader.category || ''}</div>
 								<div class="cell born" role="gridcell">{leader.yearOfBirth || ''}</div>
-								<div class="cell team-name" role="gridcell">{leader.teamName || ''}</div>
+								<div class="cell team-name" role="gridcell">
+									{#if leader.flagUrl}
+										<img class="team-flag" src={leader.flagUrl} alt={leader.teamName || ''} />
+									{/if}
+									{leader.teamName || ''}
+								</div>
 								<div class="cell v-spacer" aria-hidden="true"></div>
 								<div class="cell attempt {getAttemptClass(leader.sattempts?.[0])}" role="gridcell">
 									{displayAttempt(leader.sattempts?.[0])}
@@ -454,6 +467,10 @@
 		font-size: 1.1rem;
 	}
 
+	.scoreboard-grid.compact-team-column {
+		--col-team: 14ch;
+	}
+
 	.grid-row {
 		display: contents;
 	}
@@ -527,6 +544,15 @@
 		justify-content: flex-start;
 		padding-left: 0.625rem;
 		text-align: left;
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
+	.team-flag {
+		height: 1.2rem;
+		max-width: 1.5rem;
+		object-fit: contain;
 	}
 
 	.cell.cat {
@@ -738,6 +764,10 @@
 			--col-total: 4.5rem;
 			--col-rank: 3.5rem;
 		}
+
+		.scoreboard-grid.compact-team-column {
+			--col-team: 14ch;
+		}
 	}
 
 	@media (max-width: 932px) {
@@ -782,6 +812,10 @@
 			--col-best: 3.4rem;
 			--col-born: 0;
 			--header-primary-height: 2.5rem;
+		}
+
+		.scoreboard-grid.compact-team-column {
+			--col-team: 14ch;
 		}
 
 		.cell {
@@ -837,6 +871,10 @@
 			--header-primary-height: 2.3rem;
 		}
 
+		.scoreboard-grid.compact-team-column {
+			--col-team: 14ch;
+		}
+
 		.header-primary .col-start,
 		.grid-row.data-row > .start-num,
 		.grid-row.leader-row > .start-num,
@@ -867,5 +905,15 @@
 		.header-secondary .col-name-portrait {
 			text-align: left;
 		}
+	}
+	
+	/* Compact team column styling handled via CSS variable override */
+	.scoreboard-grid.compact-team-column .cell.team-name {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		justify-content: center;
+		padding-left: 0.375rem;
+		text-align: center;
 	}
 </style>

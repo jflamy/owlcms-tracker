@@ -3,6 +3,7 @@
  */
 
 import { competitionHub } from '$lib/server/competition-hub.js';
+import { getFlagUrl } from '$lib/server/flag-resolver.js';
 
 /**
  * Plugin-specific cache to avoid recomputing team data on every browser request
@@ -217,6 +218,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 					lastName: dbAthlete.lastName,
 					teamName: dbAthlete.team || dbAthlete.club,
 					team: dbAthlete.team || dbAthlete.club,
+					flagUrl: getFlagUrl(dbAthlete.team || dbAthlete.club),
 					startNumber: dbAthlete.startNumber,
 					lotNumber: dbAthlete.lotNumber,
 					categoryName: categoryName,
@@ -343,6 +345,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		
 		return {
 			teamName,
+			flagUrl: getFlagUrl(teamName),
 			athletes,
 			teamTotal,
 			teamScore,
@@ -352,6 +355,11 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	
 	// Sort teams by total score (highest first)
 	teams.sort((a, b) => b.teamScore - a.teamScore);
+	
+	// Calculate max team name length (for responsive layout)
+	// Narrow team column if longest team name is short (< 7 characters)
+	const maxTeamNameLength = Math.max(0, ...teams.map(t => (t.teamName || '').length));
+	const compactTeamColumn = maxTeamNameLength < 7; // Narrow team column if max name length < 7
 	
 	// Get competition stats
 	const stats = getCompetitionStats(databaseState);
@@ -375,6 +383,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		isBreak: fopUpdate?.break === 'true' || false,
 		breakType: fopUpdate?.breakType,
 		sessionStatus,  // Include session status (isDone, groupName, lastActivity)
+		compactTeamColumn,  // Narrow team column if max team size < 7
 		status: (fopUpdate || databaseState) ? 'ready' : 'waiting',
 		lastUpdate: fopUpdate?.lastUpdate || Date.now(),
 		options: { showRecords, sortBy, gender, currentAttemptInfo, topN } // Echo back the options used

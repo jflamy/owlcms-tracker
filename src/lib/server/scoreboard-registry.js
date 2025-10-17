@@ -107,6 +107,18 @@ class ScoreboardRegistry {
 	}
 
 	/**
+	 * Check if any registered scoreboard requires pictures
+	 */
+	anyScoreboardRequiresPictures() {
+		for (const scoreboard of this.scoreboards.values()) {
+			if (scoreboard.config && scoreboard.config.requiresPictures === true) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
 	 * Process data for a specific scoreboard type
 	 */
 	async processData(type, fopName, options = {}) {

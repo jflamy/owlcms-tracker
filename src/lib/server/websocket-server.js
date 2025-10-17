@@ -7,6 +7,7 @@ import { WebSocketServer } from 'ws';
 import { competitionHub } from './competition-hub.js';
 import { captureMessage, LEARNING_MODE } from './learning-mode.js';
 import { extractEmbeddedDatabase } from './embedded-database.js';
+import { handleBinaryMessage } from './binary-handler.js';
 
 let wss = null;
 
@@ -23,6 +24,7 @@ export function initWebSocketServer(httpServer) {
 		console.log('[WebSocket] Client connected');
 		
 		ws.on('message', async (data) => {
+			// Try to parse as JSON first (even if it's a Buffer, text messages are sent as Buffers)
 			try {
 				const message = JSON.parse(data.toString());
 				const messageType = message.type ? message.type.toUpperCase() : 'OTHER';
@@ -69,8 +71,21 @@ export function initWebSocketServer(httpServer) {
 				
 				ws.send(JSON.stringify(result));
 			} catch (error) {
-				console.error('[WebSocket] Error processing message:', error);
-				ws.send(JSON.stringify({ error: error.message }));
+				// If JSON parsing fails, try to handle as binary frame
+				if (data instanceof Buffer || Buffer.isBuffer(data)) {
+					try {
+						const { handleBinaryMessage } = await import('./binary-handler.js');
+						await handleBinaryMessage(data);
+						// Binary frames don't expect a response - they're unidirectional
+						return;
+					} catch (binaryError) {
+						console.error('[WebSocket] ERROR: Unable to process message:', binaryError.message);
+						ws.send(JSON.stringify({ error: `Unable to process message: ${binaryError.message}` }));
+					}
+				} else {
+					console.error('[WebSocket] ERROR: Unable to parse JSON:', error.message);
+					ws.send(JSON.stringify({ error: error.message }));
+				}
 			}
 		});
 

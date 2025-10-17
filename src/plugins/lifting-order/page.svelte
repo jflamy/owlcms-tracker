@@ -70,6 +70,9 @@
 			{:else}
 			<span class="start-number">{currentAttempt?.startNumber || '-'}</span>
 			<span class="lifter-name">{currentAttempt?.fullName || 'No athlete currently lifting'}</span>
+			{#if currentAttempt?.flagUrl}
+				<img src={currentAttempt.flagUrl} alt={currentAttempt.teamName} class="team-flag" />
+			{/if}
 			<span class="team">{currentAttempt?.teamName || ''}</span>
 			<span class="attempt-label">{@html currentAttempt?.attempt || ''}</span>
 			<span class="weight">{currentAttempt?.weight || '-'} kg</span>
@@ -113,7 +116,7 @@
 				<p>{data.message || 'Waiting for competition data...'}</p>
 			</div>
 		{:else}
-			<div class="scoreboard-grid" role="grid">
+			<div class="scoreboard-grid" class:compact-team-column={data.compactTeamColumn} role="grid">
 				<div class="grid-row header header-primary" role="row">
 					<div class="cell header col-start span-two" role="columnheader">Start</div>
 					<div class="cell header col-name span-two" role="columnheader">Name</div>
@@ -208,7 +211,12 @@
 								<div class="cell name" role="gridcell">{leader.fullName || ''}</div>
 								<div class="cell cat" role="gridcell">{leader.category || ''}</div>
 								<div class="cell born" role="gridcell">{leader.yearOfBirth || ''}</div>
-								<div class="cell team-name" role="gridcell">{leader.teamName || ''}</div>
+								<div class="cell team-name" role="gridcell">
+									{#if leader.flagUrl}
+										<img class="team-flag" src={leader.flagUrl} alt={leader.teamName || ''} />
+									{/if}
+									{leader.teamName || ''}
+								</div>
 								<div class="cell v-spacer" aria-hidden="true"></div>
 								<div class="cell attempt {getAttemptClass(leader.sattempts?.[0])}" role="gridcell">
 									{displayAttempt(leader.sattempts?.[0])}
@@ -300,6 +308,12 @@
 		font-size: 1.5rem; /* Same as lifter name */
 		font-weight: bold;
 		color: #ccc;
+	}
+	
+	.team-flag {
+		height: 1.5rem;
+		max-width: 2rem;
+		object-fit: contain;
 	}
 	
 	.attempt-label {
@@ -423,7 +437,9 @@
 		--col-name: minmax(14rem, 2.5fr);
 		--col-cat: 14ch;
 		--col-born: 14ch;
-		--col-team: minmax(8rem, 1.8fr);
+		--col-team-min: 8rem;
+		--col-team-max: 1.8fr;
+		--col-team: minmax(var(--col-team-min), var(--col-team-max));
 		--col-gap: var(--grid-gap-size);
 		--col-attempt: 4.4rem;
 		--col-best: 4.4rem;
@@ -452,6 +468,11 @@
 		grid-auto-rows: minmax(0, auto);
 		row-gap: 0;
 		font-size: 1.1rem;
+	}
+
+	.scoreboard-grid.compact-team-column {
+		--col-team-min: 5rem;
+		--col-team-max: 5rem;
 	}
 
 	.grid-row {
@@ -731,13 +752,19 @@
 
 		.scoreboard-grid {
 			--col-name: minmax(12rem, 2.2fr);
-			--col-team: minmax(7rem, 1.6fr);
+			--col-team-min: 7rem;
+			--col-team-max: 1.6fr;
 			--col-cat: 12ch;
 			--col-born: 12ch;
 			--col-attempt: 3.8rem;
 			--col-best: 3.8rem;
 			--col-total: 4.5rem;
 			--col-rank: 3.5rem;
+		}
+
+		.scoreboard-grid.compact-team-column {
+			--col-team-min: 5rem;
+			--col-team-max: 5rem;
 		}
 	}
 
@@ -778,11 +805,17 @@
 
 		.scoreboard-grid {
 			--col-name: minmax(10.5rem, 2fr);
-			--col-team: minmax(6rem, 1.4fr);
+			--col-team-min: 6rem;
+			--col-team-max: 1.4fr;
 			--col-attempt: 3.4rem;
 			--col-best: 3.4rem;
 			--col-born: 0;
 			--header-primary-height: 2.5rem;
+		}
+
+		.scoreboard-grid.compact-team-column {
+			--col-team-min: 5rem;
+			--col-team-max: 5rem;
 		}
 
 		.cell {
@@ -831,14 +864,20 @@
 		.scoreboard-grid {
 			--col-start: 0;
 			--col-cat: 0;
-			--col-team: 0;
+			--col-team-min: 0;
+			--col-team-max: 0;
 			--col-rank: 0;
 			--col-best: 0;
 			--col-attempt: 2.75rem;
 			--header-primary-height: 2.3rem;
 		}
 
-		.header-primary .col-start,
+		.scoreboard-grid.compact-team-column {
+			--col-team-min: 5rem;
+			--col-team-max: 5rem;
+		}
+
+		.header-primary .col-born,
 		.grid-row.data-row > .start-num,
 		.grid-row.leader-row > .start-num,
 		.header-primary .col-cat,
@@ -868,5 +907,12 @@
 		.header-secondary .col-name-portrait {
 			text-align: left;
 		}
+	}
+	
+	/* Compact team column styling handled via CSS variable override */
+	.scoreboard-grid.compact-team-column .cell.team-name {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 </style>

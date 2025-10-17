@@ -1,6 +1,10 @@
 export default {
 	name: 'Lower Third - Minimal Status',
 	description: 'Minimal overlay showing current athlete, weight, timer, and decision lights. Transparent background for video overlay.',
+	
+	// Whether this scoreboard requires athlete pictures
+	requiresPictures: false,
+	
 	options: [
 		{
 			key: 'position',

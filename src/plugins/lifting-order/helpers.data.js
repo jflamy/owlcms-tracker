@@ -3,6 +3,7 @@
  */
 
 import { competitionHub } from '$lib/server/competition-hub.js';
+import { getFlagUrl } from '$lib/server/flag-resolver.js';
 
 /**
  * Plugin-specific cache to avoid recomputing lifting order on every browser request
@@ -121,6 +122,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			name: cleanFullName,
 			teamName: fopUpdate.teamName,
 			team: fopUpdate.teamName,
+			flagUrl: getFlagUrl(fopUpdate.teamName),
 			startNumber: fopUpdate.startNumber,
 			categoryName: fopUpdate.categoryName,
 			category: fopUpdate.categoryName,
@@ -145,7 +147,10 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// Get precomputed liftingOrderAthletes from UPDATE message (already parsed as nested object)
 	let liftingOrderAthletes = [];
 	if (fopUpdate?.liftingOrderAthletes) {
-		liftingOrderAthletes = fopUpdate.liftingOrderAthletes;
+		liftingOrderAthletes = fopUpdate.liftingOrderAthletes.map(athlete => ({
+			...athlete,
+			flagUrl: getFlagUrl(athlete.teamName)
+		}));
 	}
 
 	// Get precomputed groupAthletes from UPDATE message (already parsed as nested object)
@@ -165,9 +170,22 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// Filter out OWLCMS spacers (isSpacer flag)
 	let leaders = [];
 	if (fopUpdate?.leaders && Array.isArray(fopUpdate.leaders)) {
-		leaders = fopUpdate.leaders.filter(leader => !leader.isSpacer);
+		leaders = fopUpdate.leaders
+			.filter(leader => !leader.isSpacer)
+			.map(leader => ({
+				...leader,
+				flagUrl: leader.teamName ? getFlagUrl(leader.teamName) : null
+			}));
 	}
-		const result = {
+	
+	// Calculate max team name length (for responsive layout)
+	// Narrow team column if longest team name is short (< 7 characters)
+	const maxTeamNameLength = Math.max(0, ...liftingOrderAthletes
+		.map(athlete => (athlete.teamName || '').length)
+	);
+	const compactTeamColumn = maxTeamNameLength < 7; // Narrow team column if max name length < 7
+	
+	const result = {
 		scoreboardName: 'Lifting Order',  // Scoreboard display name
 		competition,
 		currentAttempt,
@@ -189,6 +207,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		isBreak: fopUpdate?.break === 'true' || false,
 		breakType: fopUpdate?.breakType,
 		sessionStatus,  // Include session status (isDone, groupName, lastActivity)
+		compactTeamColumn,  // Narrow team column if max team size < 7
 		status: (fopUpdate || databaseState) ? 'ready' : 'waiting',
 		lastUpdate: fopUpdate?.lastUpdate || Date.now(),
 		options: { showRecords, maxLifters } // Echo back the options used
@@ -209,6 +228,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		isBreak: result.isBreak,
 		breakType: result.breakType,
 		status: result.status,
+		compactTeamColumn: result.compactTeamColumn,  // Include responsive layout flag
 		lastUpdate: result.lastUpdate,
 		options: result.options
 	});

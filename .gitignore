@@ -9,6 +9,7 @@ dist-ssr
 !.env.example
 vite.config.js.timestamp-*
 samples/
+local/flags/
 
 # Compliance folder - ignore all files except README.md
 compliance/*

@@ -30,13 +30,10 @@ process.on('message', (msg) => {
     console.log('');
     console.log('✅ SERVER READY TO RECEIVE OWLCMS MESSAGES');
     console.log('');
-    console.log('📡 Available endpoints:');
-    console.log('   • /timer     - Timer events (StartTime, StopTime, etc.)');
-    console.log('   • /decision  - Referee decisions');
-    console.log('   • /update    - UI events (LiftingOrderUpdated, etc.)');
-    console.log('   • /database  - Full competition data');
+    console.log('📡 OWLCMS WebSocket: ws://localhost:8096/ws');
+    console.log('   Messages: /database, /update, /timer, /decision');
     console.log('');
-    console.log('🌐 Web interface: http://localhost:8096/scoreboard');
+    console.log('🌐 Web interface: http://localhost:8096');
     console.log('');
     console.log('═══════════════════════════════════════════════════════');
     console.log('');

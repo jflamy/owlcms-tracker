@@ -3,6 +3,7 @@
  */
 
 import { competitionHub } from '$lib/server/competition-hub.js';
+import { getFlagUrl } from '$lib/server/flag-resolver.js';
 
 // Track timer visibility state per FOP so StopTime events behave like SetTime when clock is idle
 const timerStateMap = new Map();
@@ -86,6 +87,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 				name: currentAthlete.fullName,
 				teamName: currentAthlete.teamName,
 				team: currentAthlete.teamName,
+				flagUrl: getFlagUrl(currentAthlete.teamName),
 				startNumber: currentAthlete.startNumber,
 				categoryName: currentAthlete.category,
 				category: currentAthlete.category,
@@ -147,6 +149,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			name: currentAthlete.fullName,
 			teamName: currentAthlete.teamName,
 			team: currentAthlete.teamName,
+			flagUrl: getFlagUrl(currentAthlete.teamName),
 			startNumber: currentAthlete.startNumber,
 			categoryName: currentAthlete.category,
 			category: currentAthlete.category,
@@ -165,7 +168,12 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// Filter out OWLCMS spacers (isSpacer flag)
 	let leaders = [];
 	if (fopUpdate?.leaders && Array.isArray(fopUpdate.leaders)) {
-		leaders = fopUpdate.leaders.filter(leader => !leader.isSpacer);
+		leaders = fopUpdate.leaders
+			.filter(leader => !leader.isSpacer)
+			.map(leader => ({
+				...leader,
+				flagUrl: leader.teamName ? getFlagUrl(leader.teamName) : null
+			}));
 	}
 	
 	// Compute sessionStatusMessage from current fopUpdate
@@ -197,11 +205,24 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	
 	// For session results, we use groupAthletes (standard order) instead of liftingOrderAthletes
 	// groupAthletes is already sorted by category and lot number from OWLCMS
+	// Add flagUrl to each athlete
+	const athletesWithFlags = groupAthletes.map(athlete => ({
+		...athlete,
+		flagUrl: getFlagUrl(athlete.teamName)
+	}));
 
 	// Determine status and message
 	const hasData = !!(fopUpdate || databaseState);
 	const status = hasData ? 'ready' : 'waiting';
 	const message = hasData ? null : `⏳ Waiting for competition data for platform "${fopName}"...`;
+	
+	// Calculate max team name length (for responsive layout)
+	// Narrow team column if longest team name is short (< 7 characters)
+	const maxTeamNameLength = Math.max(0, ...athletesWithFlags
+		.filter(athlete => !athlete.isSpacer)
+		.map(athlete => (athlete.teamName || '').length)
+	);
+	const compactTeamColumn = maxTeamNameLength < 7; // Narrow team column if max name length < 7
 
 	const result = {
 		scoreboardName: 'Session Results',  // Scoreboard display name
@@ -210,9 +231,9 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		timer,
 		decision,
 		sessionStatusMessage,  // Cleaned message for when session is done
-		sortedAthletes: groupAthletes,        // Standardized field name (OWLCMS standard order)
-		liftingOrderAthletes: groupAthletes, // Keep for backwards compatibility
-		groupAthletes,                        // Also keep raw groupAthletes
+		sortedAthletes: athletesWithFlags,        // Standardized field name (OWLCMS standard order)
+		liftingOrderAthletes: athletesWithFlags, // Keep for backwards compatibility
+		groupAthletes: athletesWithFlags,                        // Also keep raw groupAthletes
 		leaders,                              // Leaders from previous sessions (from OWLCMS)
 		stats,
 		displaySettings: fopUpdate?.showTotalRank || fopUpdate?.showSinclair ? {
@@ -224,6 +245,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		isBreak: fopUpdate?.break === 'true' || false,
 		breakType: fopUpdate?.breakType,
 		sessionStatus,  // Include session status (isDone, groupName, lastActivity)
+		compactTeamColumn,  // Narrow team column if max team size < 7
 		status,
 		message,  // Add helpful waiting message
 		lastUpdate: fopUpdate?.lastUpdate || Date.now(),
@@ -245,6 +267,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		breakType: result.breakType,
 		status: result.status,
 		message: result.message,  // Include waiting message in cache
+		compactTeamColumn: result.compactTeamColumn,  // Include responsive layout flag
 		lastUpdate: result.lastUpdate,
 		options: result.options
 	});

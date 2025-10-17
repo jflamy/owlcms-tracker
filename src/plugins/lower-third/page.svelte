@@ -37,6 +37,9 @@
 			<div class="name-content">
 				<span class="athlete-name">{data.currentAthleteInfo.fullName}</span>
 				<span class="separator">•</span>
+				{#if data.currentAthleteInfo.flagUrl}
+					<img src={data.currentAthleteInfo.flagUrl} alt={data.currentAthleteInfo.teamName} class="team-flag" />
+				{/if}
 				<span class="team">{data.currentAthleteInfo.teamName}</span>
 				<span class="separator">•</span>
 				<span class="weight">{data.currentAthleteInfo.weight}kg</span>
@@ -157,6 +160,12 @@
 		color: #e0e0e0;
 		font-size: 1.5rem;
 		white-space: nowrap;
+	}
+
+	.team-flag {
+		height: 1.2rem;
+		max-width: 1.5rem;
+		object-fit: contain;
 	}
 
 	.weight {

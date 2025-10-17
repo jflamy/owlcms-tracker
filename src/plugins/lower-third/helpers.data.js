@@ -1,4 +1,5 @@
 import { competitionHub } from '$lib/server/competition-hub.js';
+import { getFlagUrl } from '$lib/server/flag-resolver.js';
 
 /**
  * Lower Third Minimal Status Scoreboard - Server-side data processing
@@ -146,6 +147,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		currentAthleteInfo = {
 			fullName: cleanFullName,
 			teamName: fopUpdate.teamName || '',
+			flagUrl: getFlagUrl(fopUpdate.teamName),
 			weight: fopUpdate.weight || '',
 			attemptNumber: fopUpdate.attemptNumber || '',
 			liftType: fopUpdate.attemptNumber ? 
