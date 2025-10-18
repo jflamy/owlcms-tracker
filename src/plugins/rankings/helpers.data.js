@@ -70,8 +70,9 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	const sessionStatus = competitionHub.getSessionStatus(fopName);
 
 	// Check cache first - cache key based on athlete data, NOT timer events
+	// Use length + first item ID as quick hash instead of expensive JSON.stringify
 	const groupAthletesHash = fopUpdate?.groupAthletes ? 
-		JSON.stringify(fopUpdate.groupAthletes).substring(0, 100) : '';
+		`${fopUpdate.groupAthletes.length}-${fopUpdate.groupAthletes[0]?.id || 0}` : '';
 	const cacheKey = `${fopName}-${groupAthletesHash}-${showRecords}`;
 	
 	if (rankingsCache.has(cacheKey)) {

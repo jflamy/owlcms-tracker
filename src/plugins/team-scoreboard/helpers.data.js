@@ -404,8 +404,9 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		options: result.options
 	});
 	
-	// Cleanup old cache entries (keep last 20)
-	if (teamScoreboardCache.size > 20) {
+	// Cleanup old cache entries (keep last 3 - with 6 FOPs max and 2-3 options = ~18 entries worst case)
+	// Reducing from 20 to 3 to avoid memory bloat when multiple scoreboards/FOPs loaded
+	if (teamScoreboardCache.size > 3) {
 		const firstKey = teamScoreboardCache.keys().next().value;
 		teamScoreboardCache.delete(firstKey);
 	}

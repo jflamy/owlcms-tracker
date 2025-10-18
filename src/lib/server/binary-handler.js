@@ -8,16 +8,84 @@
 import AdmZip from 'adm-zip';
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 /**
+ * Sanity check after flags extraction
+ * Verifies flags directory and file count
+ */
+function verifySanityAfterFlags() {
+	try {
+		const flagsDir = path.join(process.cwd(), 'local', 'flags');
+		if (!fs.existsSync(flagsDir)) {
+			console.warn('[Sanity] ⚠️  Flags directory does not exist');
+			return 0;
+		}
+
+		const files = fs.readdirSync(flagsDir);
+		const flagCount = files.length;
+		if (flagCount === 0) {
+			console.warn('[Sanity] ⚠️  Flags directory is empty');
+			return 0;
+		}
+
+		console.log(`[Sanity] ✅ Flags: ${flagCount} files extracted to /local/flags`);
+		return flagCount;
+	} catch (error) {
+		console.error(`[Sanity] ❌ Flags verification failed:`, error.message);
+		return 0;
+	}
+}
+
+/**
+ * Sanity check after translations load
+ * Verifies locale count and key coverage
+ */
+function verifySanityAfterTranslations() {
+	try {
+		// Lazy import to access competition hub
+		const { competitionHub } = require('./competition-hub.js');
+		
+		// Get all available locales (not just one)
+		const availableLocales = competitionHub.getAvailableLocales();
+		const localeCount = availableLocales.length;
+		
+		if (localeCount === 0) {
+			console.warn('[Sanity] ⚠️  No translations cached');
+			return 0;
+		}
+
+		// Count total keys across all locales
+		let totalKeys = 0;
+		for (const locale of availableLocales) {
+			const translationMap = competitionHub.getTranslations(locale);
+			if (translationMap && typeof translationMap === 'object') {
+				totalKeys += Object.keys(translationMap).length;
+			}
+		}
+
+		console.log(`[Sanity] ✅ Translations: ${localeCount} locales, ${totalKeys} total translation keys cached in single hub instance`);
+		return localeCount;
+	} catch (error) {
+		console.error(`[Sanity] ❌ Translations verification failed:`, error.message);
+		return 0;
+	}
+}
+
+/**
  * Parse and route binary message from OWLCMS
  * @param {Buffer} buffer - Binary frame data
  */
 export function handleBinaryMessage(buffer) {
+	const startTime = Date.now();
+	const operationId = Math.random().toString(36).substr(2, 9);
+	
+	console.log(`[BINARY] Starting operation ${operationId}`);
+	
 	try {
 		// Validate minimum frame size
 		if (buffer.length < 4) {
@@ -49,11 +117,18 @@ export function handleBinaryMessage(buffer) {
 			handlePicturesMessage(payload);
 		} else if (messageType === 'styles') {
 			handleStylesMessage(payload);
+		} else if (messageType === 'translations_zip') {
+			handleTranslationsZipMessage(payload);
 		} else {
 			console.warn(`[BINARY] WARNING: Unknown binary message type "${messageType}"`);
 		}
+		
+		const elapsed = Date.now() - startTime;
+		console.log(`[BINARY] ✅ Operation ${operationId} completed in ${elapsed}ms (type: ${messageType})`);
 	} catch (error) {
-		console.error('[BINARY] ERROR processing binary message:', error.message);
+		const elapsed = Date.now() - startTime;
+		console.error(`[BINARY] ❌ Operation ${operationId} FAILED after ${elapsed}ms:`, error.message);
+		console.error('[BINARY] Stack trace:', error.stack);
 	}
 }
 
@@ -62,6 +137,9 @@ export function handleBinaryMessage(buffer) {
  * @param {Buffer} zipBuffer - ZIP file buffer
  */
 function handleFlagsMessage(zipBuffer) {
+	const startTime = Date.now();
+	console.log(`[FLAGS] Starting extraction of ${zipBuffer.length} bytes`);
+	
 	try {
 		// Parse ZIP from buffer
 		const zip = new AdmZip(zipBuffer);
@@ -90,9 +168,15 @@ function handleFlagsMessage(zipBuffer) {
 			}
 		});
 
-		console.log(`[FLAGS] ✓ Extracted ${extractedCount} flag files`);
+		const elapsed = Date.now() - startTime;
+		console.log(`[FLAGS] ✓ Extracted ${extractedCount} flag files in ${elapsed}ms`);
+		
+		// Run sanity check after successful extraction
+		verifySanityAfterFlags();
 	} catch (error) {
-		console.error('[FLAGS] ERROR:', error.message);
+		const elapsed = Date.now() - startTime;
+		console.error(`[FLAGS] ❌ ERROR after ${elapsed}ms:`, error.message);
+		console.error('[FLAGS] Stack trace:', error.stack);
 	}
 }
 
@@ -173,3 +257,88 @@ function handleStylesMessage(zipBuffer) {
 		console.error('[STYLES] ERROR:', error.message);
 	}
 }
+
+/**
+ * Extract translations ZIP archive containing translations.json (~1MB uncompressed, 400KB compressed)
+ * ZIP contains single file "translations.json" with all 26 locale translation maps
+ * @param {Buffer} zipBuffer - ZIP file buffer with translations.json
+ */
+function handleTranslationsZipMessage(zipBuffer) {
+	const startTime = Date.now();
+	
+	try {
+		console.log(`[TRANSLATIONS_ZIP] 📦 Received ZIP: ${zipBuffer.length} bytes`);
+		
+		// Parse ZIP from buffer
+		const zip = new AdmZip(zipBuffer);
+		
+		// Look for translations.json in the ZIP
+		const translationsEntry = zip.getEntries().find(entry => 
+			entry.entryName === 'translations.json' && !entry.isDirectory
+		);
+		
+		if (!translationsEntry) {
+			console.error('[TRANSLATIONS_ZIP] ❌ ERROR: ZIP does not contain translations.json');
+			return;
+		}
+		
+		// Extract and parse translations.json
+		const jsonData = translationsEntry.getData().toString('utf8');
+		console.log(`[TRANSLATIONS_ZIP] 📄 Extracted translations.json: ${jsonData.length} bytes`);
+		
+		const payload = JSON.parse(jsonData);
+		
+		// Lazy import to avoid circular dependency at module load time
+		// This will be called at runtime when message arrives
+		const competitionHub = require('./competition-hub.js').competitionHub;
+		
+		// Check checksum first (skip if matches)
+		const checksum = payload.translationsChecksum;
+		if (checksum && checksum === competitionHub.lastTranslationsChecksum) {
+			const elapsed = Date.now() - startTime;
+			console.log(`[TRANSLATIONS_ZIP] ⏭️  Checksum ${checksum.substring(0, 8)}... matches, skipping reprocessing (${elapsed}ms)`);
+			return;
+		}
+		
+		// Handle wrapper structure: { "locales": { "en": {...}, "fr": {...} }, "translationsChecksum": "..." }
+		// Or direct structure: { "en": {...}, "fr": {...} }
+		let translationsData = payload.locales || payload;
+		
+		// Validate structure: should be object with locale keys
+		if (!translationsData || typeof translationsData !== 'object') {
+			console.error('[TRANSLATIONS_ZIP] ❌ ERROR: translations.json is not a valid object');
+			return;
+		}
+		
+		// Cache each locale
+		let localesCount = 0;
+		let totalKeys = 0;
+		console.log(`[TRANSLATIONS_ZIP] 🔄 Caching locales...`);
+		
+		for (const [locale, translationMap] of Object.entries(translationsData)) {
+			// Skip metadata fields and only process translation maps
+			if (translationMap && typeof translationMap === 'object' && locale !== 'translationsChecksum') {
+				competitionHub.setTranslations(locale, translationMap);
+				localesCount++;
+				totalKeys += Object.keys(translationMap).length;
+			}
+		}
+		
+		// Store checksum after successful processing
+		if (checksum) {
+			competitionHub.lastTranslationsChecksum = checksum;
+			console.log(`[TRANSLATIONS_ZIP] ✅ Checksum stored: ${checksum.substring(0, 8)}...`);
+		}
+		
+		const elapsed = Date.now() - startTime;
+		console.log(`[TRANSLATIONS_ZIP] ✅ Complete: ${localesCount} locales processed, ${totalKeys} source keys (${elapsed}ms)`);
+		
+		// Run sanity check after successful translations load
+		verifySanityAfterTranslations();
+	} catch (error) {
+		const elapsed = Date.now() - startTime;
+		console.error(`[TRANSLATIONS_ZIP] ❌ ERROR after ${elapsed}ms:`, error.message);
+		console.error('[TRANSLATIONS_ZIP] Stack trace:', error.stack);
+	}
+}
+

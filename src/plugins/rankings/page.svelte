@@ -1,5 +1,6 @@
 <script>
 	import { createTimer } from '$lib/timer-logic.js';
+	import { translations } from '$lib/stores.js';
 	import { onMount, onDestroy } from 'svelte';
 	
 	// Props passed from parent route
@@ -14,6 +15,12 @@
 		timerState = state;
 	});
 	
+	// Current translations object (populated from store)
+	let t = {};
+	const unsubscribeTranslations = translations.subscribe(trans => {
+		t = trans.en || {};
+	});
+	
 	onMount(() => {
 		timer.start(data.timer);
 	});
@@ -21,6 +28,7 @@
 	onDestroy(() => {
 		timer.stop();
 		unsubscribe();
+		unsubscribeTranslations();
 	});
 	
 	$: currentAttempt = data.currentAttempt;
@@ -118,34 +126,34 @@
 		{:else}
 			<div class="scoreboard-grid" class:compact-team-column={data.compactTeamColumn} style="--template-rows: {data.gridTemplateRows}" role="grid">
 				<div class="grid-row header header-primary" role="row">
-					<div class="cell header col-start span-two" role="columnheader">Start</div>
-					<div class="cell header col-name span-two" role="columnheader">Name</div>
-					<div class="cell header col-cat span-two" role="columnheader">Cat.</div>
-					<div class="cell header col-born span-two" role="columnheader">Born</div>
-					<div class="cell header col-team span-two" role="columnheader">Team</div>
+					<div class="cell header col-start span-two" role="columnheader">{t.Start || 'Start'}</div>
+					<div class="cell header col-name span-two" role="columnheader">{t.Name || 'Name'}</div>
+					<div class="cell header col-cat span-two" role="columnheader">{t.Category || 'Cat.'}</div>
+					<div class="cell header col-born span-two" role="columnheader">{t.Birth || 'Born'}</div>
+					<div class="cell header col-team span-two" role="columnheader">{t.Team || 'Team'}</div>
 					<div class="cell header v-spacer v-spacer-snatch span-two" aria-hidden="true"></div>
-					<div class="cell header col-group col-group-snatch" role="columnheader">Snatch</div>
+					<div class="cell header col-group col-group-snatch" role="columnheader">{t.Snatch || 'Snatch'}</div>
 					<div class="cell header v-spacer v-spacer-middle span-two" aria-hidden="true"></div>
-					<div class="cell header col-group col-group-cj" role="columnheader">Clean &amp; Jerk</div>
+					<div class="cell header col-group col-group-cj" role="columnheader">{t.Clean_and_Jerk || 'Clean &amp; Jerk'}</div>
 					<div class="cell header v-spacer v-spacer-total span-two" aria-hidden="true"></div>
-					<div class="cell header col-total span-two" role="columnheader">Total</div>
-					<div class="cell header col-rank span-two" role="columnheader">Rank</div>
+					<div class="cell header col-total span-two" role="columnheader">{t.TOTAL || 'Total'}</div>
+					<div class="cell header col-rank span-two" role="columnheader">{t.Rank || 'Rank'}</div>
 				</div>
 				<div class="grid-row header header-secondary" role="row">
-					<div class="cell header col-name-portrait" role="columnheader">Name</div>
+					<div class="cell header col-name-portrait" role="columnheader">{t.Name || 'Name'}</div>
 					<div class="cell header v-spacer v-spacer-snatch" aria-hidden="true"></div>
 					<div class="cell header col-attempt snatch-1" role="columnheader">1</div>
 					<div class="cell header col-attempt snatch-2" role="columnheader">2</div>
 					<div class="cell header col-attempt snatch-3" role="columnheader">3</div>
-					<div class="cell header col-best snatch-best" role="columnheader">✓</div>
+					<div class="cell header col-best snatch-best" role="columnheader">{t.Best || '✔'}</div>
 					<div class="cell header v-spacer v-spacer-middle" aria-hidden="true"></div>
 					<div class="cell header col-attempt cj-1" role="columnheader">1</div>
 					<div class="cell header col-attempt cj-2" role="columnheader">2</div>
 					<div class="cell header col-attempt cj-3" role="columnheader">3</div>
-					<div class="cell header col-best cj-best" role="columnheader">✓</div>
+					<div class="cell header col-best cj-best" role="columnheader">{t.Best || '✔'}</div>
 					<div class="cell header v-spacer v-spacer-total" aria-hidden="true"></div>
-					<div class="cell header col-total-portrait" role="columnheader">Total</div>
-					<div class="cell header col-rank-portrait" role="columnheader">Rank</div>
+					<div class="cell header col-total-portrait" role="columnheader">{t.TOTAL || 'Total'}</div>
+					<div class="cell header col-rank-portrait" role="columnheader">{t.Rank || 'Rank'}</div>
 				</div>
 
 				{#each allAthletes as athlete}
@@ -208,7 +216,7 @@
 					<!-- Leaders title row spanning all columns -->
 					<div class="grid-row leaders-header">
 						<div class="cell leaders-title-cell span-all">
-							Leaders from Previous Sessions {data.competition?.groupInfo ? data.competition.groupInfo.split('–')[0].trim() : ''}
+							{t.Leaders || 'Leaders:'} {data.competition?.groupInfo ? data.competition.groupInfo.split('–')[0].trim() : ''}
 						</div>
 					</div>
 

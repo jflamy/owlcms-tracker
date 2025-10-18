@@ -1,11 +1,17 @@
 <script>
 	import { page } from '$app/stores';
+	import { browser } from '$app/environment';
+	import { translations } from '$lib/stores.js';
+	import { subscribeSSE, connectSSE } from '$lib/sse-client.js';
 	import { onMount, onDestroy } from 'svelte';
 	
 	export let data;
 	
 	let scoreboardData = null;
-	let eventSource;
+	let unsubscribeSSE = null;
+	
+	// Get language preference from URL parameter (default: 'en')
+	$: language = $page.url.searchParams.get('lang') || 'en';
 	
 	// Build API URL with all parameters
 	$: apiUrl = `/api/scoreboard?type=${data.scoreboardType}&fop=${data.fopName}` +
@@ -13,48 +19,76 @@
 	
 	// Fetch scoreboard data from API
 	async function fetchData() {
+		const fetchId = Math.random().toString(36).substr(2, 9);
+		const startTime = Date.now();
+		
 		try {
+			console.log(`[Scoreboard Fetch] 🔄 Fetch ${fetchId} starting: ${apiUrl}`);
+			
+			const fetchStartTime = Date.now();
 			const response = await fetch(apiUrl);
+			const fetchElapsed = Date.now() - fetchStartTime;
+			console.log(`[Scoreboard Fetch] 📡 Fetch ${fetchId} received response (HTTP ${response.status}, ${fetchElapsed}ms)`);
+			
+			const parseStartTime = Date.now();
 			const result = await response.json();
+			const parseElapsed = Date.now() - parseStartTime;
+			console.log(`[Scoreboard Fetch] 📝 Fetch ${fetchId} parsed JSON (${parseElapsed}ms)`);
 			
 			if (result.success) {
 				scoreboardData = result.data;
+				const totalElapsed = Date.now() - startTime;
+				console.log(`[Scoreboard Fetch] ✅ Fetch ${fetchId} completed in ${totalElapsed}ms, data has ${Object.keys(scoreboardData).length} fields`);
 			} else {
-				console.error('[Scoreboard] API error:', result.error);
+				const totalElapsed = Date.now() - startTime;
+				console.error(`[Scoreboard Fetch] ❌ Fetch ${fetchId} API error after ${totalElapsed}ms:`, result.error);
 			}
 		} catch (err) {
-			console.error('[Scoreboard] Fetch error:', err);
+			const totalElapsed = Date.now() - startTime;
+			console.error(`[Scoreboard Fetch] ❌ Fetch ${fetchId} error after ${totalElapsed}ms:`, err);
 		}
 	}
 	
 	onMount(() => {
 		// Initial fetch
+		console.log(`[Scoreboard Mount] 🔄 onMount starting, calling fetchData for ${data.scoreboardType}`);
 		fetchData();
 		
-		// Subscribe to SSE for real-time updates
-		eventSource = new EventSource('/api/client-stream');
-		
-		eventSource.onmessage = (event) => {
-			const message = JSON.parse(event.data);
+		// Connect to shared SSE (browser only)
+		if (browser) {
+			console.log(`[Scoreboard Mount] Setting up shared SSE connection for lang=${language}`);
+			connectSSE(language);
 			
-			// Refresh data on any competition update
-			if (message.type === 'fop_update' || message.type === 'state_update' || message.type === 'competition_update') {
-				const eventType = message.data?.athleteTimerEventType || message.data?.uiEvent || message.type;
-				console.log(`[Scoreboard] SSE update received (${eventType}), fetching fresh data`);
-				fetchData();
-			}
-		};
-		
-		eventSource.onerror = (error) => {
-			console.error('[Scoreboard] SSE error:', error);
-		};
+			// Subscribe to SSE messages
+			unsubscribeSSE = subscribeSSE((message) => {
+				// Handle translation updates
+				if (message.type === 'translations') {
+					console.log(`[Scoreboard SSE] Received translations for locale '${message.locale}' (${message.keyCount} keys)`);
+					translations.setLocale(message.locale, message.data);
+				}
+				
+				// Refresh data on any competition update
+				if (message.type === 'fop_update' || message.type === 'state_update' || message.type === 'competition_update') {
+					const eventType = message.data?.athleteTimerEventType || message.data?.uiEvent || message.type;
+					console.log(`[Scoreboard SSE] Event received (${eventType}), triggering fetchData`);
+					fetchData();
+				}
+			});
+		}
 	});
 	
 	onDestroy(() => {
-		if (eventSource) {
-			eventSource.close();
+		if (unsubscribeSSE) {
+			console.log('[Scoreboard Destroy] Unsubscribing from SSE');
+			unsubscribeSSE();
 		}
 	});
+	
+	// Reconnect SSE if language changes (browser only)
+	$: if (browser && language) {
+		console.log(`[Scoreboard Language] 🔄 Language changed to ${language}, reconnecting SSE`);
+		connectSSE(language);
+	}
 </script>
 
 <svelte:head>

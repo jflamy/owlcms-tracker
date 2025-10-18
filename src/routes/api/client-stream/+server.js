@@ -7,9 +7,12 @@ import { competitionHub } from '$lib/server/competition-hub.js';
  * Sends raw competition state - individual plugins process this data
  * using their own helpers when needed.
  */
-export async function GET({ request }) {
+export async function GET({ request, url }) {
   const connectionId = Math.random().toString(36).substr(2, 9);
-  console.log(`[SSE] New client connection: ${connectionId}`);
+  
+  // Get language preference from query parameter (default: 'en')
+  const language = url.searchParams.get('lang') || 'en';
+  console.log(`[SSE] New client connection: ${connectionId} (language: ${language})`);
   
   const stream = new ReadableStream({
     start(controller) {
@@ -64,6 +67,31 @@ export async function GET({ request }) {
           message: 'No competition data available yet',
           timestamp: Date.now()
         });
+      }
+
+      // Send translations for the requested language only
+      const translations = competitionHub.getTranslations(language);
+      if (translations && Object.keys(translations).length > 0) {
+        send({
+          type: 'translations',
+          locale: language,
+          data: translations,
+          keyCount: Object.keys(translations).length,
+          timestamp: Date.now()
+        });
+      } else if (language !== 'en') {
+        // Fallback to English if requested language not available
+        const enTranslations = competitionHub.getTranslations('en');
+        if (enTranslations && Object.keys(enTranslations).length > 0) {
+          console.log(`[SSE] ${connectionId}: Language '${language}' not available, falling back to 'en'`);
+          send({
+            type: 'translations',
+            locale: 'en',
+            data: enTranslations,
+            keyCount: Object.keys(enTranslations).length,
+            timestamp: Date.now()
+          });
+        }
       }
 
       // Subscribe to hub updates

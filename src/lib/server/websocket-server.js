@@ -57,19 +57,17 @@ export function initWebSocketServer(httpServer) {
 						result = await handleUpdateMessage(message.payload, hasBundledDatabase);
 						break;
 					
-					case 'timer':
-						result = await handleTimerMessage(message.payload, hasBundledDatabase);
-						break;
-					
-					case 'decision':
-						result = await handleDecisionMessage(message.payload, hasBundledDatabase);
-						break;
-
-					default:
-						result = await handleGenericMessage(message.payload, hasBundledDatabase, message.type);
-				}
+				case 'timer':
+					result = await handleTimerMessage(message.payload, hasBundledDatabase);
+					break;
 				
-				ws.send(JSON.stringify(result));
+				case 'decision':
+					result = await handleDecisionMessage(message.payload, hasBundledDatabase);
+					break;
+
+				default:
+					result = await handleGenericMessage(message.payload, hasBundledDatabase, message.type);
+			}				ws.send(JSON.stringify(result));
 			} catch (error) {
 				// If JSON parsing fails, try to handle as binary frame
 				if (data instanceof Buffer || Buffer.isBuffer(data)) {
@@ -94,7 +92,17 @@ export function initWebSocketServer(httpServer) {
 		});
 
 		ws.on('error', (error) => {
-			console.error('[WebSocket] Connection error:', error);
+			console.error('[WebSocket] Connection error:', error.message);
+			console.error('[WebSocket] Error details:', error.stack);
+		});
+
+		// Detect disconnection (normal) vs crash (abnormal)
+		ws.on('close', (code, reason) => {
+			if (code >= 4000) {
+				console.error(`[WebSocket] Abnormal close: code=${code}, reason="${reason}"`);
+			} else {
+				console.log(`[WebSocket] Client disconnected normally: code=${code}, reason="${reason}"`);
+			}
 		});
 	});
 	
@@ -116,6 +124,44 @@ export function initWebSocketServer(httpServer) {
 }
 
 /**
+ * Sanity check after database load
+ * Verifies database structure and data integrity
+ */
+function verifySanityAfterDatabase() {
+	try {
+		const db = competitionHub.getDatabaseState();
+		if (!db) {
+			console.warn('[Sanity] ⚠️  Database state is null');
+			return false;
+		}
+
+		// Verify required fields
+		if (!Array.isArray(db.athletes) || db.athletes.length === 0) {
+			console.warn('[Sanity] ⚠️  Database has no athletes');
+			return false;
+		}
+
+		// Verify athlete IDs are unique
+		const athleteIds = new Set();
+		for (const athlete of db.athletes) {
+			if (athlete.id && athleteIds.has(athlete.id)) {
+				console.warn(`[Sanity] ⚠️  Duplicate athlete ID: ${athlete.id}`);
+				return false;
+			}
+			if (athlete.id) athleteIds.add(athlete.id);
+		}
+
+		// Log sanity results
+		const groupCount = Array.isArray(db.ageGroups) ? db.ageGroups.length : 0;
+		console.log(`[Sanity] ✅ Database: ${db.athletes.length} athletes, ${groupCount} age groups, ${athleteIds.size} unique IDs`);
+		return true;
+	} catch (error) {
+		console.error(`[Sanity] ❌ Database verification failed:`, error.message);
+		return false;
+	}
+}
+
+/**
  * Handle database message - same payload as POST /database
  */
 async function handleDatabaseMessage(payload) {
@@ -125,6 +171,10 @@ async function handleDatabaseMessage(payload) {
 	
 	if (result.accepted) {
 		console.log('[WebSocket] ✅ Full competition data accepted and loaded');
+		
+		// Run sanity check after successful database load
+		verifySanityAfterDatabase();
+		
 		return { status: 200, message: 'Full competition data loaded successfully' };
 	} else {
 		console.log('[WebSocket] ❌ Failed to process full competition data');
@@ -260,6 +310,9 @@ function mapHubResultToResponse(result, messageType) {
 	return { status: 500, message: result.reason || `Unable to process ${messageType}` };
 }
 
+/**
+ * Handle translations message - contains all locales (language or language-country format)
+ */
 function capitalize(value) {
 	return typeof value === 'string' && value.length > 0 ? value.charAt(0).toUpperCase() + value.slice(1) : value;
 }

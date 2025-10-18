@@ -43,6 +43,11 @@ class CompetitionHub {
     this.lastBroadcastTime = {};  // Structure: { 'fopName-eventType': timestamp }
     this.broadcastDebounceMs = 100; // Minimum time between identical broadcasts
     
+    // Translation map cache - per locale (initially "en", supporting up to 26 locales)
+    // Structure: { 'en': { 'Start': 'Start', 'Total': 'Total', ... }, 'fr': {...}, ... }
+    this.translations = {};
+    this.lastTranslationsChecksum = null;  // Track checksum to avoid reprocessing identical translations
+    
     // Log learning mode status on startup
     logLearningModeStatus();
     
@@ -279,10 +284,6 @@ class CompetitionHub {
       result.leaders = params.leaders;
     }
 
-    if (params.translationMap && typeof params.translationMap === 'object') {
-      result.translationMap = params.translationMap;
-    }
-
     // Break/ceremony state
     if (params.break === 'true') {
       result.isBreak = true;
@@ -458,7 +459,16 @@ class CompetitionHub {
   
   /**
    * Check which preconditions are missing
-   * @returns {string[]} Array of missing precondition names: 'database', 'flags'
+   * @returns {string[]} Array of missing precondition names: 'database', 'translations', 'flags'
+   * 
+   * Precondition Details:
+   * - 'database': Full competition data (athletes, categories, FOPs) via type="database" message
+   * - 'translations': All 26 locale translation maps (~1MB uncompressed, 400KB gzipped)
+   *   * Format: type="translations" with payload { "en": {...}, "fr": {...}, ... }
+   *   * OWLCMS can send as JSON text message OR as binary frame with ZIP payload
+   *   * If using ZIP: Send as binary frame with [type_length:4] ["translations_zip"] [ZIP buffer]
+   *   * ZIP should contain single file "translations.json" with all 26 locales
+   * - 'flags': Country/team flag images as binary ZIP frames with type="flags"
    */
   getMissingPreconditions() {
     const missing = [];
@@ -466,6 +476,12 @@ class CompetitionHub {
     // Check database
     if (!this.databaseState || !this.databaseState.athletes || this.databaseState.athletes.length === 0) {
       missing.push('database');
+    }
+    
+    // Check translations (OWLCMS sends all 26 locales in one message, can be JSON or ZIP)
+    if (Object.keys(this.translations).length === 0) {
+      missing.push('translations');
+      console.log(`[Hub] 🔄 Requesting translations from OWLCMS (428 response)`);
     }
     
     // Always request flags (used in all scoreboards for team identification)
@@ -591,6 +607,124 @@ class CompetitionHub {
     
     // Default: return single FOP 'A' if nothing else available
     return ['A'];
+  }
+
+  /**
+   * Cache translation map for a specific locale
+   * @param {string} locale - Language locale code (e.g., 'en', 'fr', 'es', 'fr-CA', 'es-AR')
+   * @param {object} translationMap - Map of translation keys to display strings
+   * 
+   * Implements locale fallback merging (like Java's ResourceBundle):
+   * - When caching 'fr-CA' with 10 keys, merges with 'fr' (1300 keys) if available
+   * - Result: fr-CA has 1310 keys (10 regional + 1300 from base)
+   * - Also handles reverse: if 'fr' cached after 'fr-CA', updates all 'fr-*' variants
+   */
+  setTranslations(locale = 'en', translationMap) {
+    if (!translationMap || typeof translationMap !== 'object') {
+      console.warn(`[Hub] ⚠️  Invalid translation map for locale '${locale}' - not cached`);
+      return;
+    }
+    
+    const keyCount = Object.keys(translationMap).length;
+    const isNew = !this.translations[locale];
+    
+    // 1. Extract base locale from regional variant (e.g., 'fr' from 'fr-CA')
+    const baseLocale = locale.includes('-') ? locale.split('-')[0] : null;
+    
+    // 2. If this is a regional variant, merge with base locale if available
+    let mergedMap = translationMap;
+    let wasMerged = false;
+    if (baseLocale && this.translations[baseLocale]) {
+      const baseTranslations = this.translations[baseLocale];
+      const baseKeyCount = Object.keys(baseTranslations).length;
+      // Merge with base locale keys (regional keys override base)
+      mergedMap = { ...baseTranslations, ...translationMap };
+      wasMerged = true;
+      console.log(`[Hub] � Merging regional '${locale}' (${keyCount} keys) + base '${baseLocale}' (${baseKeyCount} keys) → ${Object.keys(mergedMap).length} total`);
+    }
+    
+    // Cache the (possibly merged) translation map
+    this.translations[locale] = mergedMap;
+    const finalKeyCount = Object.keys(mergedMap).length;
+    
+    if (isNew && !wasMerged) {
+      console.log(`[Hub] 📚 Cached '${locale}': ${finalKeyCount} keys`);
+    } else if (isNew && wasMerged) {
+      console.log(`[Hub] 📚 Cached '${locale}' (merged): ${finalKeyCount} keys`);
+    } else {
+      console.log(`[Hub] 🔄 Updated '${locale}': ${finalKeyCount} keys`);
+    }
+    
+    // 3. If this is a base locale, update all existing regional variants to include these keys
+    if (!baseLocale) {
+      // This is a base locale (e.g., 'fr'), so update all regional variants (e.g., 'fr-CA', 'fr-BE')
+      const currentLocales = Object.keys(this.translations);
+      const updatedRegionals = [];
+      for (const existingLocale of currentLocales) {
+        if (existingLocale.startsWith(locale + '-')) {
+          // This is a regional variant of the locale just cached
+          const regionalTranslations = this.translations[existingLocale];
+          const updatedRegional = { ...translationMap, ...regionalTranslations };
+          const oldKeyCount = Object.keys(regionalTranslations).length;
+          const newKeyCount = Object.keys(updatedRegional).length;
+          if (newKeyCount > oldKeyCount) {
+            this.translations[existingLocale] = updatedRegional;
+            updatedRegionals.push(`${existingLocale} (${oldKeyCount}→${newKeyCount})`);
+          }
+        }
+      }
+      if (updatedRegionals.length > 0) {
+        console.log(`[Hub] 🔗 Updated regional variants: ${updatedRegionals.join(', ')}`);
+      }
+    }
+    
+    // Log summary of all cached locales
+    const availableLocales = Object.keys(this.translations).sort();
+    console.log(`[Hub] ✅ Translations ready: ${availableLocales.length} locale(s) - ${availableLocales.join(', ')}`);
+  }
+
+  /**
+   * Get cached translations for a specific locale
+   * Implements fallback chain:
+   * 1. Exact match (e.g., 'fr-CA')
+   * 2. Base language (e.g., 'fr' from 'fr-CA')
+   * 3. English fallback (e.g., 'en')
+   * 
+   * @param {string} locale - Language locale code (default 'en')
+   * @returns {object|null} Translation map with fallback chain applied
+   */
+  getTranslations(locale = 'en') {
+    // 1. Try exact match
+    if (this.translations[locale]) {
+      return this.translations[locale];
+    }
+    
+    // 2. Try base language (e.g., 'pt' from 'pt-PT')
+    if (locale.includes('-')) {
+      const baseLanguage = locale.split('-')[0];
+      if (this.translations[baseLanguage]) {
+        console.log(`[Hub] Locale '${locale}' not found, falling back to base language '${baseLanguage}'`);
+        return this.translations[baseLanguage];
+      }
+    }
+    
+    // 3. Fall back to English
+    if (locale !== 'en' && this.translations['en']) {
+      console.log(`[Hub] Locale '${locale}' not found, falling back to English`);
+      return this.translations['en'];
+    }
+    
+    // No translations available at all
+    console.warn(`[Hub] No translations available for locale '${locale}' (no fallback options)`);
+    return null;
+  }
+
+  /**
+   * Get all available translation locales
+   * @returns {Array<string>} Array of locale codes (e.g., ['en', 'fr', 'es'])
+   */
+  getAvailableLocales() {
+    return Object.keys(this.translations).sort();
   }
 
   /**

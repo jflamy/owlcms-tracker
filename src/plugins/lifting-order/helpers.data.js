@@ -73,9 +73,9 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 
 	// Check cache first - cache key based on lifting order data, NOT timer events
 	// Use a hash of liftingOrderAthletes to detect when athlete data actually changes
-	// liftingOrderAthletes is now a parsed object, so stringify it first for hashing
+	// liftingOrderAthletes is now a parsed object, use length + first item ID as quick hash
 	const liftingOrderHash = fopUpdate?.liftingOrderAthletes ? 
-		JSON.stringify(fopUpdate.liftingOrderAthletes).substring(0, 100) : ''; // First 100 chars as quick hash
+		`${fopUpdate.liftingOrderAthletes.length}-${fopUpdate.liftingOrderAthletes[0]?.id || 0}` : ''; // Quick hash based on length + first ID
 	const cacheKey = `${fopName}-${liftingOrderHash}-${showRecords}-${maxLifters}`;
 	
 	if (liftingOrderCache.has(cacheKey)) {
@@ -254,8 +254,8 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		options: result.options
 	});
 	
-	// Cleanup old cache entries (keep last 20)
-	if (liftingOrderCache.size > 20) {
+	// Cleanup old cache entries (keep last 3 - reduces memory footprint with multiple FOPs)
+	if (liftingOrderCache.size > 3) {
 		const firstKey = liftingOrderCache.keys().next().value;
 		liftingOrderCache.delete(firstKey);
 	}

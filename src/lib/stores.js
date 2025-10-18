@@ -2,6 +2,37 @@ import { writable, derived } from 'svelte/store';
 import { browser } from '$app/environment';
 
 /**
+ * Translation Map Store - Receives translations from SSE
+ * Stores translations keyed by locale (e.g., 'en', 'fr', 'es')
+ * Initially populated with 'en' locale from server
+ */
+export function createTranslationStore() {
+  const { subscribe, set, update } = writable({
+    en: {} // Initialize with empty 'en' locale
+  });
+
+  return {
+    subscribe,
+    setLocale: (locale, translationMap) => {
+      update(translations => ({
+        ...translations,
+        [locale]: translationMap
+      }));
+    },
+    getTranslation: (key, locale = 'en') => {
+      let result;
+      subscribe(translations => {
+        result = translations[locale]?.[key] || translations.en?.[key] || key;
+      })();
+      return result;
+    }
+  };
+}
+
+// Export singleton instance for app-wide use
+export const translations = createTranslationStore();
+
+/**
  * Competition state store with SSE connection to SvelteKit hub
  * Receives updates from OWLCMS via the hub
  * 

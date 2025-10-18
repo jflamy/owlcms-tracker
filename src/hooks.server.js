@@ -27,6 +27,64 @@ if (LEARNING_MODE) {
 console.log('═══════════════════════════════════════════════════════');
 console.log('');
 
+// Crash detection and monitoring
+console.log('[Monitor] Starting crash detection and health monitoring');
+
+// Detect unhandled exceptions (crashes)
+process.on('uncaughtException', (error) => {
+  console.error('');
+  console.error('❌ ═══════════════════════════════════════════════════════');
+  console.error('❌ UNCAUGHT EXCEPTION - SERVER CRASHING');
+  console.error('❌ ═══════════════════════════════════════════════════════');
+  console.error('[Crash] Error:', error.message);
+  console.error('[Crash] Stack:', error.stack);
+  console.error('[Crash] Time:', new Date().toISOString());
+  console.error('❌ ═══════════════════════════════════════════════════════');
+  console.error('');
+  // Process will exit after this
+  process.exit(1);
+});
+
+// Detect unhandled promise rejections (potential deadlocks or async errors)
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('');
+  console.error('⚠️  ═══════════════════════════════════════════════════════');
+  console.error('⚠️  UNHANDLED PROMISE REJECTION');
+  console.error('⚠️  ═══════════════════════════════════════════════════════');
+  console.error('[Rejection] Reason:', reason);
+  console.error('[Rejection] Promise:', promise);
+  console.error('[Rejection] Time:', new Date().toISOString());
+  console.error('⚠️  ═══════════════════════════════════════════════════════');
+  console.error('');
+  // Don't exit - this might be recoverable
+});
+
+// Detect process warnings (memory leaks, resource issues)
+process.on('warning', (warning) => {
+  console.warn('');
+  console.warn('⚠️  PROCESS WARNING');
+  console.warn('[Warning]', warning.name, ':', warning.message);
+  if (warning.stack) console.warn('[Stack]', warning.stack);
+  console.warn('');
+});
+
+// Monitor memory usage
+setInterval(() => {
+  const memUsage = process.memoryUsage();
+  const heapUsedMB = Math.round(memUsage.heapUsed / 1024 / 1024);
+  const heapTotalMB = Math.round(memUsage.heapTotal / 1024 / 1024);
+  const rssOMB = Math.round(memUsage.rss / 1024 / 1024);
+  
+  // Log if memory is high (>500MB RSS)
+  if (rssOMB > 500) {
+    console.warn(`[Memory] ⚠️  HIGH: RSS ${rssOMB}MB, Heap ${heapUsedMB}MB/${heapTotalMB}MB`);
+  }
+  // Log normally if memory is reasonable
+  else if (rssOMB > 300) {
+    console.log(`[Memory] RSS ${rssOMB}MB, Heap ${heapUsedMB}MB/${heapTotalMB}MB`);
+  }
+}, 30000); // Every 30 seconds
+
 // Track if we've shown first request message
 let hasShownFirstRequest = false;
 

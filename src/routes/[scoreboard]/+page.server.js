@@ -11,9 +11,15 @@ import { scoreboardRegistry } from '$lib/server/scoreboard-registry.js';
 import { error } from '@sveltejs/kit';
 
 export async function load({ params, url }) {
+	const requestId = Math.random().toString(36).substr(2, 9);
+	const startTime = Date.now();
+	
 	try {
+		console.log(`[Scoreboard Route] 🔄 Request ${requestId} starting: ${params.scoreboard}?fop=${url.searchParams.get('fop')}`);
+		
 		// Initialize registry
 		await scoreboardRegistry.initialize();
+		console.log(`[Scoreboard Route] ✅ Request ${requestId} registry initialized`);
 		
 		// Get scoreboard type from route param (e.g., "lifting-order")
 		const type = params.scoreboard;
@@ -48,7 +54,10 @@ export async function load({ params, url }) {
 			}
 		}
 		
-		console.log(`[Scoreboard Route] Loading: type=${type}, fop=${fopName}, options=`, options);
+		console.log(`[Scoreboard Route] 📊 Request ${requestId} Loading: type=${type}, fop=${fopName}, options=`, options);
+		
+		const elapsed = Date.now() - startTime;
+		console.log(`[Scoreboard Route] ✅ Request ${requestId} completed in ${elapsed}ms`);
 		
 		// Return metadata for the page
 		return {
@@ -61,7 +70,8 @@ export async function load({ params, url }) {
 		};
 		
 	} catch (err) {
-		console.error('[Scoreboard Route] Error:', err);
+		const elapsed = Date.now() - startTime;
+		console.error(`[Scoreboard Route] ❌ Request ${requestId} failed after ${elapsed}ms:`, err);
 		if (err.status) throw err;
 		throw error(500, { message: err.message });
 	}

@@ -20,19 +20,39 @@ class ScoreboardRegistry {
 	constructor() {
 		this.scoreboards = new Map();
 		this.initialized = false;
+		this.initializingPromise = null;  // Track ongoing initialization to prevent race conditions
 	}
 
 	/**
 	 * Auto-discover scoreboard plugins in src/plugins/
 	 * Looks for folders in plugins/ directory (excluding system folders starting with .)
+	 * 
+	 * Uses initialization lock to prevent race condition when multiple concurrent requests
+	 * all see initialized=false and try to initialize simultaneously
 	 */
 	async initialize() {
+		// If already initialized, return immediately
 		if (this.initialized) return;
+		
+		// If initialization is in progress, wait for it
+		if (this.initializingPromise) {
+			console.log('[ScoreboardRegistry] Initialization in progress, waiting...');
+			await this.initializingPromise;
+			return;
+		}
 
+		// Start initialization and create promise to block other requests
+		this.initializingPromise = this._doInitialize();
+		await this.initializingPromise;
+		this.initializingPromise = null;  // Clear after completion
+	}
+
+	async _doInitialize() {
 		const pluginsDir = join(__dirname, '../../plugins');
 
 		if (!existsSync(pluginsDir)) {
 			console.warn('[ScoreboardRegistry] Plugins directory not found:', pluginsDir);
+			this.initialized = true;
 			return;
 		}
 
@@ -46,7 +66,7 @@ class ScoreboardRegistry {
 		}
 
 		this.initialized = true;
-		console.log('[ScoreboardRegistry] Registered scoreboards:', Array.from(this.scoreboards.keys()));
+		console.log('[ScoreboardRegistry] Registered scoreboards: (' + this.scoreboards.size + ') ' + JSON.stringify(Array.from(this.scoreboards.keys())));
 	}
 
 	/**

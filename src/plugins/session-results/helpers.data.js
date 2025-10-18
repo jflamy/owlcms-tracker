@@ -68,10 +68,10 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	const sessionStatus = competitionHub.getSessionStatus(fopName);
 
 	// Check cache first - cache key based on session athletes data, NOT timer events
-	// Use a hash of groupAthletes (which contains session athletes) to detect when data actually changes
-	// Note: groupAthletes is now a parsed object, so stringify it first for hashing
+	// Use length + first item ID as quick hash instead of expensive JSON.stringify
+	// This avoids memory spikes when loading multiple scoreboards simultaneously
 	const sessionAthletesHash = fopUpdate?.groupAthletes ? 
-		JSON.stringify(fopUpdate.groupAthletes).substring(0, 100) : ''; // First 100 chars as quick hash
+		`${fopUpdate.groupAthletes.length}-${fopUpdate.groupAthletes[0]?.id || 0}` : '';
 	const cacheKey = `${fopName}-${sessionAthletesHash}-${showRecords}`;
 	
 	if (sessionResultsCache.has(cacheKey)) {
