@@ -342,31 +342,31 @@
 					<div class="records-table-grid" style="--num-categories: {getAllRecordCategories(data.records).length}">
 						<!-- Row 1: Category headers with title in top-left -->
 						<div class="records-title-cell">{t.RECORDS || 'RECORDS'}</div>
-						{#each getAllRecordCategories(data.records) as category}
-							<div class="records-category-header" style="grid-column: span 3">
+						{#each getAllRecordCategories(data.records) as category, idx}
+							<div class="records-category-header" class:first-col={idx === 0} class:last-col={idx === getAllRecordCategories(data.records).length - 1} style="grid-column: span 3">
 								{getCategoryDisplayName(data.records, category)}
 							</div>
 						{/each}
 						
 						<!-- Row 2: Sub-headers (S/CJ/T) -->
 						<div class="records-subheader-cell"></div>
-						{#each getAllRecordCategories(data.records) as category}
-							<div class="records-subheader">S</div>
+						{#each getAllRecordCategories(data.records) as category, idx}
+							<div class="records-subheader first" class:first-row-col={idx === 0} class:last-row-col={idx === getAllRecordCategories(data.records).length - 1}>S</div>
 							<div class="records-subheader">CJ</div>
-							<div class="records-subheader">T</div>
+							<div class="records-subheader last" class:last-row-col={idx === getAllRecordCategories(data.records).length - 1}>T</div>
 						{/each}
 						
 						<!-- Data rows: one per federation -->
-						{#each data.records as federationData}
-							<div class="records-federation-cell">{federationData.federation}</div>
-							{#each getAllRecordCategories(data.records) as category}
-								<div class="records-cell" class:highlighted={getRecordCell(federationData, category, 'S').highlight}>
+						{#each data.records as federationData, rowIdx}
+							<div class="records-federation-cell" class:last-row={rowIdx === data.records.length - 1}>{federationData.federation}</div>
+							{#each getAllRecordCategories(data.records) as category, colIdx}
+								<div class="records-cell first-col" class:highlighted={getRecordCell(federationData, category, 'S').highlight} class:first-row-col={colIdx === 0} class:last-row={rowIdx === data.records.length - 1}>
 									{getRecordCell(federationData, category, 'S').value ?? '-'}
 								</div>
-								<div class="records-cell" class:highlighted={getRecordCell(federationData, category, 'CJ').highlight}>
+								<div class="records-cell" class:highlighted={getRecordCell(federationData, category, 'CJ').highlight} class:last-row={rowIdx === data.records.length - 1}>
 									{getRecordCell(federationData, category, 'CJ').value ?? '-'}
 								</div>
-								<div class="records-cell" class:highlighted={getRecordCell(federationData, category, 'T').highlight}>
+								<div class="records-cell last-col" class:highlighted={getRecordCell(federationData, category, 'T').highlight} class:last-row-col={colIdx === getAllRecordCategories(data.records).length - 1} class:last-row={rowIdx === data.records.length - 1}>
 									{getRecordCell(federationData, category, 'T').value ?? '-'}
 								</div>
 							{/each}
@@ -574,8 +574,6 @@
 		width: 100px;
 		height: 35px;
 		background: #0a0a0a;
-		border-right: 2px solid #555;
-		border-bottom: 1px solid #444;
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -591,9 +589,6 @@
 		width: 100px;
 		height: 35px;
 		background: #0a0a0a;
-		border-right: 2px solid #555;
-		border-bottom: 1px solid #444;
-		border-top: 2px solid #555;
 	}
 
 	.records-category-header {
@@ -603,7 +598,7 @@
 		color: #fff;
 		font-size: 0.9rem;
 		background: #1a1a1a;
-		border-right: 1px solid #333;
+		border-right: 1px solid #555;
 		border-bottom: 1px solid #444;
 		border-top: 2px solid #555;
 		display: flex;
@@ -612,11 +607,13 @@
 		min-height: 35px;
 	}
 
-	.records-category-header:nth-child(2) {
+	/* First data column */
+	.records-category-header.first-col {
 		border-left: 2px solid #555;
 	}
 
-	.records-category-header:last-child {
+	/* Last data column */
+	.records-category-header.last-col {
 		border-right: 2px solid #555;
 	}
 
@@ -625,9 +622,6 @@
 		width: 100px;
 		height: 25px;
 		background: #0a0a0a;
-		border-right: 2px solid #555;
-		border-bottom: 2px solid #555;
-		border-top: 1px solid #333;
 	}
 
 	.records-subheader {
@@ -645,8 +639,24 @@
 		min-height: 25px;
 	}
 
-	.records-subheader:nth-child(2) {
+	/* First subheader in each category group */
+	.records-subheader.first {
 		border-left: 2px solid #555;
+	}
+
+	/* Last subheader in each category group */
+	.records-subheader.last {
+		border-right: 2px solid #555;
+	}
+
+	/* First column gets full left border */
+	.records-subheader.first-row-col {
+		border-left: 2px solid #555;
+	}
+
+	/* Last column gets full right border */
+	.records-subheader.last-row-col {
+		border-right: 2px solid #555;
 	}
 
 	/* Data rows */
@@ -657,15 +667,14 @@
 		font-weight: bold;
 		color: #fff;
 		background: #0a0a0a;
-		border-right: 2px solid #555;
-		border-bottom: 1px solid #444;
-		border-top: 1px solid #333;
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		font-size: 0.95rem;
 		min-height: 32px;
 	}
+
+	/* Federation cells should NOT have borders */
 
 	.records-cell {
 		padding: 0.4rem;
@@ -682,22 +691,38 @@
 		min-height: 32px;
 	}
 
-	.records-cell:nth-child(3n+2) {
+	/* First cell in each category group */
+	.records-cell.first-col {
 		border-left: 2px solid #555;
 	}
 
-	.records-cell:nth-child(3n) {
+	/* Last cell in each category group */
+	.records-cell.last-col {
 		border-right: 2px solid #555;
 	}
 
-	.records-cell:last-child,
-	.records-cell:nth-last-child(2),
-	.records-cell:nth-last-child(3) {
+	/* First column gets full left border */
+	.records-cell.first-row-col {
+		border-left: 2px solid #555;
+	}
+
+	/* Last column gets full right border */
+	.records-cell.last-row-col {
+		border-right: 2px solid #555;
+	}
+
+	/* Bottom row gets thick bottom border */
+	.records-cell.last-row {
 		border-bottom: 2px solid #555;
 	}
 
 	/* Ensure federation cell last row has matching bottom border */
 	.records-federation-cell:nth-last-child(-n+3) {
+		border-bottom: 2px solid #555;
+	}
+
+	/* Better: use last-of-type for last federation cell */
+	.records-federation-cell:last-of-type {
 		border-bottom: 2px solid #555;
 	}
 
