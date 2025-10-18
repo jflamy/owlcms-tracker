@@ -116,7 +116,7 @@
 				<p>{data.message || 'Waiting for competition data...'}</p>
 			</div>
 		{:else}
-			<div class="scoreboard-grid" class:compact-team-column={data.compactTeamColumn} role="grid">
+			<div class="scoreboard-grid" class:compact-team-column={data.compactTeamColumn} style="--template-rows: {data.gridTemplateRows}" role="grid">
 				<div class="grid-row header header-primary" role="row">
 					<div class="cell header col-start span-two" role="columnheader">Start</div>
 					<div class="cell header col-name span-two" role="columnheader">Name</div>
@@ -198,20 +198,28 @@
 						</div>
 					{/if}
 				{/each}
-			</div>
-			{#if data.leaders && data.leaders.length > 0}
-				<div class="leaders-block">
-					<div class="leaders-title">
-						Leaders from Previous Sessions {data.competition?.groupInfo ? data.competition.groupInfo.split('–')[0].trim() : ''}
+
+				{#if data.leaders && data.leaders.length > 0}
+					<!-- Elastic spacer row separating results from leaders -->
+					<div class="grid-row leaders-spacer" aria-hidden="true">
+						<div class="cell span-all"></div>
 					</div>
-					<div class="scoreboard-grid leaders-grid" class:compact-team-column={data.compactTeamColumn} role="grid">
-						{#each data.leaders as leader}
-							{#if leader.isSpacer}
-								<div class="grid-row spacer category-spacer" aria-hidden="true">
-									<div class="cell span-all"></div>
-								</div>
-							{:else}
-								<div class="grid-row leader-row" role="row">
+
+					<!-- Leaders title row spanning all columns -->
+					<div class="grid-row leaders-header">
+						<div class="cell leaders-title-cell span-all">
+							Leaders from Previous Sessions {data.competition?.groupInfo ? data.competition.groupInfo.split('–')[0].trim() : ''}
+						</div>
+					</div>
+
+					<!-- Leader rows -->
+					{#each data.leaders as leader}
+						{#if leader.isSpacer}
+							<div class="grid-row spacer category-spacer" aria-hidden="true">
+								<div class="cell span-all"></div>
+							</div>
+						{:else}
+							<div class="grid-row leader-row" role="row">
 								<div class="cell start-num" role="gridcell">{leader.subCategory || ''}</div>
 								<div class="cell name" role="gridcell">{leader.fullName || ''}</div>
 								<div class="cell cat" role="gridcell">{leader.category || ''}</div>
@@ -248,11 +256,10 @@
 								<div class="cell total" role="gridcell">{leader.total || '-'}</div>
 								<div class="cell rank" role="gridcell">{leader.totalRank || '-'}</div>
 							</div>
-							{/if}
-						{/each}
-					</div>
-				</div>
-			{/if}
+						{/if}
+					{/each}
+				{/if}
+			</div>
 		{/if}
 	</main>
 </div>
@@ -437,16 +444,19 @@
 		--col-cat: 14ch;
 		--col-born: 14ch;
 		--col-team: minmax(8rem, 1.8fr);
-		--col-gap: var(--grid-gap-size);
+		--col-gap: 0.65rem;
 		--col-attempt: 4.4rem;
 		--col-best: 4.4rem;
 		--col-total: 4.9rem;
 		--col-rank: 4.9rem;
-		--header-primary-height: 2.6rem;
-		--header-secondary-height: 2.3rem;
+		/* Header row heights: keep these in sync with grid-template-rows and sticky offsets */
+		--header-primary-vpad: 0.25rem; /* vertical padding for primary header cells */
+		--header-primary-height: calc(1rem + (var(--header-primary-vpad) * 2));
+		--header-secondary-vpad: 0.3rem; /* vertical padding used in secondary header cells */
+		--header-secondary-height: calc(1rem + (var(--header-secondary-vpad) * 2));
 		display: grid;
 		width: 100%;
-		flex: 0 0 auto;
+		flex: 1;
 		grid-template-columns:
 			var(--col-start)
 			var(--col-name)
@@ -462,9 +472,11 @@
 			var(--col-gap)
 			var(--col-total)
 			var(--col-rank);
-		grid-auto-rows: minmax(0, auto);
+		/* Use the same variables for row heights and sticky positioning to avoid gaps */
+		grid-template-rows: var(--header-primary-height) var(--header-secondary-height) var(--template-rows);
 		row-gap: 0;
 		font-size: 1.1rem;
+		line-height: 1.05;
 	}
 
 	.scoreboard-grid.compact-team-column {
@@ -483,6 +495,7 @@
 		border: 1px solid #444;
 		background: #1a1a1a;
 		color: #fff;
+		line-height: 1.05;
 	}
 
 	.cell.header {
@@ -505,6 +518,8 @@
 		top: 0;
 		z-index: 20;
 		align-self: stretch;
+		padding: var(--header-primary-vpad) 0.15rem;
+		min-height: 0;
 	}
 
 	.header-primary > .cell.span-two {
@@ -515,9 +530,16 @@
 	.header-secondary > .cell {
 		grid-row: 2;
 		position: sticky;
-		top: calc(var(--header-primary-height) - 1px);
+		top: var(--header-primary-height);
 		z-index: 19;
 		font-size: 1rem;
+		padding: var(--header-secondary-vpad) 0.15rem;
+		min-height: 0;
+	}
+
+	.header-secondary .cell.v-spacer {
+		height: 0;
+		min-height: 0;
 	}
 
 	.col-group {
@@ -533,6 +555,21 @@
 		background: #000;
 		border: none;
 		padding: 0;
+		height: var(--col-gap);
+		min-height: var(--col-gap);
+	}
+
+	.header .cell.v-spacer {
+		background: #000;
+		border: none;
+		height: 0;
+		min-height: 0;
+		padding: 0;
+	}
+
+	.header-secondary .cell.v-spacer {
+		height: 0;
+		min-height: 0;
 	}
 
 	.cell.span-all {
@@ -615,7 +652,7 @@
 
 	.header-secondary .col-attempt {
 		white-space: nowrap;
-		padding: 0 0.35rem;
+		padding: var(--header-secondary-vpad) 0.35rem;
 	}
 
 	.attempt.empty {
@@ -638,13 +675,44 @@
 		background: #000;
 		border: none;
 		padding: 0;
-		min-height: 0;
-		height: 0;
+		min-height: 10px;
+		height: 10px;
+		overflow: hidden;
+		display: block;
 	}
 
-	.grid-row.category-spacer > .cell {
-		height: var(--col-gap);
-		min-height: var(--col-gap);
+	/* Elastic spacer row between results and leaders sections */
+	.grid-row.leaders-spacer {
+		display: contents;
+	}
+
+	.grid-row.leaders-spacer > .cell {
+		grid-column: 1 / -1;
+		background: transparent;
+		border: none;
+		padding: 0;
+		height: 100%;
+		display: block;
+	}
+
+	/* Leaders header row with title spanning all columns */
+	.grid-row.leaders-header {
+		display: contents;
+	}
+
+	.grid-row.leaders-header > .cell {
+		grid-column: 1 / -1;
+	}
+
+	.cell.leaders-title-cell {
+		background: transparent;
+		border: none;
+		padding: 0.25rem 0;
+		font-weight: bold;
+		font-size: 1.2rem;
+		color: #ccc;
+		justify-content: flex-start;
+		text-align: left;
 	}
 
 	.leaders-block {

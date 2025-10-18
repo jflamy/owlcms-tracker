@@ -165,11 +165,10 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	const stats = getCompetitionStats(databaseState);
 	
 	// Extract leaders from fopUpdate (now a proper JSON array from OWLCMS)
-	// Filter out OWLCMS spacers (isSpacer flag)
+	// Keep OWLCMS spacers (isSpacer flag) for accurate grid row counting
 	let leaders = [];
 	if (fopUpdate?.leaders && Array.isArray(fopUpdate.leaders)) {
 		leaders = fopUpdate.leaders
-			.filter(leader => !leader.isSpacer)
 			.map(leader => ({
 				...leader,
 				flagUrl: leader.teamName ? getFlagUrl(leader.teamName) : null
@@ -224,6 +223,55 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	);
 	const compactTeamColumn = maxTeamNameLength < 7; // Narrow team column if max name length < 7
 
+	// Pre-calculate grid-template-rows with repeats for each section
+	// Header: 2 rows (primary + secondary)
+	const headerRows = 2;
+	
+	// Results: count all athlete/spacer rows in the session
+	let resultRows = 0;
+	let lastCategory = null;
+	for (const athlete of athletesWithFlags) {
+		if (athlete.isSpacer) {
+			resultRows++; // Spacer row (initial spacer or category separator)
+		} else {
+			resultRows++; // Athlete row
+			lastCategory = athlete.category;
+		}
+	}
+	
+	// Leaders: count leader rows (include spacers, title, and data rows)
+	let leaderRows = 0;
+	if (leaders && leaders.length > 0) {
+		leaderRows++; // Title row (leaders-header with leaders-title-cell)
+		let lastLeaderCategory = null;
+		for (const leader of leaders) {
+			if (leader.isSpacer) {
+				leaderRows++; // Spacer row
+			} else {
+				// Category spacer before first leader of new category
+				if (leader.category !== lastLeaderCategory && lastLeaderCategory !== null) {
+					leaderRows++; // Category separator
+				}
+				leaderRows++; // Leader row
+				lastLeaderCategory = leader.category;
+			}
+		}
+	}
+	
+	// Build grid-template-rows string with repeats
+	// IMPORTANT: Header rows are now defined in CSS using
+	//   grid-template-rows: var(--header-primary-height) var(--header-secondary-height) var(--template-rows)
+	// Therefore, DO NOT include header rows here; only include rows after headers.
+	// Format produced here (consumed as --template-rows):
+	//   "repeat(resultRows, minmax(10px, auto)) 1fr repeat(leaderRows, minmax(10px, auto))"
+	// Results: athlete rows + category spacers (NOT including the final spacer after last athlete)
+	// Leaders-spacer: 1fr (elastic spacing between results and leaders title)
+	// Leaders: title + athlete rows + category spacers
+	const gridTemplateRows = leaders && leaders.length > 0
+		? `repeat(${resultRows}, minmax(10px, auto)) 1fr repeat(${leaderRows}, minmax(10px, auto))`
+		: `repeat(${resultRows}, minmax(10px, auto))`;
+
+
 	const result = {
 		scoreboardName: 'Session Results',  // Scoreboard display name
 		competition,
@@ -246,6 +294,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		breakType: fopUpdate?.breakType,
 		sessionStatus,  // Include session status (isDone, groupName, lastActivity)
 		compactTeamColumn,  // Narrow team column if max team size < 7
+		gridTemplateRows,  // Pre-calculated grid template with repeats
 		status,
 		message,  // Add helpful waiting message
 		lastUpdate: fopUpdate?.lastUpdate || Date.now(),
@@ -268,6 +317,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		status: result.status,
 		message: result.message,  // Include waiting message in cache
 		compactTeamColumn: result.compactTeamColumn,  // Include responsive layout flag
+		gridTemplateRows: result.gridTemplateRows,  // Include pre-calculated grid template
 		lastUpdate: result.lastUpdate,
 		options: result.options
 	});
