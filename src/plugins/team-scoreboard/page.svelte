@@ -1,5 +1,6 @@
 <script>
 	import { createTimer } from '$lib/timer-logic.js';
+	import { translations } from '$lib/stores.js';
 	import { onMount, onDestroy } from 'svelte';
 
 	// Props passed from parent route
@@ -14,6 +15,12 @@
 		timerState = state;
 	});
 
+	// Current translations object (populated from store)
+	let t = {};
+	const unsubscribeTranslations = translations.subscribe(trans => {
+		t = trans.en || {};
+	});
+
 	onMount(() => {
 		timer.start(data.timer);
 	});
@@ -21,6 +28,7 @@
 	onDestroy(() => {
 		timer.stop();
 		unsubscribe();
+		unsubscribeTranslations();
 	});
 
 	$: currentAttempt = data.currentAttempt;
@@ -90,34 +98,34 @@
 		{:else}
 			<div class="scoreboard-grid" class:compact-team-column={data.compactTeamColumn} role="grid">
 				<div class="grid-row header header-primary" role="row">
-					<div class="cell header col-start span-two" role="columnheader">Start</div>
-					<div class="cell header col-name span-two" role="columnheader">Name</div>
-					<div class="cell header col-cat span-two" role="columnheader">Cat.</div>
-					<div class="cell header col-born span-two" role="columnheader">Born</div>
-					<div class="cell header col-team span-two" role="columnheader">Team</div>
+					<div class="cell header col-start span-two" role="columnheader">{t.Start || 'Start'}</div>
+					<div class="cell header col-name span-two" role="columnheader">{t.Name || 'Name'}</div>
+					<div class="cell header col-cat span-two" role="columnheader">{t.Category || 'Cat.'}</div>
+					<div class="cell header col-born span-two" role="columnheader">{t.Birth || 'Born'}</div>
+					<div class="cell header col-team span-two" role="columnheader">{t.Team || 'Team'}</div>
 					<div class="cell header v-spacer v-spacer-snatch span-two" aria-hidden="true"></div>
-					<div class="cell header col-group col-group-snatch" role="columnheader">Snatch</div>
+					<div class="cell header col-group col-group-snatch" role="columnheader">{t.Snatch || 'Snatch'}</div>
 					<div class="cell header v-spacer v-spacer-middle span-two" aria-hidden="true"></div>
-					<div class="cell header col-group col-group-cj" role="columnheader">Clean &amp; Jerk</div>
+					<div class="cell header col-group col-group-cj" role="columnheader">{t.Clean_and_Jerk || 'Clean &amp; Jerk'}</div>
 					<div class="cell header v-spacer v-spacer-total span-two" aria-hidden="true"></div>
-					<div class="cell header col-total span-two" role="columnheader">Total</div>
-					<div class="cell header col-score span-two" role="columnheader">Score</div>
+					<div class="cell header col-total span-two" role="columnheader">{t.TOTAL || 'Total'}</div>
+					<div class="cell header col-score span-two" role="columnheader">{t.Score || 'Score'}</div>
 				</div>
 				<div class="grid-row header header-secondary" role="row">
-					<div class="cell header col-name-portrait" role="columnheader">Name</div>
+					<div class="cell header col-name-portrait" role="columnheader">{t.Name || 'Name'}</div>
 					<div class="cell header v-spacer v-spacer-snatch" aria-hidden="true"></div>
 					<div class="cell header col-attempt snatch-1" role="columnheader">1</div>
 					<div class="cell header col-attempt snatch-2" role="columnheader">2</div>
 					<div class="cell header col-attempt snatch-3" role="columnheader">3</div>
-					<div class="cell header col-best snatch-best" role="columnheader">✓</div>
+					<div class="cell header col-best snatch-best" role="columnheader">{t.Best || '✔'}</div>
 					<div class="cell header v-spacer v-spacer-middle" aria-hidden="true"></div>
 					<div class="cell header col-attempt cj-1" role="columnheader">1</div>
 					<div class="cell header col-attempt cj-2" role="columnheader">2</div>
 					<div class="cell header col-attempt cj-3" role="columnheader">3</div>
-					<div class="cell header col-best cj-best" role="columnheader">✓</div>
+					<div class="cell header col-best cj-best" role="columnheader">{t.Best || '✔'}</div>
 					<div class="cell header v-spacer v-spacer-total" aria-hidden="true"></div>
-					<div class="cell header col-total-portrait" role="columnheader">Total</div>
-					<div class="cell header col-score-portrait" role="columnheader">Score</div>
+					<div class="cell header col-total-portrait" role="columnheader">{t.TOTAL || 'Total'}</div>
+					<div class="cell header col-score-portrait" role="columnheader">{t.Score || 'Score'}</div>
 				</div>
 
 				{#if teams.length > 0}
@@ -289,8 +297,11 @@
 		--col-best: 4.4rem;
 		--col-total: 4.9rem;
 		--col-score: 12ch;
-		--header-primary-height: 2.6rem;
-		--header-secondary-height: 2.3rem;
+		/* Header row heights: calculated to match session-results */
+		--header-primary-vpad: 0.2rem; /* vertical padding for primary header cells */
+		--header-primary-height: calc(1rem + (var(--header-primary-vpad) * 2));
+		--header-secondary-vpad: 0.2rem; /* vertical padding used in secondary header cells */
+		--header-secondary-height: calc(1rem + (var(--header-secondary-vpad) * 2));
 		display: grid;
 		width: 100%;
 		flex: 0 0 auto;
@@ -309,9 +320,10 @@
 			var(--col-gap)
 			var(--col-total)
 			var(--col-score);
-		grid-auto-rows: minmax(0, auto);
+		grid-template-rows: var(--header-primary-height) var(--header-secondary-height) var(--template-rows);
 		row-gap: 0;
 		font-size: 1.1rem;
+		line-height: 1;
 	}
 
 	.scoreboard-grid.compact-team-column {
@@ -343,20 +355,18 @@
 
 	.header-primary > .cell {
 		grid-row: 1;
-		position: sticky;
-		top: 0;
-		z-index: 20;
 		align-self: stretch;
+		padding: var(--header-primary-vpad) 0.15rem;
+		min-height: 0;
 	}
 
-	.header-primary > .cell.span-two { grid-row: 1 / span 2; z-index: 21; }
+	.header-primary > .cell.span-two { grid-row: 1 / span 2; }
 
 	.header-secondary > .cell {
 		grid-row: 2;
-		position: sticky;
-		top: calc(var(--header-primary-height) - 1px);
-		z-index: 19;
 		font-size: 1rem;
+		padding: var(--header-secondary-vpad) 0.15rem;
+		min-height: 0;
 	}
 
 	.col-group { justify-content: center; font-size: 1.1rem; }
