@@ -27,6 +27,9 @@
 	$: allAthletes = data.sortedAthletes || [];  // Standardized field name across all scoreboards
 	$: decisionState = data.decision || {};
 	
+	// Debug: log compactTeamColumn value (scoreboard name from backend)
+	$: console.log(`[${data.scoreboardName}] compactTeamColumn:`, data.compactTeamColumn);
+	
 	// Sync timer with server when data changes
 	$: if (data.timer) {
 		timer.syncWithServer(data.timer);
@@ -70,9 +73,6 @@
 			{:else}
 			<span class="start-number">{currentAttempt?.startNumber || '-'}</span>
 			<span class="lifter-name">{currentAttempt?.fullName || 'No athlete currently lifting'}</span>
-			{#if currentAttempt?.flagUrl}
-				<img src={currentAttempt.flagUrl} alt={currentAttempt.teamName} class="team-flag" />
-			{/if}
 			<span class="team">{currentAttempt?.teamName || ''}</span>
 			<span class="attempt-label">{@html currentAttempt?.attempt || ''}</span>
 			<span class="weight">{currentAttempt?.weight || '-'} kg</span>
@@ -116,7 +116,7 @@
 				<p>{data.message || 'Waiting for competition data...'}</p>
 			</div>
 		{:else}
-			<div class="scoreboard-grid" class:compact-team-column={data.compactTeamColumn} role="grid">
+			<div class="scoreboard-grid" class:compact-team-column={data.compactTeamColumn} style="--template-rows: {data.gridTemplateRows}" role="grid">
 				<div class="grid-row header header-primary" role="row">
 					<div class="cell header col-start span-two" role="columnheader">Start</div>
 					<div class="cell header col-name span-two" role="columnheader">Name</div>
@@ -164,7 +164,12 @@
 							<div class="cell name" role="gridcell">{athlete.fullName}</div>
 							<div class="cell cat" role="gridcell">{athlete.category || ''}</div>
 							<div class="cell born" role="gridcell">{athlete.yearOfBirth || ''}</div>
-							<div class="cell team-name" role="gridcell">{athlete.teamName || ''}</div>
+							<div class="cell team-name" role="gridcell">
+								{#if athlete.flagUrl}
+									<img src={athlete.flagUrl} alt={athlete.teamName} class="team-flag" />
+								{/if}
+								{athlete.teamName || ''}
+							</div>
 							<div class="cell v-spacer" aria-hidden="true"></div>
 							<div class="cell attempt {getAttemptClass(athlete.sattempts?.[0])}" role="gridcell">
 								{displayAttempt(athlete.sattempts?.[0])}
@@ -193,19 +198,27 @@
 						</div>
 					{/if}
 				{/each}
-			</div>
-			{#if data.leaders && data.leaders.length > 0}
-				<div class="leaders-block">
-					<div class="leaders-title">
-						Leaders from Previous Sessions {data.competition?.groupInfo ? data.competition.groupInfo.split('–')[0].trim() : ''}
+
+				{#if data.leaders && data.leaders.length > 0}
+					<!-- Elastic spacer row separating results from leaders -->
+					<div class="grid-row leaders-spacer" aria-hidden="true">
+						<div class="cell span-all"></div>
 					</div>
-					<div class="scoreboard-grid leaders-grid" role="grid">
-						{#each data.leaders as leader}
-							{#if leader.isSpacer}
-								<div class="grid-row spacer-row" role="row">
-									<div class="cell span-all spacer" aria-hidden="true"></div>
-								</div>
-							{:else}
+
+					<!-- Leaders title row spanning all columns -->
+					<div class="grid-row leaders-header">
+						<div class="cell leaders-title-cell span-all">
+							Leaders from Previous Sessions {data.competition?.groupInfo ? data.competition.groupInfo.split('–')[0].trim() : ''}
+						</div>
+					</div>
+
+					<!-- Leader rows -->
+					{#each data.leaders as leader}
+						{#if leader.isSpacer}
+							<div class="grid-row spacer category-spacer" aria-hidden="true">
+								<div class="cell span-all"></div>
+							</div>
+						{:else}
 							<div class="grid-row leader-row" role="row">
 								<div class="cell start-num" role="gridcell">{leader.subCategory || ''}</div>
 								<div class="cell name" role="gridcell">{leader.fullName || ''}</div>
@@ -243,11 +256,10 @@
 								<div class="cell total" role="gridcell">{leader.total || '-'}</div>
 								<div class="cell rank" role="gridcell">{leader.totalRank || '-'}</div>
 							</div>
-							{/if}
-						{/each}
-					</div>
-				</div>
-			{/if}
+						{/if}
+					{/each}
+				{/if}
+			</div>
 		{/if}
 	</main>
 </div>
@@ -308,12 +320,6 @@
 		font-size: 1.5rem; /* Same as lifter name */
 		font-weight: bold;
 		color: #ccc;
-	}
-	
-	.team-flag {
-		height: 1.5rem;
-		max-width: 2rem;
-		object-fit: contain;
 	}
 	
 	.attempt-label {
@@ -437,19 +443,20 @@
 		--col-name: minmax(14rem, 2.5fr);
 		--col-cat: 14ch;
 		--col-born: 14ch;
-		--col-team-min: 8rem;
-		--col-team-max: 1.8fr;
-		--col-team: minmax(var(--col-team-min), var(--col-team-max));
-		--col-gap: var(--grid-gap-size);
+		--col-team: minmax(8rem, 1.8fr);
+		--col-gap: 0.65rem;
 		--col-attempt: 4.4rem;
 		--col-best: 4.4rem;
 		--col-total: 4.9rem;
 		--col-rank: 4.9rem;
-		--header-primary-height: 2.6rem;
-		--header-secondary-height: 2.3rem;
+		/* Header row heights: keep these in sync with grid-template-rows and sticky offsets */
+		--header-primary-vpad: 0.25rem; /* vertical padding for primary header cells */
+		--header-primary-height: calc(1rem + (var(--header-primary-vpad) * 2));
+		--header-secondary-vpad: 0.3rem; /* vertical padding used in secondary header cells */
+		--header-secondary-height: calc(1rem + (var(--header-secondary-vpad) * 2));
 		display: grid;
 		width: 100%;
-		flex: 0 0 auto;
+		flex: 1;
 		grid-template-columns:
 			var(--col-start)
 			var(--col-name)
@@ -465,14 +472,15 @@
 			var(--col-gap)
 			var(--col-total)
 			var(--col-rank);
-		grid-auto-rows: minmax(0, auto);
+		/* Use the same variables for row heights and sticky positioning to avoid gaps */
+		grid-template-rows: var(--header-primary-height) var(--header-secondary-height) var(--template-rows);
 		row-gap: 0;
 		font-size: 1.1rem;
+		line-height: 1.05;
 	}
 
 	.scoreboard-grid.compact-team-column {
-		--col-team-min: 5rem;
-		--col-team-max: 5rem;
+		--col-team: 14ch;
 	}
 
 	.grid-row {
@@ -487,6 +495,7 @@
 		border: 1px solid #444;
 		background: #1a1a1a;
 		color: #fff;
+		line-height: 1.05;
 	}
 
 	.cell.header {
@@ -509,6 +518,8 @@
 		top: 0;
 		z-index: 20;
 		align-self: stretch;
+		padding: var(--header-primary-vpad) 0.15rem;
+		min-height: 0;
 	}
 
 	.header-primary > .cell.span-two {
@@ -519,9 +530,16 @@
 	.header-secondary > .cell {
 		grid-row: 2;
 		position: sticky;
-		top: calc(var(--header-primary-height) - 1px);
+		top: var(--header-primary-height);
 		z-index: 19;
 		font-size: 1rem;
+		padding: var(--header-secondary-vpad) 0.15rem;
+		min-height: 0;
+	}
+
+	.header-secondary .cell.v-spacer {
+		height: 0;
+		min-height: 0;
 	}
 
 	.col-group {
@@ -537,6 +555,21 @@
 		background: #000;
 		border: none;
 		padding: 0;
+		height: var(--col-gap);
+		min-height: var(--col-gap);
+	}
+
+	.header .cell.v-spacer {
+		background: #000;
+		border: none;
+		height: 0;
+		min-height: 0;
+		padding: 0;
+	}
+
+	.header-secondary .cell.v-spacer {
+		height: 0;
+		min-height: 0;
 	}
 
 	.cell.span-all {
@@ -548,6 +581,15 @@
 		justify-content: flex-start;
 		padding-left: 0.625rem;
 		text-align: left;
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
+	.team-flag {
+		height: 1.2rem;
+		max-width: 1.5rem;
+		object-fit: contain;
 	}
 
 	.cell.cat {
@@ -610,7 +652,7 @@
 
 	.header-secondary .col-attempt {
 		white-space: nowrap;
-		padding: 0 0.35rem;
+		padding: var(--header-secondary-vpad) 0.35rem;
 	}
 
 	.attempt.empty {
@@ -633,13 +675,44 @@
 		background: #000;
 		border: none;
 		padding: 0;
-		min-height: 0;
-		height: 0;
+		min-height: 10px;
+		height: 10px;
+		overflow: hidden;
+		display: block;
 	}
 
-	.grid-row.category-spacer > .cell {
-		height: var(--col-gap);
-		min-height: var(--col-gap);
+	/* Elastic spacer row between results and leaders sections */
+	.grid-row.leaders-spacer {
+		display: contents;
+	}
+
+	.grid-row.leaders-spacer > .cell {
+		grid-column: 1 / -1;
+		background: transparent;
+		border: none;
+		padding: 0;
+		height: 100%;
+		display: block;
+	}
+
+	/* Leaders header row with title spanning all columns */
+	.grid-row.leaders-header {
+		display: contents;
+	}
+
+	.grid-row.leaders-header > .cell {
+		grid-column: 1 / -1;
+	}
+
+	.cell.leaders-title-cell {
+		background: transparent;
+		border: none;
+		padding: 0.25rem 0;
+		font-weight: bold;
+		font-size: 1.2rem;
+		color: #ccc;
+		justify-content: flex-start;
+		text-align: left;
 	}
 
 	.leaders-block {
@@ -662,7 +735,6 @@
 		font-weight: bold;
 		padding: 0.25rem 0;
 		margin-bottom: var(--grid-gap-size);
-		text-align: left;
 	}
 
 	.leaders-grid {
@@ -752,8 +824,7 @@
 
 		.scoreboard-grid {
 			--col-name: minmax(12rem, 2.2fr);
-			--col-team-min: 7rem;
-			--col-team-max: 1.6fr;
+			--col-team: minmax(7rem, 1.6fr);
 			--col-cat: 12ch;
 			--col-born: 12ch;
 			--col-attempt: 3.8rem;
@@ -763,8 +834,7 @@
 		}
 
 		.scoreboard-grid.compact-team-column {
-			--col-team-min: 5rem;
-			--col-team-max: 5rem;
+			--col-team: 14ch;
 		}
 	}
 
@@ -805,8 +875,7 @@
 
 		.scoreboard-grid {
 			--col-name: minmax(10.5rem, 2fr);
-			--col-team-min: 6rem;
-			--col-team-max: 1.4fr;
+			--col-team: minmax(6rem, 1.4fr);
 			--col-attempt: 3.4rem;
 			--col-best: 3.4rem;
 			--col-born: 0;
@@ -814,8 +883,7 @@
 		}
 
 		.scoreboard-grid.compact-team-column {
-			--col-team-min: 5rem;
-			--col-team-max: 5rem;
+			--col-team: 14ch;
 		}
 
 		.cell {
@@ -864,8 +932,7 @@
 		.scoreboard-grid {
 			--col-start: 0;
 			--col-cat: 0;
-			--col-team-min: 0;
-			--col-team-max: 0;
+			--col-team: 0;
 			--col-rank: 0;
 			--col-best: 0;
 			--col-attempt: 2.75rem;
@@ -873,11 +940,10 @@
 		}
 
 		.scoreboard-grid.compact-team-column {
-			--col-team-min: 5rem;
-			--col-team-max: 5rem;
+			--col-team: 14ch;
 		}
 
-		.header-primary .col-born,
+		.header-primary .col-start,
 		.grid-row.data-row > .start-num,
 		.grid-row.leader-row > .start-num,
 		.header-primary .col-cat,
@@ -914,5 +980,8 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+		justify-content: center;
+		padding-left: 0.375rem;
+		text-align: center;
 	}
 </style>

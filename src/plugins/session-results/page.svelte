@@ -27,8 +27,8 @@
 	$: allAthletes = data.sortedAthletes || [];  // Standardized field name across all scoreboards
 	$: decisionState = data.decision || {};
 	
-	// Debug: log compactTeamColumn value
-	$: console.log('[SessionResults] compactTeamColumn:', data.compactTeamColumn);
+	// Debug: log compactTeamColumn value (scoreboard name from backend)
+	$: console.log(`[${data.scoreboardName}] compactTeamColumn:`, data.compactTeamColumn);
 	
 	// Sync timer with server when data changes
 	$: if (data.timer) {

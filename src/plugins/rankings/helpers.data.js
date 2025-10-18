@@ -287,6 +287,27 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		.map(athlete => (athlete.teamName || '').length)
 	);
 	const compactTeamColumn = maxTeamNameLength < 7; // Narrow team column if max name length < 7
+
+	// Calculate grid-template-rows: count all athlete/spacer rows + leaders section rows
+	// Pattern: repeat(resultRows, minmax(10px, auto)) [1fr] repeat(leaderRows, minmax(10px, auto))
+	// The 1fr elastic spacer is included if leaders exist
+	let resultRows = 0;
+	for (const athlete of rankedAthletes) {
+		resultRows += 1; // Each athlete and spacer occupies one row
+	}
+
+	let leaderRows = 0;
+	if (leaders && leaders.length > 0) {
+		leaderRows = 1; // leaders title row
+		for (const l of leaders) {
+			leaderRows += 1; // each leader and spacer occupies one row
+		}
+	}
+
+	// IMPORTANT: Header rows are defined in CSS, so only return rows AFTER the two header rows
+	const gridTemplateRows = leaders && leaders.length > 0
+		? `repeat(${resultRows}, minmax(10px, auto)) 1fr repeat(${leaderRows}, minmax(10px, auto))`
+		: `repeat(${resultRows}, minmax(10px, auto))`;
 	
 	const result = {
 		scoreboardName: 'Rankings',  // Scoreboard display name
@@ -300,6 +321,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		groupAthletes,   // Original groupAthletes for reference
 		leaders,         // Leaders from previous sessions (from OWLCMS)
 		stats,
+		gridTemplateRows,
 		displaySettings: fopUpdate?.showTotalRank || fopUpdate?.showSinclair ? {
 			showTotalRank: fopUpdate.showTotalRank === 'true',
 			showSinclair: fopUpdate.showSinclair === 'true',
@@ -324,10 +346,12 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		groupAthletes: result.groupAthletes,
 		leaders: result.leaders,  // Include leaders in cache
 		stats: result.stats,
+		gridTemplateRows: result.gridTemplateRows,
 		displaySettings: result.displaySettings,
 		isBreak: result.isBreak,
 		breakType: result.breakType,
 		status: result.status,
+		compactTeamColumn: result.compactTeamColumn,  // Include responsive layout flag
 		lastUpdate: result.lastUpdate,
 		options: result.options
 	});

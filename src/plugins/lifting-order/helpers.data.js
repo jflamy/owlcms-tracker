@@ -167,15 +167,13 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 
 	
 	// Extract leaders from fopUpdate (now a proper JSON array from OWLCMS)
-	// Filter out OWLCMS spacers (isSpacer flag)
+	// KEEP spacers (isSpacer flag) so we can count rows and render category separators
 	let leaders = [];
 	if (fopUpdate?.leaders && Array.isArray(fopUpdate.leaders)) {
-		leaders = fopUpdate.leaders
-			.filter(leader => !leader.isSpacer)
-			.map(leader => ({
-				...leader,
-				flagUrl: leader.teamName ? getFlagUrl(leader.teamName) : null
-			}));
+		leaders = fopUpdate.leaders.map(leader => ({
+			...leader,
+			flagUrl: leader.teamName ? getFlagUrl(leader.teamName) : null
+		}));
 	}
 	
 	// Calculate max team name length (for responsive layout)
@@ -185,6 +183,27 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	);
 	const compactTeamColumn = maxTeamNameLength < 7; // Narrow team column if max name length < 7
 	
+	// Build grid-template-rows for a single-grid layout (headers are defined in CSS)
+	// Count session result rows (athletes + any spacers present)
+	let resultRows = 0;
+	for (const a of liftingOrderAthletes) {
+		resultRows += 1; // each entry is a row; OWLCMS may include spacers as {isSpacer:true}
+	}
+
+	// Count leader rows: 1 for the title row + each leader row + spacers
+	let leaderRows = 0;
+	if (leaders && leaders.length > 0) {
+		leaderRows = 1; // leaders title row
+		for (const l of leaders) {
+			leaderRows += 1; // each leader and spacer occupies one row
+		}
+	}
+
+	// IMPORTANT: Header rows are defined in CSS, so only return rows AFTER the two header rows
+	const gridTemplateRows = leaders && leaders.length > 0
+		? `repeat(${resultRows}, minmax(10px, auto)) 1fr repeat(${leaderRows}, minmax(10px, auto))`
+		: `repeat(${resultRows}, minmax(10px, auto))`;
+
 	const result = {
 		scoreboardName: 'Lifting Order',  // Scoreboard display name
 		competition,
@@ -198,6 +217,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		leaders,               // Leaders from previous sessions (from OWLCMS)
 		rankings,              // Computed from database
 		stats,
+		gridTemplateRows,
 		displaySettings: fopUpdate?.showTotalRank || fopUpdate?.showSinclair ? {
 			showTotalRank: fopUpdate.showTotalRank === 'true',
 			showSinclair: fopUpdate.showSinclair === 'true',
@@ -224,6 +244,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		leaders: result.leaders,  // Include leaders in cache
 		rankings: result.rankings,
 		stats: result.stats,
+		gridTemplateRows: result.gridTemplateRows,
 		displaySettings: result.displaySettings,
 		isBreak: result.isBreak,
 		breakType: result.breakType,
