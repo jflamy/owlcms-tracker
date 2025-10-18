@@ -55,6 +55,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			currentAthlete: null,
 			timer: { state: 'stopped', timeRemaining: 0 },
 			decision: extractDecisionState(fopUpdate),
+			records: [],
 			liftingOrderAthletes: [],
 			groupAthletes: [],
 			rankings: [],
@@ -131,6 +132,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// Extract timer info from UPDATE message or keep previous timer state
 	const timer = extractTimerState(fopUpdate, fopName);
 	const decision = extractDecisionState(fopUpdate);
+	const records = extractRecordsFromUpdate(fopUpdate);
 
 	// Get precomputed groupAthletes from UPDATE message (already JSON-encoded string)
 	// This contains all athletes in standard order (sorted by category, lot number)
@@ -189,6 +191,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			currentAttempt,
 			timer,
 			decision: extractDecisionState(fopUpdate),
+			records,
 			sessionStatus,  // Include session status even in waiting state
 			sessionStatusMessage,  // Include status message
 			liftingOrderAthletes: [],
@@ -299,6 +302,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		gridTemplateRows,  // Pre-calculated grid template with repeats
 		resultRows,        // Expose row count for results section (for frontend overrides)
 		leaderRows,        // Expose row count for leaders section (for frontend overrides)
+		records,           // Records from current session UPDATE
 		status,
 		message,  // Add helpful waiting message
 		lastUpdate: fopUpdate?.lastUpdate || Date.now(),
@@ -314,6 +318,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		liftingOrderAthletes: result.liftingOrderAthletes,
 		groupAthletes: result.groupAthletes,
 		leaders: result.leaders,  // Include leaders in cache
+		records: result.records,   // Include records in cache
 		stats: result.stats,
 		displaySettings: result.displaySettings,
 		isBreak: result.isBreak,
@@ -413,6 +418,148 @@ function extractTimerState(fopUpdate, fopName = 'A') {
 		duration: parseInt(fopUpdate?.timeAllowed || 60000),
 		startTime: null
 	};
+}
+
+/**
+ * Extract records from UPDATE message
+ * Records come as a JSON string in fopUpdate.records
+ * Format: {"recordNames":["PanAm"],"recordCategories":["JR 86","SR 86"],"recordTable":[...]}
+ * Returns: Array of objects grouped by federation with categories and lift values
+ */
+function extractRecordsFromUpdate(fopUpdate) {
+	if (!fopUpdate?.records) {
+		return [];
+	}
+
+	try {
+		// Parse the JSON string
+		const recordsData = typeof fopUpdate.records === 'string' 
+			? JSON.parse(fopUpdate.records) 
+			: fopUpdate.records;
+
+		if (!recordsData?.recordTable || !recordsData?.recordNames) {
+			return [];
+		}
+
+		// Helper to check if a value is "empty" (spaces, empty string, falsy, etc.)
+		const isEmpty = (val) => !val || val === '' || (typeof val === 'string' && val.trim() === '');
+
+		// Track unique categories to detect collisions (e.g., two "JR 77" with different meanings)
+		const categoryNameCounts = {};
+		const categoryKeyMap = {}; // Maps displayName to unique keys: "JR 77" -> ["JR 77-1", "JR 77-2"]
+
+		// First pass: identify category collisions and create unique keys
+		for (const block of recordsData.recordTable) {
+			const displayName = block.cat || '';
+			if (!categoryNameCounts[displayName]) {
+				categoryNameCounts[displayName] = 0;
+			}
+			categoryNameCounts[displayName]++;
+		}
+
+		// Create unique keys for categories with collisions
+		const categoryCounters = {}; // Tracks current count for each display name
+		for (const block of recordsData.recordTable) {
+			const displayName = block.cat || '';
+			const hasCollision = categoryNameCounts[displayName] > 1;
+			
+			if (!categoryCounters[displayName]) {
+				categoryCounters[displayName] = 0;
+			}
+			categoryCounters[displayName]++;
+			
+			// Create unique key: use display name if no collision, else add -1, -2, etc.
+			const uniqueKey = hasCollision ? `${displayName}-${categoryCounters[displayName]}` : displayName;
+			
+			if (!categoryKeyMap[displayName]) {
+				categoryKeyMap[displayName] = [];
+			}
+			if (!categoryKeyMap[displayName].includes(uniqueKey)) {
+				categoryKeyMap[displayName].push(uniqueKey);
+			}
+			
+			block._uniqueKey = uniqueKey; // Store unique key for later use
+		}
+
+		// Build structure: recordsByFederation[fedName] = { categories: Set, recordsByCategory: {...} }
+		const recordsByFederation = {};
+		
+		// Initialize each federation
+		for (const fedName of recordsData.recordNames) {
+			recordsByFederation[fedName] = {
+				categories: new Set(),
+				recordsByCategory: {}
+			};
+		}
+
+		// Iterate through each record block
+		for (const block of recordsData.recordTable) {
+			if (!block.records || block.records.length === 0) {
+				continue;
+			}
+
+			const displayName = block.cat || '';
+			const uniqueKey = block._uniqueKey; // Use the unique key we created
+			
+			// Each position in block.records corresponds to a federation in recordNames
+			for (let fedIndex = 0; fedIndex < recordsData.recordNames.length; fedIndex++) {
+				const recordObj = block.records[fedIndex];
+				const fedName = recordsData.recordNames[fedIndex];
+				
+				if (!recordObj) continue;
+
+				// Initialize category for this federation if not already present
+				if (!recordsByFederation[fedName].recordsByCategory[uniqueKey]) {
+					recordsByFederation[fedName].recordsByCategory[uniqueKey] = {
+						displayName, // Store display name for rendering
+						S: null,
+						CJ: null,
+						T: null
+					};
+				}
+
+				// Track this category for this federation
+				recordsByFederation[fedName].categories.add(uniqueKey);
+
+				// Extract SNATCH with optional snatchHighlight
+				if (!isEmpty(recordObj.SNATCH)) {
+					recordsByFederation[fedName].recordsByCategory[uniqueKey].S = {
+						value: recordObj.SNATCH,
+						highlight: recordObj.snatchHighlight || null
+					};
+				}
+
+				// Extract CLEANJERK with optional cjHighlight
+				if (!isEmpty(recordObj.CLEANJERK)) {
+					recordsByFederation[fedName].recordsByCategory[uniqueKey].CJ = {
+						value: recordObj.CLEANJERK,
+						highlight: recordObj.cjHighlight || null
+					};
+				}
+
+				// Extract TOTAL with optional totalHighlight
+				if (!isEmpty(recordObj.TOTAL)) {
+					recordsByFederation[fedName].recordsByCategory[uniqueKey].T = {
+						value: recordObj.TOTAL,
+						highlight: recordObj.totalHighlight || null
+					};
+				}
+			}
+		}
+
+		// Convert to flat array format for easier frontend consumption
+		// Returns: [ { federation, categories: [cat1, cat2, ...], records: { cat1: {displayName, S, CJ, T}, cat2: {...}, ... } } ]
+		return Object.entries(recordsByFederation)
+			.filter(([fedName, data]) => data.categories.size > 0)
+			.map(([fedName, data]) => ({
+				federation: fedName,
+				categories: Array.from(data.categories).sort(),
+				records: data.recordsByCategory
+			}));
+	} catch (error) {
+		console.error('[Session Results] Error parsing records:', error);
+		return [];
+	}
 }
 
 function extractDecisionState(fopUpdate) {

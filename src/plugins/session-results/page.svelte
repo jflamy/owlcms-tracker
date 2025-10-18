@@ -41,6 +41,11 @@
 	$: showLeaders = showLeadersParam !== 'false';  // Default true unless explicitly set to false
 	$: hasLeaders = data.leaders && data.leaders.length > 0;
 	
+	// Read showRecords from URL parameter (default: true)
+	$: showRecordsParam = $page.url.searchParams.get('showRecords');
+	$: showRecords = showRecordsParam !== 'false';  // Default true unless explicitly set to false
+	$: hasRecords = data.records && data.records.length > 0;
+	
 	// Compute grid template rows based on showLeaders URL parameter and available leaders
 	// Frontend conditionally includes leader rows based on user preference
 	$: computedGridTemplateRows = (() => {
@@ -85,6 +90,46 @@
 		if (!attempt || !attempt.stringValue || attempt.stringValue === '') return '-';
 		// Remove parentheses from failed attempts (OWLCMS sends "(62)" for failed 62kg)
 		return attempt.stringValue.replace(/[()]/g, '');
+	}
+
+	// Get all unique categories across all federations
+	function getAllRecordCategories(recordsData) {
+		if (!recordsData || recordsData.length === 0) return [];
+		const categoryMap = new Map(); // key → displayName
+		
+		for (const fedData of recordsData) {
+			if (fedData.records) {
+				for (const [categoryKey, categoryData] of Object.entries(fedData.records)) {
+					if (!categoryMap.has(categoryKey)) {
+						categoryMap.set(categoryKey, categoryData.displayName || categoryKey);
+					}
+				}
+			}
+		}
+		
+		// Return sorted array of keys
+		return Array.from(categoryMap.keys()).sort();
+	}
+
+	// Get display name for a category key
+	function getCategoryDisplayName(recordsData, categoryKey) {
+		if (!recordsData || recordsData.length === 0) return categoryKey;
+		
+		for (const fedData of recordsData) {
+			if (fedData.records?.[categoryKey]?.displayName) {
+				return fedData.records[categoryKey].displayName;
+			}
+		}
+		
+		return categoryKey;
+	}
+
+	// Get record cell for a specific federation, category, and lift type
+	function getRecordCell(federationData, category, liftType) {
+		if (!federationData?.records?.[category]?.[liftType]) {
+			return { value: '-', highlight: null };
+		}
+		return federationData.records[category][liftType];
 	}
 </script>
 
@@ -289,6 +334,48 @@
 					{/each}
 				{/if}
 			</div>
+
+			<!-- Records Section (Below Grid, Not Part of Grid) -->
+			{#if showRecords && hasRecords}
+				<div class="records-section">
+					<div class="records-title">RECORDS</div>
+					
+					<!-- Single unified grid container -->
+					<div class="records-table-grid" style="--num-categories: {getAllRecordCategories(data.records).length}">
+						<!-- Row 1: Category headers -->
+						<div class="records-header-cell"></div>
+						{#each getAllRecordCategories(data.records) as category}
+							<div class="records-category-header" style="grid-column: span 3">
+								{getCategoryDisplayName(data.records, category)}
+							</div>
+						{/each}
+						
+						<!-- Row 2: Sub-headers (S/CJ/T) -->
+						<div class="records-subheader-cell"></div>
+						{#each getAllRecordCategories(data.records) as category}
+							<div class="records-subheader">S</div>
+							<div class="records-subheader">CJ</div>
+							<div class="records-subheader">T</div>
+						{/each}
+						
+						<!-- Data rows: one per federation -->
+						{#each data.records as federationData}
+							<div class="records-federation-cell">{federationData.federation}</div>
+							{#each getAllRecordCategories(data.records) as category}
+								<div class="records-cell" class:highlighted={getRecordCell(federationData, category, 'S').highlight}>
+									{getRecordCell(federationData, category, 'S').value ?? '-'}
+								</div>
+								<div class="records-cell" class:highlighted={getRecordCell(federationData, category, 'CJ').highlight}>
+									{getRecordCell(federationData, category, 'CJ').value ?? '-'}
+								</div>
+								<div class="records-cell" class:highlighted={getRecordCell(federationData, category, 'T').highlight}>
+									{getRecordCell(federationData, category, 'T').value ?? '-'}
+								</div>
+							{/each}
+						{/each}
+					</div>
+				</div>
+			{/if}
 		{/if}
 	</main>
 </div>
@@ -465,6 +552,161 @@
 		display: flex;
 		flex-direction: column;
 		min-height: 0;
+	}
+
+	/* Records Section - Below Grid */
+	.records-section {
+		padding: 1.5rem;
+		background: rgba(26, 26, 26, 0.95);
+		border-top: 1px solid #333;
+		margin-top: 0.5rem;
+	}
+
+	.records-title {
+		font-size: 1.25rem;
+		font-weight: bold;
+		color: #fff;
+		margin-bottom: 1.5rem;
+		text-transform: uppercase;
+		letter-spacing: 1px;
+		display: block;
+	}
+
+	/* Unified grid with dynamic columns: 1 federation column + (3 * num_categories) data columns */
+	.records-table-grid {
+		display: inline-grid;
+		grid-template-columns: 100px repeat(calc(var(--num-categories, 2) * 3), 1fr);
+		gap: 0;
+		border: 2px solid #555;
+		background: #000;
+		overflow: auto;
+	}
+
+	/* Row 1: Category headers - each spans 3 columns (S, CJ, T) */
+	.records-header-cell {
+		width: 100px;
+		height: 40px;
+		background: #0a0a0a;
+		border-right: 2px solid #555;
+		border-bottom: 2px solid #555;
+	}
+
+	.records-category-header {
+		padding: 0.5rem;
+		text-align: center;
+		font-weight: bold;
+		color: #fff;
+		font-size: 0.9rem;
+		background: #1a1a1a;
+		border-right: 2px solid #555;
+		border-bottom: 2px solid #555;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		min-height: 40px;
+	}
+
+	.records-category-header:last-child {
+		border-right: none;
+	}
+
+	/* Row 2: Sub-headers (S, CJ, T) */
+	.records-subheader-cell {
+		width: 100px;
+		height: 30px;
+		background: #0a0a0a;
+		border-right: 2px solid #555;
+		border-bottom: 1px solid #444;
+	}
+
+	.records-subheader {
+		padding: 0.25rem;
+		text-align: center;
+		font-weight: bold;
+		color: #999;
+		font-size: 0.85rem;
+		background: #1a1a1a;
+		border-right: 1px solid #333;
+		border-bottom: 1px solid #444;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		min-height: 30px;
+	}
+
+	.records-subheader:nth-child(3n) {
+		border-right: 2px solid #555;
+	}
+
+	/* Data rows */
+	.records-federation-cell {
+		width: 100px;
+		padding: 0.5rem;
+		text-align: center;
+		font-weight: bold;
+		color: #fff;
+		background: #0a0a0a;
+		border-right: 2px solid #555;
+		border-bottom: 1px solid #444;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 0.95rem;
+		min-height: 40px;
+	}
+
+	.records-cell {
+		padding: 0.5rem;
+		text-align: center;
+		color: #fff;
+		font-size: 0.95rem;
+		font-weight: bold;
+		background: #1a1a1a;
+		border-right: 1px solid #333;
+		border-bottom: 1px solid #444;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		min-height: 40px;
+	}
+
+	.records-cell:nth-child(3n) {
+		border-right: 2px solid #555;
+	}
+
+	.records-cell.highlighted {
+		background: #a855f7;
+		color: #fff;
+		font-weight: bold;
+	}
+
+	.records-list {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+		gap: 1rem;
+	}
+
+	.record-item {
+		display: grid;
+		grid-template-columns: 1fr 80px;
+		gap: 0.75rem;
+		align-items: center;
+		padding: 0.75rem;
+		background: rgba(0, 0, 0, 0.5);
+		border-left: 4px solid #fbbf24;
+		border-radius: 0.25rem;
+	}
+
+	.record-label {
+		font-size: 0.9rem;
+		color: #ccc;
+	}
+
+	.record-holder {
+		grid-column: 1 / -1;
+		font-size: 0.8rem;
+		color: #999;
+		font-style: italic;
 	}
 
 	.scoreboard-grid {
