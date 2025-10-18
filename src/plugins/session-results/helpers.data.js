@@ -67,12 +67,12 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// Get session status early (before cache check, so it's always fresh)
 	const sessionStatus = competitionHub.getSessionStatus(fopName);
 
-	// Check cache first - cache key based on session athletes data, NOT timer events
+	// Check cache first - cache key based on session athletes data, NOT timer events or UI preferences
 	// Use length + first item ID as quick hash instead of expensive JSON.stringify
 	// This avoids memory spikes when loading multiple scoreboards simultaneously
 	const sessionAthletesHash = fopUpdate?.groupAthletes ? 
 		`${fopUpdate.groupAthletes.length}-${fopUpdate.groupAthletes[0]?.id || 0}` : '';
-	const cacheKey = `${fopName}-${sessionAthletesHash}-${showRecords}`;
+	const cacheKey = `${fopName}-${sessionAthletesHash}`;
 	
 	if (sessionResultsCache.has(cacheKey)) {
 		const cached = sessionResultsCache.get(cacheKey);
@@ -198,7 +198,9 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			message: 'Waiting for competition update from OWLCMS...',
 			lastUpdate: fopUpdate?.lastUpdate || Date.now(),
 			learningMode,
-			options: { showRecords }
+			options: { showRecords },
+			resultRows: 0,  // No athletes yet
+			leaderRows: 0   // No leaders yet
 		};
 	}
 	
@@ -295,6 +297,8 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		sessionStatus,  // Include session status (isDone, groupName, lastActivity)
 		compactTeamColumn,  // Narrow team column if max team size < 7
 		gridTemplateRows,  // Pre-calculated grid template with repeats
+		resultRows,        // Expose row count for results section (for frontend overrides)
+		leaderRows,        // Expose row count for leaders section (for frontend overrides)
 		status,
 		message,  // Add helpful waiting message
 		lastUpdate: fopUpdate?.lastUpdate || Date.now(),
@@ -318,6 +322,8 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		message: result.message,  // Include waiting message in cache
 		compactTeamColumn: result.compactTeamColumn,  // Include responsive layout flag
 		gridTemplateRows: result.gridTemplateRows,  // Include pre-calculated grid template
+		resultRows: result.resultRows,  // Include result row count
+		leaderRows: result.leaderRows,  // Include leader row count
 		lastUpdate: result.lastUpdate,
 		options: result.options
 	});

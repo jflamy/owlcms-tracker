@@ -69,11 +69,12 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// Get session status early (before cache check, so it's always fresh)
 	const sessionStatus = competitionHub.getSessionStatus(fopName);
 
-	// Check cache first - cache key based on athlete data, NOT timer events
+	// Check cache first - cache key based on athlete data, NOT timer events or UI preferences
 	// Use length + first item ID as quick hash instead of expensive JSON.stringify
+	// showRecords is just a UI preference (handled client-side like showLeaders)
 	const groupAthletesHash = fopUpdate?.groupAthletes ? 
 		`${fopUpdate.groupAthletes.length}-${fopUpdate.groupAthletes[0]?.id || 0}` : '';
-	const cacheKey = `${fopName}-${groupAthletesHash}-${showRecords}`;
+	const cacheKey = `${fopName}-${groupAthletesHash}`;
 	
 	if (rankingsCache.has(cacheKey)) {
 		const cached = rankingsCache.get(cacheKey);
@@ -323,6 +324,8 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		leaders,         // Leaders from previous sessions (from OWLCMS)
 		stats,
 		gridTemplateRows,
+		resultRows,      // Expose row count for results section (for frontend overrides)
+		leaderRows,      // Expose row count for leaders section (for frontend overrides)
 		displaySettings: fopUpdate?.showTotalRank || fopUpdate?.showSinclair ? {
 			showTotalRank: fopUpdate.showTotalRank === 'true',
 			showSinclair: fopUpdate.showSinclair === 'true',
@@ -348,6 +351,8 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		leaders: result.leaders,  // Include leaders in cache
 		stats: result.stats,
 		gridTemplateRows: result.gridTemplateRows,
+		resultRows: result.resultRows,  // Include result row count
+		leaderRows: result.leaderRows,  // Include leader row count
 		displaySettings: result.displaySettings,
 		isBreak: result.isBreak,
 		breakType: result.breakType,

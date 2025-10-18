@@ -12,6 +12,13 @@ export default {
 	
 	options: [
 		{
+			key: 'showLeaders',
+			label: 'Show Leaders Section',
+			type: 'boolean',
+			default: true,
+			description: 'Display the leaders section on the grid'
+		},
+		{
 			key: 'showRecords',
 			label: 'Show Records',
 			type: 'boolean',

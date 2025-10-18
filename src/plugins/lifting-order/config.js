@@ -15,7 +15,15 @@ export default {
 	requiresPictures: false,
 	
 	// User-configurable options
-	options: [],
+	options: [
+		{
+			key: 'showLeaders',
+			label: 'Show Leaders Section',
+			type: 'boolean',
+			default: true,
+			description: 'Display the leaders section on the grid'
+		}
+	],
 	
 	// Required FOP data fields
 	requiredFields: [

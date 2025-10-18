@@ -1,6 +1,7 @@
 <script>
 	import { createTimer } from '$lib/timer-logic.js';
 	import { translations } from '$lib/stores.js';
+	import { page } from '$app/stores';
 	import { onMount, onDestroy } from 'svelte';
 	
 	// Props passed from parent route
@@ -34,6 +35,26 @@
 	$: currentAttempt = data.currentAttempt;
 	$: allAthletes = data.sortedAthletes || [];  // Standardized field name across all scoreboards
 	$: decisionState = data.decision || {};
+	
+	// Read showLeaders from URL parameter (default: true)
+	$: showLeadersParam = $page.url.searchParams.get('showLeaders');
+	$: showLeaders = showLeadersParam !== 'false';  // Default true unless explicitly set to false
+	$: hasLeaders = data.leaders && data.leaders.length > 0;
+	
+	// Compute grid template rows based on showLeaders URL parameter and available leaders
+	// Frontend conditionally includes leader rows based on user preference
+	$: computedGridTemplateRows = (() => {
+		if (showLeaders && hasLeaders) {
+			// Include leaders: results + elastic spacer + leader rows (title already counted in leaderRows)
+			// resultRows = all result rows including category spacers
+			// leaderRows = leader title + all leader rows including category spacers
+			return `repeat(${data.resultRows || 0}, minmax(10px, auto)) repeat(1, 1fr) repeat(${data.leaderRows || 0}, minmax(10px, auto))`;
+		} else {
+			// Exclude leaders: only results (which include category spacers)
+			// resultRows includes all athletes AND category spacer rows
+			return `repeat(${data.resultRows || 0}, minmax(10px, auto)) repeat(1, 1fr)`;
+		}
+	})();
 	
 	// Debug: log compactTeamColumn value (scoreboard name from backend)
 	$: console.log(`[${data.scoreboardName}] compactTeamColumn:`, data.compactTeamColumn);
@@ -124,7 +145,7 @@
 				<p>{data.message || 'Waiting for competition data...'}</p>
 			</div>
 		{:else}
-			<div class="scoreboard-grid" class:compact-team-column={data.compactTeamColumn} style="--template-rows: {data.gridTemplateRows}" role="grid">
+			<div class="scoreboard-grid" class:compact-team-column={data.compactTeamColumn} style="--template-rows: {computedGridTemplateRows}" role="grid">
 				<div class="grid-row header header-primary" role="row">
 					<div class="cell header col-start span-two" role="columnheader">{t.Start || 'Start'}</div>
 					<div class="cell header col-name span-two" role="columnheader">{t.Name || 'Name'}</div>
@@ -204,23 +225,21 @@
 							<div class="cell total" role="gridcell">{athlete.total || '-'}</div>
 							<div class="cell rank" role="gridcell">{athlete.totalRank || '-'}</div>
 						</div>
-					{/if}
-				{/each}
+			{/if}
+		{/each}
 
-				{#if data.leaders && data.leaders.length > 0}
-					<!-- Elastic spacer row separating results from leaders -->
-					<div class="grid-row leaders-spacer" aria-hidden="true">
-						<div class="cell span-all"></div>
-					</div>
+		{#if hasLeaders && showLeaders}
+			<!-- Elastic spacer row separating results from leaders -->
+			<div class="grid-row leaders-spacer" aria-hidden="true">
+				<div class="cell span-all"></div>
+			</div>
 
-					<!-- Leaders title row spanning all columns -->
-					<div class="grid-row leaders-header">
-						<div class="cell leaders-title-cell span-all">
-							{t.Leaders || 'Leaders:'} {data.competition?.groupInfo ? data.competition.groupInfo.split('–')[0].trim() : ''}
-						</div>
-					</div>
-
-					<!-- Leader rows -->
+			<!-- Leaders title row spanning all columns -->
+			<div class="grid-row leaders-header">
+				<div class="cell leaders-title-cell span-all">
+					{t.Leaders || 'Leaders:'} {data.competition?.groupInfo ? data.competition.groupInfo.split('–')[0].trim() : ''}
+				</div>
+			</div>					<!-- Leader rows -->
 					{#each data.leaders as leader}
 						{#if leader.isSpacer}
 							<div class="grid-row spacer category-spacer" aria-hidden="true">
@@ -690,8 +709,11 @@
 	}
 
 	/* Elastic spacer row between results and leaders sections */
+	/* Must be display: grid so that 1fr sizing in parent's grid-template-rows applies to this row */
 	.grid-row.leaders-spacer {
-		display: contents;
+		display: grid;
+		grid-column: 1 / -1;
+		grid-template-columns: 1fr;
 	}
 
 	.grid-row.leaders-spacer > .cell {
@@ -699,7 +721,6 @@
 		background: transparent;
 		border: none;
 		padding: 0;
-		height: 100%;
 		display: block;
 	}
 

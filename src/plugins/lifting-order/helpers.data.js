@@ -39,7 +39,7 @@ export function getFopUpdate(fopName = 'A') {
  * Get formatted scoreboard data for SSR/API (SERVER-SIDE ONLY)
  * Uses the latest UPDATE message which already has precomputed liftingOrderAthletes
  * @param {string} fopName - FOP name (default: 'A')
- * @param {Object} options - User preferences (e.g., { showRecords: true, maxLifters: 8 })
+ * @param {Object} options - User preferences (e.g., { showRecords: true })
  * @returns {Object} Formatted data ready for browser consumption
  */
 export function getScoreboardData(fopName = 'A', options = {}) {
@@ -48,7 +48,6 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	
 	// Extract options with defaults
 	const showRecords = options.showRecords ?? false;
-	const maxLifters = options.maxLifters ?? 8;
 	
 	// Get learning mode from environment
 	const learningMode = process.env.LEARNING_MODE === 'true' ? 'enabled' : 'disabled';
@@ -71,12 +70,11 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// Get session status early (before cache check, so it's always fresh)
 	const sessionStatus = competitionHub.getSessionStatus(fopName);
 
-	// Check cache first - cache key based on lifting order data, NOT timer events
+	// Check cache first - cache key based on lifting order data ONLY (no UI preferences)
 	// Use a hash of liftingOrderAthletes to detect when athlete data actually changes
-	// liftingOrderAthletes is now a parsed object, use length + first item ID as quick hash
 	const liftingOrderHash = fopUpdate?.liftingOrderAthletes ? 
 		`${fopUpdate.liftingOrderAthletes.length}-${fopUpdate.liftingOrderAthletes[0]?.id || 0}` : ''; // Quick hash based on length + first ID
-	const cacheKey = `${fopName}-${liftingOrderHash}-${showRecords}-${maxLifters}`;
+	const cacheKey = `${fopName}-${liftingOrderHash}`;
 	
 	if (liftingOrderCache.has(cacheKey)) {
 		const cached = liftingOrderCache.get(cacheKey);
@@ -218,6 +216,8 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		rankings,              // Computed from database
 		stats,
 		gridTemplateRows,
+		resultRows,            // Expose row count for results section (for frontend overrides)
+		leaderRows,            // Expose row count for leaders section (for frontend overrides)
 		displaySettings: fopUpdate?.showTotalRank || fopUpdate?.showSinclair ? {
 			showTotalRank: fopUpdate.showTotalRank === 'true',
 			showSinclair: fopUpdate.showSinclair === 'true',
@@ -230,7 +230,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		compactTeamColumn,  // Narrow team column if max team size < 7
 		status: (fopUpdate || databaseState) ? 'ready' : 'waiting',
 		lastUpdate: fopUpdate?.lastUpdate || Date.now(),
-		options: { showRecords, maxLifters } // Echo back the options used
+		options: { showRecords } // Echo back the options used
 	};
 	
 	// Cache the result (excluding timer, learningMode, sessionStatus, and sessionStatusMessage which change frequently)
@@ -245,6 +245,8 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		rankings: result.rankings,
 		stats: result.stats,
 		gridTemplateRows: result.gridTemplateRows,
+		resultRows: result.resultRows,  // Include result row count
+		leaderRows: result.leaderRows,  // Include leader row count
 		displaySettings: result.displaySettings,
 		isBreak: result.isBreak,
 		breakType: result.breakType,
