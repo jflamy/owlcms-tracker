@@ -338,12 +338,10 @@
 			<!-- Records Section (Below Grid, Not Part of Grid) -->
 			{#if showRecords && hasRecords}
 				<div class="records-section">
-					<div class="records-title">RECORDS</div>
-					
 					<!-- Single unified grid container -->
 					<div class="records-table-grid" style="--num-categories: {getAllRecordCategories(data.records).length}">
-						<!-- Row 1: Category headers -->
-						<div class="records-header-cell"></div>
+						<!-- Row 1: Category headers with title in top-left -->
+						<div class="records-title-cell">{t.RECORDS || 'RECORDS'}</div>
 						{#each getAllRecordCategories(data.records) as category}
 							<div class="records-category-header" style="grid-column: span 3">
 								{getCategoryDisplayName(data.records, category)}
@@ -556,20 +554,9 @@
 
 	/* Records Section - Below Grid */
 	.records-section {
-		padding: 1.5rem;
-		background: rgba(26, 26, 26, 0.95);
-		border-top: 1px solid #333;
+		padding: 1rem 1.5rem;
+		background: transparent;
 		margin-top: 0.5rem;
-	}
-
-	.records-title {
-		font-size: 1.25rem;
-		font-weight: bold;
-		color: #fff;
-		margin-bottom: 1.5rem;
-		text-transform: uppercase;
-		letter-spacing: 1px;
-		display: block;
 	}
 
 	/* Unified grid with dynamic columns: 1 federation column + (3 * num_categories) data columns */
@@ -577,86 +564,111 @@
 		display: inline-grid;
 		grid-template-columns: 100px repeat(calc(var(--num-categories, 2) * 3), 1fr);
 		gap: 0;
-		border: 2px solid #555;
+		border: none;
 		background: #000;
 		overflow: auto;
+	}
+
+	/* Title cell in top-left corner */
+	.records-title-cell {
+		width: 100px;
+		height: 35px;
+		background: #0a0a0a;
+		border-right: 2px solid #555;
+		border-bottom: 1px solid #444;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 0.9rem;
+		font-weight: bold;
+		color: #fff;
+		text-transform: uppercase;
+		letter-spacing: 1px;
 	}
 
 	/* Row 1: Category headers - each spans 3 columns (S, CJ, T) */
 	.records-header-cell {
 		width: 100px;
-		height: 40px;
+		height: 35px;
 		background: #0a0a0a;
 		border-right: 2px solid #555;
-		border-bottom: 2px solid #555;
+		border-bottom: 1px solid #444;
+		border-top: 2px solid #555;
 	}
 
 	.records-category-header {
-		padding: 0.5rem;
+		padding: 0.4rem;
 		text-align: center;
 		font-weight: bold;
 		color: #fff;
 		font-size: 0.9rem;
 		background: #1a1a1a;
-		border-right: 2px solid #555;
-		border-bottom: 2px solid #555;
+		border-right: 1px solid #333;
+		border-bottom: 1px solid #444;
+		border-top: 2px solid #555;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		min-height: 40px;
+		min-height: 35px;
+	}
+
+	.records-category-header:nth-child(2) {
+		border-left: 2px solid #555;
 	}
 
 	.records-category-header:last-child {
-		border-right: none;
+		border-right: 2px solid #555;
 	}
 
 	/* Row 2: Sub-headers (S, CJ, T) */
 	.records-subheader-cell {
 		width: 100px;
-		height: 30px;
+		height: 25px;
 		background: #0a0a0a;
 		border-right: 2px solid #555;
-		border-bottom: 1px solid #444;
+		border-bottom: 2px solid #555;
+		border-top: 1px solid #333;
 	}
 
 	.records-subheader {
-		padding: 0.25rem;
+		padding: 0.2rem;
 		text-align: center;
 		font-weight: bold;
 		color: #999;
 		font-size: 0.85rem;
 		background: #1a1a1a;
 		border-right: 1px solid #333;
-		border-bottom: 1px solid #444;
+		border-bottom: 2px solid #555;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		min-height: 30px;
+		min-height: 25px;
 	}
 
-	.records-subheader:nth-child(3n) {
-		border-right: 2px solid #555;
+	.records-subheader:nth-child(2) {
+		border-left: 2px solid #555;
 	}
 
 	/* Data rows */
 	.records-federation-cell {
 		width: 100px;
-		padding: 0.5rem;
+		padding: 0.4rem;
 		text-align: center;
 		font-weight: bold;
 		color: #fff;
 		background: #0a0a0a;
 		border-right: 2px solid #555;
 		border-bottom: 1px solid #444;
+		border-top: 1px solid #333;
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		font-size: 0.95rem;
-		min-height: 40px;
+		min-height: 32px;
 	}
 
 	.records-cell {
-		padding: 0.5rem;
+		padding: 0.4rem;
 		text-align: center;
 		color: #fff;
 		font-size: 0.95rem;
@@ -667,11 +679,26 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		min-height: 40px;
+		min-height: 32px;
+	}
+
+	.records-cell:nth-child(3n+2) {
+		border-left: 2px solid #555;
 	}
 
 	.records-cell:nth-child(3n) {
 		border-right: 2px solid #555;
+	}
+
+	.records-cell:last-child,
+	.records-cell:nth-last-child(2),
+	.records-cell:nth-last-child(3) {
+		border-bottom: 2px solid #555;
+	}
+
+	/* Ensure federation cell last row has matching bottom border */
+	.records-federation-cell:nth-last-child(-n+3) {
+		border-bottom: 2px solid #555;
 	}
 
 	.records-cell.highlighted {

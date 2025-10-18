@@ -619,6 +619,39 @@ class CompetitionHub {
    * - Result: fr-CA has 1310 keys (10 regional + 1300 from base)
    * - Also handles reverse: if 'fr' cached after 'fr-CA', updates all 'fr-*' variants
    */
+  /**
+   * Decode HTML entities in translation strings
+   * Converts: &amp; → &, &nbsp; → non-breaking space, &ndash; → –, etc.
+   * @param {string} str - String with HTML entities
+   * @returns {string} Decoded string with Unicode characters
+   */
+  decodeHTMLEntities(str) {
+    if (typeof str !== 'string') return str;
+    
+    const entities = {
+      '&amp;': '&',
+      '&lt;': '<',
+      '&gt;': '>',
+      '&quot;': '"',
+      '&apos;': "'",
+      '&#39;': "'",
+      '&nbsp;': '\u00A0',  // Non-breaking space (U+00A0)
+      '&ndash;': '–',
+      '&mdash;': '—',
+      '&hellip;': '…',
+      '&copy;': '©',
+      '&reg;': '®',
+      '&trade;': '™'
+    };
+    
+    let result = str;
+    for (const [entity, char] of Object.entries(entities)) {
+      result = result.replace(new RegExp(entity, 'g'), char);
+    }
+    
+    return result;
+  }
+
   setTranslations(locale = 'en', translationMap) {
     if (!translationMap || typeof translationMap !== 'object') {
       console.warn(`[Hub] Invalid translation map for locale '${locale}'`);
@@ -626,19 +659,26 @@ class CompetitionHub {
     }
     
     const keyCount = Object.keys(translationMap).length;
+    
+    // Decode HTML entities in all translation values
+    const decodedMap = {};
+    for (const [key, value] of Object.entries(translationMap)) {
+      decodedMap[key] = this.decodeHTMLEntities(value);
+    }
+    
     const isNew = !this.translations[locale];
     
     // 1. Extract base locale from regional variant (e.g., 'fr' from 'fr-CA')
     const baseLocale = locale.includes('-') ? locale.split('-')[0] : null;
     
     // 2. If this is a regional variant, merge with base locale if available
-    let mergedMap = translationMap;
+    let mergedMap = decodedMap;
     let wasMerged = false;
     if (baseLocale && this.translations[baseLocale]) {
       const baseTranslations = this.translations[baseLocale];
       const baseKeyCount = Object.keys(baseTranslations).length;
       // Merge with base locale keys (regional keys override base)
-      mergedMap = { ...baseTranslations, ...translationMap };
+      mergedMap = { ...baseTranslations, ...decodedMap };
       wasMerged = true;
       console.log(`[Hub] � Merging regional '${locale}' (${keyCount} keys) + base '${baseLocale}' (${baseKeyCount} keys) → ${Object.keys(mergedMap).length} total`);
     }
@@ -660,7 +700,7 @@ class CompetitionHub {
         if (existingLocale.startsWith(locale + '-')) {
           // This is a regional variant of the locale just cached
           const regionalTranslations = this.translations[existingLocale];
-          const updatedRegional = { ...translationMap, ...regionalTranslations };
+          const updatedRegional = { ...decodedMap, ...regionalTranslations };
           this.translations[existingLocale] = updatedRegional;
         }
       }
@@ -698,9 +738,12 @@ class CompetitionHub {
       return this.translations['en'];
     }
     
-    // No translations available at all
-    console.warn(`[Hub] No translations available for locale '${locale}' (no fallback options)`);
-    return null;
+    // No translations available - return empty object (expected until OWLCMS sends translations)
+    // Don't warn for 'en' locale as it's normal for English to not be loaded yet
+    if (locale !== 'en') {
+      console.warn(`[Hub] No translations available for locale '${locale}' (no fallback options)`);
+    }
+    return {};
   }
 
   /**
