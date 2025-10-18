@@ -7,6 +7,7 @@ let eventSource = null;
 let subscribers = new Set();
 let connectionId = Math.random().toString(36).substr(2, 9);
 let language = 'en';
+let clientCount = 0;
 
 /**
  * Connect to SSE stream (called once, reused by all pages)
@@ -61,6 +62,8 @@ export function connectSSE(lang = 'en') {
  */
 export function subscribeSSE(callback) {
 	subscribers.add(callback);
+	clientCount++;
+	console.log(`[SSE] Client connected (${clientCount} active, lang=${language})`);
 	
 	// Ensure connection is open
 	if (!eventSource || eventSource.readyState !== EventSource.OPEN) {
@@ -70,6 +73,8 @@ export function subscribeSSE(callback) {
 	// Return unsubscribe function
 	return () => {
 		subscribers.delete(callback);
+		clientCount--;
+		console.log(`[SSE] Client disconnected (lang=${language}). ${clientCount} active`);
 		
 		// Close connection if no more subscribers
 		if (subscribers.size === 0 && eventSource) {
