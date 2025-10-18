@@ -19,58 +19,37 @@
 	
 	// Fetch scoreboard data from API
 	async function fetchData() {
-		const fetchId = Math.random().toString(36).substr(2, 9);
-		const startTime = Date.now();
-		
 		try {
-			console.log(`[Scoreboard Fetch] 🔄 Fetch ${fetchId} starting: ${apiUrl}`);
-			
-			const fetchStartTime = Date.now();
 			const response = await fetch(apiUrl);
-			const fetchElapsed = Date.now() - fetchStartTime;
-			console.log(`[Scoreboard Fetch] 📡 Fetch ${fetchId} received response (HTTP ${response.status}, ${fetchElapsed}ms)`);
-			
-			const parseStartTime = Date.now();
 			const result = await response.json();
-			const parseElapsed = Date.now() - parseStartTime;
-			console.log(`[Scoreboard Fetch] 📝 Fetch ${fetchId} parsed JSON (${parseElapsed}ms)`);
 			
 			if (result.success) {
 				scoreboardData = result.data;
-				const totalElapsed = Date.now() - startTime;
-				console.log(`[Scoreboard Fetch] ✅ Fetch ${fetchId} completed in ${totalElapsed}ms, data has ${Object.keys(scoreboardData).length} fields`);
 			} else {
-				const totalElapsed = Date.now() - startTime;
-				console.error(`[Scoreboard Fetch] ❌ Fetch ${fetchId} API error after ${totalElapsed}ms:`, result.error);
+				console.error('[Scoreboard] API error:', result.error);
 			}
 		} catch (err) {
-			const totalElapsed = Date.now() - startTime;
-			console.error(`[Scoreboard Fetch] ❌ Fetch ${fetchId} error after ${totalElapsed}ms:`, err);
+			console.error('[Scoreboard] Fetch error:', err);
 		}
 	}
 	
 	onMount(() => {
 		// Initial fetch
-		console.log(`[Scoreboard Mount] 🔄 onMount starting, calling fetchData for ${data.scoreboardType}`);
 		fetchData();
 		
 		// Connect to shared SSE (browser only)
 		if (browser) {
-			console.log(`[Scoreboard Mount] Setting up shared SSE connection for lang=${language}`);
 			connectSSE(language);
 			
 			// Subscribe to SSE messages
 			unsubscribeSSE = subscribeSSE((message) => {
 				// Handle translation updates
 				if (message.type === 'translations') {
-					console.log(`[Scoreboard SSE] Received translations for locale '${message.locale}' (${message.keyCount} keys)`);
 					translations.setLocale(message.locale, message.data);
 				}
 				
 				// Refresh data on any competition update
 				if (message.type === 'fop_update' || message.type === 'state_update' || message.type === 'competition_update') {
-					const eventType = message.data?.athleteTimerEventType || message.data?.uiEvent || message.type;
-					console.log(`[Scoreboard SSE] Event received (${eventType}), triggering fetchData`);
 					fetchData();
 				}
 			});
@@ -86,7 +65,6 @@
 	
 	// Reconnect SSE if language changes (browser only)
 	$: if (browser && language) {
-		console.log(`[Scoreboard Language] 🔄 Language changed to ${language}, reconnecting SSE`);
 		connectSSE(language);
 	}
 </script>

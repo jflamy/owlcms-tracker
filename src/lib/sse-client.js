@@ -17,18 +17,14 @@ export function connectSSE(lang = 'en') {
 	
 	// If already connected and language matches, reuse
 	if (eventSource && eventSource.readyState === EventSource.OPEN) {
-		console.log(`[SSE Client] Reusing existing connection (${subscribers.size} subscribers)`);
 		return eventSource;
 	}
 	
 	// Close old connection if language changed
 	if (eventSource) {
-		console.log(`[SSE Client] Language changed (${lang}), reconnecting`);
 		eventSource.close();
 		eventSource = null;
 	}
-	
-	console.log(`[SSE Client] Connecting to /api/client-stream?lang=${lang}`);
 	
 	eventSource = new EventSource(`/api/client-stream?lang=${lang}`);
 	
@@ -40,18 +36,17 @@ export function connectSSE(lang = 'en') {
 				try {
 					callback(message);
 				} catch (err) {
-					console.error('[SSE Client] Subscriber error:', err);
+					console.error('[SSE] Subscriber error:', err);
 				}
 			});
 		} catch (err) {
-			console.error('[SSE Client] Message parse error:', err);
+			console.error('[SSE] Message parse error:', err);
 		}
 	};
 	
 	eventSource.onerror = (error) => {
-		console.error('[SSE Client] Connection error:', error);
+		console.error('[SSE] Connection error:', error);
 		if (eventSource.readyState === EventSource.CLOSED) {
-			console.log('[SSE Client] Connection closed, will reconnect on next subscribe');
 			eventSource = null;
 		}
 	};
@@ -72,16 +67,12 @@ export function subscribeSSE(callback) {
 		connectSSE(language);
 	}
 	
-	console.log(`[SSE Client] Subscriber added (${subscribers.size} total)`);
-	
 	// Return unsubscribe function
 	return () => {
 		subscribers.delete(callback);
-		console.log(`[SSE Client] Subscriber removed (${subscribers.size} remaining)`);
 		
 		// Close connection if no more subscribers
 		if (subscribers.size === 0 && eventSource) {
-			console.log('[SSE Client] No more subscribers, closing connection');
 			eventSource.close();
 			eventSource = null;
 		}

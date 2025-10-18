@@ -10,15 +10,9 @@ import { json } from '@sveltejs/kit';
 import { scoreboardRegistry } from '$lib/server/scoreboard-registry.js';
 
 export async function GET({ url }) {
-	const requestId = Math.random().toString(36).substr(2, 9);
-	const startTime = Date.now();
-	
 	try {
-		console.log(`[API /api/scoreboard] 🔄 Request ${requestId} starting`);
-		
 		// Initialize registry on first call
 		await scoreboardRegistry.initialize();
-		console.log(`[API /api/scoreboard] ✅ Request ${requestId} registry initialized`);
 		
 		// Extract parameters
 		const type = url.searchParams.get('type') || 'lifting-order';
@@ -45,16 +39,8 @@ export async function GET({ url }) {
 			}
 		}
 		
-		console.log(`[API /api/scoreboard] 📊 Request ${requestId} Processing: type=${type}, fop=${fopName}, options=`, options);
-		
 		// Process data using the scoreboard's helper
-		const dataStartTime = Date.now();
 		const data = await scoreboardRegistry.processData(type, fopName, options);
-		const dataElapsed = Date.now() - dataStartTime;
-		console.log(`[API /api/scoreboard] ✅ Request ${requestId} data processing complete (${dataElapsed}ms)`);
-		
-		const totalElapsed = Date.now() - startTime;
-		console.log(`[API /api/scoreboard] ✅ Request ${requestId} completed in ${totalElapsed}ms`);
 		
 		return json({
 			success: true,
@@ -66,9 +52,7 @@ export async function GET({ url }) {
 		});
 		
 	} catch (error) {
-		const elapsed = Date.now() - startTime;
-		console.error(`[API /api/scoreboard] ❌ Request ${requestId} failed after ${elapsed}ms:`, error.message);
-		console.error('[API /api/scoreboard] Stack:', error.stack);
+		console.error('[API /api/scoreboard] Error:', error.message);
 		return json({
 			success: false,
 			error: error.message,

@@ -621,7 +621,7 @@ class CompetitionHub {
    */
   setTranslations(locale = 'en', translationMap) {
     if (!translationMap || typeof translationMap !== 'object') {
-      console.warn(`[Hub] ⚠️  Invalid translation map for locale '${locale}' - not cached`);
+      console.warn(`[Hub] Invalid translation map for locale '${locale}'`);
       return;
     }
     
@@ -647,12 +647,8 @@ class CompetitionHub {
     this.translations[locale] = mergedMap;
     const finalKeyCount = Object.keys(mergedMap).length;
     
-    if (isNew && !wasMerged) {
-      console.log(`[Hub] 📚 Cached '${locale}': ${finalKeyCount} keys`);
-    } else if (isNew && wasMerged) {
-      console.log(`[Hub] 📚 Cached '${locale}' (merged): ${finalKeyCount} keys`);
-    } else {
-      console.log(`[Hub] 🔄 Updated '${locale}': ${finalKeyCount} keys`);
+    if (isNew) {
+      console.log(`[Hub] Cached locale '${locale}': ${finalKeyCount} keys`);
     }
     
     // 3. If this is a base locale, update all existing regional variants to include these keys
@@ -665,22 +661,10 @@ class CompetitionHub {
           // This is a regional variant of the locale just cached
           const regionalTranslations = this.translations[existingLocale];
           const updatedRegional = { ...translationMap, ...regionalTranslations };
-          const oldKeyCount = Object.keys(regionalTranslations).length;
-          const newKeyCount = Object.keys(updatedRegional).length;
-          if (newKeyCount > oldKeyCount) {
-            this.translations[existingLocale] = updatedRegional;
-            updatedRegionals.push(`${existingLocale} (${oldKeyCount}→${newKeyCount})`);
-          }
+          this.translations[existingLocale] = updatedRegional;
         }
       }
-      if (updatedRegionals.length > 0) {
-        console.log(`[Hub] 🔗 Updated regional variants: ${updatedRegionals.join(', ')}`);
-      }
     }
-    
-    // Log summary of all cached locales
-    const availableLocales = Object.keys(this.translations).sort();
-    console.log(`[Hub] ✅ Translations ready: ${availableLocales.length} locale(s) - ${availableLocales.join(', ')}`);
   }
 
   /**
