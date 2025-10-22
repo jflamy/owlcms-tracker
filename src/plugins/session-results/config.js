@@ -22,6 +22,13 @@ export default {
 			type: 'boolean',
 			default: true,
 			description: 'Display the leaders section on the grid'
+		},
+		{
+			key: 'showRecords',
+			label: 'Show Records',
+			type: 'boolean',
+			default: true,
+			description: 'Display competition records'
 		}
 	],
 	

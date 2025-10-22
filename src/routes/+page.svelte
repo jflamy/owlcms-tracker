@@ -154,18 +154,18 @@
         {/if}
       </section>
 
-      <!-- Lower Third Overlays -->
-      {#if lowerThirdScoreboards.length > 0}
+      <!-- Team Scoreboards -->
+      {#if teamScoreboards.length > 0}
         <section class="scoreboard-category collapsible">
           <!-- svelte-ignore a11y-click-events-have-key-events -->
           <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
-          <h2 class="category-title clickable" on:click={() => toggleCategory('lower-thirds')}>
-            <span class="toggle-icon">{expandedCategory === 'lower-thirds' ? '▼' : '▶'}</span>
-            Lower Third Overlays
+          <h2 class="category-title clickable" on:click={() => toggleCategory('teams')}>
+            <span class="toggle-icon">{expandedCategory === 'teams' ? '▼' : '▶'}</span>
+            Team Scoreboards
           </h2>
-          {#if expandedCategory === 'lower-thirds'}
+          {#if expandedCategory === 'teams'}
             <div class="scoreboards-grid">
-              {#each lowerThirdScoreboards as scoreboard}
+              {#each teamScoreboards as scoreboard}
                 <div class="scoreboard-card">
                   <h3>{scoreboard.name}</h3>
                   <p class="description">{scoreboard.description}</p>
@@ -203,18 +203,18 @@
         </section>
       {/if}
 
-      <!-- Team Scoreboards -->
-      {#if teamScoreboards.length > 0}
+      <!-- Lower Third Overlays -->
+      {#if lowerThirdScoreboards.length > 0}
         <section class="scoreboard-category collapsible">
           <!-- svelte-ignore a11y-click-events-have-key-events -->
           <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
-          <h2 class="category-title clickable" on:click={() => toggleCategory('teams')}>
-            <span class="toggle-icon">{expandedCategory === 'teams' ? '▼' : '▶'}</span>
-            Team Scoreboards
+          <h2 class="category-title clickable" on:click={() => toggleCategory('lower-thirds')}>
+            <span class="toggle-icon">{expandedCategory === 'lower-thirds' ? '▼' : '▶'}</span>
+            Lower Third Overlays
           </h2>
-          {#if expandedCategory === 'teams'}
+          {#if expandedCategory === 'lower-thirds'}
             <div class="scoreboards-grid">
-              {#each teamScoreboards as scoreboard}
+              {#each lowerThirdScoreboards as scoreboard}
                 <div class="scoreboard-card">
                   <h3>{scoreboard.name}</h3>
                   <p class="description">{scoreboard.description}</p>
