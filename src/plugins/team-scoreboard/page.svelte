@@ -66,6 +66,15 @@
 	}
 </script>
 
+<script context="module">
+// Helper: only render flag images when they are not data: placeholders
+export function shouldRenderFlag(url) {
+	if (!url) return false;
+	if (typeof url === 'string' && url.startsWith('data:image/')) return false;
+	return true;
+}
+</script>
+
 <svelte:head>
 	<title>{data.scoreboardName || 'Team Scoreboard'} - {data.competition?.name || 'OWLCMS'}</title>
 </svelte:head>
@@ -137,7 +146,7 @@
 				{#each teams as team}
 					<div class="grid-row team-header" role="row">
 						<div class="cell team-name-header" role="gridcell">
-							{#if team.flagUrl}
+							{#if shouldRenderFlag(team.flagUrl)}
 								<img src={team.flagUrl} alt={team.teamName} class="team-flag" />
 							{/if}
 							{team.teamName}
@@ -417,6 +426,9 @@
 	}
 	.grid-row.team-header > .team-name-header { grid-column: 1 / span 5; justify-content: flex-start; font-size: 1.6rem; text-shadow: 1px 1px 2px rgba(0,0,0,0.7); border-left: 8px solid #4a5568; display: flex; align-items: center; gap: 0.75rem; }
 	.grid-row.team-header > .team-name-header .team-flag { height: 1.5rem; max-width: 2rem; object-fit: contain; }
+
+	/* Hide any data: URI flags (legacy placeholders) */
+	.team-flag[src^="data:image/"] { display: none; }
 	.grid-row.team-header > .team-stats { grid-column: 6 / 18; justify-content: flex-start; font-size: 0.95rem; color: #cbd5e0; }
 	.grid-row.team-header > .team-score { grid-column: 18; justify-content: center; font-size: 1.6rem; border-right: 8px solid #4a5568; }
 

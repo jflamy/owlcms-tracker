@@ -133,6 +133,14 @@
 	}
 </script>
 
+<script context="module">
+	export function shouldRenderFlag(url) {
+		if (!url) return false;
+		if (typeof url === 'string' && url.startsWith('data:image/')) return false;
+		return true;
+	}
+</script>
+
 <svelte:head>
 	<title>{data.scoreboardName || 'Scoreboard'} - {data.competition?.name || 'OWLCMS'}</title>
 </svelte:head>
@@ -239,7 +247,7 @@
 							<div class="cell cat" role="gridcell">{athlete.category || ''}</div>
 							<div class="cell born" role="gridcell">{athlete.yearOfBirth || ''}</div>
 							<div class="cell team-name" role="gridcell">
-								{#if athlete.flagUrl}
+								{#if shouldRenderFlag(athlete.flagUrl)}
 									<img src={athlete.flagUrl} alt={athlete.teamName} class="team-flag" />
 								{/if}
 								{athlete.teamName || ''}
@@ -299,7 +307,7 @@
 								<div class="cell cat" role="gridcell">{leader.category || ''}</div>
 								<div class="cell born" role="gridcell">{leader.yearOfBirth || ''}</div>
 								<div class="cell team-name" role="gridcell">
-									{#if leader.flagUrl}
+									{#if shouldRenderFlag(leader.flagUrl)}
 										<img class="team-flag" src={leader.flagUrl} alt={leader.teamName || ''} />
 									{/if}
 									{leader.teamName || ''}
@@ -913,6 +921,11 @@
 		height: 1.2rem;
 		max-width: 1.5rem;
 		object-fit: contain;
+	}
+
+	/* Hide any data: URI flags (covers legacy 1x1 transparent PNG placeholders) */
+	.team-flag[src^="data:image/"] {
+		display: none;
 	}
 
 	.cell.cat {

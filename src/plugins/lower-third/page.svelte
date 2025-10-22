@@ -30,6 +30,14 @@
 	$: fontSizeClass = `font-${data.options?.fontSize || 'medium'}`;
 </script>
 
+<script context="module">
+export function shouldRenderFlag(url) {
+	if (!url) return false;
+	if (typeof url === 'string' && url.startsWith('data:image/')) return false;
+	return true;
+}
+</script>
+
 <div class="lower-third-overlay {positionClass} {fontSizeClass}">
 	<!-- Left: Athlete Name Card (always shown when athlete is present) -->
 	{#if data.currentAthleteInfo}
@@ -38,7 +46,9 @@
 				<span class="athlete-name">{data.currentAthleteInfo.fullName}</span>
 				<span class="separator">•</span>
 				{#if data.currentAthleteInfo.flagUrl}
-					<img src={data.currentAthleteInfo.flagUrl} alt={data.currentAthleteInfo.teamName} class="team-flag" />
+					{#if shouldRenderFlag(data.currentAthleteInfo.flagUrl)}
+						<img src={data.currentAthleteInfo.flagUrl} alt={data.currentAthleteInfo.teamName} class="team-flag" />
+					{/if}
 				{/if}
 				<span class="team">{data.currentAthleteInfo.teamName}</span>
 				<span class="separator">•</span>
@@ -124,9 +134,11 @@
 
 	/* Athlete/Name card - Left side */
 	.name-card {
+		/* Size to content: do not grow to fill space; background will expand
+		   to fit the text. */
 		flex: 0 0 auto;
-		min-width: 400px;
-		max-width: 500px;
+		min-width: auto;
+		max-width: none;
 	}
 
 	.name-content {
@@ -134,6 +146,8 @@
 		align-items: center;
 		gap: 8px;
 		flex-wrap: nowrap;
+		/* Let the content determine the card width so the background matches the text */
+		white-space: nowrap;
 	}
 
 	.athlete-name {
@@ -167,6 +181,7 @@
 		max-width: 1.5rem;
 		object-fit: contain;
 	}
+	.team-flag[src^="data:image/"] { display: none; }
 
 	.weight {
 		color: #fbbf24;

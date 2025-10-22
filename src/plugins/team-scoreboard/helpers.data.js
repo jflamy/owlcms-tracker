@@ -218,7 +218,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 					lastName: dbAthlete.lastName,
 					teamName: dbAthlete.team || dbAthlete.club,
 					team: dbAthlete.team || dbAthlete.club,
-					flagUrl: getFlagUrl(dbAthlete.team || dbAthlete.club),
+					flagUrl: getFlagUrl(dbAthlete.team || dbAthlete.club, true),
 					startNumber: dbAthlete.startNumber,
 					lotNumber: dbAthlete.lotNumber,
 					categoryName: categoryName,
@@ -345,7 +345,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		
 		return {
 			teamName,
-			flagUrl: getFlagUrl(teamName),
+			flagUrl: getFlagUrl(teamName, true),
 			athletes,
 			teamTotal,
 			teamScore,

@@ -88,7 +88,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 				name: currentAthlete.fullName,
 				teamName: currentAthlete.teamName,
 				team: currentAthlete.teamName,
-				flagUrl: getFlagUrl(currentAthlete.teamName),
+				flagUrl: getFlagUrl(currentAthlete.teamName, true),
 				startNumber: currentAthlete.startNumber,
 				categoryName: currentAthlete.category,
 				category: currentAthlete.category,
@@ -151,7 +151,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			name: currentAthlete.fullName,
 			teamName: currentAthlete.teamName,
 			team: currentAthlete.teamName,
-			flagUrl: getFlagUrl(currentAthlete.teamName),
+			flagUrl: getFlagUrl(currentAthlete.teamName, true),
 			startNumber: currentAthlete.startNumber,
 			categoryName: currentAthlete.category,
 			category: currentAthlete.category,
@@ -173,7 +173,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		leaders = fopUpdate.leaders
 			.map(leader => ({
 				...leader,
-				flagUrl: leader.teamName ? getFlagUrl(leader.teamName) : null
+				flagUrl: leader.teamName ? getFlagUrl(leader.teamName, true) : null
 			}));
 	}
 	
@@ -212,7 +212,10 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// Add flagUrl to each athlete
 	const athletesWithFlags = groupAthletes.map(athlete => ({
 		...athlete,
-		flagUrl: getFlagUrl(athlete.teamName)
+		// ask resolver to return null for missing flags so the template doesn't
+		// render a transparent placeholder image (which simply shows the
+		// cell background, e.g. green for the current row)
+		flagUrl: getFlagUrl(athlete.teamName, true)
 	}));
 
 	// Determine status and message
