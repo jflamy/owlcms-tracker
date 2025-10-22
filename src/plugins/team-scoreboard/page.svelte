@@ -454,7 +454,6 @@ export function shouldRenderFlag(url) {
 	@media (max-width: 932px) and (orientation: portrait) {
 		.header { font-size: 0.75rem; }
 		.lifter-info { gap: 0.3rem; line-height: 1.1; }
-		.lifter-info .team { display: none; }
 		.timer { font-size: 1.4rem; }
 		.start-number { font-size: 0.75rem; padding: 0.2rem 0.3rem; }
 		.main { --grid-gap-size: 0.3rem; }
