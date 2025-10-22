@@ -2,6 +2,7 @@
 	import { createTimer } from '$lib/timer-logic.js';
 	import { translations } from '$lib/stores.js';
 	import { onMount, onDestroy } from 'svelte';
+	import CurrentAttemptBar from '$lib/components/CurrentAttemptBar.svelte';
 
 	// Props passed from parent route
 	export let data = {};
@@ -81,24 +82,17 @@ export function shouldRenderFlag(url) {
 
 <div class="scoreboard">
 	{#if data.status !== 'waiting'}
-	<header class="header">
-		<div class="lifter-info">
-			<span class="start-number">{currentAttempt?.startNumber || '-'}</span>
-			<span class="lifter-name">{currentAttempt?.fullName || 'No athlete currently lifting'}</span>
-			<span class="team">{currentAttempt?.teamName || ''}</span>
-			<span class="attempt-label">{@html currentAttempt?.attempt || ''}</span>
-			<span class="weight">{currentAttempt?.weight || '-'} kg</span>
-			<div class="timer"
-				class:running={timerState.isRunning}
-				class:warning={timerState.isWarning}
-			>
-				{timerState.display}
-			</div>
-		</div>
-		<div class="session-info">
-			{data.scoreboardName || 'Team Scoreboard'} - {@html data.competition?.groupInfo || 'Session'} - {data.competition?.liftsDone || ''}
-		</div>
-	</header>
+		<CurrentAttemptBar 
+			currentAttempt={data.currentAttempt}
+			timerState={timerState}
+			decisionState={{}}
+			scoreboardName={data.scoreboardName}
+			sessionStatus={data.sessionStatus}
+			competition={data.competition}
+			showDecisionLights={false}
+			showTimer={true}
+			compactMode={true}
+		/>
 	{/if}
 
 	<main class="main">
@@ -210,75 +204,6 @@ export function shouldRenderFlag(url) {
 		display: flex;
 		flex-direction: column;
 		overflow: hidden;
-	}
-
-	/* Header - Current Lifter */
-	.header {
-		background: #000;
-		padding: 0.75rem 1.5rem;
-		border-bottom: 0.125rem solid #333;
-	}
-
-	.lifter-info {
-		display: flex;
-		align-items: center;
-		gap: 1rem;
-		margin-bottom: 0.25rem;
-	}
-
-	.start-number {
-		background: #dc2626;
-		color: #fff;
-		padding: 0.5rem 1rem;
-		font-size: 1.5rem;
-		font-weight: bold;
-		border-radius: 0.25rem;
-		text-align: center;
-		min-width: 3rem;
-	}
-
-	.lifter-name {
-		font-size: 1.5rem;
-		font-weight: bold;
-		color: #fff;
-		flex: 1;
-	}
-
-	.team {
-		font-size: 1.5rem;
-		font-weight: bold;
-		color: #ccc;
-	}
-
-	.attempt-label {
-		font-size: 1.5rem;
-		font-weight: bold;
-		color: #aaa;
-	}
-
-	.weight {
-		font-size: 1.5rem;
-		font-weight: bold;
-		color: #4ade80;
-	}
-
-	.timer {
-		font-size: 1.8rem;
-		font-weight: bold;
-		color: #fbbf24;
-		background: #1a1a1a;
-		padding: 0.4rem 1rem;
-		border-radius: 0.25rem;
-		min-width: 5rem;
-		text-align: center;
-	}
-
-	.timer.running { color: #4ade80; }
-	.timer.warning { color: #fbbf24; }
-
-	.session-info {
-		font-size: 0.9rem;
-		color: #888;
 	}
 
 	/* Main grid */
