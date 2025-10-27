@@ -5,6 +5,7 @@
 	// Import background images for plugin autonomy
 	import bgImage from './StandingResults/Background/bg.jpg';
 	import topImage from './StandingResults/Background/top.jpg';
+	import yellowImage from './StandingResults/Background/yellow.jpg';
 	import weightliftingImage from './StandingResults/Elements/WEIGHTLIFTING.jpg';
 	
 	export let data = {};
@@ -97,7 +98,6 @@
 		await tick();
 		
 		if (!rowElements || rowElements.length === 0) {
-			console.log('[Animation] No row elements, unlocking isAnimating');
 			isAnimating = false;
 			return;
 		}
@@ -105,12 +105,9 @@
 		// Kill any existing animations on these elements to prevent conflicts
 		gsap.killTweensOf(rowElements);
 		
-		console.log('[Animation] Starting fade-in for', rowElements.length, 'rows');
-		
 		// Stagger animation for each row revealing from top to bottom
 		const tl = gsap.timeline({
 			onComplete: () => {
-				console.log('[Animation] Complete, unlocking isAnimating');
 				isAnimating = false;
 			}
 		});
@@ -133,7 +130,6 @@
 		// Safety timeout: Force unlock after 2 seconds if something goes wrong
 		setTimeout(() => {
 			if (isAnimating) {
-				console.log('[Animation] Safety timeout triggered, force unlocking');
 				isAnimating = false;
 			}
 		}, 2000);
@@ -301,9 +297,16 @@
 				<text transform="matrix(1 0 0 1 557.376 369.6324)" style="fill:#FFFFFF; font-family:'Albert Sans', sans-serif; font-size:49px; font-weight:bold;">WEIGHTLIFTING</text>
 			</g>
 			
-			<!-- MIDDLE SECTION (cutb2) - Yellow bar with headers -->
-			<g style="clip-path:url(#cutb2Clip);">
-				<image style="overflow:visible;" width="950" height="90" xlink:href={topImage} transform="matrix(1 0 0 1 472.7523 419.3126)"/>
+			<!-- YELLOW BAR (cutb2) - Overlays on top of sections (NO CLIPPING) -->
+			<g>
+				<!-- Solid yellow background for testing -->
+				<rect x="472.7523" y="419.3126" width="950" height="90" style="fill:#FFFF00;"/>
+				<!-- Yellow image overlay -->
+				<image style="overflow:visible;" width="950" height="90" xlink:href={yellowImage} transform="matrix(1 0 0 1 472.7523 419.3126)" preserveAspectRatio="none"/>
+			</g>
+			
+			<!-- YELLOW BAR HEADERS -->
+			<g>
 				<text transform="matrix(1 0 0 1 559.3323 472.6267)" style="fill:#2A535A; font-family:'Albert Sans', sans-serif; font-size:29px; font-weight:bold;">EVENT - PHASE</text>
 				<text transform="matrix(1 0 0 1 1126.3245 471.0262)" style="fill:#2A535A; font-family:'Albert Sans', sans-serif; font-size:24px; font-weight:bold;">1ST</text>
 				<text transform="matrix(1 0 0 1 1212.8242 471.0262)" style="fill:#2A535A; font-family:'Albert Sans', sans-serif; font-size:24px; font-weight:bold;">2ND</text>
@@ -314,9 +317,6 @@
 			<g style="clip-path:url(#cutb3Clip);">
 				<image style="overflow:visible;" width="1031" height="625" xlink:href={bgImage} transform="matrix(1 0 0 1 467.6277 413.6489)"/>
 			</g>
-			
-			<!-- Data rows overlay area (for grid) -->
-			<image style="clip-path:url(#dataAreaClip);" xlink:href={bgImage} width="1920" height="1080" x="0" y="0"/>
 			
 			<!-- ForeignObject grid for athlete data (overlays data area) -->
 			{#if showGrid}
