@@ -1,0 +1,614 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 25.0.1, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<svg version="1.1" id="biGr0" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 viewBox="0 0 1920 1080" style="enable-background:new 0 0 1920 1080;" xml:space="preserve">
+<g>
+	<defs>
+		<path id="cutb3" d="M1275.92,1018.49h-783V437.3h980.68v383.51C1473.6,929.98,1385.09,1018.49,1275.92,1018.49z"/>
+	</defs>
+	<clipPath id="cutb3_1_">
+		<use xlink:href="#cutb3"  style="overflow:visible;"/>
+	</clipPath>
+	<g style="clip-path:url(#cutb3_1_);">
+		<g id="b3">
+			<defs>
+				<path id="SVGID_1_" d="M1275.92,1018.49h-783V437.3h980.68v383.51C1473.6,929.98,1385.09,1018.49,1275.92,1018.49z"/>
+			</defs>
+			<clipPath id="SVGID_2_">
+				<use xlink:href="#SVGID_1_"  style="overflow:visible;"/>
+			</clipPath>
+			<g style="clip-path:url(#SVGID_2_);">
+				
+					<image style="overflow:visible;" width="1031" height="625" xlink:href="Background/bg.jpg"  transform="matrix(1 0 0 1 467.6277 413.6489)">
+				</image>
+			</g>
+		</g>
+		<g>
+			<defs>
+				<rect id="cutbRows" x="532.47" y="521.34" width="819.9" height="459.77"/>
+			</defs>
+			<clipPath id="cutbRows_1_">
+				<use xlink:href="#cutbRows"  style="overflow:visible;"/>
+			</clipPath>
+			<g id="t3" style="clip-path:url(#cutbRows_1_);">
+				<g id="rowsT">
+					<g id="sp8">
+						<g id="sp8col3TG">
+							<g id="sp8col3bg">
+								<rect id="sp8col3bgcolorA" x="1264.57" y="945.15" style="fill:#FFFFFF;" width="65.03" height="34.6"/>
+							</g>
+							<g id="sp8col3T">
+								<rect id="sp8col3TWs" x="1265.02" y="948.21" style="fill:none;" width="64.58" height="31.02"/>
+								<rect x="1297.31" y="953.89" style="fill:none;" width="47.76" height="19.35"/>
+								
+									<text id="sp8col3" transform="matrix(1 0 0 1 1297.311 971.8879)" style="fill:#2A535A; font-family:'AlbertSans-Bold'; font-size:25px;">00</text>
+							</g>
+						</g>
+						<g id="sp8col2TG">
+							<g id="sp8col2bg">
+								<rect id="sp8col2bgcolorA" x="1180.23" y="945.15" style="fill:#FFFFFF;" width="65.03" height="34.6"/>
+							</g>
+							<g id="sp8col2T">
+								<rect id="sp8col2TWs" x="1180.68" y="948.21" style="fill:none;" width="64.58" height="31.02"/>
+								<rect x="1212.97" y="953.89" style="fill:none;" width="47.76" height="19.35"/>
+								
+									<text id="sp8col2" transform="matrix(1 0 0 1 1212.968 971.8879)" style="fill:#2A535A; font-family:'AlbertSans-Bold'; font-size:25px;">00</text>
+							</g>
+						</g>
+						<g id="sp8col1TG">
+							<g id="sp8col1bg">
+								<rect id="sp8col1bgcolorA" x="1095.15" y="945.15" style="fill:#FFFFFF;" width="65.03" height="34.6"/>
+							</g>
+							<g id="sp8col1T">
+								<rect id="sp8col1TWs" x="1095.6" y="948.21" style="fill:none;" width="64.58" height="31.02"/>
+								<rect x="1127.89" y="953.89" style="fill:none;" width="47.76" height="19.35"/>
+								
+									<text id="sp8col1" transform="matrix(1 0 0 1 1127.8868 971.8879)" style="fill:#2A535A; font-family:'AlbertSans-Bold'; font-size:25px;">00</text>
+							</g>
+						</g>
+						<g id="sp8nameT">
+							<rect id="sp8nameTWs" x="761.3" y="943.45" style="fill:none;" width="316.81" height="40.46"/>
+							<rect x="760.05" y="951.91" style="fill:none;" width="204.02" height="23.54"/>
+							<text transform="matrix(1 0 0 1 760.0503 972.7857)" style="fill:#FFFFFF; font-family:'AlbertSans-Bold'; font-size:29px;">N. Surname</text>
+						</g>
+						<g id="sp8countryT">
+							<rect id="sp8countryTWs" x="667.16" y="943.2" style="fill:none;" width="79.84" height="40.46"/>
+							<rect x="707.08" y="951.66" style="fill:none;" width="56.74" height="23.54"/>
+							
+								<text id="sp8country" transform="matrix(1 0 0 1 707.0793 972.5441)" style="fill:#FFFFFF; font-family:'AlbertSans-Medium'; font-size:29px;">KSA</text>
+						</g>
+						<g id="sp8flagT">
+							
+								<image style="overflow:visible;" width="132" height="88" id="sp8flag" xlink:href="Flags/KSA.png"  transform="matrix(0.4242 0 0 0.4242 605.1045 943.3474)">
+							</image>
+						</g>
+						<g id="sp8numberT">
+							<rect id="sp8numberTWs" x="547.64" y="944.49" style="fill:none;" width="49.96" height="41.41"/>
+							<rect x="572.23" y="953.42" style="fill:none;" width="18.98" height="23.54"/>
+							
+								<text id="sp8number" transform="matrix(1 0 0 1 572.2341 975.0161)" style="fill:#FFFFFF; font-family:'AlbertSans-Bold'; font-size:30px;">8</text>
+						</g>
+					</g>
+					<g id="sp7">
+						<g id="sp7col3TG">
+							<g id="sp7col3bg">
+								<rect id="sp7col3bgcolorA" x="1264.57" y="884.98" style="fill:#FFFFFF;" width="65.03" height="34.6"/>
+							</g>
+							<g id="sp7col3T">
+								<rect id="sp7col3TWs" x="1265.02" y="888.04" style="fill:none;" width="64.58" height="31.02"/>
+								<rect x="1297.31" y="893.71" style="fill:none;" width="47.76" height="19.35"/>
+								
+									<text id="sp7col3" transform="matrix(1 0 0 1 1297.311 911.7146)" style="fill:#2A535A; font-family:'AlbertSans-Bold'; font-size:25px;">00</text>
+							</g>
+						</g>
+						<g id="sp7col2TG">
+							<g id="sp7col2bg">
+								<rect id="sp7col2bgcolorA" x="1180.23" y="884.98" style="fill:#FFFFFF;" width="65.03" height="34.6"/>
+							</g>
+							<g id="sp7col2T">
+								<rect id="sp7col2TWs" x="1180.68" y="888.04" style="fill:none;" width="64.58" height="31.02"/>
+								<rect x="1212.97" y="893.71" style="fill:none;" width="47.76" height="19.35"/>
+								
+									<text id="sp7col2" transform="matrix(1 0 0 1 1212.968 911.7146)" style="fill:#2A535A; font-family:'AlbertSans-Bold'; font-size:25px;">00</text>
+							</g>
+						</g>
+						<g id="sp7col1TG">
+							<g id="sp7col1bg">
+								<rect id="sp7col1bgcolorA" x="1095.15" y="884.98" style="fill:#FFFFFF;" width="65.03" height="34.6"/>
+							</g>
+							<g id="sp7col1T">
+								<rect id="sp7col1TWs" x="1095.6" y="888.04" style="fill:none;" width="64.58" height="31.02"/>
+								<rect x="1127.89" y="893.71" style="fill:none;" width="47.76" height="19.35"/>
+								
+									<text id="sp7col1" transform="matrix(1 0 0 1 1127.8868 911.7146)" style="fill:#2A535A; font-family:'AlbertSans-Bold'; font-size:25px;">00</text>
+							</g>
+						</g>
+						<g id="sp7nameT">
+							<rect id="sp7nameTWs" x="761.3" y="883.2" style="fill:none;" width="316.81" height="40.46"/>
+							<rect x="760.05" y="891.66" style="fill:none;" width="204.02" height="23.54"/>
+							<text transform="matrix(1 0 0 1 760.0503 912.5364)" style="fill:#FFFFFF; font-family:'AlbertSans-Bold'; font-size:29px;">N. Surname</text>
+						</g>
+						<g id="sp7countryT">
+							<rect id="sp7countryTWs" x="667.16" y="883.2" style="fill:none;" width="79.84" height="40.46"/>
+							<rect x="707.08" y="891.66" style="fill:none;" width="56.74" height="23.54"/>
+							
+								<text id="sp7country" transform="matrix(1 0 0 1 707.0793 912.5364)" style="fill:#FFFFFF; font-family:'AlbertSans-Medium'; font-size:29px;">KSA</text>
+						</g>
+						<g id="sp7flagT">
+							
+								<image style="overflow:visible;" width="132" height="88" id="sp7flag" xlink:href="Flags/KSA.png"  transform="matrix(0.4242 0 0 0.4242 605.1045 883.3397)">
+							</image>
+						</g>
+						<g id="sp7numberT">
+							<rect id="sp7numberTWs" x="547.64" y="884.44" style="fill:none;" width="49.96" height="41.41"/>
+							<rect x="572.23" y="893.37" style="fill:none;" width="18.98" height="23.54"/>
+							
+								<text id="sp7number" transform="matrix(1 0 0 1 572.2341 914.9741)" style="fill:#FFFFFF; font-family:'AlbertSans-Bold'; font-size:30px;">7</text>
+						</g>
+					</g>
+					<g id="sp6">
+						<g id="sp6col3TG">
+							<g id="sp6col3bg">
+								<rect id="sp6col3bgcolorA" x="1264.57" y="824.8" style="fill:#FFFFFF;" width="65.03" height="34.6"/>
+							</g>
+							<g id="sp6col3T">
+								<rect id="sp6col3TWs" x="1265.02" y="827.87" style="fill:none;" width="64.58" height="31.02"/>
+								<rect x="1297.31" y="833.54" style="fill:none;" width="47.76" height="19.35"/>
+								
+									<text id="sp6col3" transform="matrix(1 0 0 1 1297.311 851.5413)" style="fill:#2A535A; font-family:'AlbertSans-Bold'; font-size:25px;">00</text>
+							</g>
+						</g>
+						<g id="sp6col2TG">
+							<g id="sp6col2bg">
+								<rect id="sp6col2bgcolorA" x="1180.23" y="824.8" style="fill:#FFFFFF;" width="65.03" height="34.6"/>
+							</g>
+							<g id="sp6col2T">
+								<rect id="sp6col2TWs" x="1180.68" y="827.87" style="fill:none;" width="64.58" height="31.02"/>
+								<rect x="1212.97" y="833.54" style="fill:none;" width="47.76" height="19.35"/>
+								
+									<text id="sp6col2" transform="matrix(1 0 0 1 1212.968 851.5413)" style="fill:#2A535A; font-family:'AlbertSans-Bold'; font-size:25px;">00</text>
+							</g>
+						</g>
+						<g id="sp6col1TG">
+							<g id="sp6col1bg">
+								<rect id="sp6col1bgcolorA" x="1095.15" y="824.8" style="fill:#FFFFFF;" width="65.03" height="34.6"/>
+							</g>
+							<g id="sp6col1T">
+								<rect id="sp6col1TWs" x="1095.6" y="827.87" style="fill:none;" width="64.58" height="31.02"/>
+								<rect x="1127.89" y="833.54" style="fill:none;" width="47.76" height="19.35"/>
+								
+									<text id="sp6col1" transform="matrix(1 0 0 1 1127.8868 851.5413)" style="fill:#2A535A; font-family:'AlbertSans-Bold'; font-size:25px;">00</text>
+							</g>
+						</g>
+						<g id="sp6nameT">
+							<rect id="sp6nameTWs" x="761.3" y="823.19" style="fill:none;" width="316.81" height="40.46"/>
+							<rect x="760.05" y="831.65" style="fill:none;" width="204.02" height="23.54"/>
+							<text transform="matrix(1 0 0 1 760.0503 852.5288)" style="fill:#FFFFFF; font-family:'AlbertSans-Bold'; font-size:29px;">N. Surname</text>
+						</g>
+						<g id="sp6countryT">
+							<rect id="sp6countryTWs" x="667.16" y="823.19" style="fill:none;" width="79.84" height="40.46"/>
+							<rect x="707.08" y="831.65" style="fill:none;" width="56.74" height="23.54"/>
+							
+								<text id="sp6country" transform="matrix(1 0 0 1 707.0793 852.5288)" style="fill:#FFFFFF; font-family:'AlbertSans-Medium'; font-size:29px;">KSA</text>
+						</g>
+						<g id="sp6flagT">
+							
+								<image style="overflow:visible;" width="132" height="88" id="sp6flag" xlink:href="Flags/KSA.png"  transform="matrix(0.4242 0 0 0.4242 605.1045 823.3321)">
+							</image>
+						</g>
+						<g id="sp6numberT">
+							<rect id="sp6numberTWs" x="547.64" y="824.4" style="fill:none;" width="49.96" height="41.41"/>
+							<rect x="572.23" y="833.33" style="fill:none;" width="18.98" height="23.54"/>
+							
+								<text id="sp6number" transform="matrix(1 0 0 1 572.2341 854.932)" style="fill:#FFFFFF; font-family:'AlbertSans-Bold'; font-size:30px;">6</text>
+						</g>
+					</g>
+					<g id="sp5">
+						<g id="sp5col3TG">
+							<g id="sp5col3bg">
+								<rect id="sp5col3bgcolorA" x="1264.57" y="764.63" style="fill:#FFFFFF;" width="65.03" height="34.6"/>
+							</g>
+							<g id="sp5col3T">
+								<rect id="sp5col3TWs" x="1265.02" y="767.69" style="fill:none;" width="64.58" height="31.02"/>
+								<rect x="1297.31" y="773.37" style="fill:none;" width="47.76" height="19.35"/>
+								
+									<text id="sp5col3" transform="matrix(1 0 0 1 1297.311 791.3679)" style="fill:#2A535A; font-family:'AlbertSans-Bold'; font-size:25px;">00</text>
+							</g>
+						</g>
+						<g id="sp5col2TG">
+							<g id="sp5col2bg">
+								<rect id="sp5col2bgcolorA" x="1180.23" y="764.63" style="fill:#FFFFFF;" width="65.03" height="34.6"/>
+							</g>
+							<g id="sp5col2T">
+								<rect id="sp5col2TWs" x="1180.68" y="767.69" style="fill:none;" width="64.58" height="31.02"/>
+								<rect x="1212.97" y="773.37" style="fill:none;" width="47.76" height="19.35"/>
+								
+									<text id="sp5col2" transform="matrix(1 0 0 1 1212.968 791.3679)" style="fill:#2A535A; font-family:'AlbertSans-Bold'; font-size:25px;">00</text>
+							</g>
+						</g>
+						<g id="sp5col1TG">
+							<g id="sp5col1bg">
+								<rect id="sp5col1bgcolorA" x="1095.15" y="764.63" style="fill:#FFFFFF;" width="65.03" height="34.6"/>
+							</g>
+							<g id="sp5col1T">
+								<rect id="sp5col1TWs" x="1095.6" y="767.69" style="fill:none;" width="64.58" height="31.02"/>
+								<rect x="1127.89" y="773.37" style="fill:none;" width="47.76" height="19.35"/>
+								
+									<text id="sp5col1" transform="matrix(1 0 0 1 1127.8868 791.3679)" style="fill:#2A535A; font-family:'AlbertSans-Bold'; font-size:25px;">00</text>
+							</g>
+						</g>
+						<g id="sp5nameT">
+							<rect id="sp5nameTWs" x="761.3" y="763.18" style="fill:none;" width="316.81" height="40.46"/>
+							<rect x="760.05" y="771.64" style="fill:none;" width="204.02" height="23.54"/>
+							<text transform="matrix(1 0 0 1 760.0503 792.5212)" style="fill:#FFFFFF; font-family:'AlbertSans-Bold'; font-size:29px;">N. Surname</text>
+						</g>
+						<g id="sp5countryT">
+							<rect id="sp5countryTWs" x="667.16" y="763.18" style="fill:none;" width="79.84" height="40.46"/>
+							<rect x="707.08" y="771.64" style="fill:none;" width="56.74" height="23.54"/>
+							
+								<text id="sp5country" transform="matrix(1 0 0 1 707.0793 792.5212)" style="fill:#FFFFFF; font-family:'AlbertSans-Medium'; font-size:29px;">KSA</text>
+						</g>
+						<g id="sp5flagT">
+							
+								<image style="overflow:visible;" width="132" height="88" id="sp5flag" xlink:href="Flags/KSA.png"  transform="matrix(0.4242 0 0 0.4242 605.1045 763.3245)">
+							</image>
+						</g>
+						<g id="sp5numberT">
+							<rect id="sp5numberTWs" x="547.64" y="764.36" style="fill:none;" width="49.96" height="41.41"/>
+							<rect x="572.23" y="773.29" style="fill:none;" width="18.98" height="23.54"/>
+							
+								<text id="sp5number" transform="matrix(1 0 0 1 572.2341 794.89)" style="fill:#FFFFFF; font-family:'AlbertSans-Bold'; font-size:30px;">5</text>
+						</g>
+					</g>
+					<g id="sp4">
+						<g id="sp4col3TG">
+							<g id="sp4col3bg">
+								<rect id="sp4col3bgcolorA" x="1264.57" y="704.46" style="fill:#FFFFFF;" width="65.03" height="34.6"/>
+							</g>
+							<g id="sp4col3T">
+								<rect id="sp4col3TWs" x="1265.02" y="707.52" style="fill:none;" width="64.58" height="31.02"/>
+								<rect x="1297.31" y="713.19" style="fill:none;" width="47.76" height="19.35"/>
+								
+									<text id="sp4col3" transform="matrix(1 0 0 1 1297.311 731.1946)" style="fill:#2A535A; font-family:'AlbertSans-Bold'; font-size:25px;">00</text>
+							</g>
+						</g>
+						<g id="sp4col2TG">
+							<g id="sp4col2bg">
+								<rect id="sp4col2bgcolorA" x="1180.23" y="704.46" style="fill:#FFFFFF;" width="65.03" height="34.6"/>
+							</g>
+							<g id="sp4col2T">
+								<rect id="sp4col2TWs" x="1180.68" y="707.52" style="fill:none;" width="64.58" height="31.02"/>
+								<rect x="1212.97" y="713.19" style="fill:none;" width="47.76" height="19.35"/>
+								
+									<text id="sp4col2" transform="matrix(1 0 0 1 1212.968 731.1946)" style="fill:#2A535A; font-family:'AlbertSans-Bold'; font-size:25px;">00</text>
+							</g>
+						</g>
+						<g id="sp4col1TG">
+							<g id="sp4col1bg">
+								<rect id="sp4col1bgcolorA" x="1095.15" y="704.46" style="fill:#FFFFFF;" width="65.03" height="34.6"/>
+							</g>
+							<g id="sp4col1T">
+								<rect id="sp4col1TWs" x="1095.6" y="707.52" style="fill:none;" width="64.58" height="31.02"/>
+								<rect x="1127.89" y="713.19" style="fill:none;" width="47.76" height="19.35"/>
+								
+									<text id="sp4col1" transform="matrix(1 0 0 1 1127.8868 731.1946)" style="fill:#2A535A; font-family:'AlbertSans-Bold'; font-size:25px;">00</text>
+							</g>
+						</g>
+						<g id="sp4nameT">
+							<rect id="sp4nameTWs" x="761.3" y="703.17" style="fill:none;" width="316.81" height="40.46"/>
+							<rect x="760.05" y="711.63" style="fill:none;" width="204.02" height="23.54"/>
+							<text transform="matrix(1 0 0 1 760.0503 732.5136)" style="fill:#FFFFFF; font-family:'AlbertSans-Bold'; font-size:29px;">N. Surname</text>
+						</g>
+						<g id="sp4countryT">
+							<rect id="sp4countryTWs" x="667.16" y="703.17" style="fill:none;" width="79.84" height="40.46"/>
+							<rect x="707.08" y="711.63" style="fill:none;" width="56.74" height="23.54"/>
+							
+								<text id="sp4country" transform="matrix(1 0 0 1 707.0793 732.5136)" style="fill:#FFFFFF; font-family:'AlbertSans-Medium'; font-size:29px;">KSA</text>
+						</g>
+						<g id="sp4flagT">
+							
+								<image style="overflow:visible;" width="132" height="88" id="sp4flag" xlink:href="Flags/KSA.png"  transform="matrix(0.4242 0 0 0.4242 605.1045 703.3169)">
+							</image>
+						</g>
+						<g id="sp4numberT">
+							<rect id="sp4numberTWs" x="547.64" y="704.32" style="fill:none;" width="49.96" height="41.41"/>
+							<rect x="572.23" y="713.25" style="fill:none;" width="20" height="23.54"/>
+							
+								<text id="sp4number" transform="matrix(1 0 0 1 572.2341 734.8479)" style="fill:#FFFFFF; font-family:'AlbertSans-Bold'; font-size:30px;">4</text>
+						</g>
+					</g>
+					<g id="sp3">
+						<g id="sp3col3TG">
+							<g id="sp3col3bg">
+								<rect id="sp3col3bgcolorA" x="1264.57" y="644.28" style="fill:#FFFFFF;" width="65.03" height="34.6"/>
+							</g>
+							<g id="sp3col3T">
+								<rect id="sp3col3TWs" x="1265.02" y="647.35" style="fill:none;" width="64.58" height="31.02"/>
+								<rect x="1297.31" y="653.02" style="fill:none;" width="47.76" height="19.35"/>
+								
+									<text id="sp3col3" transform="matrix(1 0 0 1 1297.311 671.0213)" style="fill:#2A535A; font-family:'AlbertSans-Bold'; font-size:25px;">00</text>
+							</g>
+						</g>
+						<g id="sp3col2TG">
+							<g id="sp3col2bg">
+								<rect id="sp3col2bgcolorA" x="1180.23" y="644.28" style="fill:#FFFFFF;" width="65.03" height="34.6"/>
+							</g>
+							<g id="sp3col2T">
+								<rect id="sp3col2TWs" x="1180.68" y="647.35" style="fill:none;" width="64.58" height="31.02"/>
+								<rect x="1212.97" y="653.02" style="fill:none;" width="47.76" height="19.35"/>
+								
+									<text id="sp3col2" transform="matrix(1 0 0 1 1212.968 671.0213)" style="fill:#2A535A; font-family:'AlbertSans-Bold'; font-size:25px;">00</text>
+							</g>
+						</g>
+						<g id="sp3col1TG">
+							<g id="sp3col1bg">
+								<rect id="sp3col1bgcolorA" x="1095.15" y="644.28" style="fill:#FFFFFF;" width="65.03" height="34.6"/>
+							</g>
+							<g id="sp3col1T">
+								<rect id="sp3col1TWs" x="1095.6" y="647.35" style="fill:none;" width="64.58" height="31.02"/>
+								<rect x="1127.89" y="653.02" style="fill:none;" width="47.76" height="19.35"/>
+								
+									<text id="sp3col1" transform="matrix(1 0 0 1 1127.8868 671.0213)" style="fill:#2A535A; font-family:'AlbertSans-Bold'; font-size:25px;">00</text>
+							</g>
+						</g>
+						<g id="sp3nameT">
+							<rect id="sp3nameTWs" x="761.3" y="643.17" style="fill:none;" width="316.81" height="40.46"/>
+							<rect x="760.05" y="651.63" style="fill:none;" width="204.02" height="23.54"/>
+							<text transform="matrix(1 0 0 1 760.0503 672.506)" style="fill:#FFFFFF; font-family:'AlbertSans-Bold'; font-size:29px;">N. Surname</text>
+						</g>
+						<g id="sp3countryT">
+							<rect id="sp3countryTWs" x="667.16" y="643.17" style="fill:none;" width="79.84" height="40.46"/>
+							<rect x="707.08" y="651.63" style="fill:none;" width="56.74" height="23.54"/>
+							
+								<text id="sp3country" transform="matrix(1 0 0 1 707.0793 672.506)" style="fill:#FFFFFF; font-family:'AlbertSans-Medium'; font-size:29px;">KSA</text>
+						</g>
+						<g id="sp3flagT">
+							
+								<image style="overflow:visible;" width="132" height="88" id="sp3flag" xlink:href="Flags/KSA.png"  transform="matrix(0.4242 0 0 0.4242 605.1045 643.3093)">
+							</image>
+						</g>
+						<g id="sp3numberT">
+							<rect id="sp3numberTWs" x="547.64" y="644.27" style="fill:none;" width="49.96" height="41.41"/>
+							<rect x="572.23" y="653.21" style="fill:none;" width="18.98" height="23.54"/>
+							
+								<text id="sp3number" transform="matrix(1 0 0 1 572.2341 674.8058)" style="fill:#FFFFFF; font-family:'AlbertSans-Bold'; font-size:30px;">3</text>
+						</g>
+					</g>
+					<g id="sp2">
+						<g id="sp2col3TG">
+							<g id="sp2col3bg">
+								<rect id="sp2col3bgcolorA" x="1264.57" y="584.11" style="fill:#FFFFFF;" width="65.03" height="34.6"/>
+							</g>
+							<g id="sp2col3T">
+								<rect id="sp2col3TWs" x="1265.02" y="587.17" style="fill:none;" width="64.58" height="31.02"/>
+								<rect x="1297.31" y="592.85" style="fill:none;" width="47.76" height="19.35"/>
+								
+									<text id="sp2col3" transform="matrix(1 0 0 1 1297.311 610.848)" style="fill:#2A535A; font-family:'AlbertSans-Bold'; font-size:25px;">00</text>
+							</g>
+						</g>
+						<g id="sp2col2TG">
+							<g id="sp2col2bg">
+								<rect id="sp2col2bgcolorA" x="1180.23" y="584.11" style="fill:#FFFFFF;" width="65.03" height="34.6"/>
+							</g>
+							<g id="sp2col2T">
+								<rect id="sp2col2TWs" x="1180.68" y="587.17" style="fill:none;" width="64.58" height="31.02"/>
+								<rect x="1212.97" y="592.85" style="fill:none;" width="47.76" height="19.35"/>
+								
+									<text id="sp2col2" transform="matrix(1 0 0 1 1212.968 610.848)" style="fill:#2A535A; font-family:'AlbertSans-Bold'; font-size:25px;">00</text>
+							</g>
+						</g>
+						<g id="sp2col1TG">
+							<g id="sp2col1bg">
+								<rect id="sp2col1bgcolorA" x="1095.15" y="584.11" style="fill:#FFFFFF;" width="65.03" height="34.6"/>
+							</g>
+							<g id="sp2col1T">
+								<rect id="sp2col1TWs" x="1095.6" y="587.17" style="fill:none;" width="64.58" height="31.02"/>
+								<rect x="1127.89" y="592.85" style="fill:none;" width="47.76" height="19.35"/>
+								
+									<text id="sp2col1" transform="matrix(1 0 0 1 1127.8868 610.848)" style="fill:#2A535A; font-family:'AlbertSans-Bold'; font-size:25px;">00</text>
+							</g>
+						</g>
+						<g id="sp2nameT">
+							<rect id="sp2nameTWs" x="761.3" y="583.16" style="fill:none;" width="316.81" height="40.46"/>
+							<rect x="760.05" y="591.62" style="fill:none;" width="204.02" height="23.54"/>
+							<text transform="matrix(1 0 0 1 760.0503 612.4984)" style="fill:#FFFFFF; font-family:'AlbertSans-Bold'; font-size:29px;">N. Surname</text>
+						</g>
+						<g id="sp2countryT">
+							<rect id="sp2countryTWs" x="667.16" y="583.16" style="fill:none;" width="79.84" height="40.46"/>
+							<rect x="707.08" y="591.62" style="fill:none;" width="56.74" height="23.54"/>
+							
+								<text id="sp2country" transform="matrix(1 0 0 1 707.0793 612.4984)" style="fill:#FFFFFF; font-family:'AlbertSans-Medium'; font-size:29px;">KSA</text>
+						</g>
+						<g id="sp2flagT">
+							
+								<image style="overflow:visible;" width="132" height="88" id="sp2flag" xlink:href="Flags/KSA.png"  transform="matrix(0.4242 0 0 0.4242 605.1045 583.3016)">
+							</image>
+						</g>
+						<g id="sp2numberT">
+							<rect id="sp2numberTWs" x="547.64" y="584.23" style="fill:none;" width="49.96" height="41.41"/>
+							<rect x="572.23" y="593.16" style="fill:none;" width="18.98" height="23.54"/>
+							
+								<text id="sp2number" transform="matrix(1 0 0 1 572.2341 614.7638)" style="fill:#FFFFFF; font-family:'AlbertSans-Bold'; font-size:30px;">2</text>
+						</g>
+					</g>
+					<g id="sp1">
+						<g id="sp1col3TG">
+							<g id="sp1col3bg">
+								<rect id="sp1col3bgcolorA" x="1264.57" y="523.94" style="fill:#FFFFFF;" width="65.03" height="34.6"/>
+							</g>
+							<g id="sp1col3T">
+								<rect id="sp1col3TWs" x="1265.02" y="527" style="fill:none;" width="64.58" height="31.02"/>
+								<rect x="1297.31" y="532.67" style="fill:none;" width="47.76" height="19.35"/>
+								
+									<text id="sp1col3" transform="matrix(1 0 0 1 1297.311 550.6747)" style="fill:#2A535A; font-family:'AlbertSans-Bold'; font-size:25px;">00</text>
+							</g>
+						</g>
+						<g id="sp1col2TG">
+							<g id="sp1col2bg">
+								<rect id="sp1col2bgcolorA" x="1180.23" y="523.94" style="fill:#FFFFFF;" width="65.03" height="34.6"/>
+							</g>
+							<g id="sp1col2T">
+								<rect id="sp1col2TWs" x="1180.68" y="527" style="fill:none;" width="64.58" height="31.02"/>
+								<rect x="1212.97" y="532.67" style="fill:none;" width="47.76" height="19.35"/>
+								
+									<text id="sp1col2" transform="matrix(1 0 0 1 1212.968 550.6747)" style="fill:#2A535A; font-family:'AlbertSans-Bold'; font-size:25px;">00</text>
+							</g>
+						</g>
+						<g id="sp1col1TG">
+							<g id="sp1col1bg">
+								<rect id="sp1col1bgcolorA" x="1095.15" y="523.94" style="fill:#FFFFFF;" width="65.03" height="34.6"/>
+							</g>
+							<g id="sp1col1T">
+								<rect id="sp1col1TWs" x="1095.6" y="527" style="fill:none;" width="64.58" height="31.02"/>
+								<rect x="1127.89" y="532.67" style="fill:none;" width="47.76" height="19.35"/>
+								
+									<text id="sp1col1" transform="matrix(1 0 0 1 1127.8868 550.6747)" style="fill:#2A535A; font-family:'AlbertSans-Bold'; font-size:25px;">00</text>
+							</g>
+						</g>
+						<g id="sp1nameT">
+							<rect id="sp1nameTWs" x="761.3" y="523.15" style="fill:none;" width="316.81" height="40.46"/>
+							<rect x="760.05" y="531.61" style="fill:none;" width="204.02" height="23.54"/>
+							<text transform="matrix(1 0 0 1 760.0503 552.4907)" style="fill:#FFFFFF; font-family:'AlbertSans-Bold'; font-size:29px;">N. Surname</text>
+						</g>
+						<g id="sp1countryT">
+							<rect id="sp1countryTWs" x="667.16" y="523.15" style="fill:none;" width="79.84" height="40.46"/>
+							<rect x="708.08" y="531.61" style="fill:none;" width="56.74" height="23.54"/>
+							
+								<text id="sp1country" transform="matrix(1 0 0 1 708.0793 552.4907)" style="fill:#FFFFFF; font-family:'AlbertSans-Medium'; font-size:29px;">KSA</text>
+						</g>
+						<g id="sp1flagT">
+							
+								<image style="overflow:visible;" width="132" height="88" id="sp1flag" xlink:href="Flags/KSA.png"  transform="matrix(0.4242 0 0 0.4242 605.1045 523.294)">
+							</image>
+						</g>
+						<g id="sp1numberT">
+							<rect id="sp1numberTWs" x="547.64" y="524.19" style="fill:none;" width="49.96" height="41.41"/>
+							<rect x="572.23" y="533.12" style="fill:none;" width="10.38" height="23.54"/>
+							
+								<text id="sp1number" transform="matrix(1 0 0 1 572.2341 554.7217)" style="fill:#FFFFFF; font-family:'AlbertSans-Bold'; font-size:30px;">1</text>
+						</g>
+					</g>
+				</g>
+				<g id="linesT" style="opacity:0.6;">
+					
+						<line id="line7" style="fill:none;stroke:#FFFFFF;stroke-width:2;stroke-miterlimit:10;" x1="534.87" y1="931.54" x2="1335.85" y2="931.54"/>
+					
+						<line id="line6" style="fill:none;stroke:#FFFFFF;stroke-width:2;stroke-miterlimit:10;" x1="534.87" y1="871.53" x2="1335.85" y2="871.53"/>
+					
+						<line id="line5" style="fill:none;stroke:#FFFFFF;stroke-width:2;stroke-miterlimit:10;" x1="534.87" y1="811.53" x2="1335.85" y2="811.53"/>
+					
+						<line id="line4" style="fill:none;stroke:#FFFFFF;stroke-width:2;stroke-miterlimit:10;" x1="534.87" y1="751.53" x2="1335.85" y2="751.53"/>
+					
+						<line id="line3" style="fill:none;stroke:#FFFFFF;stroke-width:2;stroke-miterlimit:10;" x1="534.87" y1="691.52" x2="1335.85" y2="691.52"/>
+					
+						<line id="line2" style="fill:none;stroke:#FFFFFF;stroke-width:2;stroke-miterlimit:10;" x1="534.87" y1="631.52" x2="1335.85" y2="631.52"/>
+					
+						<line id="line1" style="fill:none;stroke:#FFFFFF;stroke-width:2;stroke-miterlimit:10;" x1="534.87" y1="571.52" x2="1335.85" y2="571.52"/>
+				</g>
+			</g>
+		</g>
+	</g>
+</g>
+<g>
+	<defs>
+		<path id="cutb2" d="M493.81,437.3h898.91c-5.42,19.47-14.04,35.4-27.94,45.47c-8.93,6.47-19.82,9.68-30.85,9.68H493.81V437.3z"/>
+	</defs>
+	<clipPath id="cutb2_1_">
+		<use xlink:href="#cutb2"  style="overflow:visible;"/>
+	</clipPath>
+	<g style="clip-path:url(#cutb2_1_);">
+		<g id="b2">
+			<defs>
+				<path id="SVGID_3_" d="M493.81,437.3h913.96c-5.42,19.47-14.04,35.4-27.94,45.47c-8.93,6.47-19.82,9.68-30.85,9.68H493.81V437.3
+					z"/>
+			</defs>
+			<clipPath id="SVGID_4_">
+				<use xlink:href="#SVGID_3_"  style="overflow:visible;"/>
+			</clipPath>
+			<g style="clip-path:url(#SVGID_4_);">
+				
+					<image style="overflow:visible;" width="950" height="90" xlink:href="Background/yellow.jpg"  transform="matrix(1 0 0 1 472.7523 419.3126)">
+				</image>
+			</g>
+		</g>
+		<g id="t2">
+			<g id="col3T">
+				<rect id="col3TWs" x="1258.88" y="444.79" style="fill:none;" width="80.5" height="42.49"/>
+				<rect x="1298.89" y="453.75" style="fill:none;" width="58.02" height="22.18"/>
+				
+					<text id="col3" transform="matrix(1 0 0 1 1298.8857 471.0262)" style="fill:#2A535A; font-family:'AlbertSans-Bold'; font-size:24px;">3RD</text>
+			</g>
+			<g id="col2T">
+				<rect id="col2TWs" x="1173.24" y="444.79" style="fill:none;" width="80.5" height="42.49"/>
+				<rect x="1212.82" y="453.75" style="fill:none;" width="60.48" height="22.18"/>
+				
+					<text id="col2" transform="matrix(1 0 0 1 1212.8242 471.0262)" style="fill:#2A535A; font-family:'AlbertSans-Bold'; font-size:24px;">2ND</text>
+			</g>
+			<g id="col1T">
+				<rect id="col1TWs" x="1066.78" y="444.79" style="fill:none;" width="101.02" height="42.49"/>
+				<rect x="1126.32" y="453.75" style="fill:none;" width="47.61" height="22.18"/>
+				
+					<text id="col1" transform="matrix(1 0 0 1 1126.3245 471.0262)" style="fill:#2A535A; font-family:'AlbertSans-Bold'; font-size:24px;">1ST</text>
+			</g>
+			<g id="phaseT">
+				<rect id="phaseTWs" x="516.73" y="443.26" style="fill:none;" width="313.21" height="40.66"/>
+				<rect x="559.33" y="451.75" style="fill:none;" width="225.46" height="22.18"/>
+				
+					<text id="phase" transform="matrix(1 0 0 1 559.3323 472.6267)" style="fill:#2A535A; font-family:'AlbertSans-Bold'; font-size:29px;">EVENT - PHASE</text>
+			</g>
+		</g>
+	</g>
+</g>
+<g>
+	<defs>
+		<path id="cutb1" d="M1473.6,302.32v131.94c0,1.02-0.01,2.03-0.03,3.04H493.81v-7.35c0-4.18,0.21-8.35,0.69-12.5
+			c5.21-44.54,21.43-78.52,48.35-98.5c14.84-11.01,33-16.63,51.48-16.63H1473.6z"/>
+	</defs>
+	<clipPath id="cutb1_1_">
+		<use xlink:href="#cutb1"  style="overflow:visible;"/>
+	</clipPath>
+	<g style="clip-path:url(#cutb1_1_);">
+		<g id="b1">
+			<defs>
+				<path id="SVGID_5_" d="M1473.6,302.32v131.94c0,1.02-0.01,2.03-0.03,3.04H493.81v-7.35c0-4.18,0.21-8.35,0.69-12.5
+					c5.21-44.54,21.43-78.52,48.35-98.5c14.84-11.01,33-16.63,51.48-16.63H1473.6z"/>
+			</defs>
+			<clipPath id="SVGID_6_">
+				<use xlink:href="#SVGID_5_"  style="overflow:visible;"/>
+			</clipPath>
+			<g style="clip-path:url(#SVGID_6_);">
+				
+					<image style="overflow:visible;" width="1028" height="211" xlink:href="Background/top.jpg"  transform="matrix(1 0 0 1 466.7872 268.3989)">
+				</image>
+			</g>
+		</g>
+		<g id="t1">
+			<g id="pictogramT">
+				<defs>
+					<rect id="SVGID_7_" x="1338.53" y="302.32" width="134.98" height="134.98"/>
+				</defs>
+				<clipPath id="SVGID_8_">
+					<use xlink:href="#SVGID_7_"  style="overflow:visible;"/>
+				</clipPath>
+				<g id="sportLogoT" style="clip-path:url(#SVGID_8_);">
+					
+						<image style="overflow:visible;" width="1489" height="1489" id="sportLogo" xlink:href="Elements/WEIGHTLIFTING.jpg"  transform="matrix(0.0907 0 0 0.0907 1338.5327 302.2393)">
+					</image>
+				</g>
+			</g>
+			<g id="textT">
+				<rect id="textTWs" x="560.32" y="376.88" style="fill:none;" width="761.48" height="48.03"/>
+				<rect x="560.32" y="389.16" style="fill:none;" width="638.68" height="23.46"/>
+				
+					<text id="text" transform="matrix(1 0 0 1 560.3243 410.0415)" style="fill:#FFFFFF; font-family:'AlbertSans-Regular'; font-size:29px;">6th ISLAMIC SOLIDARITY GAMES RIYADH </text>
+			</g>
+			<g id="titleT">
+				<rect id="titleTWs" x="560.71" y="320.79" style="fill:none;" width="761.1" height="64.79"/>
+				<rect x="557.38" y="334.35" style="fill:none;" width="383.37" height="37.67"/>
+				
+					<text id="title" transform="matrix(1 0 0 1 557.376 369.6324)" style="fill:#FFFFFF; font-family:'AlbertSans-Bold'; font-size:49px;">WEIGHTLIFTING</text>
+			</g>
+		</g>
+	</g>
+</g>
+</svg>

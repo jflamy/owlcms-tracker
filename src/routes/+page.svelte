@@ -20,7 +20,7 @@
   ].filter(Boolean); // Remove any undefined entries
   
   $: lowerThirdScoreboards = data.scoreboards.filter(s => 
-    s.type === 'lower-third'
+    s.isLowerThird === true
   );
   
   $: teamScoreboards = data.scoreboards.filter(s => 
