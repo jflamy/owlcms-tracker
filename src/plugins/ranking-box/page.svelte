@@ -1,6 +1,7 @@
 <script>
 	import { onMount, onDestroy, tick } from 'svelte';
 	import gsap from 'gsap';
+	import { translations } from '$lib/stores.js';
 	
 	// Import background images for plugin autonomy
 	import bgImage from './StandingResults/Background/bg.jpg';
@@ -9,6 +10,12 @@
 	import weightliftingImage from './StandingResults/Elements/WEIGHTLIFTING.jpg';
 	
 	export let data = {};
+	
+	// Current translations object (populated from store)
+	let t = {};
+	const unsubscribeTranslations = translations.subscribe(trans => {
+		t = trans || {};
+	});
 	
 	let currentCategoryIndex = 0;
 	let currentPageWithinCategory = 0;
@@ -72,8 +79,15 @@
 	$: totalCategories = categorySequence.length;
 	$: totalPagesInCurrentCategory = categorySequence[currentCategoryIndex]?.pages.length || 0;
 	
+	// Get current category name
+	$: currentCategoryName = categorySequence[currentCategoryIndex]?.categoryName || '';
+	
 	// Get current page athletes
 	$: currentPageAthletes = categorySequence[currentCategoryIndex]?.pages[currentPageWithinCategory] || [];
+	
+	// Determine number of score columns (varies by modality: 3 for snatch/cj, 1 for total)
+	$: numScoreColumns = currentPageAthletes.length > 0 ? (currentPageAthletes[0]?.scores?.length || 0) : 0;
+	$: showScoreHeader = numScoreColumns > 1; // Only show 1ST/2ND/3RD if multiple columns
 	
 	// Pad with empty rows if needed
 	$: displayAthletes = [
@@ -236,6 +250,8 @@
 		}
 		// Kill any running animations
 		gsap.killTweensOf(rowElements);
+		// Unsubscribe from translations store
+		unsubscribeTranslations();
 	});
 
 </script>
@@ -297,37 +313,51 @@
 				<text transform="matrix(1 0 0 1 557.376 369.6324)" style="fill:#FFFFFF; font-family:'Albert Sans', sans-serif; font-size:49px; font-weight:bold;">WEIGHTLIFTING</text>
 			</g>
 			
-			<!-- YELLOW BAR (cutb2) - Overlays on top of sections (NO CLIPPING) -->
-			<g>
-				<!-- Solid yellow background for testing -->
-				<rect x="472.7523" y="419.3126" width="950" height="90" style="fill:#FFFF00;"/>
-				<!-- Yellow image overlay -->
-				<image style="overflow:visible;" width="950" height="90" xlink:href={yellowImage} transform="matrix(1 0 0 1 472.7523 419.3126)" preserveAspectRatio="none"/>
-			</g>
-			
-			<!-- YELLOW BAR HEADERS -->
-			<g>
-				<text transform="matrix(1 0 0 1 559.3323 472.6267)" style="fill:#2A535A; font-family:'Albert Sans', sans-serif; font-size:29px; font-weight:bold;">EVENT - PHASE</text>
-				<text transform="matrix(1 0 0 1 1126.3245 471.0262)" style="fill:#2A535A; font-family:'Albert Sans', sans-serif; font-size:24px; font-weight:bold;">1ST</text>
-				<text transform="matrix(1 0 0 1 1212.8242 471.0262)" style="fill:#2A535A; font-family:'Albert Sans', sans-serif; font-size:24px; font-weight:bold;">2ND</text>
-				<text transform="matrix(1 0 0 1 1298.8857 471.0262)" style="fill:#2A535A; font-family:'Albert Sans', sans-serif; font-size:24px; font-weight:bold;">3RD</text>
-			</g>
-			
 			<!-- BOTTOM SECTION (cutb3) - Data area background -->
 			<g style="clip-path:url(#cutb3Clip);">
 				<image style="overflow:visible;" width="1031" height="625" xlink:href={bgImage} transform="matrix(1 0 0 1 467.6277 413.6489)"/>
+			</g>
+			
+			<!-- YELLOW BAR (cutb2) - Plain yellow solid background -->
+			<g id="b2" style="clip-path:url(#cutb2Clip);">
+				<rect x="493.81" y="437.3" width="913.96" height="54.85" style="fill:#FFFF00;"/>
 			</g>
 			
 			<!-- ForeignObject grid for athlete data (overlays data area) -->
 			{#if showGrid}
 			<foreignObject
 				x="532.47"
-				y="521.34"
+				y="437.3"
 				width="819.9"
-				height="459.77"
-				style="clip-path:url(#dataAreaClip);"
+				height="583.47"
 			>
-				<div class="grid-container" xmlns="http://www.w3.org/1999/xhtml">
+			<div class="grid-container" xmlns="http://www.w3.org/1999/xhtml">
+				<!-- Header Row 1 - Category name, ranking label, and modality labels (Snatch/C&J/Total) -->
+				<div class="grid-row grid-header header-row-1">
+					<div class="cell-rank"></div>
+					<div class="cell-category-group">{currentCategoryName || ''} {t['Scoreboard.RANKING'] || 'RANKING'}</div>
+					<div class="score-box best">{t.Snatch || 'Snatch'}</div>
+					<div class="score-box best">{t.Clean_and_Jerk || 'C&J'}</div>
+					<div class="score-box best">{t.TOTAL || 'Total'}</div>
+				</div>
+				
+				<!-- Header Row 2 - Score column headers (dynamic based on modality) -->
+				<div class="grid-row grid-header header-row-2">
+					<div class="cell-rank"></div>
+					<div class="cell-flag"></div>
+					<div class="cell-country"></div>
+					<div class="cell-name"></div>
+					
+					{#if data.modality === 'snatch' || data.modality === 'cj'}
+						<!-- Snatch/C&J modality: four score columns -->
+						<div class="score-box best">1</div>
+						<div class="score-box best">2</div>
+						<div class="score-box best">3</div>
+						<div class="score-box best">{t.Best || '✔'}</div>
+					{/if}
+				</div>
+				
+				<!-- Data Rows -->
 					{#each displayAthletes as athlete, idx}
 						<div 
 							class="grid-row"
@@ -412,6 +442,7 @@
 		padding: 8px 16px;
 		border-radius: 4px;
 		border: 1px solid rgba(255, 215, 0, 0.2);
+		display: none;
 	}
 	
 	/* Grid Container (inside foreignObject) */
@@ -443,6 +474,46 @@
 		transform: translateY(-5px);
 	}
 	
+	/* Header Row - Static, dark blue text on transparent background (yellow bar shows through) */
+	:global(.grid-header) {
+		display: grid;
+		grid-template-columns: 32px 70px 36px minmax(350px, 1fr) repeat(auto-fit, minmax(8px, 1fr));
+		gap: 2px;
+		padding: 2px 4px;
+		align-items: center;
+		height: 56px;
+		background-color: transparent;
+		color: #2A535A;
+		flex-shrink: 0;
+		opacity: 1;
+		transform: none;
+	}
+	
+	/* Header Row 1 - Category and modality labels (taller for better spacing) */
+	:global(.header-row-1) {
+		height: 40px;
+		align-items: flex-end;
+		padding-top: 8px;
+		padding-bottom: 4px;
+	}
+	
+	/* Header Row 2 - Column numbers (normal height) */
+	:global(.header-row-2) {
+		height: 32px;
+		align-items: center;
+		padding: 2px 4px;
+	}
+	
+	/* Category group cell - spans flag, code, and name columns */
+	:global(.cell-category-group) {
+		grid-column: span 3;
+		color: #2A535A;
+		font-weight: 700;
+		font-size: 28px;
+		text-align: left;
+		padding-left: 12px;
+	}
+	
 	/* Rank cell - matches StandingResults styling */
 	:global(.cell-rank) {
 		text-align: center;
@@ -457,6 +528,11 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
+	}
+	
+	/* Rank cell in header - dark blue text */
+	:global(.grid-header .cell-rank) {
+		color: #2A535A;
 	}
 	
 	/* Flag cell - shows country flag image */
@@ -490,6 +566,13 @@
 		text-transform: uppercase;
 	}
 	
+	/* Country code cell in header - dark blue text */
+	:global(.grid-header .cell-country) {
+		color: #2A535A;
+		font-size: 22px;
+		font-weight: 700;
+	}
+	
 	/* Athlete name cell */
 	:global(.cell-name) {
 		text-align: left;
@@ -505,6 +588,12 @@
 		align-items: center;
 	}
 	
+	/* Athlete name cell in header - dark blue text */
+	:global(.grid-header .cell-name) {
+		color: #2A535A;
+		font-weight: 700;
+	}
+	
 	/* Score boxes - dynamically displayed */
 	:global(.score-box) {
 		display: flex;
@@ -516,6 +605,33 @@
 		font-weight: 700;
 		font-size: 22px;
 		border: 1px solid transparent;
+	}
+	
+	/* Score box in header - dark blue text and styling */
+	:global(.grid-header .score-box) {
+		color: #2A535A;
+		background: transparent;
+		border: none;
+		font-size: 18px;
+		font-weight: 700;
+		height: auto;
+		padding: 4px 8px;
+	}
+	
+	/* Score boxes in header row 1 - modality labels (larger font) */
+	:global(.header-row-1 .score-box) {
+		font-size: 24px;
+		font-weight: 700;
+		height: auto;
+		padding: 4px 8px;
+	}
+	
+	/* Score boxes in header row 2 - column numbers (smaller font) */
+	:global(.header-row-2 .score-box) {
+		font-size: 18px;
+		font-weight: 700;
+		height: auto;
+		padding: 2px 4px;
 	}
 	
 	/* Score box states */
