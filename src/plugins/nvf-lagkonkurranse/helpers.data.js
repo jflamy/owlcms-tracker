@@ -455,63 +455,6 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		const athletesByPredictedScore = [...allTeamAthletes].sort((a, b) => (b.nextScore || 0) - (a.nextScore || 0));
 		const top4ByPredictedScore = athletesByPredictedScore.slice(0, 4);
 		
-		const getDisplayNameForLog = (athlete) => {
-			const fallback = `${athlete.firstName || ''} ${athlete.lastName || ''}`.trim();
-			const lotLabel = athlete.lotNumber ? `Lot ${athlete.lotNumber}` : '';
-			const name = (athlete.fullName || fallback || lotLabel || 'Unknown').trim();
-			return name || 'Unknown';
-		};
-
-		const formatScoreForLog = (value) => {
-			const num = Number(value);
-			if (!Number.isFinite(num)) return '   0.00';
-			return num.toFixed(2).padStart(8);
-		};
-
-		// LOG: Show all athletes and top 4
-		console.log(`\n[NVF] ========================================`);
-		console.log(`[NVF] TEAM: ${teamName} (${allTeamAthletes.length} athletes total)`);
-		console.log(`[NVF] ========================================`);
-		console.log(`[NVF] CURRENT SCORE ranking:`);
-		athletesByCurrentScore.forEach((a, idx) => {
-			const score = getAthleteScore(a);
-			const nextScore = a.nextScore || 0;
-			const isInTop4 = idx < 4;
-			const source = a.inCurrentSession !== false ? '(SESSION)' : '(DATABASE)';
-			const displayName = getDisplayNameForLog(a).padEnd(25);
-			const scoreStr = formatScoreForLog(score);
-			const nextScoreStr = formatScoreForLog(nextScore);
-			const fullStr = `${displayName} Score: ${scoreStr} NextScore: ${nextScoreStr} ${source}`;
-			if (isInTop4) {
-				console.log(`[NVF] ⭐ [${idx + 1}] %c${fullStr}`, 'color: green; font-weight: bold;');
-			} else {
-				console.log(`[NVF]    [${idx + 1}] ${fullStr}`);
-			}
-		});
-		console.log(`[NVF] `);
-		console.log(`[NVF] PREDICTED SCORE ranking:`);
-		athletesByPredictedScore.forEach((a, idx) => {
-			const score = getAthleteScore(a);
-			const nextScore = a.nextScore || 0;
-			const isInTop4 = idx < 4;
-			const source = a.inCurrentSession !== false ? '(SESSION)' : '(DATABASE)';
-			const displayName = getDisplayNameForLog(a).padEnd(25);
-			const scoreStr = formatScoreForLog(score);
-			const nextScoreStr = formatScoreForLog(nextScore);
-			const fullStr = `${displayName} Score: ${scoreStr} NextScore: ${nextScoreStr} ${source}`;
-			if (isInTop4) {
-				console.log(`[NVF] ⭐ [${idx + 1}] %c${fullStr}`, 'color: green; font-weight: bold;');
-			} else {
-				console.log(`[NVF]    [${idx + 1}] ${fullStr}`);
-			}
-		});
-		console.log(`[NVF] ------`);
-		const top4CurrentSum = top4ByCurrentScore.reduce((sum, a) => sum + getAthleteScore(a), 0);
-		const top4PredictedSum = top4ByPredictedScore.reduce((sum, a) => sum + (a.nextScore || 0), 0);
-		console.log(`[NVF] %cTOP 4 CURRENT SCORE: ${top4CurrentSum.toFixed(2)}`, 'color: green; font-weight: bold;');
-		console.log(`[NVF] %cTOP 4 PREDICTED SCORE: ${top4PredictedSum.toFixed(2)}`, 'color: green; font-weight: bold;');
-		console.log(`[NVF] ========================================\n`);
-		
 		// Now apply Top N filter per team if specified (for DISPLAY only)
 		let athletes = allTeamAthletes;
 		if (topN > 0) {

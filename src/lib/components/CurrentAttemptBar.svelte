@@ -23,8 +23,12 @@
 	<!-- Compact mode for team scoreboard -->
 	<header class="header compact">
 		<div class="lifter-info">
-			<span class="lifter-name">{currentAttempt?.fullName || 'No athlete currently lifting'}</span>
-			<span class="team">{currentAttempt?.teamName || ''}</span>
+			<div class="name-and-team">
+				<span class="lifter-name">{currentAttempt?.fullName || 'No athlete currently lifting'}</span>
+				{#if currentAttempt?.teamName}
+					<span class="team">{currentAttempt.teamName}</span>
+				{/if}
+			</div>
 			<span class="attempt-label">{@html currentAttempt?.attempt || ''}</span>
 			<span class="weight">{currentAttempt?.weight || '-'} kg</span>
 			<div class="timer {timerState.isRunning ? 'running' : ''} {timerState.isWarning ? 'warning' : ''}">
@@ -42,8 +46,12 @@
 			{#if sessionStatus?.isDone}
 				<span class="lifter-name">{sessionStatus.statusMessage || 'Session Done.'}</span>
 			{:else}
-				<span class="lifter-name">{currentAttempt?.fullName || 'No athlete currently lifting'}</span>
-				<span class="team">{currentAttempt?.teamName || ''}</span>
+				<div class="name-and-team">
+					<span class="lifter-name">{currentAttempt?.fullName || 'No athlete currently lifting'}</span>
+					{#if currentAttempt?.teamName}
+						<span class="team">{currentAttempt.teamName}</span>
+					{/if}
+				</div>
 				<span class="attempt-label">{@html currentAttempt?.attempt || ''}</span>
 				<span class="weight">{currentAttempt?.weight || '-'} kg</span>
 				{#if showTimer || showDecisionLights}
@@ -104,17 +112,28 @@
 		margin-bottom: 0.25rem;
 	}
 
+	.name-and-team {
+		display: flex;
+		align-items: baseline;
+		gap: 1rem;
+		flex: 1;
+		min-width: 0;
+	}
+
 	.lifter-name {
 		font-size: 1.5rem;
 		font-weight: bold;
 		color: #fff;
-		flex: 1;
+		flex-shrink: 1;
+		min-width: 0;
 	}
 
 	.team {
-		font-size: 1.5rem; /* Same as lifter name */
-		font-weight: bold;
-		color: #ccc;
+		font-size: 1.2rem;
+		font-weight: 600;
+		color: #cbd5f5;
+		flex-shrink: 0;
+		white-space: nowrap;
 	}
 
 	.attempt-label {
