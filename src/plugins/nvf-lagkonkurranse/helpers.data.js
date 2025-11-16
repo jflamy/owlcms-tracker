@@ -414,10 +414,16 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	allAthletes = allAthletes.map(athlete => {
 		const nextTotal = calculatePredictedTotal(athlete);
 		const nextScore = nextTotal > 0 ? calculatePredictedSinclair(nextTotal, athlete.bodyWeight, athlete.gender) : 0;
+		const bestSnatchValue = parseFormattedNumber(athlete.bestSnatch);
+		const bestCleanJerkValue = parseFormattedNumber(athlete.bestCleanJerk);
+		const hasBest = bestSnatchValue > 0 || bestCleanJerkValue > 0;
+		const combinedBest = bestSnatchValue + bestCleanJerkValue;
+		const displayTotal = hasBest ? combinedBest : '-';
 		return {
 			...athlete,
 			nextTotal,
-			nextScore
+			nextScore,
+			displayTotal
 		};
 	});
 	

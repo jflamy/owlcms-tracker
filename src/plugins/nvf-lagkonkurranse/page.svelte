@@ -190,7 +190,7 @@ export function shouldRenderFlag(url) {
 							<div class="cell attempt {getAttemptClass(athlete.cattempts?.[2])} {athlete.cattempts?.[2]?.className || ''}" role="gridcell">{displayAttempt(athlete.cattempts?.[2])}</div>
 							<div class="cell best" role="gridcell">{athlete.bestCleanJerk || '-'}</div>
 						<div class="cell v-spacer" aria-hidden="true"></div>
-						<div class="cell total" role="gridcell">{athlete.total || '-'}</div>
+						<div class="cell total" role="gridcell">{athlete.displayTotal ?? '-'}</div>
 						<div class="cell score" class:in-top4-current={isLotInList(team.top4CurrentLotNumbers, athlete.lotNumber)} role="gridcell">{formatScore(athlete.globalScore || athlete.sinclair)}</div>
 					<div class="cell v-spacer" aria-hidden="true"></div>
 					<div class="cell next-total" role="gridcell">{athlete.nextTotal ? athlete.nextTotal : '-'}</div>
