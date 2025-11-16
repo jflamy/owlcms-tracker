@@ -24,8 +24,13 @@
   );
   
   $: teamScoreboards = data.scoreboards.filter(s => 
-    s.type === 'team-scoreboard'
-  );
+    s.type === 'team-scoreboard' || s.type === 'nvf-lagkonkurranse'
+  ).sort((a, b) => {
+    // Keep team-scoreboard first, then nvf-lagkonkurranse
+    if (a.type === 'team-scoreboard') return -1;
+    if (b.type === 'team-scoreboard') return 1;
+    return 0;
+  });
   
   // Toggle function for accordion behavior
   function toggleCategory(category) {
