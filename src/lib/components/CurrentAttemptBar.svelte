@@ -23,7 +23,6 @@
 	<!-- Compact mode for team scoreboard -->
 	<header class="header compact">
 		<div class="lifter-info">
-			<span class="start-number">{currentAttempt?.startNumber || '-'}</span>
 			<span class="lifter-name">{currentAttempt?.fullName || 'No athlete currently lifting'}</span>
 			<span class="team">{currentAttempt?.teamName || ''}</span>
 			<span class="attempt-label">{@html currentAttempt?.attempt || ''}</span>
@@ -43,7 +42,6 @@
 			{#if sessionStatus?.isDone}
 				<span class="lifter-name">{sessionStatus.statusMessage || 'Session Done.'}</span>
 			{:else}
-				<span class="start-number">{currentAttempt?.startNumber || '-'}</span>
 				<span class="lifter-name">{currentAttempt?.fullName || 'No athlete currently lifting'}</span>
 				<span class="team">{currentAttempt?.teamName || ''}</span>
 				<span class="attempt-label">{@html currentAttempt?.attempt || ''}</span>
@@ -104,17 +102,6 @@
 		align-items: center;
 		gap: 1rem;
 		margin-bottom: 0.25rem;
-	}
-
-	.start-number {
-		background: #dc2626; /* Red background */
-		color: #fff;
-		padding: 0.5rem 1rem;
-		font-size: 1.5rem;
-		font-weight: bold;
-		border-radius: 0.25rem;
-		text-align: center;
-		min-width: 3rem;
 	}
 
 	.lifter-name {

@@ -109,7 +109,7 @@ export function shouldRenderFlag(url) {
 		{:else}
 			<div class="scoreboard-grid" class:compact-team-column={data.compactTeamColumn} role="grid">
 				<div class="grid-row header header-primary" role="row">
-					<div class="cell header col-start span-two" role="columnheader">{t.Start || 'Start'}</div>
+					<div class="cell header col-start span-two" role="columnheader">{t.Order || t.Start || 'Order'}</div>
 					<div class="cell header col-name span-two" role="columnheader">{t.Name || 'Name'}</div>
 					<div class="cell header col-cat span-two" role="columnheader">{t.Category || 'Cat.'}</div>
 					<div class="cell header col-born span-two" role="columnheader">{t.Birth || 'Born'}</div>
@@ -174,7 +174,7 @@ export function shouldRenderFlag(url) {
 							class:next={athlete.classname && athlete.classname.includes('next')}
 							role="row"
 						>
-							<div class="cell start-num" role="gridcell">{athlete.inCurrentSession ? athlete.startNumber || '' : ''}</div>
+							<div class="cell start-num" role="gridcell">{athlete.inCurrentSession ? (athlete.liftingOrder ?? '') : ''}</div>
 							<div class="cell name" role="gridcell">{athlete.fullName}</div>
 							<div class="cell cat" role="gridcell">{athlete.category || ''}</div>
 							<div class="cell born" role="gridcell">{athlete.yearOfBirth || ''}</div>

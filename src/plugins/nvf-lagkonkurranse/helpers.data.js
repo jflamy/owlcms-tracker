@@ -31,6 +31,12 @@ function parseFormattedNumber(value) {
 	return isNaN(parsed) ? 0 : parsed;
 }
 
+function normalizeLotNumber(value) {
+	if (value === undefined || value === null) return '';
+	const normalized = String(value).trim();
+	return normalized;
+}
+
 /**
  * Get score from athlete (tries globalScore first, then sinclair)
  * @param {Object} athlete - Athlete object
@@ -261,6 +267,20 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		// Find the current athlete (has 'current' in classname)
 		const currentAthlete = sessionAthletes.find(a => a.classname && a.classname.includes('current'));
 	}
+
+	const liftingOrderMap = new Map();
+	if (Array.isArray(fopUpdate?.liftingOrderAthletes)) {
+		let orderPosition = 1;
+		for (const orderEntry of fopUpdate.liftingOrderAthletes) {
+			if (!orderEntry || orderEntry.isSpacer) continue;
+			const lotKey = normalizeLotNumber(orderEntry.lotNumber ?? orderEntry.startNumber);
+			if (!lotKey) continue;
+			if (!liftingOrderMap.has(lotKey)) {
+				liftingOrderMap.set(lotKey, orderPosition);
+			}
+			orderPosition += 1;
+		}
+	}
 	
 	// Get all athletes from database
 	let allAthletes = [];
@@ -268,14 +288,17 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		// Build a map of database athletes by lot number for quick lookup
 		const databaseAthletesByLot = new Map();
 		databaseState.athletes.forEach(dbAthlete => {
-			const lotKey = String(dbAthlete.lotNumber);
-			databaseAthletesByLot.set(lotKey, dbAthlete);
+			const lotKey = normalizeLotNumber(dbAthlete.lotNumber);
+			if (lotKey) {
+				databaseAthletesByLot.set(lotKey, dbAthlete);
+			}
 		});
 		
 		// Extract lot numbers from current session to identify who's in the session
 		// Note: sessionAthletes now has lotNumber field (as of latest OWLCMS version)
-		// IMPORTANT: Convert to strings for comparison - sessionAthletes has strings, database has numbers
-		const currentSessionLotNumbers = new Set(sessionAthletes.map(a => String(a.lotNumber)).filter(Boolean));
+		const currentSessionLotNumbers = new Set(
+			sessionAthletes.map(a => normalizeLotNumber(a.lotNumber)).filter(Boolean)
+		);
 		
 		// STRATEGY: Use session athletes data FIRST (they have computed fields), 
 		// then add database-only athletes (those not in current session)
@@ -283,20 +306,23 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		// Step 1: Start with all session athletes (they have all the computed OWLCMS data)
 		// IMPORTANT: Merge in bodyWeight from database so we can calculate Sinclair
 		allAthletes = sessionAthletes.map(sa => {
-			const dbAthlete = databaseAthletesByLot.get(String(sa.lotNumber));
+			const lotKey = normalizeLotNumber(sa.lotNumber ?? sa.startNumber);
+			const dbAthlete = lotKey ? databaseAthletesByLot.get(lotKey) : null;
 			return {
 				...sa,
 				bodyWeight: dbAthlete?.bodyWeight || 0,
-				inCurrentSession: true
+				inCurrentSession: true,
+				liftingOrder: lotKey ? liftingOrderMap.get(lotKey) ?? null : null
 			};
 		});
 		
 		// Step 2: Add athletes from database that are NOT in the current session
 		const databaseOnlyAthletes = databaseState.athletes
-			.filter(dbAthlete => !currentSessionLotNumbers.has(String(dbAthlete.lotNumber)))
+			.filter(dbAthlete => !currentSessionLotNumbers.has(normalizeLotNumber(dbAthlete.lotNumber)))
 			.map(dbAthlete => {
 				// Format database athlete to match session athlete structure
 				const categoryName = dbAthlete.categoryName || getCategoryName(dbAthlete.category, databaseState);
+				const lotKey = normalizeLotNumber(dbAthlete.lotNumber);
 				
 				// Format name as "LASTNAME, Firstname" to match OWLCMS format
 				const lastName = (dbAthlete.lastName || '').toUpperCase();
@@ -352,7 +378,8 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 					globalScore: dbAthlete.globalScore || null,
 					
 					// No classname (not in current session)
-					inCurrentSession: false
+					inCurrentSession: false,
+					liftingOrder: lotKey ? liftingOrderMap.get(lotKey) ?? null : null
 				};
 			});
 		
@@ -361,7 +388,14 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		
 	} else {
 		// No database available, use only session athletes
-		allAthletes = sessionAthletes.map(a => ({ ...a, inCurrentSession: true }));
+		allAthletes = sessionAthletes.map(a => {
+			const lotKey = normalizeLotNumber(a.lotNumber ?? a.startNumber);
+			return {
+				...a,
+				inCurrentSession: true,
+				liftingOrder: lotKey ? liftingOrderMap.get(lotKey) ?? null : null
+			};
+		});
 	}
 	
 	// Filter athletes by gender if not 'MF'
@@ -549,7 +583,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			teamScore,
 			teamNextScore,
 			teamNextTotal,
-			athleteCount: 'top 4 athletes',
+			athleteCount: 'top 4 scores',
 			top4CurrentLotNumbers,
 			top4PredictedLotNumbers
 		};
