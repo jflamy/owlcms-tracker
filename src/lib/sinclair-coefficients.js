@@ -1,10 +1,26 @@
 /**
  * Sinclair Coefficient Lookup Table
- * Based on sinclair2020.properties from OWLCMS (2017-2020 coefficients)
- * Reference: https://www.iwfmasters.org/uploads/1/2/9/7/129797858/iwf_master_age_factors_2019.pdf
+ * Based on IWF 2024 coefficients (updated April 2024)
+ * These are the current official coefficients used for international competition
  */
 
 export const SINCLAIR_COEFFICIENTS = {
+	men: {
+		coefficient: 0.722762521,
+		maxWeight: 193.609
+	},
+	women: {
+		coefficient: 0.787004341,
+		maxWeight: 153.757
+	}
+};
+
+/**
+ * Sinclair Coefficient Lookup Table - 2020 version
+ * Used specifically for SMHF (Sinclair Masters) calculations
+ * Based on sinclair2020.properties from OWLCMS (2017-2020 coefficients)
+ */
+export const SINCLAIR_COEFFICIENTS_2020 = {
 	men: {
 		coefficient: 0.751945030,
 		maxWeight: 175.508
@@ -144,6 +160,7 @@ export function getMastersAgeFactor(age, gender) {
 
 /**
  * Calculate Sinclair Masters (age-adjusted) score
+ * Uses 2020 Sinclair coefficients for SMHF calculations
  *
  * @param {number} total - Snatch + Clean & Jerk total
  * @param {number} bodyWeight - Athlete's bodyweight in kg
@@ -152,7 +169,14 @@ export function getMastersAgeFactor(age, gender) {
  * @returns {number} Age-adjusted Sinclair score
  */
 export function calculateSinclairMasters(total, bodyWeight, gender, age) {
-	const sinclairScore = calculateSinclairScore(total, bodyWeight, gender);
+	if (!total || total <= 0) return 0;
+	if (!bodyWeight || bodyWeight <= 0) return 0;
+
+	// Use 2020 coefficients for SMHF calculations
+	const coeffs = gender === 'M' ? SINCLAIR_COEFFICIENTS_2020.men : SINCLAIR_COEFFICIENTS_2020.women;
+	const sinclairFactor2020 = sinclairFactor(bodyWeight, coeffs.coefficient, coeffs.maxWeight);
+	const sinclairScore = total * sinclairFactor2020;
+	
 	const ageFactor = getMastersAgeFactor(age, gender);
 	
 	return sinclairScore * ageFactor;
