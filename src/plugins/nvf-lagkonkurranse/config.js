@@ -30,6 +30,15 @@ export default {
 			default: true,
 			description: 'Display current lifter information at the top'
 		}
+		,
+		{
+			key: 'language',
+			label: 'Language',
+			type: 'select',
+			options: ['en', 'no'],
+			default: 'en',
+			description: 'Choose scoreboard text language (English or Norwegian)'
+		},
 	],
 	
 	// Required FOP data fields
