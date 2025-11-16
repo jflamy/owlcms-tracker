@@ -18,27 +18,17 @@ export default {
 	options: [
 		{
 			key: 'gender',
-			label: 'Gender',
-			type: 'select',
-			options: ['MF', 'M', 'F'],
-			default: 'MF',
-			description: 'Filter athletes by gender'
+			label: 'Mixed (both genders)',
+			type: 'boolean',
+			default: false,
+			description: 'Show both men and women (unchecked = show only current athlete gender)'
 		},
 		{
 			key: 'currentAttemptInfo',
 			label: 'Show Current Attempt Info',
 			type: 'boolean',
-			default: false,
+			default: true,
 			description: 'Display current lifter information at the top'
-		},
-		{
-			key: 'topN',
-			label: 'Top N Athletes',
-			type: 'number',
-			default: 0,
-			min: 0,
-			max: 50,
-			description: 'Show only top N men and top N women per team by score (0 = show all)'
 		}
 	],
 	

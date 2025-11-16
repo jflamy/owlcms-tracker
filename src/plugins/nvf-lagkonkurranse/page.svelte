@@ -100,6 +100,7 @@ export function shouldRenderFlag(url) {
 			showDecisionLights={false}
 			showTimer={true}
 			compactMode={true}
+			showLifterInfo={data.options?.currentAttemptInfo ?? true}
 		/>
 	{/if}
 

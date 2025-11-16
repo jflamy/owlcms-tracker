@@ -157,7 +157,18 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	const showRecords = options.showRecords ?? false;
 	// Always sort teams by total score (sum of athlete scores: globalScore→sinclair)
 	const sortBy = 'score';
-	const gender = options.gender ?? 'MF';
+	
+	// Determine gender: 
+	// - If 'gender' option is true (Mixed checkbox), use 'MF' to show both genders
+	// - Otherwise, auto-detect from current athlete (if available) to show only their gender
+	let gender = 'MF';  // Default to mixed
+	if (options.gender !== true) {
+		// Mixed checkbox is not checked, so auto-detect from current athlete
+		if (fopUpdate?.gender) {
+			gender = fopUpdate.gender;
+		}
+	}
+	
 	const currentAttemptInfo = options.currentAttemptInfo ?? false;
 	const topN = options.topN ?? 0;
 	
@@ -184,7 +195,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// groupAthletes is now a parsed object, so stringify it first for hashing
 	const groupAthletesHash = fopUpdate?.groupAthletes ? 
 		JSON.stringify(fopUpdate.groupAthletes).substring(0, 100) : ''; // First 100 chars as quick hash
-	const cacheKey = `${fopName}-${groupAthletesHash}-${gender}-${topN}-${sortBy}`;
+	const cacheKey = `${fopName}-${groupAthletesHash}-${gender}-${topN}-${sortBy}-${currentAttemptInfo}`;
 	
 	console.log(`[NVF] Cache check - FOP: ${fopName}, Hash: ${groupAthletesHash.substring(0, 30)}..., Key: ${cacheKey.substring(0, 50)}...`);
 	

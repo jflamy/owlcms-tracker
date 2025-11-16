@@ -11,6 +11,7 @@
 	export let showDecisionLights = true;  // For grid scoreboards, false for simpler scoreboards
 	export let showTimer = true;  // Control whether to show timer slot
 	export let compactMode = false;  // Simpler layout for team scoreboard
+	export let showLifterInfo = true;  // Toggle athlete/attempt info display
 	
 	function getRefereeClass(value) {
 		if (value === 'good') return 'good';
@@ -22,30 +23,8 @@
 {#if compactMode}
 	<!-- Compact mode for team scoreboard -->
 	<header class="header compact">
-		<div class="lifter-info">
-			<div class="name-and-team">
-				<span class="lifter-name">{currentAttempt?.fullName || 'No athlete currently lifting'}</span>
-				{#if currentAttempt?.teamName}
-					<span class="team">{currentAttempt.teamName}</span>
-				{/if}
-			</div>
-			<span class="attempt-label">{@html currentAttempt?.attempt || ''}</span>
-			<span class="weight">{currentAttempt?.weight || '-'} kg</span>
-			<div class="timer {timerState.isRunning ? 'running' : ''} {timerState.isWarning ? 'warning' : ''}">
-				{timerState.display}
-			</div>
-		</div>
-		<div class="session-info">
-			{scoreboardName || 'Scoreboard'} - {@html competition?.groupInfo || 'Session'} - {competition?.liftsDone || ''}
-		</div>
-	</header>
-{:else}
-	<!-- Full mode for grid scoreboards (session-results, lifting-order, rankings) -->
-	<header class="header">
-		<div class="lifter-info">
-			{#if sessionStatus?.isDone}
-				<span class="lifter-name">{sessionStatus.statusMessage || 'Session Done.'}</span>
-			{:else}
+		{#if showLifterInfo}
+			<div class="lifter-info">
 				<div class="name-and-team">
 					<span class="lifter-name">{currentAttempt?.fullName || 'No athlete currently lifting'}</span>
 					{#if currentAttempt?.teamName}
@@ -54,40 +33,72 @@
 				</div>
 				<span class="attempt-label">{@html currentAttempt?.attempt || ''}</span>
 				<span class="weight">{currentAttempt?.weight || '-'} kg</span>
-				{#if showTimer || showDecisionLights}
-					<div class="timer-decision-container">
-						{#if showTimer}
-							<div 
-								class="timer-slot"
-								class:visible={!decisionState?.visible}
-								class:running={timerState.isRunning}
-								class:warning={timerState.isWarning}
-							>
-								<span class="timer-display">{timerState.display}</span>
-							</div>
-						{/if}
-						{#if showDecisionLights}
-							<div class="decision-slot" class:visible={decisionState?.visible}>
-								<div class="decision-lights" aria-label="Referee decisions">
-									{#if !decisionState?.isSingleReferee}
-										<div class="referee-light {getRefereeClass(decisionState?.ref1)}"></div>
-									{/if}
-									<div class="referee-light {getRefereeClass(decisionState?.ref2)}"></div>
-									{#if !decisionState?.isSingleReferee}
-										<div class="referee-light {getRefereeClass(decisionState?.ref3)}"></div>
-									{/if}
-								</div>
-							</div>
-						{/if}
-					</div>
-				{/if}
+				<div class="timer {timerState.isRunning ? 'running' : ''} {timerState.isWarning ? 'warning' : ''}">
+					{timerState.display}
+				</div>
+			</div>
+		{/if}
+		<div class="session-info">
+			{#if competition?.groupInfo?.trim()}
+				{@html competition.groupInfo}{#if competition?.liftsDone} - {competition.liftsDone}{/if}
+			{:else}
+				Session{#if competition?.liftsDone} - {competition.liftsDone}{/if}
 			{/if}
 		</div>
+	</header>
+{:else}
+	<!-- Full mode for grid scoreboards (session-results, lifting-order, rankings) -->
+	<header class="header">
+		{#if showLifterInfo}
+			<div class="lifter-info">
+				{#if sessionStatus?.isDone}
+					<span class="lifter-name">{sessionStatus.statusMessage || 'Session Done.'}</span>
+				{:else}
+					<div class="name-and-team">
+						<span class="lifter-name">{currentAttempt?.fullName || 'No athlete currently lifting'}</span>
+						{#if currentAttempt?.teamName}
+							<span class="team">{currentAttempt.teamName}</span>
+						{/if}
+					</div>
+					<span class="attempt-label">{@html currentAttempt?.attempt || ''}</span>
+					<span class="weight">{currentAttempt?.weight || '-'} kg</span>
+					{#if showTimer || showDecisionLights}
+						<div class="timer-decision-container">
+							{#if showTimer}
+								<div 
+									class="timer-slot"
+									class:visible={!decisionState?.visible}
+									class:running={timerState.isRunning}
+									class:warning={timerState.isWarning}
+								>
+									<span class="timer-display">{timerState.display}</span>
+								</div>
+							{/if}
+							{#if showDecisionLights}
+								<div class="decision-slot" class:visible={decisionState?.visible}>
+									<div class="decision-lights" aria-label="Referee decisions">
+										{#if !decisionState?.isSingleReferee}
+											<div class="referee-light {getRefereeClass(decisionState?.ref1)}"></div>
+										{/if}
+										<div class="referee-light {getRefereeClass(decisionState?.ref2)}"></div>
+										{#if !decisionState?.isSingleReferee}
+											<div class="referee-light {getRefereeClass(decisionState?.ref3)}"></div>
+										{/if}
+									</div>
+								</div>
+							{/if}
+						</div>
+					{/if}
+				{/if}
+			</div>
+		{/if}
 		<div class="session-info">
 			{#if sessionStatus?.isDone}
 				{@html '&nbsp;'}
+			{:else if competition?.groupInfo?.trim()}
+				{@html competition.groupInfo}{#if competition?.liftsDone} - {competition.liftsDone}{/if}
 			{:else}
-				{scoreboardName || 'Scoreboard'} - {@html competition?.groupInfo || 'Session'} - {competition?.liftsDone || ''}
+				Session{#if competition?.liftsDone} - {competition.liftsDone}{/if}
 			{/if}
 		</div>
 	</header>

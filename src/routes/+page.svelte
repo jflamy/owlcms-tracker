@@ -71,9 +71,17 @@
     const options = scoreboardOptions[type]?.[fop] || {};
     const params = new URLSearchParams({ fop });
     
-    // Add configured options to URL
+    // Find the scoreboard config to get default values
+    const scoreboard = data.scoreboards.find(s => s.type === type);
+    
+    // Add configured options to URL (only if different from default)
     Object.entries(options).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
+      // Find the option config to get its default value
+      const optionConfig = scoreboard?.options?.find(opt => opt.key === key);
+      const defaultValue = optionConfig?.default;
+      
+      // Only include in URL if value is different from default and not empty
+      if (value !== defaultValue && value !== undefined && value !== null && value !== '') {
         params.append(key, value);
       }
     });
@@ -90,9 +98,17 @@
     const options = scoreboardOptions[type]?.[fop] || {};
     const params = new URLSearchParams({ fop });
     
-    // Add configured options to URL
+    // Find the scoreboard config to get default values
+    const scoreboard = data.scoreboards.find(s => s.type === type);
+    
+    // Add configured options to URL (only if different from default)
     Object.entries(options).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
+      // Find the option config to get its default value
+      const optionConfig = scoreboard?.options?.find(opt => opt.key === key);
+      const defaultValue = optionConfig?.default;
+      
+      // Only include in URL if value is different from default and not empty
+      if (value !== defaultValue && value !== undefined && value !== null && value !== '') {
         params.append(key, value);
       }
     });
