@@ -172,6 +172,53 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	const currentAttemptInfo = options.currentAttemptInfo ?? false;
 	const topN = options.topN ?? 0;
 	
+	// Get language preference from options (default: 'en')
+	// Accept both 'lang' (URL param) and 'language' (config option)
+	const language = options.lang || options.language || 'en';
+	console.log(`[NVF helpers] Language requested: ${language}, options:`, options);
+	
+	// Fetch translations from hub for the selected language
+	const translations = competitionHub.getTranslations(language);
+	console.log(`[NVF helpers] Got ${Object.keys(translations).length} translation keys for language '${language}'`);
+	console.log(`[NVF helpers] Sample translations:`, {
+		Name: translations.Name,
+		Team: translations.Team,
+		Snatch: translations.Snatch,
+		Total: translations.TOTAL,
+		Start: translations.Start,
+		Order: translations.Order,
+		Birth: translations.Birth,
+		Score: translations.Score,
+		Rank: translations.Rank,
+		Best: translations.Best,
+		Category: translations.Category,
+		Clean_and_Jerk: translations.Clean_and_Jerk
+	});
+	console.log(`[NVF helpers] Keys matching 'start': `, Object.keys(translations).filter(k => k.toLowerCase().includes('start')));
+	console.log(`[NVF helpers] Keys matching 'order': `, Object.keys(translations).filter(k => k.toLowerCase().includes('order')));
+	console.log(`[NVF helpers] Keys matching 'total': `, Object.keys(translations).filter(k => k.toLowerCase().includes('total')));
+	console.log(`[NVF helpers] Keys matching 'birth': `, Object.keys(translations).filter(k => k.toLowerCase().includes('birth')));
+	
+	// Build header labels from translations with fallbacks
+	const headers = {
+		order: language === 'no' ? 'Ordre' : (translations.Start || translations.Order || 'Order'),
+		name: translations.Name || 'Name',
+		category: translations.Category || 'Cat.',
+		birth: translations['Scoreboard.Birth'] || translations.Birth || 'Born',
+		team: translations.Team || 'Team',
+		snatch: translations.Snatch || 'Snatch',
+		cleanJerk: translations.Clean_and_Jerk || 'Clean & Jerk',
+		total: translations['Scoreboard.Total'] || translations.TOTAL || 'Total',
+		score: translations.Score || 'Score',
+		best: translations.Best || '✔',
+		rank: translations.Rank || 'Rank',
+		session: translations.Session || 'Session',
+		top4scores: language === 'no' ? 'topp 4 poengsummer' : 'top 4 scores',
+		totalNextS: language === 'no' ? 'Total Neste S' : 'Total Next S',
+		scoreNextS: language === 'no' ? 'Poeng Neste S' : 'Score Next S'
+	};
+	console.log(`[NVF helpers] Built headers:`, headers);
+	
 	// Get learning mode from environment
 	const learningMode = process.env.LEARNING_MODE === 'true' ? 'enabled' : 'disabled';
 	
@@ -182,6 +229,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			timer: { state: 'stopped', timeRemaining: 0 },
 			sessionStatus: { isDone: false, groupName: '', lastActivity: 0 },  // Include default sessionStatus
 			teams: [],
+			headers,
 			status: 'waiting',
 			learningMode
 		};
@@ -195,13 +243,13 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// groupAthletes is now a parsed object, so stringify it first for hashing
 	const groupAthletesHash = fopUpdate?.groupAthletes ? 
 		JSON.stringify(fopUpdate.groupAthletes).substring(0, 100) : ''; // First 100 chars as quick hash
-	const cacheKey = `${fopName}-${groupAthletesHash}-${gender}-${topN}-${sortBy}-${currentAttemptInfo}`;
+	const cacheKey = `${fopName}-${groupAthletesHash}-${gender}-${topN}-${sortBy}-${currentAttemptInfo}-${language}`;
 	
-	console.log(`[NVF] Cache check - FOP: ${fopName}, Hash: ${groupAthletesHash.substring(0, 30)}..., Key: ${cacheKey.substring(0, 50)}...`);
+	console.log(`[NVF] Cache check - FOP: ${fopName}, Lang: ${language}, Hash: ${groupAthletesHash.substring(0, 30)}..., Key: ${cacheKey.substring(0, 50)}...`);
 	
 	if (nvfScoreboardCache.has(cacheKey)) {
 		const cached = nvfScoreboardCache.get(cacheKey);
-		console.log(`[NVF] ✓ Cache HIT`);
+		console.log(`[NVF] ✓ Cache HIT - returning cached headers:`, cached.headers);
 		
 		// Compute sessionStatusMessage from current fopUpdate (even on cache hit)
 		let sessionStatusMessage = null;
@@ -219,14 +267,22 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		};
 	}
 
+	// Determine current lift type from attempt number
+	const attemptNum = parseInt(fopUpdate?.attemptNumber || '0');
+	const liftType = attemptNum >= 1 && attemptNum <= 3 ? 'snatch' : 'cleanJerk';
+	const liftTypeLabel = liftType === 'snatch' ? 
+		(translations.Snatch || 'Snatch') : 
+		(translations.Clean_and_Jerk || 'Clean & Jerk');
+	
 	// Extract basic competition info
 	const competition = {
 		name: fopUpdate?.competitionName || databaseState?.competition?.name || 'Competition',
 		fop: fopName,
 		state: fopUpdate?.fopState || 'INACTIVE',
 		session: fopUpdate?.groupName || 'A',
-		// Replace HTML entities with Unicode characters
-		groupInfo: (fopUpdate?.groupInfo || '').replace(/&ndash;/g, '–').replace(/&mdash;/g, '—')
+		liftType: liftType,
+		// Always build custom groupInfo with translations (ignore OWLCMS groupInfo)
+		groupInfo: `${translations.Session || 'Session'} ${fopUpdate?.groupName || 'A'} - ${liftTypeLabel}`
 	};
 
 	// Extract current athlete info from UPDATE message
@@ -543,7 +599,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			teamScore,
 			teamNextScore,
 			teamNextTotal,
-			athleteCount: 'top 4 scores',
+			athleteCount: headers.top4scores,
 			top4CurrentLotNumbers,
 			top4PredictedLotNumbers
 		};
@@ -568,6 +624,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		teams, // Array of team objects with athletes
 		allAthletes, // Flat list if needed
 		stats,
+		headers,  // Translated header labels
 		displaySettings: fopUpdate?.showTotalRank || fopUpdate?.showSinclair ? {
 			showTotalRank: fopUpdate.showTotalRank === 'true',
 			showSinclair: fopUpdate.showSinclair === 'true',
@@ -592,6 +649,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		allAthletes: result.allAthletes,
 		stats: result.stats,
 		displaySettings: result.displaySettings,
+		headers: result.headers,
 		isBreak: result.isBreak,
 		breakType: result.breakType,
 		status: result.status,

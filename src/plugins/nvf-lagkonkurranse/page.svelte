@@ -1,6 +1,5 @@
 <script>
 	import { createTimer } from '$lib/timer-logic.js';
-	import { translations } from '$lib/stores.js';
 	import { onMount, onDestroy } from 'svelte';
 	import CurrentAttemptBar from '$lib/components/CurrentAttemptBar.svelte';
 
@@ -16,11 +15,8 @@
 		timerState = state;
 	});
 
-	// Current translations object (populated from store)
-	let t = {};
-	const unsubscribeTranslations = translations.subscribe(trans => {
-		t = trans.en || {};
-	});
+	// Language is handled server-side via data.headers
+	// No client-side translation needed
 
 	onMount(() => {
 		timer.start(data.timer);
@@ -29,7 +25,6 @@
 	onDestroy(() => {
 		timer.stop();
 		unsubscribe();
-		unsubscribeTranslations();
 	});
 
 	$: currentAttempt = data.currentAttempt;
@@ -101,6 +96,10 @@ export function shouldRenderFlag(url) {
 			showTimer={true}
 			compactMode={true}
 			showLifterInfo={data.options?.currentAttemptInfo ?? true}
+			translations={{
+				session: data.headers?.session || 'Session',
+				snatch: data.headers?.snatch || 'Snatch'
+			}}
 		/>
 	{/if}
 
@@ -110,40 +109,40 @@ export function shouldRenderFlag(url) {
 		{:else}
 			<div class="scoreboard-grid" class:compact-team-column={data.compactTeamColumn} role="grid">
 				<div class="grid-row header header-primary" role="row">
-					<div class="cell header col-start span-two" role="columnheader">{t.Order || t.Start || 'Order'}</div>
-					<div class="cell header col-name span-two" role="columnheader">{t.Name || 'Name'}</div>
-					<div class="cell header col-cat span-two" role="columnheader">{t.Category || 'Cat.'}</div>
-					<div class="cell header col-born span-two" role="columnheader">{t.Birth || 'Born'}</div>
-					<div class="cell header col-team span-two" role="columnheader">{t.Team || 'Team'}</div>
+					<div class="cell header col-start span-two" role="columnheader">{data.headers?.order || 'Order'}</div>
+					<div class="cell header col-name span-two" role="columnheader">{data.headers?.name || 'Name'}</div>
+					<div class="cell header col-cat span-two" role="columnheader">{data.headers?.category || 'Cat.'}</div>
+					<div class="cell header col-born span-two" role="columnheader">{data.headers?.birth || 'Born'}</div>
+					<div class="cell header col-team span-two" role="columnheader">{data.headers?.team || 'Team'}</div>
 					<div class="cell header v-spacer v-spacer-snatch span-two" aria-hidden="true"></div>
-					<div class="cell header col-group col-group-snatch" role="columnheader">{t.Snatch || 'Snatch'}</div>
+					<div class="cell header col-group col-group-snatch" role="columnheader">{data.headers?.snatch || 'Snatch'}</div>
 					<div class="cell header v-spacer v-spacer-middle span-two" aria-hidden="true"></div>
-					<div class="cell header col-group col-group-cj" role="columnheader">{t.Clean_and_Jerk || 'Clean & Jerk'}</div>
+					<div class="cell header col-group col-group-cj" role="columnheader">{data.headers?.cleanJerk || 'Clean & Jerk'}</div>
 					<div class="cell header v-spacer v-spacer-total span-two" aria-hidden="true"></div>
-					<div class="cell header col-total span-two" role="columnheader">{t.TOTAL || 'Total'}</div>
-					<div class="cell header col-score span-two" role="columnheader">{t.Score || 'Score'}</div>
+					<div class="cell header col-total span-two" role="columnheader">{data.headers?.total || 'Total'}</div>
+					<div class="cell header col-score span-two" role="columnheader">{data.headers?.score || 'Score'}</div>
 					<div class="cell header v-spacer v-spacer-next span-two" aria-hidden="true"></div>
-					<div class="cell header col-next-total span-two" role="columnheader">{t.TOTAL || 'Total'}<br/>Next S</div>
-					<div class="cell header col-next-score span-two" role="columnheader">{t.Score || 'Score'}<br/>Next S</div>
+					<div class="cell header col-next-total span-two" role="columnheader">{data.headers?.totalNextS || 'Total Next S'}</div>
+					<div class="cell header col-next-score span-two" role="columnheader">{data.headers?.scoreNextS || 'Score Next S'}</div>
 				</div>
 				<div class="grid-row header header-secondary" role="row">
-					<div class="cell header col-name-portrait" role="columnheader">{t.Name || 'Name'}</div>
+					<div class="cell header col-name-portrait" role="columnheader">{data.headers?.name || 'Name'}</div>
 					<div class="cell header v-spacer v-spacer-snatch" aria-hidden="true"></div>
 					<div class="cell header col-attempt snatch-1" role="columnheader">1</div>
 					<div class="cell header col-attempt snatch-2" role="columnheader">2</div>
 					<div class="cell header col-attempt snatch-3" role="columnheader">3</div>
-					<div class="cell header col-best snatch-best" role="columnheader">{t.Best || '✔'}</div>
+					<div class="cell header col-best snatch-best" role="columnheader">{data.headers?.best || '✔'}</div>
 					<div class="cell header v-spacer v-spacer-middle" aria-hidden="true"></div>
 					<div class="cell header col-attempt cj-1" role="columnheader">1</div>
 					<div class="cell header col-attempt cj-2" role="columnheader">2</div>
 					<div class="cell header col-attempt cj-3" role="columnheader">3</div>
-					<div class="cell header col-best cj-best" role="columnheader">{t.Best || '✔'}</div>
+					<div class="cell header col-best cj-best" role="columnheader">{data.headers?.best || '✔'}</div>
 					<div class="cell header v-spacer v-spacer-total" aria-hidden="true"></div>
-					<div class="cell header col-total-portrait" role="columnheader">{t.TOTAL || 'Total'}</div>
-					<div class="cell header col-score-portrait" role="columnheader">{t.Score || 'Score'}</div>
+					<div class="cell header col-total-portrait" role="columnheader">{data.headers?.total || 'Total'}</div>
+					<div class="cell header col-score-portrait" role="columnheader">{data.headers?.score || 'Score'}</div>
 					<div class="cell header v-spacer v-spacer-next" aria-hidden="true"></div>
-					<div class="cell header col-next-total-portrait" role="columnheader">NEXT S</div>
-					<div class="cell header col-next-score-portrait" role="columnheader">NEXT S</div>
+					<div class="cell header col-next-total-portrait" role="columnheader">{data.headers?.totalNextS || 'NEXT S'}</div>
+					<div class="cell header col-next-score-portrait" role="columnheader">{data.headers?.scoreNextS || 'NEXT S'}</div>
 				</div>
 
 				{#if teams.length > 0}
@@ -253,7 +252,7 @@ export function shouldRenderFlag(url) {
 		--col-best: 4.4rem;
 		--col-total: 4.9rem;
 		--col-score: 12ch;
-		--col-next-total: 4.9rem;
+		--col-next-total: 5.9rem;
 		--col-next-score: 12ch;
 		/* Header row heights: calculated to match session-results */
 		--header-primary-vpad: 0.2rem; /* vertical padding for primary header cells */
@@ -332,6 +331,13 @@ export function shouldRenderFlag(url) {
 
 	.col-group { justify-content: center; font-size: 1.1rem; }
 	.span-two { align-self: stretch; }
+
+	/* Center Next S column headers */
+	.header-primary .col-next-total,
+	.header-primary .col-next-score {
+		justify-content: center;
+		text-align: center;
+	}
 
 	.cell.v-spacer { background: #000; border: none; padding: 0; }
 	.cell.span-all { grid-column: 1 / -1; }
@@ -485,7 +491,7 @@ export function shouldRenderFlag(url) {
 			--col-best: 3.8rem;
 			--col-total: 4.5rem;
 			--col-score: 12ch;
-			--col-next-total: 4.5rem;
+			--col-next-total: 5.5rem;
 			--col-next-score: 12ch;
 		}
 		.scoreboard-grid.compact-team-column {
@@ -509,7 +515,7 @@ export function shouldRenderFlag(url) {
 			--col-best: 3.4rem;
 			--col-born: 0;
 			--col-score: 12ch;
-			--col-next-total: 4.2rem;
+			--col-next-total: 5.2rem;
 			--col-next-score: 11ch;
 			--header-primary-height: 2.5rem;
 		}

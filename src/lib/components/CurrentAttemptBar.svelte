@@ -12,6 +12,7 @@
 	export let showTimer = true;  // Control whether to show timer slot
 	export let compactMode = false;  // Simpler layout for team scoreboard
 	export let showLifterInfo = true;  // Toggle athlete/attempt info display
+	export let translations = {};  // Translated strings (session, snatch, etc.)
 	
 	function getRefereeClass(value) {
 		if (value === 'good') return 'good';
@@ -39,11 +40,7 @@
 			</div>
 		{/if}
 		<div class="session-info">
-			{#if competition?.groupInfo?.trim()}
-				{@html competition.groupInfo}{#if competition?.liftsDone} - {competition.liftsDone}{/if}
-			{:else}
-				Session{#if competition?.liftsDone} - {competition.liftsDone}{/if}
-			{/if}
+			{@html competition?.groupInfo || (translations.session || 'Session')}
 		</div>
 	</header>
 {:else}
@@ -95,10 +92,8 @@
 		<div class="session-info">
 			{#if sessionStatus?.isDone}
 				{@html '&nbsp;'}
-			{:else if competition?.groupInfo?.trim()}
-				{@html competition.groupInfo}{#if competition?.liftsDone} - {competition.liftsDone}{/if}
 			{:else}
-				Session{#if competition?.liftsDone} - {competition.liftsDone}{/if}
+				{@html competition?.groupInfo || (translations.session || 'Session')}
 			{/if}
 		</div>
 	</header>

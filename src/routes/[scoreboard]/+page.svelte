@@ -10,11 +10,11 @@
 	let scoreboardData = null;
 	let unsubscribeSSE = null;
 	
-	// Get language preference from URL parameter (default: 'en')
-	$: language = $page.url.searchParams.get('lang') || 'en';
+	// Get language preference from URL parameter or options (default: 'en')
+	$: language = $page.url.searchParams.get('lang') || $page.url.searchParams.get('language') || 'en';
 	
-	// Build API URL with all parameters
-	$: apiUrl = `/api/scoreboard?type=${data.scoreboardType}&fop=${data.fopName}` +
+	// Build API URL with all parameters (including lang)
+	$: apiUrl = `/api/scoreboard?type=${data.scoreboardType}&fop=${data.fopName}&lang=${language}` +
 		Object.entries(data.options).map(([k, v]) => `&${k}=${v}`).join('');
 	
 	// Fetch scoreboard data from API
