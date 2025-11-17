@@ -161,7 +161,6 @@ export function shouldRenderFlag(url) {
 						<span class="team-name-text">{team.teamName}</span>
 					</div>
 					<div class="cell team-stats" role="gridcell">{team.athleteCount}</div>
-					<div class="cell team-total" role="gridcell">&nbsp;</div>
 					<div class="cell team-score" role="gridcell">{formatScore(team.teamScore)}</div>
 					<div class="cell team-gap" aria-hidden="true"></div>
 					<div class="cell team-next-total" role="gridcell">&nbsp;</div>
@@ -414,8 +413,7 @@ export function shouldRenderFlag(url) {
 
 	/* Hide any data: URI flags (legacy placeholders) */
 	.team-flag[src^="data:image/"] { display: none; }
-	.grid-row.team-header > .team-stats { grid-column: 6 / 17; justify-content: flex-end; font-size: 0.95rem; color: #cbd5e0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-	.grid-row.team-header > .team-total { grid-column: 17; justify-content: center; font-size: 1.4rem; font-weight: bold; background: #4a5568 !important; color: #fff; border: none !important; }
+	.grid-row.team-header > .team-stats { grid-column: 6 / 18; justify-content: flex-end; font-size: 0.95rem; color: #cbd5e0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 	.grid-row.team-header > .team-score { grid-column: 18; justify-content: center; font-size: 1.4rem; font-weight: bold; background: #1b5e20 !important; color: #fff; border: none !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 	.grid-row.team-header > .team-gap { grid-column: 19; background: #000; border: none; padding: 0; }
 	.grid-row.team-header > .team-next-total { grid-column: 20; justify-content: center; font-size: 1.4rem; font-weight: bold; background: #4a5568 !important; color: #fff; border: none !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
