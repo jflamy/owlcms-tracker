@@ -20,7 +20,7 @@ export default {
 			key: 'currentAttemptInfo',
 			label: 'Show Current Attempt Info',
 			type: 'boolean',
-			default: true,
+			default: false,
 			description: 'Display current lifter information at the top'
 		},
 		{

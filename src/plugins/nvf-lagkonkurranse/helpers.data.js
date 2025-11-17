@@ -169,7 +169,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		}
 	}
 	
-	const currentAttemptInfo = options.currentAttemptInfo ?? true;
+	const currentAttemptInfo = options.currentAttemptInfo ?? false;
 	const topN = options.topN ?? 0;
 	
 	// Get language preference from options (default: 'no')
