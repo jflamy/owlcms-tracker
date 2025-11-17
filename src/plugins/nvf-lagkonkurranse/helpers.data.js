@@ -169,35 +169,15 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		}
 	}
 	
-	const currentAttemptInfo = options.currentAttemptInfo ?? false;
+	const currentAttemptInfo = options.currentAttemptInfo ?? true;
 	const topN = options.topN ?? 0;
 	
-	// Get language preference from options (default: 'en')
+	// Get language preference from options (default: 'no')
 	// Accept both 'lang' (URL param) and 'language' (config option)
-	const language = options.lang || options.language || 'en';
-	console.log(`[NVF helpers] Language requested: ${language}, options:`, options);
+	const language = options.lang || options.language || 'no';
 	
 	// Fetch translations from hub for the selected language
 	const translations = competitionHub.getTranslations(language);
-	console.log(`[NVF helpers] Got ${Object.keys(translations).length} translation keys for language '${language}'`);
-	console.log(`[NVF helpers] Sample translations:`, {
-		Name: translations.Name,
-		Team: translations.Team,
-		Snatch: translations.Snatch,
-		Total: translations.TOTAL,
-		Start: translations.Start,
-		Order: translations.Order,
-		Birth: translations.Birth,
-		Score: translations.Score,
-		Rank: translations.Rank,
-		Best: translations.Best,
-		Category: translations.Category,
-		Clean_and_Jerk: translations.Clean_and_Jerk
-	});
-	console.log(`[NVF helpers] Keys matching 'start': `, Object.keys(translations).filter(k => k.toLowerCase().includes('start')));
-	console.log(`[NVF helpers] Keys matching 'order': `, Object.keys(translations).filter(k => k.toLowerCase().includes('order')));
-	console.log(`[NVF helpers] Keys matching 'total': `, Object.keys(translations).filter(k => k.toLowerCase().includes('total')));
-	console.log(`[NVF helpers] Keys matching 'birth': `, Object.keys(translations).filter(k => k.toLowerCase().includes('birth')));
 	
 	// Build header labels from translations with fallbacks
 	const headers = {
@@ -242,14 +222,11 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// Use a hash of groupAthletes to detect when athlete data actually changes
 	// groupAthletes is now a parsed object, so stringify it first for hashing
 	const groupAthletesHash = fopUpdate?.groupAthletes ? 
-		JSON.stringify(fopUpdate.groupAthletes).substring(0, 100) : ''; // First 100 chars as quick hash
+		JSON.stringify(fopUpdate.groupAthletes) : ''; // Full JSON string as hash
 	const cacheKey = `${fopName}-${groupAthletesHash}-${gender}-${topN}-${sortBy}-${currentAttemptInfo}-${language}`;
-	
-	console.log(`[NVF] Cache check - FOP: ${fopName}, Lang: ${language}, Hash: ${groupAthletesHash.substring(0, 30)}..., Key: ${cacheKey.substring(0, 50)}...`);
 	
 	if (nvfScoreboardCache.has(cacheKey)) {
 		const cached = nvfScoreboardCache.get(cacheKey);
-		console.log(`[NVF] ✓ Cache HIT - returning cached headers:`, cached.headers);
 		
 		// Compute sessionStatusMessage from current fopUpdate (even on cache hit)
 		let sessionStatusMessage = null;
@@ -267,9 +244,9 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		};
 	}
 
-	// Determine current lift type from attempt number
-	const attemptNum = parseInt(fopUpdate?.attemptNumber || '0');
-	const liftType = attemptNum >= 1 && attemptNum <= 3 ? 'snatch' : 'cleanJerk';
+	// Determine current lift type from OWLCMS liftTypeKey field
+	const liftTypeKey = fopUpdate?.liftTypeKey || 'Snatch';
+	const liftType = liftTypeKey === 'Snatch' ? 'snatch' : 'cleanJerk';
 	const liftTypeLabel = liftType === 'snatch' ? 
 		(translations.Snatch || 'Snatch') : 
 		(translations.Clean_and_Jerk || 'Clean & Jerk');
@@ -641,7 +618,6 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	};
 	
 	// Cache the result (excluding timer, learningMode, sessionStatus, and sessionStatusMessage which change frequently)
-	console.log(`[NVF] Cache MISS - computing data for key: ${cacheKey.substring(0, 50)}...`);
 	nvfScoreboardCache.set(cacheKey, {
 		competition: result.competition,
 		currentAttempt: result.currentAttempt,

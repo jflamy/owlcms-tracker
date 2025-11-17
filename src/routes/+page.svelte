@@ -11,6 +11,20 @@
   
   // Collapse state for categories (accordion behavior - only one open at a time)
   let expandedCategory = 'standard'; // Start with standard expanded
+
+  // Language name translations (for displaying language options)
+  const languageNames = {
+    'en': 'English',
+    'no': 'Norsk'
+  };
+
+  function getDisplayName(option, optionKey) {
+    // If this is a language option, use the language name translations
+    if (optionKey === 'language' && languageNames[option]) {
+      return languageNames[option];
+    }
+    return option;
+  }
   
   // Categorize scoreboards
   $: standardScoreboards = [
@@ -141,7 +155,7 @@
             {#each standardScoreboards as scoreboard}
               <div class="scoreboard-card">
                 <h3>{scoreboard.name}</h3>
-                <p class="description">{scoreboard.description}</p>
+                <p class="description">{@html scoreboard.description}</p>
                 
                 <div class="fop-links">
                   <h4>Select Platform:</h4>
@@ -162,7 +176,7 @@
                             on:click={() => openOptionsModal(scoreboard, fop)}
                             title="Configure options for Platform {fop}"
                           >
-                            ⚙️
+                            ⚙️ Options
                           </button>
                         {/if}
                       </div>
@@ -189,7 +203,7 @@
               {#each teamScoreboards as scoreboard}
                 <div class="scoreboard-card">
                   <h3>{scoreboard.name}</h3>
-                  <p class="description">{scoreboard.description}</p>
+                  <p class="description">{@html scoreboard.description}</p>
                   
                   <div class="fop-links">
                     <h4>Select Platform:</h4>
@@ -210,7 +224,7 @@
                               on:click={() => openOptionsModal(scoreboard, fop)}
                               title="Configure options for Platform {fop}"
                             >
-                              ⚙️
+                              ⚙️ Options
                             </button>
                           {/if}
                         </div>
@@ -238,7 +252,7 @@
               {#each lowerThirdScoreboards as scoreboard}
                 <div class="scoreboard-card">
                   <h3>{scoreboard.name}</h3>
-                  <p class="description">{scoreboard.description}</p>
+                  <p class="description">{@html scoreboard.description}</p>
                   
                   <div class="fop-links">
                     <h4>Select Platform:</h4>
@@ -325,7 +339,7 @@
                     bind:value={scoreboardOptions[modalScoreboard.type][modalFop][option.key]}
                   >
                     {#each option.options as opt}
-                      <option value={opt}>{opt}</option>
+                      <option value={opt}>{getDisplayName(opt, option.key)}</option>
                     {/each}
                   </select>
                 {:else if option.type === 'boolean'}
@@ -508,19 +522,20 @@
   }
   
   .options-btn {
-    width: 2.5rem;
+    width: auto;
     height: 2.5rem;
-    padding: 0;
+    padding: 0 1rem;
     background: rgba(255, 255, 255, 0.1);
     border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 8px;
     color: white;
-    font-size: 1.2rem;
+    font-size: 0.95rem;
     cursor: pointer;
     transition: all 0.2s;
     display: flex;
     align-items: center;
     justify-content: center;
+    gap: 0.5rem;
   }
   
   .options-btn:hover {

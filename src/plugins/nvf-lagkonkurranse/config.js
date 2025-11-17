@@ -9,7 +9,7 @@ export default {
 	name: 'NVF Lagkonkurranse',
 	
 	// Description for AI assistants
-	description: 'Norwegian team league competition scoreboard showing team rankings with athletes grouped by team',
+	description: 'Norske lagkonkurranser med forutsatt totalt og poengsum hvis neste løft lykkes.<br><br>Norwegian team league competitions with predicted total and score if the next lift is successful.',
 	
 	// Whether this scoreboard requires athlete pictures
 	requiresPictures: false,
@@ -17,27 +17,26 @@ export default {
 	// User-configurable options
 	options: [
 		{
-			key: 'gender',
-			label: 'Mixed (both genders)',
-			type: 'boolean',
-			default: false,
-			description: 'Show both men and women (unchecked = show only current athlete gender)'
-		},
-		{
 			key: 'currentAttemptInfo',
 			label: 'Show Current Attempt Info',
 			type: 'boolean',
 			default: true,
 			description: 'Display current lifter information at the top'
-		}
-		,
+		},
 		{
 			key: 'language',
 			label: 'Language',
 			type: 'select',
 			options: ['en', 'no'],
-			default: 'en',
+			default: 'no',
 			description: 'Choose scoreboard text language (English or Norwegian)'
+		},
+		{
+			key: 'gender',
+			label: 'Mixed (both genders)',
+			type: 'boolean',
+			default: false,
+			description: 'Show both men and women (unchecked = show only current athlete gender)'
 		},
 	],
 	

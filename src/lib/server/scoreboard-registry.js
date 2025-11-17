@@ -66,7 +66,6 @@ class ScoreboardRegistry {
 		}
 
 		this.initialized = true;
-		console.log('[ScoreboardRegistry] Registered scoreboards: (' + this.scoreboards.size + ') ' + JSON.stringify(Array.from(this.scoreboards.keys())));
 	}
 
 	/**

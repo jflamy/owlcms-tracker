@@ -412,12 +412,12 @@ export function shouldRenderFlag(url) {
 
 	/* Hide any data: URI flags (legacy placeholders) */
 	.team-flag[src^="data:image/"] { display: none; }
-	.grid-row.team-header > .team-stats { grid-column: 6 / 17; justify-content: flex-start; font-size: 0.95rem; color: #cbd5e0; }
+	.grid-row.team-header > .team-stats { grid-column: 6 / 16; justify-content: flex-start; font-size: 0.95rem; color: #cbd5e0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 	.grid-row.team-header > .team-total { grid-column: 17; justify-content: center; font-size: 1.4rem; font-weight: bold; background: #4a5568 !important; color: #fff; border: none !important; }
-	.grid-row.team-header > .team-score { grid-column: 18; justify-content: center; font-size: 1.4rem; font-weight: bold; background: #1b5e20 !important; color: #fff; border: none !important; }
+	.grid-row.team-header > .team-score { grid-column: 18; justify-content: center; font-size: 1.4rem; font-weight: bold; background: #1b5e20 !important; color: #fff; border: none !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 	.grid-row.team-header > .team-gap { grid-column: 19; background: #000; border: none; padding: 0; }
-	.grid-row.team-header > .team-next-total { grid-column: 20; justify-content: center; font-size: 1.4rem; font-weight: bold; background: #4a5568 !important; color: #fff; border: none !important; }
-	.grid-row.team-header > .team-next-score { grid-column: 21; justify-content: center; font-size: 1.4rem; font-weight: bold; border-right: 8px solid #4a5568; background: #831843 !important; color: #fff; border: none !important; border-right: 8px solid #4a5568 !important; }
+	.grid-row.team-header > .team-next-total { grid-column: 20; justify-content: center; font-size: 1.4rem; font-weight: bold; background: #4a5568 !important; color: #fff; border: none !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	.grid-row.team-header > .team-next-score { grid-column: 21; justify-content: center; font-size: 1.4rem; font-weight: bold; border-right: 8px solid #4a5568; background: #831843 !important; color: #fff; border: none !important; border-right: 8px solid #4a5568 !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 	/* Highlight athlete scores that contribute to team score */
 	.grid-row.data-row > .score.in-top4-current { background: #1b5e20 !important; color: #fff !important; font-weight: bold; }
