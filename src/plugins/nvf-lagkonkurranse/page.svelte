@@ -244,9 +244,9 @@ export function shouldRenderFlag(url) {
 		--col-name: minmax(14rem, 2.5fr);
 		--col-cat: 14ch;
 		--col-born: 14ch;
-		--col-team-min: 6rem;
-		--col-team-max: 1.2fr;
-		--col-team: minmax(var(--col-team-min), var(--col-team-max));
+		--col-team-min: 0;
+		--col-team-max: 0;
+		--col-team: 0;
 		--col-gap: var(--grid-gap-size);
 		--col-attempt: 4.4rem;
 		--col-best: 4.4rem;
@@ -282,7 +282,7 @@ export function shouldRenderFlag(url) {
 			var(--col-next-score);
 		grid-template-rows: var(--header-primary-height) var(--header-secondary-height) var(--template-rows);
 		row-gap: 0;
-		font-size: 1.1rem;
+		font-size: 1.2rem;
 		line-height: 1;
 	}
 
@@ -351,6 +351,7 @@ export function shouldRenderFlag(url) {
 
 	.cell.cat { justify-content: center; padding: 0; text-align: center; white-space: nowrap; }
 	.cell.start-num { font-weight: bold; color: #fbbf24; }
+	.cell.col-team { visibility: hidden; width: 0; padding: 0; border: none; }
 
 	.cell.best,
 	.cell.total,
@@ -379,7 +380,7 @@ export function shouldRenderFlag(url) {
 	.grid-row.data-row > .name { grid-column: 2; }
 	.grid-row.data-row > .cat { grid-column: 3; }
 	.grid-row.data-row > .born { grid-column: 4; }
-	.grid-row.data-row > .team-name { grid-column: 5; }
+	.grid-row.data-row > .team-name { grid-column: 5; visibility: hidden; width: 0; padding: 0; border: none; }
 	.grid-row.data-row > .v-spacer:nth-of-type(1) { grid-column: 6; }
 	.grid-row.data-row > .attempt:nth-of-type(1) { grid-column: 7; }
 	.grid-row.data-row > .attempt:nth-of-type(2) { grid-column: 8; }
