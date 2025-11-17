@@ -158,7 +158,7 @@ export function shouldRenderFlag(url) {
 						{#if shouldRenderFlag(team.flagUrl)}
 							<img src={team.flagUrl} alt={team.teamName} class="team-flag" />
 						{/if}
-						{team.teamName}
+						<span class="team-name-text">{team.teamName}</span>
 					</div>
 					<div class="cell team-stats" role="gridcell">{team.athleteCount}</div>
 					<div class="cell team-total" role="gridcell">&nbsp;</div>
@@ -244,8 +244,8 @@ export function shouldRenderFlag(url) {
 		--col-name: minmax(14rem, 2.5fr);
 		--col-cat: 14ch;
 		--col-born: 14ch;
-		--col-team-min: 8rem;
-		--col-team-max: 1.8fr;
+		--col-team-min: 6rem;
+		--col-team-max: 1.2fr;
 		--col-team: minmax(var(--col-team-min), var(--col-team-max));
 		--col-gap: var(--grid-gap-size);
 		--col-attempt: 4.4rem;
@@ -287,9 +287,9 @@ export function shouldRenderFlag(url) {
 	}
 
 	.scoreboard-grid.compact-team-column {
-		--col-team-min: 5rem;
-		--col-team-max: 5rem;
-		--col-team: 5rem;
+		--col-team-min: 6rem;
+		--col-team-max: 6rem;
+		--col-team: 6rem;
 	}
 
 	.grid-row { display: contents; }
@@ -407,12 +407,13 @@ export function shouldRenderFlag(url) {
 		border-top: 4px solid #4a5568;
 		border-bottom: 4px solid #4a5568;
 	}
-	.grid-row.team-header > .team-name-header { grid-column: 1 / span 5; justify-content: flex-start; font-size: 1.6rem; text-shadow: 1px 1px 2px rgba(0,0,0,0.7); border-left: 8px solid #4a5568; display: flex; align-items: center; gap: 0.75rem; }
+	.grid-row.team-header > .team-name-header { grid-column: 1 / span 5; justify-content: flex-start; font-size: 1.6rem; text-shadow: 1px 1px 2px rgba(0,0,0,0.7); border-left: 8px solid #4a5568; display: flex; align-items: center; gap: 0.75rem; overflow: visible; white-space: nowrap; }
 	.grid-row.team-header > .team-name-header .team-flag { height: 1.5rem; max-width: 2rem; object-fit: contain; }
+	.grid-row.team-header > .team-name-header .team-name-text { flex: 1; min-width: 0; white-space: nowrap; overflow: visible; }
 
 	/* Hide any data: URI flags (legacy placeholders) */
 	.team-flag[src^="data:image/"] { display: none; }
-	.grid-row.team-header > .team-stats { grid-column: 6 / 17; justify-content: flex-end; font-size: 0.95rem; color: #cbd5e0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	.grid-row.team-header > .team-stats { grid-column: 6 / 17; justify-content: flex-end; font-size: 0.95rem; color: #cbd5e0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 	.grid-row.team-header > .team-total { grid-column: 17; justify-content: center; font-size: 1.4rem; font-weight: bold; background: #4a5568 !important; color: #fff; border: none !important; }
 	.grid-row.team-header > .team-score { grid-column: 18; justify-content: center; font-size: 1.4rem; font-weight: bold; background: #1b5e20 !important; color: #fff; border: none !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 	.grid-row.team-header > .team-gap { grid-column: 19; background: #000; border: none; padding: 0; }
@@ -560,12 +561,12 @@ export function shouldRenderFlag(url) {
 	
 	/* Compact team column for small team sizes (< 7 athletes) */
 	.scoreboard-grid.compact-team-column .grid-row.team-header > .team-name-header {
-		grid-column: 1 / span 3;
+		grid-column: 1 / span 5;
 		font-size: 1.4rem;
 	}
 	
 	.scoreboard-grid.compact-team-column .grid-row.team-header > .team-stats {
-		grid-column: 4 / 18;
+		grid-column: 6 / 17;
 	}
 	
 	.scoreboard-grid.compact-team-column .grid-row.team-athlete > .team-name {
