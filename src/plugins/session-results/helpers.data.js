@@ -3,7 +3,9 @@
  */
 
 import { competitionHub } from '$lib/server/competition-hub.js';
+import { extractRecordsFromUpdate } from '$lib/server/records-extractor.js';
 import { getFlagUrl } from '$lib/server/flag-resolver.js';
+import { getCompetitionState } from './helpers.js';
 
 // Track timer visibility state per FOP so StopTime events behave like SetTime when clock is idle
 const timerStateMap = new Map();
@@ -42,105 +44,46 @@ export function getFopUpdate(fopName = 'A') {
 export function getScoreboardData(fopName = 'A', options = {}) {
 	const fopUpdate = getFopUpdate(fopName);
 	const databaseState = getDatabaseState();
-	
-	// Extract options with defaults
-	const showRecords = options.showRecords ?? false;
-	
-	// Get learning mode from environment
+	const showRecords = options.showRecords ?? true;
 	const learningMode = process.env.LEARNING_MODE === 'true' ? 'enabled' : 'disabled';
-	
-	if (!fopUpdate && !databaseState) {
-		return {
-			competition: { name: 'No Competition Data', fop: 'unknown' },
-			currentAthlete: null,
-			timer: { state: 'stopped', timeRemaining: 0 },
-			decision: extractDecisionState(fopUpdate),
-			records: [],
-			liftingOrderAthletes: [],
-			groupAthletes: [],
-			rankings: [],
-			stats: { totalAthletes: 0, activeAthletes: 0, completedAthletes: 0, categories: [], teams: [] },
-			status: 'waiting',
-			learningMode
-		};
-	}
-
-	// Get session status early (before cache check, so it's always fresh)
 	const sessionStatus = competitionHub.getSessionStatus(fopName);
-
-	// Check cache first - cache key based on session athletes data, NOT timer events or UI preferences
-	// Use length + first item ID as quick hash instead of expensive JSON.stringify
-	// This avoids memory spikes when loading multiple scoreboards simultaneously
-	const sessionAthletesHash = fopUpdate?.groupAthletes ? 
-		`${fopUpdate.groupAthletes.length}-${fopUpdate.groupAthletes[0]?.id || 0}` : '';
-	const cacheKey = `${fopName}-${sessionAthletesHash}`;
-	
-	if (sessionResultsCache.has(cacheKey)) {
-		const cached = sessionResultsCache.get(cacheKey);
-		
-		// Extract current athlete from groupAthletes (single source of truth)
-		let currentAttempt = null;
-		const groupAthletes = fopUpdate?.groupAthletes || [];
-		const currentAthlete = groupAthletes.find(a => a.classname && a.classname.includes('current'));
-		if (currentAthlete) {
-			currentAttempt = {
-				fullName: currentAthlete.fullName,
-				name: currentAthlete.fullName,
-				teamName: currentAthlete.teamName,
-				team: currentAthlete.teamName,
-				flagUrl: getFlagUrl(currentAthlete.teamName, true),
-				startNumber: currentAthlete.startNumber,
-				categoryName: currentAthlete.category,
-				category: currentAthlete.category,
-				attempt: fopUpdate?.attempt || '',  // Use preformatted attempt from fopUpdate
-				attemptNumber: fopUpdate?.attemptNumber,
-				weight: fopUpdate?.weight || '-',  // Use weight directly from fopUpdate
-				timeAllowed: fopUpdate?.timeAllowed,
-				startTime: null
-			};
-		}
-		
-		// Compute sessionStatusMessage from current fopUpdate (even on cache hit)
-		let sessionStatusMessage = null;
-		if (sessionStatus.isDone && fopUpdate?.fullName) {
-			sessionStatusMessage = (fopUpdate.fullName || '').replace(/&ndash;/g, '–').replace(/&mdash;/g, '—');
-		}
-		
-		// Return cached data with current athlete, timer state, session status, and status message
-		return {
-			...cached,
-			currentAttempt,  // Fresh current athlete from groupAthletes
-			timer: extractTimerState(fopUpdate, fopName),
-			decision: extractDecisionState(fopUpdate),
-			sessionStatus,  // Fresh session status
-			sessionStatusMessage,  // Fresh status message
-			learningMode
-		};
-	}
-
-	// Extract basic competition info
+	const timer = extractTimerState(fopUpdate, fopName);
 	const competition = {
 		name: fopUpdate?.competitionName || databaseState?.competition?.name || 'Competition',
 		fop: fopName,
 		state: fopUpdate?.fopState || 'INACTIVE',
 		session: fopUpdate?.groupName || 'A',
-		// Replace HTML entities with Unicode characters
-		groupInfo: (fopUpdate?.groupInfo || '').replace(/&ndash;/g, '–').replace(/&mdash;/g, '—'),
-		liftsDone: fopUpdate?.liftsDone || ''  // Pre-formatted string from OWLCMS
+		groupInfo: (fopUpdate?.groupInfo || '').replace(/&ndash;/g, '\u2013').replace(/&mdash;/g, '\u2014'),
+		liftsDone: fopUpdate?.liftsDone || ''
 	};
-
-	// Extract timer info from UPDATE message or keep previous timer state
-	const timer = extractTimerState(fopUpdate, fopName);
-	const decision = extractDecisionState(fopUpdate);
+	let groupAthletes = fopUpdate?.groupAthletes || [];
+	if (typeof groupAthletes === 'string') {
+		try {
+			groupAthletes = JSON.parse(groupAthletes);
+		} catch (error) {
+			console.error('[SessionResults] Failed to parse groupAthletes JSON:', error);
+			groupAthletes = [];
+		}
+	} else if (!Array.isArray(groupAthletes)) {
+		groupAthletes = [];
+	}
 	const records = extractRecordsFromUpdate(fopUpdate);
 
-	// Get precomputed groupAthletes from UPDATE message (already JSON-encoded string)
-	// This contains all athletes in standard order (sorted by category, lot number)
-	let groupAthletes = [];
-	if (fopUpdate?.groupAthletes) {
-		// groupAthletes is already a parsed object (nested JSON from WebSocket)
-		groupAthletes = fopUpdate.groupAthletes;
+	// Debug: log raw records payload and parsed records for troubleshooting
+	try {
+		if (fopUpdate?.records) {
+			const raw = typeof fopUpdate.records === 'string'
+				? `${fopUpdate.records.substring(0, 1000)}${fopUpdate.records.length > 1000 ? '...<truncated>' : ''}`
+				: fopUpdate.records;
+			console.log('[SessionResults] Raw fopUpdate.records payload:', raw);
+			console.log('[SessionResults] Parsed records (extractRecordsFromUpdate):', JSON.stringify(records, null, 2));
+		}
+	} catch (err) {
+		console.error('[SessionResults] Error logging records payload:', err?.message || err);
 	}
+	const decision = extractDecisionState(fopUpdate);
+	const groupAthletesHash = groupAthletes.map(athlete => athlete?.lotNumber || athlete?.startNumber || athlete?.fullName).join('-');
+	const cacheKey = `${fopName}-${groupAthletesHash}`;
 	
 	// Extract current athlete from groupAthletes (has classname="current" or "current blink")
 	let currentAttempt = null;
@@ -163,9 +106,27 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		};
 	}
 	
+	// Compute sessionStatusMessage from current fopUpdate
+	let sessionStatusMessage = null;
+	if (sessionStatus.isDone && fopUpdate?.fullName) {
+		sessionStatusMessage = (fopUpdate.fullName || '').replace(/&ndash;/g, '\u2013').replace(/&mdash;/g, '\u2014');
+	}
+
+	if (sessionResultsCache.has(cacheKey)) {
+		const cached = sessionResultsCache.get(cacheKey);
+		return {
+			...cached,
+			timer,
+			decision,
+			sessionStatus,
+			sessionStatusMessage,
+			learningMode
+		};
+	}
+
 	// Get competition stats (needed even for waiting status)
 	const stats = getCompetitionStats(databaseState);
-	
+
 	// Extract leaders from fopUpdate (now a proper JSON array from OWLCMS)
 	// Keep OWLCMS spacers (isSpacer flag) for accurate grid row counting
 	let leaders = [];
@@ -177,12 +138,6 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			}));
 	}
 	
-	// Compute sessionStatusMessage from current fopUpdate
-	let sessionStatusMessage = null;
-	if (sessionStatus.isDone && fopUpdate?.fullName) {
-		sessionStatusMessage = (fopUpdate.fullName || '').replace(/&ndash;/g, '–').replace(/&mdash;/g, '—');
-	}
-	
 	// If no session athletes available, return waiting status
 	// We need the UPDATE message from OWLCMS with precomputed presentation data (stored in groupAthletes key)
 	if (groupAthletes.length === 0) {
@@ -190,7 +145,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			competition,
 			currentAttempt,
 			timer,
-			decision: extractDecisionState(fopUpdate),
+			decision,
 			records,
 			sessionStatus,  // Include session status even in waiting state
 			sessionStatusMessage,  // Include status message
@@ -342,7 +297,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		sessionResultsCache.delete(firstKey);
 	}
 
- 	return {
+	return {
 		...result,
 		sessionStatus,  // Always include fresh session status
 		learningMode
@@ -421,148 +376,6 @@ function extractTimerState(fopUpdate, fopName = 'A') {
 		duration: parseInt(fopUpdate?.timeAllowed || 60000),
 		startTime: null
 	};
-}
-
-/**
- * Extract records from UPDATE message
- * Records come as a JSON string in fopUpdate.records
- * Format: {"recordNames":["PanAm"],"recordCategories":["JR 86","SR 86"],"recordTable":[...]}
- * Returns: Array of objects grouped by federation with categories and lift values
- */
-function extractRecordsFromUpdate(fopUpdate) {
-	if (!fopUpdate?.records) {
-		return [];
-	}
-
-	try {
-		// Parse the JSON string
-		const recordsData = typeof fopUpdate.records === 'string' 
-			? JSON.parse(fopUpdate.records) 
-			: fopUpdate.records;
-
-		if (!recordsData?.recordTable || !recordsData?.recordNames) {
-			return [];
-		}
-
-		// Helper to check if a value is "empty" (spaces, empty string, falsy, etc.)
-		const isEmpty = (val) => !val || val === '' || (typeof val === 'string' && val.trim() === '');
-
-		// Track unique categories to detect collisions (e.g., two "JR 77" with different meanings)
-		const categoryNameCounts = {};
-		const categoryKeyMap = {}; // Maps displayName to unique keys: "JR 77" -> ["JR 77-1", "JR 77-2"]
-
-		// First pass: identify category collisions and create unique keys
-		for (const block of recordsData.recordTable) {
-			const displayName = block.cat || '';
-			if (!categoryNameCounts[displayName]) {
-				categoryNameCounts[displayName] = 0;
-			}
-			categoryNameCounts[displayName]++;
-		}
-
-		// Create unique keys for categories with collisions
-		const categoryCounters = {}; // Tracks current count for each display name
-		for (const block of recordsData.recordTable) {
-			const displayName = block.cat || '';
-			const hasCollision = categoryNameCounts[displayName] > 1;
-			
-			if (!categoryCounters[displayName]) {
-				categoryCounters[displayName] = 0;
-			}
-			categoryCounters[displayName]++;
-			
-			// Create unique key: use display name if no collision, else add -1, -2, etc.
-			const uniqueKey = hasCollision ? `${displayName}-${categoryCounters[displayName]}` : displayName;
-			
-			if (!categoryKeyMap[displayName]) {
-				categoryKeyMap[displayName] = [];
-			}
-			if (!categoryKeyMap[displayName].includes(uniqueKey)) {
-				categoryKeyMap[displayName].push(uniqueKey);
-			}
-			
-			block._uniqueKey = uniqueKey; // Store unique key for later use
-		}
-
-		// Build structure: recordsByFederation[fedName] = { categories: Set, recordsByCategory: {...} }
-		const recordsByFederation = {};
-		
-		// Initialize each federation
-		for (const fedName of recordsData.recordNames) {
-			recordsByFederation[fedName] = {
-				categories: new Set(),
-				recordsByCategory: {}
-			};
-		}
-
-		// Iterate through each record block
-		for (const block of recordsData.recordTable) {
-			if (!block.records || block.records.length === 0) {
-				continue;
-			}
-
-			const displayName = block.cat || '';
-			const uniqueKey = block._uniqueKey; // Use the unique key we created
-			
-			// Each position in block.records corresponds to a federation in recordNames
-			for (let fedIndex = 0; fedIndex < recordsData.recordNames.length; fedIndex++) {
-				const recordObj = block.records[fedIndex];
-				const fedName = recordsData.recordNames[fedIndex];
-				
-				if (!recordObj) continue;
-
-				// Initialize category for this federation if not already present
-				if (!recordsByFederation[fedName].recordsByCategory[uniqueKey]) {
-					recordsByFederation[fedName].recordsByCategory[uniqueKey] = {
-						displayName, // Store display name for rendering
-						S: null,
-						CJ: null,
-						T: null
-					};
-				}
-
-				// Track this category for this federation
-				recordsByFederation[fedName].categories.add(uniqueKey);
-
-				// Extract SNATCH with optional snatchHighlight
-				if (!isEmpty(recordObj.SNATCH)) {
-					recordsByFederation[fedName].recordsByCategory[uniqueKey].S = {
-						value: recordObj.SNATCH,
-						highlight: recordObj.snatchHighlight || null
-					};
-				}
-
-				// Extract CLEANJERK with optional cjHighlight
-				if (!isEmpty(recordObj.CLEANJERK)) {
-					recordsByFederation[fedName].recordsByCategory[uniqueKey].CJ = {
-						value: recordObj.CLEANJERK,
-						highlight: recordObj.cjHighlight || null
-					};
-				}
-
-				// Extract TOTAL with optional totalHighlight
-				if (!isEmpty(recordObj.TOTAL)) {
-					recordsByFederation[fedName].recordsByCategory[uniqueKey].T = {
-						value: recordObj.TOTAL,
-						highlight: recordObj.totalHighlight || null
-					};
-				}
-			}
-		}
-
-		// Convert to flat array format for easier frontend consumption
-		// Returns: [ { federation, categories: [cat1, cat2, ...], records: { cat1: {displayName, S, CJ, T}, cat2: {...}, ... } } ]
-		return Object.entries(recordsByFederation)
-			.filter(([fedName, data]) => data.categories.size > 0)
-			.map(([fedName, data]) => ({
-				federation: fedName,
-				categories: Array.from(data.categories).sort(),
-				records: data.recordsByCategory
-			}));
-	} catch (error) {
-		console.error('[Session Results] Error parsing records:', error);
-		return [];
-	}
 }
 
 function extractDecisionState(fopUpdate) {

@@ -93,8 +93,9 @@ export function handleBinaryMessage(buffer) {
 			return;
 		}
 
-		// Read type length as little-endian 32-bit integer (OWLCMS sends little-endian)
-		const typeLength = buffer.readUInt32LE(0);
+		// Read type length as big-endian 32-bit integer (network byte order)
+		// OWLCMS prefixes binary frames with a 4-byte big-endian length for the type string
+		const typeLength = buffer.readUInt32BE(0);
 
 		// Log first 20 bytes for debugging
 		const preview = buffer.slice(0, Math.min(20, buffer.length)).toString('hex');

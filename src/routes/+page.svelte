@@ -116,9 +116,25 @@
 
     const handleMessage = (event) => {
       try {
-        const payload = JSON.parse(event.data || '{}');
-        if (payload?.type === 'state_update' && payload?.data?.fops?.length) {
+        const msg = JSON.parse(event.data || '{}');
+
+        // Normalize the message body - the hub sometimes uses `data`, sometimes `payload`.
+        const body = msg?.data || msg?.payload || msg || {};
+
+        // Accept several event types that indicate competition data is available.
+        // OWLCMS/hub may send 'state_update', 'competition_initialized', 'init', or 'fop_update'.
+        const okTypes = ['state_update', 'competition_initialized', 'init', 'fop_update'];
+
+        const hasFops = Array.isArray(body?.fops) && body.fops.length > 0;
+        const hasCompetition = !!body?.competition;
+
+        if (okTypes.includes(msg?.type) && (hasFops || hasCompetition || msg?.type === 'fop_update')) {
           markConfirmed();
+        }
+        // If the hub explicitly sent a 'waiting' message, ensure we reflect that
+        // by marking `confirmedFops` false so the UI returns to the Waiting state.
+        if (msg?.type === 'waiting' || body?.message?.toLowerCase?.().includes('waiting')) {
+          confirmedFops = false;
         }
       } catch (error) {
         console.warn('[Landing Page] Unable to parse SSE payload', error);

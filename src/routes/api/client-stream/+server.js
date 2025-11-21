@@ -52,6 +52,14 @@ export async function GET({ request, url }) {
           // Controller might already be closed - ignore
         }
       };
+      // Ensure we listen for client aborts as early as possible to avoid races
+      // where the request was aborted before the listener was registered.
+      request.signal.addEventListener('abort', cleanup);
+      if (request.signal.aborted) {
+        // Client already disconnected - clean up immediately
+        cleanup();
+        return;
+      }
 
       // Send initial state if available
       const currentState = competitionHub.getState();
@@ -94,18 +102,14 @@ export async function GET({ request, url }) {
         }
       }
 
-      // Subscribe to hub updates
+      // Subscribe to hub updates (future broadcasts)
       unsubscribe = competitionHub.subscribe((data) => {
         if (!isClosed) {
           send(data);
         }
       });
 
-      // NO KEEPALIVE - this might be causing the issues
-      // We'll rely on the browser's natural connection management
-      
-      // Handle client disconnect
-      request.signal.addEventListener('abort', cleanup);
+      // NO KEEPALIVE - rely on browser's connection management for now
     }
   });
 

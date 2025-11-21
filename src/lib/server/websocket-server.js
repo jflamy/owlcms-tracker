@@ -110,6 +110,16 @@ export function initWebSocketServer(httpServer) {
 			} else {
 				console.log(`[WebSocket] Client disconnected normally: code=${code}, reason="${reason}"`);
 			}
+
+			try {
+				// When the OWLCMS connection closes, force the hub into a waiting state
+				// so browsers show 'Waiting for Competition Data'. This avoids stale UI
+				// when the authoritative source disconnects.
+				console.log('[WebSocket] OWLCMS connection closed - forcing hub refresh (entering waiting state)');
+				competitionHub.refresh();
+			} catch (err) {
+				console.error('[WebSocket] Error while refreshing hub state after WS close:', err?.message || err);
+			}
 		});
 	});
 	

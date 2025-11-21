@@ -24,13 +24,6 @@ export default {
 			default: true,
 			description: 'Display the leaders section on the grid'
 		},
-		{
-			key: 'showRecords',
-			label: 'Show Records',
-			type: 'boolean',
-			default: false,
-			description: 'Display competition records'
-		}
 	],
 	requiredFields: ['fullName', 'total', 'totalRank']
 };

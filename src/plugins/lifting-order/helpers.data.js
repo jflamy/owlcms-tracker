@@ -4,6 +4,7 @@
 
 import { competitionHub } from '$lib/server/competition-hub.js';
 import { getFlagUrl } from '$lib/server/flag-resolver.js';
+import { extractRecordsFromUpdate } from '$lib/server/records-extractor.js';
 
 /**
  * Plugin-specific cache to avoid recomputing lifting order on every browser request
@@ -142,6 +143,9 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	const timer = extractTimerState(fopUpdate, fopName);
 	const decision = extractDecisionState(fopUpdate);
 
+	// Extract records from UPDATE message (shared extractor)
+	const records = extractRecordsFromUpdate(fopUpdate);
+
 	// Get precomputed liftingOrderAthletes from UPDATE message (already parsed as nested object)
 	let liftingOrderAthletes = [];
 	if (fopUpdate?.liftingOrderAthletes) {
@@ -214,6 +218,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		groupAthletes,         // Precomputed from OWLCMS UPDATE
 		leaders,               // Leaders from previous sessions (from OWLCMS)
 		rankings,              // Computed from database
+		records,               // Records from current session UPDATE
 		stats,
 		gridTemplateRows,
 		resultRows,            // Expose row count for results section (for frontend overrides)
@@ -243,6 +248,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		groupAthletes: result.groupAthletes,
 		leaders: result.leaders,  // Include leaders in cache
 		rankings: result.rankings,
+		records: result.records,   // Include records in cache
 		stats: result.stats,
 		gridTemplateRows: result.gridTemplateRows,
 		resultRows: result.resultRows,  // Include result row count
@@ -495,3 +501,7 @@ export function getCompetitionStats(competitionState = null) {
 		averageTotal: athletes.filter(a => a.total > 0).reduce((sum, a, _, arr) => sum + a.total / arr.length, 0) || 0
 	};
 }
+
+// NOTE: records extraction is handled by shared module at
+// `src/lib/server/records-extractor.js` and imported above. This ensures
+// `lifting-order` and `session-results` use identical parsing and normalization.
