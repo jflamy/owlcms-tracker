@@ -286,9 +286,9 @@ export function shouldRenderFlag(url) {
 	}
 
 	.scoreboard-grid.compact-team-column {
-		--col-team-min: 6rem;
-		--col-team-max: 6rem;
-		--col-team: 6rem;
+		--col-team-min: 0;
+		--col-team-max: 0;
+		--col-team: 0;
 	}
 
 	.grid-row { display: contents; }
@@ -495,8 +495,9 @@ export function shouldRenderFlag(url) {
 			--col-next-score: 12ch;
 		}
 		.scoreboard-grid.compact-team-column {
-			--col-team-min: 5rem;
-			--col-team-max: 5rem;
+			--col-team-min: 0;
+			--col-team-max: 0;
+			--col-team: 0;
 		}
 	}
 
@@ -536,7 +537,7 @@ export function shouldRenderFlag(url) {
 		.start-number { font-size: 0.75rem; padding: 0.2rem 0.3rem; }
 		.main { --grid-gap-size: 0.3rem; }
 		.scoreboard-grid { --col-start: 0; --col-cat: 0; --col-team: 0; --col-best: 0; --col-attempt: 2.75rem; --header-primary-height: 2.3rem; }
-		.scoreboard-grid.compact-team-column { --col-team: 5rem; }
+		.scoreboard-grid.compact-team-column { --col-team: 0; }
 		.header-primary .col-start,
 		.grid-row.data-row > .start-num,
 		.header-primary .col-cat,
@@ -565,7 +566,7 @@ export function shouldRenderFlag(url) {
 	}
 	
 	.scoreboard-grid.compact-team-column .grid-row.team-header > .team-stats {
-		grid-column: 6 / 17;
+		grid-column: 6 / 18;
 	}
 	
 	.scoreboard-grid.compact-team-column .grid-row.team-athlete > .team-name {

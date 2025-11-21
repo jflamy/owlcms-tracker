@@ -181,7 +181,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	
 	// Build header labels from translations with fallbacks
 	const headers = {
-		order: language === 'no' ? 'Ordre' : (translations.Start || translations.Order || 'Order'),
+		order: language === 'no' ? 'Rekke\u00ADfølge' : (translations.Start || translations.Order || 'Order'),
 		name: translations.Name || 'Name',
 		category: translations.Category || 'Cat.',
 		birth: translations['Scoreboard.Birth'] || translations.Birth || 'Born',
@@ -192,7 +192,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		score: translations.Score || 'Score',
 		best: translations.Best || '✔',
 		rank: translations.Rank || 'Rank',
-		session: translations.Session || 'Session',
+		session: language === 'no' ? 'Pulje' : (translations.Session || 'Session'),
 		top4scores: language === 'no' ? 'topp 4 poengsummer' : 'top 4 scores',
 		totalNextS: language === 'no' ? 'Total Neste S' : 'Total Next S',
 		scoreNextS: language === 'no' ? 'Poeng Neste S' : 'Score Next S'
@@ -259,7 +259,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		session: fopUpdate?.groupName || 'A',
 		liftType: liftType,
 		// Always build custom groupInfo with translations (ignore OWLCMS groupInfo)
-		groupInfo: `${translations.Session || 'Session'} ${fopUpdate?.groupName || 'A'} - ${liftTypeLabel}`
+		groupInfo: `${language === 'no' ? 'Pulje' : (translations.Session || 'Session')} ${fopUpdate?.groupName || 'A'} - ${liftTypeLabel}`
 	};
 
 	// Extract current athlete info from UPDATE message
