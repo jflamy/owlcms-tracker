@@ -16,7 +16,14 @@ console.log('✅ SERVER READY TO RECEIVE OWLCMS MESSAGES');
 console.log('✅ ═══════════════════════════════════════════════════════');
 console.log('');
 console.log('📡 OWLCMS WebSocket: ws://localhost:8096/ws');
-console.log('   Messages: /database, /update, /timer, /decision');
+
+// Get list of supported message types
+const jsonMessageTypes = ['database', 'update', 'timer', 'decision'];
+const binaryMessageTypes = ['flags_zip', 'pictures', 'styles', 'translations_zip'];
+const allMessageTypes = [...jsonMessageTypes, ...binaryMessageTypes];
+
+console.log(`   JSON Messages: ${jsonMessageTypes.join(', ')}`);
+console.log(`   Binary Frames: ${binaryMessageTypes.join(', ')}`);
 console.log('');
 console.log('🌐 Web interface: http://localhost:8096');
 console.log('');
@@ -75,15 +82,15 @@ setInterval(() => {
   const heapTotalMB = Math.round(memUsage.heapTotal / 1024 / 1024);
   const rssOMB = Math.round(memUsage.rss / 1024 / 1024);
   
-  // Log if memory is high (>500MB RSS)
-  if (rssOMB > 500) {
+  // Log if memory is high (>800MB RSS)
+  if (rssOMB > 800) {
     console.warn(`[Memory] ⚠️  HIGH: RSS ${rssOMB}MB, Heap ${heapUsedMB}MB/${heapTotalMB}MB`);
   }
-  // Log normally if memory is reasonable
-  else if (rssOMB > 300) {
+  // Log normally if memory is elevated (500-800MB RSS)
+  else if (rssOMB > 500) {
     console.log(`[Memory] RSS ${rssOMB}MB, Heap ${heapUsedMB}MB/${heapTotalMB}MB`);
   }
-}, 30000); // Every 30 seconds
+}, 120000); // Every 120 seconds
 
 // Track if we've shown first request message
 let hasShownFirstRequest = false;

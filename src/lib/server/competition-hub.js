@@ -38,6 +38,9 @@ class CompetitionHub {
     };
 
     this.lastDatabaseChecksum = null;
+    this._hasConfirmedFops = false;
+    this.flagsLoaded = false;
+    this.translationsReady = false;
     
     // Debounce state for broadcasts - per FOP and event type
     this.lastBroadcastTime = {};  // Structure: { 'fopName-eventType': timestamp }
@@ -79,6 +82,7 @@ class CompetitionHub {
       
       // Extract FOP name early so we can process the update even if we need database
       const fopName = params.fop || params.fopName || 'A';
+      this._hasConfirmedFops = true;
       
       // Store/merge the update data regardless of database state
       // This ensures we have current athlete, timer, etc. even while waiting for database
@@ -110,16 +114,19 @@ class CompetitionHub {
       
       // Check if we have initialized database state
       if (!this.databaseState || !this.databaseState.athletes || this.databaseState.athletes.length === 0) {
-        const missing = this.getMissingPreconditions();
-        console.log(`[Hub] Missing preconditions: ${missing.join(', ')}, requesting from OWLCMS (update was still processed)`);
+        // Only request database at this point - translations/flags will arrive via OWLCMS startup callback
+        console.log(`[Hub] Database not yet received, requesting from OWLCMS (update was still processed)`);
         this.databaseRequested = Date.now();
         return { 
           accepted: false, 
           needsData: true, 
-          reason: 'missing_preconditions',
-          missing: missing
+          reason: 'missing_database',
+          missing: ['database']
         };
       }
+      
+      // Database is present - OWLCMS has already sent translations_zip and flags_zip via startup callback
+      // Don't request them again unless explicitly missing from binary handler
       
       // DISABLED: SwitchGroup refresh - causes issues with category display
       // Request fresh database on SwitchGroup events (new group = new athletes)
@@ -148,6 +155,8 @@ class CompetitionHub {
    */
   handleFullCompetitionData(params) {
     this.metrics.messagesReceived++;
+    
+    const hadDatabase = this.databaseState && this.databaseState.athletes && this.databaseState.athletes.length > 0;
     
     try {
       const incomingChecksum = params?.databaseChecksum || params?.checksum || null;
@@ -195,6 +204,10 @@ class CompetitionHub {
         console.error('[Hub] Parsed result:', JSON.stringify(fullState).substring(0, 200));
         return { accepted: false, reason: 'no_valid_data_parsed' };
       }
+
+      if (hasCompetitionInfo || hasAthletes) {
+        this._hasConfirmedFops = true;
+      }
       
       // Store in databaseState (raw competition data)
       this.databaseState = {
@@ -216,6 +229,13 @@ class CompetitionHub {
 
       console.log(`[Hub] Full competition data loaded: ${this.databaseState.competition?.name || 'unknown competition'}`);
       console.log(`[Hub] Athletes loaded: ${this.databaseState.athletes?.length || 0}`);
+      
+      // Log when database is received for the first time vs updated
+      if (!hadDatabase) {
+        console.log(`[Hub] ✅ DATABASE INITIALIZED - Competition: ${this.databaseState.competition?.name || 'unknown'}, ${this.databaseState.athletes?.length || 0} athletes`);
+      } else {
+        console.log(`[Hub] ✅ DATABASE UPDATED - Competition: ${this.databaseState.competition?.name || 'unknown'}, ${this.databaseState.athletes?.length || 0} athletes`);
+      }
       
       // Release loading latch and record successful load time
       this.isLoadingDatabase = false;
@@ -478,16 +498,16 @@ class CompetitionHub {
       missing.push('database');
     }
     
-    // Check translations (OWLCMS sends all 26 locales in one message, can be JSON or ZIP)
-    if (Object.keys(this.translations).length === 0) {
-      missing.push('translations');
-      console.log(`[Hub] 🔄 Requesting translations from OWLCMS (428 response)`);
+    // Check translations (OWLCMS sends as binary frame type="translations_zip")
+    if (!this.translationsReady) {
+      missing.push('translations_zip');
+      console.log(`[Hub] 🔄 Requesting translations_zip from OWLCMS (428 response)`);
     }
     
-    // Always request flags (used in all scoreboards for team identification)
-    // OWLCMS will respond with binary frames if needed
-    if (!missing.includes('flags')) {
-      missing.push('flags');
+    // Check flags (OWLCMS sends as binary frame type="flags_zip")
+    if (!this.flagsLoaded) {
+      missing.push('flags_zip');
+      console.log(`[Hub] 🔄 Requesting flags_zip from OWLCMS (428 response)`);
     }
     
     return missing;
@@ -609,6 +629,10 @@ class CompetitionHub {
     return ['A'];
   }
 
+  hasConfirmedFops() {
+    return this._hasConfirmedFops;
+  }
+
   /**
    * Cache translation map for a specific locale
    * @param {string} locale - Language locale code (e.g., 'en', 'fr', 'es', 'fr-CA', 'es-AR')
@@ -658,6 +682,7 @@ class CompetitionHub {
       return;
     }
     
+    const hadTranslations = Object.keys(this.translations).length > 0;
     const keyCount = Object.keys(translationMap).length;
     
     // Decode HTML entities in all translation values
@@ -689,6 +714,17 @@ class CompetitionHub {
     
     if (isNew) {
       console.log(`[Hub] Cached locale '${locale}': ${finalKeyCount} keys`);
+      
+      // Log when first translation is received
+      if (!hadTranslations && locale === 'en') {
+        console.log(`[Hub] ✅ TRANSLATIONS INITIALIZED - locale: ${locale}, ${finalKeyCount} keys`);
+      } else if (!hadTranslations) {
+        console.log(`[Hub] ✅ TRANSLATIONS INITIALIZED - locale: ${locale}, ${finalKeyCount} keys`);
+      }
+    } else if (!hadTranslations && Object.keys(this.translations).length > 0) {
+      // Translations were just fully populated
+      const totalLocales = Object.keys(this.translations).length;
+      console.log(`[Hub] ✅ TRANSLATIONS UPDATED - ${totalLocales} locales available`);
     }
     
     // 3. If this is a base locale, update all existing regional variants to include these keys
@@ -704,6 +740,10 @@ class CompetitionHub {
           this.translations[existingLocale] = updatedRegional;
         }
       }
+    }
+
+    if (Object.keys(this.translations).length > 0) {
+      this.translationsReady = true;
     }
   }
 
@@ -755,11 +795,23 @@ class CompetitionHub {
   }
 
   /**
+   * Mark flags data as loaded so we don't keep requesting them
+   */
+  markFlagsLoaded() {
+    if (!this.flagsLoaded) {
+      this.flagsLoaded = true;
+      console.log('[Hub] ✅ Flags ZIP processed and cached');
+    }
+  }
+
+  /**
    * Force refresh (clear state to trigger 428)
    */
   refresh() {
     console.log('[Hub] Forcing refresh - clearing state');
     this.state = null;
+    this.flagsLoaded = false;
+    this.translationsReady = false;
     this.broadcast({
       type: 'waiting',
       message: 'Competition data refresh in progress...',
@@ -993,3 +1045,6 @@ if (!globalThis.__competitionHub) {
 }
 
 export const competitionHub = globalThis.__competitionHub;
+if (!competitionHub.hasConfirmedFops) {
+  competitionHub.hasConfirmedFops = () => competitionHub._hasConfirmedFops;
+}

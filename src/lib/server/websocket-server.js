@@ -23,12 +23,30 @@ export function initWebSocketServer(httpServer) {
 	wss.on('connection', (ws) => {
 		console.log('[WebSocket] Client connected');
 		
-		ws.on('message', async (data) => {
-			// Try to parse as JSON first (even if it's a Buffer, text messages are sent as Buffers)
+		// Use raw message event which provides both data and a flag for isBinary
+		ws.on('message', async (data, isBinary) => {
+			// Strictly follow OWLCMS spec:
+			// - If isBinary is true, frame is binary with [4-byte length][type][payload]
+			// - If isBinary is false, frame is JSON text
+			
+			if (isBinary) {
+				// Binary frame: [4-byte big-endian typeLength][type UTF-8][binary payload]
+				try {
+					console.log('[WebSocket] Binary frame received, routing to binary handler');
+					await handleBinaryMessage(data);
+					return;
+				} catch (binaryError) {
+					console.error('[WebSocket] ERROR: Unable to process binary message:', binaryError.message);
+					ws.send(JSON.stringify({ error: `Unable to process binary message: ${binaryError.message}` }));
+					return;
+				}
+			}
+
+			// Text frame: JSON with {"type":"...","payload":{...}}
 			try {
 				const message = JSON.parse(data.toString());
 				const messageType = message.type ? message.type.toUpperCase() : 'OTHER';
-				console.log(`[WebSocket] Received message type: ${messageType}`);
+				console.log(`[WebSocket] Text frame received, message type: ${messageType}`);
 				
 				// Capture message in learning mode using explicit WebSocket type
 				if (LEARNING_MODE) {
@@ -57,33 +75,22 @@ export function initWebSocketServer(httpServer) {
 						result = await handleUpdateMessage(message.payload, hasBundledDatabase);
 						break;
 					
-				case 'timer':
-					result = await handleTimerMessage(message.payload, hasBundledDatabase);
-					break;
-				
-				case 'decision':
-					result = await handleDecisionMessage(message.payload, hasBundledDatabase);
-					break;
+					case 'timer':
+						result = await handleTimerMessage(message.payload, hasBundledDatabase);
+						break;
+					
+					case 'decision':
+						result = await handleDecisionMessage(message.payload, hasBundledDatabase);
+						break;
 
-				default:
-					result = await handleGenericMessage(message.payload, hasBundledDatabase, message.type);
-			}				ws.send(JSON.stringify(result));
-			} catch (error) {
-				// If JSON parsing fails, try to handle as binary frame
-				if (data instanceof Buffer || Buffer.isBuffer(data)) {
-					try {
-						const { handleBinaryMessage } = await import('./binary-handler.js');
-						await handleBinaryMessage(data);
-						// Binary frames don't expect a response - they're unidirectional
-						return;
-					} catch (binaryError) {
-						console.error('[WebSocket] ERROR: Unable to process message:', binaryError.message);
-						ws.send(JSON.stringify({ error: `Unable to process message: ${binaryError.message}` }));
-					}
-				} else {
-					console.error('[WebSocket] ERROR: Unable to parse JSON:', error.message);
-					ws.send(JSON.stringify({ error: error.message }));
+					default:
+						result = await handleGenericMessage(message.payload, hasBundledDatabase, message.type);
 				}
+
+				ws.send(JSON.stringify(result));
+			} catch (error) {
+				console.error('[WebSocket] ERROR: Unable to parse JSON text frame:', error.message);
+				ws.send(JSON.stringify({ error: `Unable to parse JSON: ${error.message}` }));
 			}
 		});
 
@@ -175,6 +182,8 @@ async function handleDatabaseMessage(payload) {
 		// Run sanity check after successful database load
 		verifySanityAfterDatabase();
 		
+		// OWLCMS sends translations_zip and flags_zip at socket open via startup callback
+		// Don't request them again after database is received - they will arrive independently
 		return { status: 200, message: 'Full competition data loaded successfully' };
 	} else {
 		console.log('[WebSocket] ❌ Failed to process full competition data');
@@ -186,29 +195,48 @@ async function handleDatabaseMessage(payload) {
  * Handle update message - same payload as POST /update
  */
 async function handleUpdateMessage(payload, hasBundledDatabase = false) {
-	// Special case: SwitchGroup and GroupDone indicate database is coming
-	// Don't request database for these events
 	const uiEvent = payload.uiEvent || '';
 	const isDatabaseComing = uiEvent === 'SwitchGroup' || uiEvent === 'GroupDone';
 
-	if (isDatabaseComing && !hasBundledDatabase) {
-		console.error(`[WebSocket] ERROR: ${uiEvent} update arrived without embedded database payload`);
-		return { status: 500, message: `${uiEvent} requires database payload` };
+	const result = competitionHub.handleOwlcmsMessage(payload);
+	const missing = competitionHub.getMissingPreconditions();
+
+	if (isDatabaseComing) {
+		console.log(`[WebSocket] ${uiEvent} update received${hasBundledDatabase ? ' with embedded database' : ' without embedded database'}`);
+
+		if (missing.includes('translations')) {
+			console.log(`[WebSocket] ${uiEvent} processed but translations missing - requesting translations`);
+			return {
+				status: 428,
+				message: 'Precondition Required: Missing required data',
+				reason: 'missing_translations',
+				missing: missing
+			};
+		}
+
+		if (!hasBundledDatabase && !competitionHub.getDatabaseState()) {
+			console.log(`[WebSocket] ${uiEvent} processed but database missing - requesting database`);
+			return {
+				status: 428,
+				message: 'Precondition Required: Missing required data',
+				reason: 'no_database_state',
+				missing: missing
+			};
+		}
+
+		return mapHubResultToResponse(result, 'update');
 	}
-	
-	// Check if we have database first (unless database is already coming)
+
 	if (!competitionHub.getDatabaseState() && !isDatabaseComing && !hasBundledDatabase) {
 		console.log(`[WebSocket] Update received (${uiEvent}) but no database - requesting database`);
-		const interimResult = competitionHub.handleOwlcmsMessage(payload);
-		const missing = competitionHub.getMissingPreconditions();
 		return {
 			status: 428,
 			message: 'Precondition Required: Missing required data',
-			reason: interimResult?.reason || 'no_database_state',
+			reason: result?.reason || 'no_database_state',
 			missing: missing
 		};
 	}
-	
+
 	if (isDatabaseComing) {
 		if (hasBundledDatabase) {
 			console.log(`[WebSocket] Update received (${uiEvent}) with embedded database payload`);
@@ -216,8 +244,7 @@ async function handleUpdateMessage(payload, hasBundledDatabase = false) {
 			console.log(`[WebSocket] Update received (${uiEvent}) - database message expected to follow`);
 		}
 	}
-	
-	const result = competitionHub.handleOwlcmsMessage(payload);
+
 	return mapHubResultToResponse(result, 'update');
 }
 

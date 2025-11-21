@@ -25,10 +25,14 @@ export async function load() {
 	const databaseState = competitionHub.getDatabaseState();
 	const competitionName = databaseState?.competition?.name || 'OWLCMS Competition';
 	
+	const confirmedFopsAvailable = typeof competitionHub.hasConfirmedFops === 'function'
+		? competitionHub.hasConfirmedFops()
+		: false;
 	return {
 		scoreboards,
 		fops: availableFOPs,
 		competitionName,
-		hasData: availableFOPs.length > 0
+		hasData: availableFOPs.length > 0,
+		hasConfirmedFops: confirmedFopsAvailable
 	};
 }

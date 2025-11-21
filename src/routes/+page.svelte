@@ -1,4 +1,6 @@
 <script>
+  import { browser } from '$app/environment';
+  import { onMount } from 'svelte';
   export let data;
   
   // Store option selections per scoreboard type AND per FOP
@@ -10,7 +12,7 @@
   let modalFop = null;
   
   // Collapse state for categories (accordion behavior - only one open at a time)
-  let expandedCategory = 'standard'; // Start with standard expanded
+  let expandedCategory = null; // Start folded
 
   // Language name translations (for displaying language options)
   const languageNames = {
@@ -36,6 +38,8 @@
   $: lowerThirdScoreboards = data.scoreboards.filter(s => 
     s.isLowerThird === true
   );
+
+  $: documentsScoreboard = data.scoreboards.find(s => s.type === 'referee-assignments');
   
   $: teamScoreboards = data.scoreboards.filter(s => 
     s.type === 'team-scoreboard' || s.type === 'nvf-lagkonkurranse'
@@ -102,12 +106,40 @@
     
     const url = `/${type}?${params.toString()}`;
     window.open(url, '_blank', 'noopener,noreferrer');
-    
+
     if (withOptions) {
       closeModal();
     }
   }
-  
+
+  let confirmedFops = data.hasConfirmedFops ?? false;
+
+  onMount(() => {
+    if (!browser) return;
+    const eventSource = new EventSource('/api/client-stream');
+    const markConfirmed = () => {
+      confirmedFops = true;
+    };
+
+    const handleMessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data || '{}');
+        if (payload?.type === 'state_update' && payload?.data?.fops?.length) {
+          markConfirmed();
+        }
+      } catch (error) {
+        console.warn('[Landing Page] Unable to parse SSE payload', error);
+      }
+    };
+
+    eventSource.addEventListener('message', handleMessage);
+
+    return () => {
+      eventSource.removeEventListener('message', handleMessage);
+      eventSource.close();
+    };
+  });
+
   function getScoreboardUrl(type, fop) {
     const options = scoreboardOptions[type]?.[fop] || {};
     const params = new URLSearchParams({ fop });
@@ -140,7 +172,15 @@
     <h1>🏋️ OWLCMS Tracker</h1>
   </header>
 
-  {#if data.hasData}
+  {#if !confirmedFops}
+    <div class="waiting">
+      <div class="waiting-content">
+        <h2>⏳ Waiting for Competition Data</h2>
+        <p class="waiting-note">This page will automatically update when data arrives.</p>
+      </div>
+    </div>
+  {/if}
+
     <main class="main">
       <!-- Standard Scoreboards -->
       <section class="scoreboard-category collapsible">
@@ -162,22 +202,35 @@
                   <div class="fop-list">
                     {#each data.fops as fop}
                       <div class="fop-row">
-                        <a 
-                          href={getScoreboardUrl(scoreboard.type, fop)}
-                          class="fop-link"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          Platform {fop}
-                        </a>
-                        {#if scoreboard.options && scoreboard.options.length > 0}
-                          <button
-                            class="options-btn"
-                            on:click={() => openOptionsModal(scoreboard, fop)}
-                            title="Configure options for Platform {fop}"
+                        {#if confirmedFops}
+                          <a 
+                            href={getScoreboardUrl(scoreboard.type, fop)}
+                            class="fop-link"
+                            target="_blank"
+                            rel="noopener noreferrer"
                           >
-                            ⚙️ Options
-                          </button>
+                            Platform {fop}
+                          </a>
+                        {:else}
+                          <div class="fop-link disabled">
+                            Platform {fop}
+                            <span class="fop-wait">Awaiting OWLCMS connection</span>
+                          </div>
+                        {/if}
+                          {#if scoreboard.options && scoreboard.options.length > 0}
+                            {#if confirmedFops}
+                            <button
+                              class="options-btn"
+                              on:click={() => openOptionsModal(scoreboard, fop)}
+                              title="Configure options for Platform {fop}"
+                            >
+                              ⚙️ Options
+                            </button>
+                          {:else}
+                            <button class="options-btn disabled" disabled title="Waiting for OWLCMS connection">
+                              ⚙️ Options
+                            </button>
+                          {/if}
                         {/if}
                       </div>
                     {/each}
@@ -210,22 +263,35 @@
                     <div class="fop-list">
                       {#each data.fops as fop}
                         <div class="fop-row">
-                          <a 
-                            href={getScoreboardUrl(scoreboard.type, fop)}
-                            class="fop-link"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            Platform {fop}
-                          </a>
-                          {#if scoreboard.options && scoreboard.options.length > 0}
-                            <button
-                              class="options-btn"
-                              on:click={() => openOptionsModal(scoreboard, fop)}
-                              title="Configure options for Platform {fop}"
+                          {#if confirmedFops}
+                            <a 
+                              href={getScoreboardUrl(scoreboard.type, fop)}
+                              class="fop-link"
+                              target="_blank"
+                              rel="noopener noreferrer"
                             >
-                              ⚙️ Options
-                            </button>
+                              Platform {fop}
+                            </a>
+                          {:else}
+                            <div class="fop-link disabled">
+                              Platform {fop}
+                              <span class="fop-wait">Awaiting OWLCMS connection</span>
+                            </div>
+                          {/if}
+                          {#if scoreboard.options && scoreboard.options.length > 0}
+                            {#if confirmedFops}
+                              <button
+                                class="options-btn"
+                                on:click={() => openOptionsModal(scoreboard, fop)}
+                                title="Configure options for Platform {fop}"
+                              >
+                                ⚙️ Options
+                              </button>
+                            {:else}
+                              <button class="options-btn disabled" disabled title="Waiting for OWLCMS connection">
+                                ⚙️ Options
+                              </button>
+                            {/if}
                           {/if}
                         </div>
                       {/each}
@@ -238,16 +304,73 @@
         </section>
       {/if}
 
-      <!-- Lower Third Overlays -->
+
+
+      {#if documentsScoreboard}
+        <section class="scoreboard-category documents-section collapsible">
+          <!-- svelte-ignore a11y-click-events-have-key-events -->
+          <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+          <h2 class="category-title clickable" on:click={() => toggleCategory('documents')}>
+            <span class="toggle-icon">{expandedCategory === 'documents' ? '▼' : '▶'}</span>
+            Documents
+          </h2>
+          {#if expandedCategory === 'documents'}
+            <div class="scoreboards-grid">
+              <div class="scoreboard-card document-card">
+                <h3>{documentsScoreboard.name}</h3>
+                <p class="description">
+                  {@html documentsScoreboard.description}
+                </p>
+                <div class="fop-links">
+                  <h4>Document Views:</h4>
+                  <div class="fop-list">
+                    {#each data.fops as fop}
+                      <div class="fop-row">
+                        {#if confirmedFops}
+                          <a 
+                            href={getScoreboardUrl(documentsScoreboard.type, fop)}
+                            class="fop-link"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            Platform {fop}
+                          </a>
+                          <button
+                            class="options-btn"
+                            on:click={() => openOptionsModal(documentsScoreboard, fop)}
+                            title="Configure document options for Platform {fop}"
+                          >
+                            ⚙️ Options
+                          </button>
+                        {:else}
+                          <div class="fop-link disabled">
+                            Platform {fop}
+                            <span class="fop-wait">Awaiting OWLCMS connection</span>
+                          </div>
+                          <button class="options-btn disabled" disabled title="Waiting for OWLCMS connection">
+                            ⚙️ Options
+                          </button>
+                        {/if}
+                      </div>
+                    {/each}
+                  </div>
+                </div>
+              </div>
+            </div>
+          {/if}
+        </section>
+      {/if}
+
+      <!-- Video Overlays -->
       {#if lowerThirdScoreboards.length > 0}
         <section class="scoreboard-category collapsible">
           <!-- svelte-ignore a11y-click-events-have-key-events -->
           <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
-          <h2 class="category-title clickable" on:click={() => toggleCategory('lower-thirds')}>
-            <span class="toggle-icon">{expandedCategory === 'lower-thirds' ? '▼' : '▶'}</span>
-            Lower Third Overlays
+          <h2 class="category-title clickable" on:click={() => toggleCategory('video-overlays')}>
+            <span class="toggle-icon">{expandedCategory === 'video-overlays' ? '▼' : '▶'}</span>
+            Video Overlays
           </h2>
-          {#if expandedCategory === 'lower-thirds'}
+          {#if expandedCategory === 'video-overlays'}
             <div class="scoreboards-grid">
               {#each lowerThirdScoreboards as scoreboard}
                 <div class="scoreboard-card">
@@ -259,22 +382,35 @@
                     <div class="fop-list">
                       {#each data.fops as fop}
                         <div class="fop-row">
-                          <a 
-                            href={getScoreboardUrl(scoreboard.type, fop)}
-                            class="fop-link"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            Platform {fop}
-                          </a>
-                          {#if scoreboard.options && scoreboard.options.length > 0}
-                            <button
-                              class="options-btn"
-                              on:click={() => openOptionsModal(scoreboard, fop)}
-                              title="Configure options for Platform {fop}"
+                          {#if confirmedFops}
+                            <a 
+                              href={getScoreboardUrl(scoreboard.type, fop)}
+                              class="fop-link"
+                              target="_blank"
+                              rel="noopener noreferrer"
                             >
-                              ⚙️
-                            </button>
+                              Platform {fop}
+                            </a>
+                          {:else}
+                            <div class="fop-link disabled">
+                              Platform {fop}
+                              <span class="fop-wait">Awaiting OWLCMS connection</span>
+                            </div>
+                          {/if}
+                          {#if scoreboard.options && scoreboard.options.length > 0}
+                            {#if confirmedFops}
+                              <button
+                                class="options-btn"
+                                on:click={() => openOptionsModal(scoreboard, fop)}
+                                title="Configure options for Platform {fop}"
+                              >
+                                ⚙️
+                              </button>
+                            {:else}
+                              <button class="options-btn disabled" disabled title="Waiting for OWLCMS connection">
+                                ⚙️
+                              </button>
+                            {/if}
                           {/if}
                         </div>
                       {/each}
@@ -287,25 +423,6 @@
         </section>
       {/if}
     </main>
-  {:else}
-    <div class="waiting">
-      <div class="waiting-content">
-        <h2>⏳ Waiting for Competition Data</h2>
-        <p>No competition data received yet.</p>
-        
-        <div class="config-help">
-          <h3>Configure OWLCMS:</h3>
-          <ol>
-            <li>Go to <strong>Prepare Competition → Language and System Settings → Connections</strong></li>
-            <li>Set <strong>URL for Video Data</strong> to: <code>http://localhost:8095</code></li>
-            <li>Start your competition session</li>
-          </ol>
-        </div>
-        
-        <p class="note">This page will automatically update when data arrives.</p>
-      </div>
-    </div>
-  {/if}
 </div>
 
 <!-- Options Modal -->
@@ -464,6 +581,10 @@
     margin-top: 2rem;
   }
   
+  .documents-section .scoreboards-grid {
+    margin-top: 1.25rem;
+  }
+
   .scoreboard-card {
     background: rgba(255, 255, 255, 0.05);
     border-radius: 12px;
@@ -488,6 +609,11 @@
     font-size: 0.95rem;
     margin-bottom: 1.5rem;
     min-height: 3em;
+  }
+
+  .document-card {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.2);
   }
   
   .fop-list {
@@ -520,6 +646,21 @@
     transform: scale(1.02);
     box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
   }
+
+  .fop-link.disabled {
+    background: rgba(255, 255, 255, 0.15);
+    cursor: not-allowed;
+    pointer-events: none;
+    opacity: 0.65;
+  }
+
+  .fop-wait {
+    display: block;
+    margin-top: 0.35rem;
+    font-size: 0.75rem;
+    color: #cbd5e0;
+    font-weight: 400;
+  }
   
   .options-btn {
     width: auto;
@@ -542,6 +683,12 @@
     background: rgba(102, 126, 234, 0.3);
     border-color: #667eea;
     transform: scale(1.05);
+  }
+
+  .options-btn.disabled {
+    pointer-events: none;
+    opacity: 0.6;
+    cursor: not-allowed;
   }
   
   /* Modal Styles */
@@ -736,11 +883,11 @@
   }
   
   .waiting {
-    flex: 1;
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: 60vh;
+    padding: 2rem 0;
+    width: 100%;
   }
   
   .waiting-content {
@@ -757,41 +904,9 @@
     margin-bottom: 1rem;
   }
   
-  .config-help {
-    margin: 2rem 0;
-    padding: 1.5rem;
-    background: rgba(102, 126, 234, 0.1);
-    border-radius: 8px;
-    border: 1px solid rgba(102, 126, 234, 0.3);
-  }
-  
-  .config-help h3 {
-    margin: 0 0 1rem 0;
-    color: #667eea;
-  }
-  
-  .config-help ol {
-    text-align: left;
-    margin: 0;
-    padding-left: 1.5rem;
-  }
-  
-  .config-help li {
-    margin: 0.75rem 0;
-    line-height: 1.6;
-  }
-  
-  .config-help code {
-    background: rgba(0, 0, 0, 0.3);
-    padding: 0.25rem 0.5rem;
-    border-radius: 4px;
-    font-family: 'Courier New', monospace;
-    color: #667eea;
-  }
-  
-  .note {
+  .waiting-note {
     margin-top: 1.5rem;
-    font-size: 0.9rem;
+    font-size: 1.1rem;
     color: #a0aec0;
     font-style: italic;
   }

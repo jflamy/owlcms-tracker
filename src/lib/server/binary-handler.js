@@ -93,8 +93,27 @@ export function handleBinaryMessage(buffer) {
 			return;
 		}
 
-		// Read type length as big-endian 32-bit integer
-		const typeLength = buffer.readUInt32BE(0);
+		// Read type length as little-endian 32-bit integer (OWLCMS sends little-endian)
+		const typeLength = buffer.readUInt32LE(0);
+
+		// Log first 20 bytes for debugging
+		const preview = buffer.slice(0, Math.min(20, buffer.length)).toString('hex');
+		console.log(`[BINARY] Frame start (hex): ${preview}`);
+		console.log(`[BINARY] Parsed typeLength: ${typeLength} (0x${typeLength.toString(16)}), total frame: ${buffer.length} bytes`);
+
+		// Sanity check: if typeLength is unreasonably large (> 10MB), it's probably malformed
+		if (typeLength > 10 * 1024 * 1024) {
+			// Try to detect if this is a ZIP file (starts with 504B0304)
+			if (buffer[0] === 0x50 && buffer[1] === 0x4b && buffer[2] === 0x03 && buffer[3] === 0x04) {
+				console.log('[BINARY] ℹ️  Detected ZIP file without type prefix - treating as flags_zip');
+				handleFlagsMessage(buffer);
+				return;
+			}
+			console.error(
+				`[BINARY] ERROR: typeLength appears malformed (${typeLength} bytes, 0x${typeLength.toString(16)}), but buffer is only ${buffer.length} bytes total`
+			);
+			return;
+		}
 
 		// Validate frame contains complete type string
 		if (buffer.length < 4 + typeLength) {
@@ -111,7 +130,10 @@ export function handleBinaryMessage(buffer) {
 		const payload = buffer.slice(4 + typeLength);
 
 		// Route to handler based on message type
-		if (messageType === 'flags') {
+		if (messageType === 'flags_zip') {
+			handleFlagsMessage(payload);
+		} else if (messageType === 'flags') {
+			// Legacy support for old 'flags' message type
 			handleFlagsMessage(payload);
 		} else if (messageType === 'pictures') {
 			handlePicturesMessage(payload);
@@ -141,6 +163,7 @@ function handleFlagsMessage(zipBuffer) {
 	console.log(`[FLAGS] Starting extraction of ${zipBuffer.length} bytes`);
 	
 	try {
+		const competitionHub = require('./competition-hub.js').competitionHub;
 		// Parse ZIP from buffer
 		const zip = new AdmZip(zipBuffer);
 		const flagsDir = path.join(process.cwd(), 'local', 'flags');
@@ -152,6 +175,7 @@ function handleFlagsMessage(zipBuffer) {
 
 		// Extract all files from ZIP
 		let extractedCount = 0;
+		const flagFileNames = [];
 		zip.getEntries().forEach((entry) => {
 			if (!entry.isDirectory) {
 				const targetPath = path.join(flagsDir, entry.entryName);
@@ -165,14 +189,28 @@ function handleFlagsMessage(zipBuffer) {
 				// Write file
 				fs.writeFileSync(targetPath, entry.getData());
 				extractedCount++;
+				
+				// Track first 10 flag file names
+				if (flagFileNames.length < 10) {
+					flagFileNames.push(entry.entryName);
+				}
 			}
 		});
 
 		const elapsed = Date.now() - startTime;
 		console.log(`[FLAGS] ✓ Extracted ${extractedCount} flag files in ${elapsed}ms`);
 		
+		// Log first 10 flags
+		if (flagFileNames.length > 0) {
+			console.log(`[FLAGS] First ${Math.min(10, extractedCount)} flags:`);
+			flagFileNames.forEach((name, index) => {
+				console.log(`  ${index + 1}. ${name}`);
+			});
+		}
+		
 		// Run sanity check after successful extraction
 		verifySanityAfterFlags();
+		competitionHub.markFlagsLoaded();
 	} catch (error) {
 		const elapsed = Date.now() - startTime;
 		console.error(`[FLAGS] ❌ ERROR after ${elapsed}ms:`, error.message);
@@ -332,6 +370,15 @@ function handleTranslationsZipMessage(zipBuffer) {
 		
 		const elapsed = Date.now() - startTime;
 		console.log(`[TRANSLATIONS_ZIP] ✅ Complete: ${localesCount} locales processed, ${totalKeys} source keys (${elapsed}ms)`);
+		
+		// Log when translations are initialized vs updated
+		const hadTranslations = Object.keys(competitionHub.translations).length > localesCount;
+		
+		if (!hadTranslations) {
+			console.log(`[TRANSLATIONS_ZIP] ✅ TRANSLATIONS INITIALIZED (${localesCount} locales, ${totalKeys} keys)`);
+		} else {
+			console.log(`[TRANSLATIONS_ZIP] ✅ TRANSLATIONS UPDATED (${localesCount} locales, ${totalKeys} keys)`);
+		}
 		
 		// Run sanity check after successful translations load
 		verifySanityAfterTranslations();
