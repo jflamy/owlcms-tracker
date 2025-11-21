@@ -2,6 +2,12 @@ export default {
 	name: 'Lower Third - Minimal Status',
 	description: 'Minimal overlay showing current athlete, weight, timer, and decision lights. Transparent background for video overlay.',
 	
+	// Category for grouping in the UI
+	category: 'lower-third',
+	
+	// Sort order within category
+	order: 100,
+
 	// Lower-third scoreboard marker
 	isLowerThird: true,
 	

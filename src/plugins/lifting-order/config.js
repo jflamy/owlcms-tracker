@@ -11,6 +11,12 @@ export default {
 	// Description for AI assistants
 	description: 'Shows current lifter and upcoming lifting order with timer',
 	
+	// Category for grouping in the UI
+	category: 'standard',
+	
+	// Sort order within category
+	order: 100,
+
 	// Whether this scoreboard requires athlete pictures
 	requiresPictures: false,
 	

@@ -11,6 +11,12 @@ export default {
 	// Description for AI assistants
 	description: 'Summary table for referee assignments.',
 	
+	// Category for grouping in the UI
+	category: 'documents',
+	
+	// Sort order within category
+	order: 100,
+
 	// Whether this scoreboard requires athlete pictures
 	requiresPictures: false,
 	

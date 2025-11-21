@@ -27,28 +27,21 @@
     }
     return option;
   }
+
+  function sortScoreboards(a, b) {
+    return (a.order || 999) - (b.order || 999);
+  }
   
   // Categorize scoreboards
-  $: standardScoreboards = [
-    data.scoreboards.find(s => s.type === 'lifting-order'),
-    data.scoreboards.find(s => s.type === 'session-results'),
-    data.scoreboards.find(s => s.type === 'rankings')
-  ].filter(Boolean); // Remove any undefined entries
+  $: standardScoreboards = data.scoreboards.filter(s => s.category === 'standard').sort(sortScoreboards);
   
-  $: lowerThirdScoreboards = data.scoreboards.filter(s => 
-    s.isLowerThird === true
-  );
+  $: lowerThirdScoreboards = data.scoreboards.filter(s => s.category === 'lower-third').sort(sortScoreboards);
 
-  $: documentsScoreboard = data.scoreboards.find(s => s.type === 'referee-assignments');
+  $: documentsScoreboards = data.scoreboards.filter(s => s.category === 'documents').sort(sortScoreboards);
   
-  $: teamScoreboards = data.scoreboards.filter(s => 
-    s.type === 'team-scoreboard' || s.type === 'nvf-lagkonkurranse'
-  ).sort((a, b) => {
-    // Keep team-scoreboard first, then nvf-lagkonkurranse
-    if (a.type === 'team-scoreboard') return -1;
-    if (b.type === 'team-scoreboard') return 1;
-    return 0;
-  });
+  $: teamScoreboards = data.scoreboards.filter(s => s.category === 'team').sort(sortScoreboards);
+
+  $: attemptBoardScoreboards = data.scoreboards.filter(s => s.category === 'attempt-board').sort(sortScoreboards);
   
   // Toggle function for accordion behavior
   function toggleCategory(category) {
@@ -242,6 +235,68 @@
         {/if}
       </section>
 
+      <!-- Attempt Boards -->
+      {#if attemptBoardScoreboards.length > 0}
+        <section class="scoreboard-category collapsible">
+          <!-- svelte-ignore a11y-click-events-have-key-events -->
+          <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+          <h2 class="category-title clickable" on:click={() => toggleCategory('attempt-boards')}>
+            <span class="toggle-icon">{expandedCategory === 'attempt-boards' ? '▼' : '▶'}</span>
+            Attempt Boards
+          </h2>
+          {#if expandedCategory === 'attempt-boards'}
+            <div class="scoreboards-grid">
+              {#each attemptBoardScoreboards as scoreboard}
+                <div class="scoreboard-card">
+                  <h3>{scoreboard.name}</h3>
+                  <p class="description">{@html scoreboard.description}</p>
+                  
+                  <div class="fop-links">
+                    <h4>Select Platform:</h4>
+                    <div class="fop-list">
+                      {#each data.fops as fop}
+                        <div class="fop-row">
+                          {#if confirmedFops}
+                            <a 
+                              href={getScoreboardUrl(scoreboard.type, fop)}
+                              class="fop-link"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              Platform {fop}
+                            </a>
+                          {:else}
+                            <div class="fop-link disabled">
+                              Platform {fop}
+                              <span class="fop-wait">Awaiting OWLCMS connection</span>
+                            </div>
+                          {/if}
+                          {#if scoreboard.options && scoreboard.options.length > 0}
+                            {#if confirmedFops}
+                              <button
+                                class="options-btn"
+                                on:click={() => openOptionsModal(scoreboard, fop)}
+                                title="Configure options for Platform {fop}"
+                              >
+                                ⚙️ Options
+                              </button>
+                            {:else}
+                              <button class="options-btn disabled" disabled title="Waiting for OWLCMS connection">
+                                ⚙️ Options
+                              </button>
+                            {/if}
+                          {/if}
+                        </div>
+                      {/each}
+                    </div>
+                  </div>
+                </div>
+              {/each}
+            </div>
+          {/if}
+        </section>
+      {/if}
+
       <!-- Team Scoreboards -->
       {#if teamScoreboards.length > 0}
         <section class="scoreboard-category collapsible">
@@ -306,7 +361,7 @@
 
 
 
-      {#if documentsScoreboard}
+      {#if documentsScoreboards.length > 0}
         <section class="scoreboard-category documents-section collapsible">
           <!-- svelte-ignore a11y-click-events-have-key-events -->
           <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
@@ -316,46 +371,48 @@
           </h2>
           {#if expandedCategory === 'documents'}
             <div class="scoreboards-grid">
-              <div class="scoreboard-card document-card">
-                <h3>{documentsScoreboard.name}</h3>
-                <p class="description">
-                  {@html documentsScoreboard.description}
-                </p>
-                <div class="fop-links">
-                  <h4>Document Views:</h4>
-                  <div class="fop-list">
-                    {#each data.fops as fop}
-                      <div class="fop-row">
-                        {#if confirmedFops}
-                          <a 
-                            href={getScoreboardUrl(documentsScoreboard.type, fop)}
-                            class="fop-link"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            Platform {fop}
-                          </a>
-                          <button
-                            class="options-btn"
-                            on:click={() => openOptionsModal(documentsScoreboard, fop)}
-                            title="Configure document options for Platform {fop}"
-                          >
-                            ⚙️ Options
-                          </button>
-                        {:else}
-                          <div class="fop-link disabled">
-                            Platform {fop}
-                            <span class="fop-wait">Awaiting OWLCMS connection</span>
-                          </div>
-                          <button class="options-btn disabled" disabled title="Waiting for OWLCMS connection">
-                            ⚙️ Options
-                          </button>
-                        {/if}
-                      </div>
-                    {/each}
+              {#each documentsScoreboards as scoreboard}
+                <div class="scoreboard-card document-card">
+                  <h3>{scoreboard.name}</h3>
+                  <p class="description">
+                    {@html scoreboard.description}
+                  </p>
+                  <div class="fop-links">
+                    <h4>Document Views:</h4>
+                    <div class="fop-list">
+                      {#each data.fops as fop}
+                        <div class="fop-row">
+                          {#if confirmedFops}
+                            <a 
+                              href={getScoreboardUrl(scoreboard.type, fop)}
+                              class="fop-link"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              Platform {fop}
+                            </a>
+                            <button
+                              class="options-btn"
+                              on:click={() => openOptionsModal(scoreboard, fop)}
+                              title="Configure document options for Platform {fop}"
+                            >
+                              ⚙️ Options
+                            </button>
+                          {:else}
+                            <div class="fop-link disabled">
+                              Platform {fop}
+                              <span class="fop-wait">Awaiting OWLCMS connection</span>
+                            </div>
+                            <button class="options-btn disabled" disabled title="Waiting for OWLCMS connection">
+                              ⚙️ Options
+                            </button>
+                          {/if}
+                        </div>
+                      {/each}
+                    </div>
                   </div>
                 </div>
-              </div>
+              {/each}
             </div>
           {/if}
         </section>

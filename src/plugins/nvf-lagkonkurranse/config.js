@@ -11,6 +11,12 @@ export default {
 	// Description for AI assistants
 	description: 'Norske lagkonkurranser med forutsatt totalt og poengsum hvis neste løft lykkes.<br><br>Norwegian team league competitions with predicted total and score if the next lift is successful.',
 	
+	// Category for grouping in the UI
+	category: 'team',
+	
+	// Sort order within category
+	order: 200,
+
 	// Whether this scoreboard requires athlete pictures
 	requiresPictures: false,
 	

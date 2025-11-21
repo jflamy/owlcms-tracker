@@ -11,6 +11,12 @@ export default {
 	// Description for AI assistants
 	description: 'Lower-third overlay with animated ranking display in SVG box',
 	
+	// Category for grouping in the UI
+	category: 'lower-third',
+	
+	// Sort order within category
+	order: 200,
+
 	// Lower-third scoreboard marker
 	isLowerThird: true,
 	

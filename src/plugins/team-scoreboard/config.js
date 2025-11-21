@@ -11,6 +11,12 @@ export default {
 	// Description for AI assistants
 	description: 'Shows team competition results with athletes grouped by team',
 	
+	// Category for grouping in the UI
+	category: 'team',
+	
+	// Sort order within category
+	order: 100,
+
 	// Whether this scoreboard requires athlete pictures
 	requiresPictures: false,
 	
