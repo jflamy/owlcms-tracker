@@ -112,6 +112,44 @@ All messages follow this JSON structure:
 
 **Frequency:** Sent when remote system requests full data (typically in response to HTTP 428 status or missing data)
 
+## Binary Frames (ZIP payloads)
+
+In addition to the JSON text frames documented above, OWLCMS can send large binary payloads over the same WebSocket connection. These are used to transfer ZIP archives for flags, pictures, styles, and translations. The tracker recognizes a small set of binary message types and routes each ZIP to an appropriate handler.
+
+Frame layout (preferred format):
+
+- 4 bytes: `typeLength` (unsigned 32-bit big-endian / network byte order)
+- `typeLength` bytes: UTF-8 `type` string (examples: `flags_zip`, `pictures`, `styles`, `translations_zip`)
+- Remaining bytes: binary payload (typically a ZIP archive)
+
+Notes:
+- The `typeLength` is read using big-endian (network) byte order. The receiver must use `readUInt32BE(0)` to parse it correctly.
+- The payload is usually a ZIP archive; handlers will parse ZIP entries and extract files to `./local/{flags,pictures,styles}` or will parse `translations.json` inside a translations ZIP.
+- For robustness, the tracker also supports a fallback: when `typeLength` appears malformed but the buffer begins with the ZIP magic bytes (`50 4B 03 04`), the frame is treated as a `flags_zip` (legacy behavior seen in some integrations).
+
+Supported binary message types:
+
+- `flags_zip` (preferred) / `flags` (legacy): ZIP archive containing flag image files. The tracker extracts files into `./local/flags` and marks flags as loaded.
+- `pictures`: ZIP archive of athlete/team pictures; extracted into `./local/pictures`.
+- `styles`: ZIP archive containing CSS/asset files; extracted into `./local/styles`.
+- `translations_zip`: ZIP archive expected to contain a single file named `translations.json`.
+
+Translations ZIP details:
+- `translations.json` may have one of two wrapper formats:
+  - Wrapper form: `{ "locales": { "en": {...}, "fr": {...} }, "translationsChecksum": "..." }`
+  - Direct form: `{ "en": {...}, "fr": {...} }`
+- The tracker extracts each locale map and caches it in the Competition Hub.
+- If `translationsChecksum` is provided and matches the hub's `lastTranslationsChecksum`, the tracker will skip reprocessing to save CPU/time.
+
+Server behavior and sanity checks:
+- After extracting flags or translations, the tracker runs lightweight sanity checks (file counts, locale/key counts) and logs the result.
+- When translations are loaded for the first time the hub logs `TRANSLATIONS INITIALIZED` and caches the checksum.
+- When the tracker cannot find `translations.json` inside a `translations_zip`, it logs an error and ignores the payload.
+
+Security and size considerations:
+- The tracker validates `typeLength` against an upper bound (to avoid attempting to allocate huge buffers). If the reported length is unreasonably large, the tracker attempts ZIP-detection before rejecting the frame.
+- ZIP entries are written to disk under `./local/*` using their entry names; ensure OWLCMS produces safe file names.
+
 ---
 
 ## Implementation Notes
