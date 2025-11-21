@@ -1,16 +1,20 @@
 # OWLCMS Tracker
 
-> This project is a proof of concept for using AI-Assisted coding to create customizable owlcms scoreboards.  *Except for this note, everything in this repository has been generated without actual programming, strictly by providing instructions to a coding Agent*.
+This project aims at giving users of owlcms the capability to create their own scoreboards, TV graphics, and documents.  The program receives the database from owlcms and all lifting order, decisions and timer updates.  It is therefore able to track the state of the competition.
+
+> *Except for this note, everything in this repository has been generated without actual programming, strictly by providing instructions to a coding Agent*.
 >
-> **The idea is that you should be able to open this repository in a development environment, start an LLM Agent like Claude or ChatGPT, and argue with the agent until you get the scoreboard you want.** You can even paste screen shots of existing scoreboards, or of defects in the generated scoreboards to guide the evolution. The author did not write *any* JavaScript and does not know Svelte.
+> **The idea is that you should be able to open this repository in a development environment, start an "AI" Agent like Claude or ChatGPT, and argue with the agent until you get the scoreboard you want.** You can even paste screen shots of existing scoreboards, or of defects in the generated scoreboards to guide the evolution. The author did not write *any* JavaScript and does not know Svelte.
 >
-> This is the first workable scoreboard generated with this approach.  
->
-> ![WhatsApp Image 2025-10-08 at 12 23 27_e98fafa4](https://github.com/user-attachments/assets/2e98bdc8-3ba6-43af-ae7d-85cee68cb11a)
->
-> Since the tracker has the full database available + the current session, it can do team scoreboards.  In this example, the AI assistant was asked to implement grouping, filtering and score totals.
-> Additional queries would allow creating buttons to export the data.
-><img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/b61be0a7-650e-4c28-bdcf-3480bade0e0d" />
+> Of course, if you are a programmer you can actually change the code
+
+This is the first workable scoreboard generated with this "AI" approach.  
+
+![WhatsApp Image 2025-10-08 at 12 23 27_e98fafa4](https://github.com/user-attachments/assets/2e98bdc8-3ba6-43af-ae7d-85cee68cb11a)
+
+Since the tracker has the full database available + the current session, it can do team scoreboards.  In this example, the AI assistant was asked to implement grouping, filtering and score totals.
+Additional queries would allow creating buttons to export the data.
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/b61be0a7-650e-4c28-bdcf-3480bade0e0d" />
 
 
 ## Description
