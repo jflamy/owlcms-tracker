@@ -251,18 +251,18 @@
         {/if}
       </section>
 
-      <!-- Attempt Boards -->
-      {#if attemptBoardScoreboards.length > 0}
+      <!-- Team Scoreboards -->
+      {#if teamScoreboards.length > 0}
         <section class="scoreboard-category collapsible">
           <!-- svelte-ignore a11y-click-events-have-key-events -->
           <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
-          <h2 class="category-title clickable" on:click={() => toggleCategory('attempt-boards')}>
-            <span class="toggle-icon">{expandedCategory === 'attempt-boards' ? '▼' : '▶'}</span>
-            Attempt Boards
+          <h2 class="category-title clickable" on:click={() => toggleCategory('teams')}>
+            <span class="toggle-icon">{expandedCategory === 'teams' ? '▼' : '▶'}</span>
+            Team Scoreboards
           </h2>
-          {#if expandedCategory === 'attempt-boards'}
+          {#if expandedCategory === 'teams'}
             <div class="scoreboards-grid">
-              {#each attemptBoardScoreboards as scoreboard}
+              {#each teamScoreboards as scoreboard}
                 <div class="scoreboard-card">
                   <h3>{scoreboard.name}</h3>
                   <p class="description">{@html scoreboard.description}</p>
@@ -313,18 +313,18 @@
         </section>
       {/if}
 
-      <!-- Team Scoreboards -->
-      {#if teamScoreboards.length > 0}
+      <!-- Attempt Boards -->
+      {#if attemptBoardScoreboards.length > 0}
         <section class="scoreboard-category collapsible">
           <!-- svelte-ignore a11y-click-events-have-key-events -->
           <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
-          <h2 class="category-title clickable" on:click={() => toggleCategory('teams')}>
-            <span class="toggle-icon">{expandedCategory === 'teams' ? '▼' : '▶'}</span>
-            Team Scoreboards
+          <h2 class="category-title clickable" on:click={() => toggleCategory('attempt-boards')}>
+            <span class="toggle-icon">{expandedCategory === 'attempt-boards' ? '▼' : '▶'}</span>
+            Attempt Boards
           </h2>
-          {#if expandedCategory === 'teams'}
+          {#if expandedCategory === 'attempt-boards'}
             <div class="scoreboards-grid">
-              {#each teamScoreboards as scoreboard}
+              {#each attemptBoardScoreboards as scoreboard}
                 <div class="scoreboard-card">
                   <h3>{scoreboard.name}</h3>
                   <p class="description">{@html scoreboard.description}</p>

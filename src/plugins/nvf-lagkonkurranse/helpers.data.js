@@ -173,21 +173,6 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// Always sort teams by total score (sum of athlete scores: globalScore→sinclair)
 	const sortBy = 'score';
 	
-	// Determine gender:
-	// - If options.gender === true => Mixed ('MF')
-	// - If options.gender is a string ('M'/'F'/'MF') => use that (normalized)
-	// - Otherwise, auto-detect from fopUpdate (if available)
-	let gender = 'MF'; // default to mixed
-	if (options.gender === true) {
-		gender = 'MF';
-	} else if (typeof options.gender === 'string') {
-		const gnorm = normalizeGender(options.gender);
-		gender = gnorm || 'MF';
-	} else {
-		const detected = normalizeGender(fopUpdate?.gender);
-		gender = detected || 'MF';
-	}
-	
 	const currentAttemptInfo = options.currentAttemptInfo ?? false;
 	const topN = options.topN ?? 0;
 	
@@ -197,26 +182,8 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	
 	// Fetch translations from hub for the selected language
 	const translations = competitionHub.getTranslations(language);
-	
-	// Build header labels from translations with fallbacks
-	const headers = {
-		order: language === 'no' ? 'Rekke\u00ADfølge' : (translations.Start || translations.Order || 'Order'),
-		name: translations.Name || 'Name',
-		category: translations.Category || 'Cat.',
-		birth: translations['Scoreboard.Birth'] || translations.Birth || 'Born',
-		team: translations.Team || 'Team',
-		snatch: translations.Snatch || 'Snatch',
-		cleanJerk: translations.Clean_and_Jerk || 'Clean & Jerk',
-		total: translations['Scoreboard.Total'] || translations.TOTAL || 'Total',
-		score: translations.Score || 'Score',
-		best: translations.Best || '✔',
-		rank: translations.Rank || 'Rank',
-		session: language === 'no' ? 'Pulje' : (translations.Session || 'Session'),
-		top4scores: (gender === 'MF') ? (language === 'no' ? 'topp 2+2 poengsummer' : 'top 2+2 scores') : (language === 'no' ? 'topp 4 poengsummer' : 'top 4 scores'),
-		totalNextS: language === 'no' ? 'Total Neste F' : 'Total Next S',
-		scoreNextS: language === 'no' ? 'Poeng Neste F' : 'Score Next S'
-	};
-	// Diagnostic: pick the first non-spacer athlete and report name + normalized gender
+
+	// Diagnostic: Detect session athlete gender EARLY (used for 'current' resolution and returned diagnostic)
 	let helperDetectedGender = 'unknown';
 	let helperDetectedAthlete = null;
 	try {
@@ -235,9 +202,65 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	}
 	const helperName = helperDetectedAthlete?.fullName || helperDetectedAthlete?.startNumber || 'none';
 	console.log(`[NVF helpers] Detected session athlete: "${helperName}" gender: ${helperDetectedGender}`);
-	
+
+	// Determine gender:
+	// - Preserve the raw requested gender (if provided) so the client can see 'current'
+	// - Normalize a gender value for server-side logic and caching
+	// - If no gender provided, treat it like 'current' mode
+	const requestedGender = (typeof options.gender === 'string' || options.gender === true) ? options.gender : undefined;
+	let gender = 'MF'; // normalized gender used for server logic (default to mixed)
+	if (options.gender === true) {
+		gender = 'MF';
+	} else if (typeof options.gender === 'string') {
+		// If the user requested 'current', resolve to the detected gender for internal logic
+		if (String(options.gender).trim().toLowerCase() === 'current') {
+			// Use the robust helper-detected gender (scanned from groupAthletes)
+			gender = (helperDetectedGender && helperDetectedGender !== 'unknown') ? helperDetectedGender : 'MF';
+		} else {
+			const gnorm = normalizeGender(options.gender);
+			gender = gnorm || 'MF';
+		}
+	} else {
+		// No gender provided in URL - treat like 'current' mode: detect session gender
+		gender = (helperDetectedGender && helperDetectedGender !== 'unknown') ? helperDetectedGender : 'MF';
+	}
+
+	// Build header labels from translations with fallbacks
+	const headers = {
+		order: language === 'no' ? 'Rekke\u00ADfølge' : (translations.Start || translations.Order || 'Order'),
+		name: translations.Name || 'Name',
+		category: translations.Category || 'Cat.',
+		birth: translations['Scoreboard.Birth'] || translations.Birth || 'Born',
+		team: translations.Team || 'Team',
+		snatch: translations.Snatch || 'Snatch',
+		cleanJerk: translations.Clean_and_Jerk || 'Clean & Jerk',
+		total: translations['Scoreboard.Total'] || translations.TOTAL || 'Total',
+		score: translations.Score || 'Score',
+		best: translations.Best || '✔',
+		rank: translations.Rank || 'Rank',
+		session: language === 'no' ? 'Pulje' : (translations.Session || 'Session'),
+		top4scores: (gender === 'MF') ? (language === 'no' ? 'topp 2+2 poengsummer' : 'top 2+2 scores') : (language === 'no' ? 'topp 4 poengsummer' : 'top 4 scores'),
+		totalNextS: language === 'no' ? 'Total Neste F' : 'Total Next S',
+		scoreNextS: language === 'no' ? 'Poeng Neste F' : 'Score Next S'
+	};
 	// Get learning mode from environment
 	const learningMode = process.env.LEARNING_MODE === 'true' ? 'enabled' : 'disabled';
+
+	// If user requested 'current' but no session is detected, return waiting state with blank scoreboard
+	if (requestedGender && String(requestedGender).trim().toLowerCase() === 'current' && helperDetectedGender === 'unknown') {
+		return {
+			competition: { name: fopUpdate?.competitionName || databaseState?.competition?.name || 'Competition', fop: fopName },
+			currentAttempt: null,
+			detectedAthlete: { fullName: null, gender: null },
+			timer: { state: 'stopped', timeRemaining: 0 },
+			sessionStatus: { isDone: false, groupName: '', lastActivity: 0 },
+			teams: [],
+			headers,
+			status: 'waiting',
+			learningMode,
+			options: { showRecords, sortBy, gender: requestedGender, currentAttemptInfo, topN }
+		};
+	}
 	
 	if (!fopUpdate && !databaseState) {
 		return {
@@ -678,7 +701,10 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		compactTeamColumn,  // Narrow team column if max team size < 7
 		status: (fopUpdate || databaseState) ? 'ready' : 'waiting',
 		lastUpdate: fopUpdate?.lastUpdate || Date.now(),
-		options: { showRecords, sortBy, gender, currentAttemptInfo, topN } // Echo back the options used
+		// Echo back the options used. Expose the raw requested gender if provided so the client
+		// can honor 'Current' as a distinct option. If the client did not request a gender explicitly
+		// we omit the gender field so the client treats it as "no gender" and can auto-switch.
+		options: { showRecords, sortBy, gender: requestedGender !== undefined ? requestedGender : undefined, currentAttemptInfo, topN }
 	};
 	
 	// Cache the result (excluding timer, learningMode, sessionStatus, and sessionStatusMessage which change frequently)

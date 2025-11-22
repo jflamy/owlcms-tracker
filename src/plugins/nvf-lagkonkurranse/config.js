@@ -26,9 +26,9 @@ export default {
 			key: 'gender',
 			label: 'Gender',
 			type: 'select',
-			options: ['M', 'F', 'MF'],
-			default: 'M',
-			description: 'Select scoreboard gender: M, F or MF (mixed). Default: M. When set to M or F, the scoreboard will auto-switch to the current athlete gender when a new session starts.'
+			options: ['M', 'F', 'MF', 'Current'],
+			default: 'Current',
+			description: 'Select scoreboard gender: M, F, MF (mixed) or Current. Default: Current. When set to M, F or MF the scoreboard will respect that selection and not auto-switch. When set to Current (or when no gender is set in the URL) the scoreboard will follow the current session athlete gender provided by the server.'
 		},
 		{
 			key: 'currentAttemptInfo',

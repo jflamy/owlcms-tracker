@@ -1,20 +1,16 @@
 # NVF Lagkonkurranse Plugin
 
-This plugin implements the NVF (Norwegian Weightlifting Federation) team competition scoreboard used at team championships.
-
-## Purpose
-
-Provide a server-side processed scoreboard that groups athletes by team and shows retained totals and predicted retained totals for team scoring.
+This plugin implements the NVF (Norwegian Weightlifting Federation) team competition scoreboard used at team championships.  It provides a scoreboard that groups athletes by team and shows current scores and predicted scores for team scoring.
 
 ## Rules for Gendered Team Competitions
 
 Normal team competitions are gendered, separate men and women scores.
 
-1. **"sub-sessions" are mapped directly to OWLCMS sessions.**
-   - Example: `1.1` as a subsession will be a session in owlcms
+1. **"NVF sub-sessions" are mapped to OWLCMS sessions.**
+   - Example: `1.1` as a sub-session is a session in owlcms
    - owlcms round-robin order is used; this makes the athletes do all first lifts, all second lifts, all third lifts.
-   - The speaker will switch manually from 1.1 to 1.2
-2. **Each sub-session OWLCMS session contains athletes of a single gender.**
+   - The speaker will switch manually from 1.1 to 1.2 and so on.
+2. **Each OWLCMS session (NVF sub-session) contains athletes of a single gender.**
    - The scoreboard has 3 modes: M, F or MF.  For gendered competitions, M or F is used, and the scoreboard will switch to the current gender of the current sub-session.
 3. **Scores are computed using the Sinclair 2024 coefficients, without age factors.**
    - The predicted score assumes the the next declared lift is successful.
@@ -35,5 +31,8 @@ Normal team competitions are gendered, separate men and women scores.
 
 ## URL / options
 
-- Route: `/nvf-lagkonkurranse?fop={FOP_NAME}&gender={M|F|MF}` (FOP means field of play)
-- A right-click in the top area of the screen allows changing, but as explained above in a gendered competition the scoreboard will track the current group.
+- Route: `/nvf-lagkonkurranse?fop={FOP_NAME}&gender={M|F|MF}` 
+  - fop means field of play -- the platform name if multiple platforms
+  - Gender is normally not used except when forcing a gender
+    - For example, if you want to display the Men score in a a broadcast during the women session, use gender=M
+    - Using gender=MF forces Mixed mode with top 2 + 2 calculation.

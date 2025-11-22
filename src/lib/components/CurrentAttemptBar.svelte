@@ -24,20 +24,22 @@
 {#if compactMode}
 	<!-- Compact mode for team scoreboard -->
 	<header class="header compact">
-		{#if showLifterInfo}
-			<div class="lifter-info">
-				<div class="name-and-team">
-					<span class="lifter-name">{currentAttempt?.fullName || 'No athlete currently lifting'}</span>
-					{#if currentAttempt?.teamName}
-						<span class="team">{currentAttempt.teamName}</span>
-					{/if}
+		{#if !sessionStatus?.isDone}
+			{#if showLifterInfo}
+				<div class="lifter-info">
+					<div class="name-and-team">
+						<span class="lifter-name">{currentAttempt?.fullName || 'No athlete currently lifting'}</span>
+						{#if currentAttempt?.teamName}
+							<span class="team">{currentAttempt.teamName}</span>
+						{/if}
+					</div>
+					<span class="attempt-label">{@html currentAttempt?.attempt || ''}</span>
+					<span class="weight">{currentAttempt?.weight || '-'} kg</span>
+					<div class="timer {timerState.isRunning ? 'running' : ''} {timerState.isWarning ? 'warning' : ''}">
+						{timerState.display}
+					</div>
 				</div>
-				<span class="attempt-label">{@html currentAttempt?.attempt || ''}</span>
-				<span class="weight">{currentAttempt?.weight || '-'} kg</span>
-				<div class="timer {timerState.isRunning ? 'running' : ''} {timerState.isWarning ? 'warning' : ''}">
-					{timerState.display}
-				</div>
-			</div>
+			{/if}
 		{/if}
 		<div class="session-info">
 			{@html competition?.groupInfo || (translations.session || 'Session')}
