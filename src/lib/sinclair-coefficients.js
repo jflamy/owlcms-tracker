@@ -105,11 +105,11 @@ function sinclairFactor(bodyWeight, coefficient, maxWeight) {
 		return 1.0;
 	}
 
-	// Factor = coefficient * (maxWeight / bodyWeight) ^ (2 * coefficient)
-	const exponent = 2 * coefficient;
-	const factor = coefficient * Math.pow(maxWeight / bodyWeight, exponent);
-
-	return factor;
+	// Official Sinclair formula: 10^(A * (log10(bodyWeight / maxWeight))^2)
+	const ratio = bodyWeight / maxWeight;
+	const logTerm = Math.log10(ratio);
+	const exponent = coefficient * (logTerm * logTerm);
+	return Math.pow(10, exponent);
 }
 
 /**
@@ -152,7 +152,12 @@ export function CalculateSinclair2024(total, bodyWeight, gender) {
 	if (!total || total <= 0) return 0;
 	if (!bodyWeight || bodyWeight <= 0) return 0;
 
-	const coeffs = gender === 'M' ? SINCLAIR_COEFFICIENTS.men : SINCLAIR_COEFFICIENTS.women;
+	const coeffs = gender === 'M'
+		? SINCLAIR_COEFFICIENTS.men
+		: gender === 'F'
+			? SINCLAIR_COEFFICIENTS.women
+			: null;
+	if (!coeffs) return 0;
 	const factor = sinclairFactor(bodyWeight, coeffs.coefficient, coeffs.maxWeight);
 	return total * factor;
 }
