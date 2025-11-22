@@ -59,6 +59,9 @@ function normalizeGender(g) {
  */
 function getAthleteScore(athlete) {
 	if (!athlete) return 0;
+	if (typeof athlete.actualScore === 'number' && Number.isFinite(athlete.actualScore)) {
+		return athlete.actualScore;
+	}
 	const globalScore = parseFormattedNumber(athlete.globalScore);
 	if (globalScore > 0) return globalScore;
 	return parseFormattedNumber(athlete.sinclair);
@@ -127,31 +130,32 @@ function isDefinitiveTotalZero(athlete) {
 
 /**
  * Get the predicted best lift for a lift type
- * PRIORITY: Requested weight (if any) > Best achieved weight
+ * Logic: If there's a next requested weight (not yet attempted), use it as the projection
+ *        Otherwise, use the best achieved weight
  * @param {Array} attempts - Array of attempt objects for one lift type
  * @param {number} bestAchieved - Best weight already achieved
  * @returns {number} Predicted best weight or 0
  */
 function getPredictedBestLift(attempts, bestAchieved) {
-	// HIGHEST PRIORITY: If there's a requested weight, use it
+	// Check if there's a next requested weight (attempt not yet taken)
 	const nextRequested = getNextRequestedWeight(attempts);
 	if (nextRequested > 0) {
+		// There's still an attempt to come - use the requested weight as projection
 		return nextRequested;
 	}
 	
-	// FALLBACK: Use best achieved weight (what they've already successfully lifted)
+	// No more attempts remaining - use best achieved weight
 	if (bestAchieved && bestAchieved > 0) {
 		return bestAchieved;
 	}
 	
-	// No prediction possible
+	// No prediction possible (no requests and no successful lifts)
 	return 0;
 }
 
 /**
- * Calculate the predicted total (best possible outcome)
- * For snatch: if none done yet, use requested weight; if some done, use best achieved
- * For C&J: same logic
+ * Calculate the predicted total
+ * For each lift type: if there's a next request (liftStatus='request'), use it; else use bestAchieved
  * @param {Object} athlete - Athlete object with sattempts, cattempts, bestSnatch, bestCleanJerk
  * @returns {number} Predicted total or 0 if no prediction possible
  */
@@ -161,10 +165,13 @@ function calculatePredictedTotal(athlete) {
 	const bestSnatch = parseFormattedNumber(athlete.bestSnatch) || 0;
 	const bestCJ = parseFormattedNumber(athlete.bestCleanJerk) || 0;
 	
-	// Get predicted best snatch: if best exists, use it; else use first requested
-	const predictedSnatch = getPredictedBestLift(athlete.sattempts || [], bestSnatch);
-	// Get predicted best C&J: if best exists, use it; else use first requested
-	const predictedCJ = getPredictedBestLift(athlete.cattempts || [], bestCJ);
+	// For snatch: if there's a request, use it; otherwise use best achieved
+	const nextSnatchRequest = getNextRequestedWeight(athlete.sattempts || []);
+	const predictedSnatch = nextSnatchRequest > 0 ? nextSnatchRequest : bestSnatch;
+	
+	// For C&J: if there's a request, use it; otherwise use best achieved
+	const nextCJRequest = getNextRequestedWeight(athlete.cattempts || []);
+	const predictedCJ = nextCJRequest > 0 ? nextCJRequest : bestCJ;
 	
 	// Only return a prediction if we have at least one predictable value
 	if (predictedSnatch === 0 && predictedCJ === 0) return 0;
@@ -477,6 +484,20 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 				const fullName = lastName && firstName ? `${lastName}, ${firstName}` : 
 				                 lastName || firstName || '';
 				
+				// Compute best lifts from actual lift results
+				const bestSnatch = computeBestLift([
+					dbAthlete.snatch1ActualLift,
+					dbAthlete.snatch2ActualLift,
+					dbAthlete.snatch3ActualLift
+				]);
+				const bestCleanJerk = computeBestLift([
+					dbAthlete.cleanJerk1ActualLift,
+					dbAthlete.cleanJerk2ActualLift,
+					dbAthlete.cleanJerk3ActualLift
+				]);
+				// Total is bestSnatch + bestCleanJerk (for this scoreboard)
+				const total = bestSnatch + bestCleanJerk;
+				
 				return {
 					fullName,
 					firstName: dbAthlete.firstName,
@@ -506,18 +527,10 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 						formatAttempt(dbAthlete.cleanJerk3Declaration, dbAthlete.cleanJerk3Change1, dbAthlete.cleanJerk3Change2, dbAthlete.cleanJerk3ActualLift, dbAthlete.cleanJerk3AutomaticProgression)
 					],
 					
-					// Totals
-					total: dbAthlete.total || 0,
-					bestSnatch: computeBestLift([
-						dbAthlete.snatch1ActualLift,
-						dbAthlete.snatch2ActualLift,
-						dbAthlete.snatch3ActualLift
-					]),
-					bestCleanJerk: computeBestLift([
-						dbAthlete.cleanJerk1ActualLift,
-						dbAthlete.cleanJerk2ActualLift,
-						dbAthlete.cleanJerk3ActualLift
-					]),
+					// Best lifts and total (computed from actual lift results)
+					bestSnatch,
+					bestCleanJerk,
+					total,
 					
 					// Scoring fields from OWLCMS
 					totalRank: 0,
@@ -567,13 +580,15 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		const hasBest = bestSnatchValue > 0 || bestCleanJerkValue > 0;
 		const combinedBest = bestSnatchValue + bestCleanJerkValue;
 		const displayTotal = hasBest ? combinedBest : '-';
+		const actualTotalNumeric = hasBest ? combinedBest : 0;
 		
 		// Compute definitive zero flag
 		const isDefinitiveZero = isDefinitiveTotalZero(athlete);
 		
-		// Pre-format scores for display (cached computation - no business logic in frontend)
-		const currentScore = athlete.globalScore || athlete.sinclair;
-		const currentScoreNum = parseFormattedNumber(currentScore);
+		// Pre-format actual score using Sinclair formula for consistency with predicted score
+		const currentScoreNum = (actualTotalNumeric > 0 && normalizedAthleteGender)
+			? CalculateSinclair2024(actualTotalNumeric, athlete.bodyWeight, normalizedAthleteGender)
+			: 0;
 		const displayScore = currentScoreNum > 0 ? currentScoreNum.toFixed(2) : 
 		                     (isDefinitiveZero && currentScoreNum === 0) ? '0.00' : '-';
 		
@@ -585,6 +600,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			...athlete,
 			nextTotal,
 			nextScore,
+			actualScore: currentScoreNum,
 			displayTotal,
 			isDefinitiveZero,
 			displayScore,
@@ -846,11 +862,18 @@ function getCategoryName(categoryId, databaseState) {
 function computeBestLift(attempts) {
 	let best = 0;
 	attempts.forEach(attempt => {
-		if (attempt && !attempt.startsWith('-')) {
-			const weight = parseInt(attempt);
-			if (!isNaN(weight) && weight > best) {
-				best = weight;
-			}
+		// Treat "-" (dash) as 0, skip null/undefined/empty
+		if (!attempt || attempt === '' || attempt === '-') {
+			return;
+		}
+		// Skip failed lifts (negative prefix or "0" meaning no lift)
+		if (attempt.startsWith('-') || attempt === '0') {
+			return;
+		}
+		// Parse successful lift weight
+		const weight = parseInt(attempt);
+		if (!isNaN(weight) && weight > best) {
+			best = weight;
 		}
 	});
 	return best;
