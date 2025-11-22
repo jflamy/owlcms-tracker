@@ -23,7 +23,7 @@
 
 {#if compactMode}
 	<!-- Compact mode for team scoreboard -->
-	<header class="header compact">
+	<header class="header compact" data-scoreboard={scoreboardName}>
 		{#if !sessionStatus?.isDone}
 			{#if showLifterInfo}
 				<div class="lifter-info">
@@ -47,7 +47,7 @@
 	</header>
 {:else}
 	<!-- Full mode for grid scoreboards (session-results, lifting-order, rankings) -->
-	<header class="header">
+	<header class="header" data-scoreboard={scoreboardName}>
 		{#if showLifterInfo}
 			<div class="lifter-info">
 				{#if sessionStatus?.isDone}

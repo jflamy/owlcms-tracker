@@ -99,6 +99,33 @@ function hasAttemptBeenTaken(attempts) {
 }
 
 /**
+ * Determine if an athlete's total is definitively zero
+ * Total is definitive 0 when all lifts have been taken (or are explicitly 0)
+ * @param {Object} athlete - Athlete object with sattempts, cattempts, and total
+ * @returns {boolean} True if total is definitively zero (all attempts completed and total is 0)
+ */
+function isDefinitiveTotalZero(athlete) {
+	if (!athlete) return false;
+	const total = parseFormattedNumber(athlete.total ?? athlete.displayTotal ?? 0);
+	if (total !== 0) return false;
+
+	// Collect all attempt objects (snatch + clean&jerk)
+	const attempts = [];
+	if (Array.isArray(athlete.sattempts)) attempts.push(...athlete.sattempts);
+	if (Array.isArray(athlete.cattempts)) attempts.push(...athlete.cattempts);
+
+	// If any attempt is 'request' or 'empty' then session not completed -> not definitive
+	for (const a of attempts) {
+		if (!a) return false; // missing attempt info -> be conservative
+		const status = (a.liftStatus || '').toString().toLowerCase();
+		if (status === 'request' || status === 'empty') return false;
+	}
+
+	// All attempts present and none are request/empty -> definitive
+	return true;
+}
+
+/**
  * Get the predicted best lift for a lift type
  * PRIORITY: Requested weight (if any) > Best achieved weight
  * @param {Array} attempts - Array of attempt objects for one lift type
@@ -540,11 +567,28 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		const hasBest = bestSnatchValue > 0 || bestCleanJerkValue > 0;
 		const combinedBest = bestSnatchValue + bestCleanJerkValue;
 		const displayTotal = hasBest ? combinedBest : '-';
+		
+		// Compute definitive zero flag
+		const isDefinitiveZero = isDefinitiveTotalZero(athlete);
+		
+		// Pre-format scores for display (cached computation - no business logic in frontend)
+		const currentScore = athlete.globalScore || athlete.sinclair;
+		const currentScoreNum = parseFormattedNumber(currentScore);
+		const displayScore = currentScoreNum > 0 ? currentScoreNum.toFixed(2) : 
+		                     (isDefinitiveZero && currentScoreNum === 0) ? '0.00' : '-';
+		
+		const nextScoreNum = parseFormattedNumber(nextScore);
+		const displayNextScore = nextScoreNum > 0 ? nextScoreNum.toFixed(2) : 
+		                         (isDefinitiveZero && nextScoreNum === 0) ? '0.00' : '-';
+		
 		return {
 			...athlete,
 			nextTotal,
 			nextScore,
-			displayTotal
+			displayTotal,
+			isDefinitiveZero,
+			displayScore,
+			displayNextScore
 		};
 	});
 	
@@ -827,9 +871,13 @@ function formatAttempt(declaration, change1, change2, actualLift, automaticProgr
 	let displayWeight = null;
 	
 	// Priority 1: actualLift (if lift has been attempted)
-	if (actualLift && actualLift !== '' && actualLift !== '0') {
-		if (actualLift.startsWith('-')) {
-			// Failed lift
+	// Note: actualLift of "0" means "no lift" (all red lights) and has precedence over requested weight
+	if (actualLift && actualLift !== '') {
+		if (actualLift === '0') {
+			// No lift with 0 weight - display as dash to match session athlete formatting
+			return { liftStatus: 'fail', stringValue: '-' };
+		} else if (actualLift.startsWith('-')) {
+			// Failed lift (negative weight)
 			const weight = actualLift.substring(1);
 			return { liftStatus: 'fail', stringValue: `(${weight})` };
 		} else {

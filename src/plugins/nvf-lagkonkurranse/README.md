@@ -12,11 +12,14 @@ Normal team competitions are gendered, separate men and women scores.
    - The speaker will switch manually from 1.1 to 1.2 and so on.
 2. **Each OWLCMS session (NVF sub-session) contains athletes of a single gender.**
    - The scoreboard has 3 modes: M, F or MF.  For gendered competitions, M or F is used, and the scoreboard will switch to the current gender of the current sub-session.
-3. **Scores are computed using the Sinclair 2024 coefficients, without age factors.**
+3. **Any kg lifted scores points.**
+   - If two teams have athletes bomb-out in snatch, then these athletes can score point in clean-and-jerk
+   - Same for a bomb-out in clean-and-jerk, the kilos lifted in snatch score points.
+4. **Scores are computed using the Sinclair 2024 coefficients, without age factors.**
    - The predicted score assumes the the next declared lift is successful.
-4. **Team scores the sum of the scores for the best 4 athletes of the same gender**
+5. **Team scores the sum of the scores for the best 4 athletes of the same gender**
    - Team members retained for scoring are highlighted
-5. **Number of members in the team is not enforced by the scoreboard.**
+6. **Number of members in the team is not enforced by the scoreboard.**
    - The scoreboard will show them all.  owlcms can give warnings on team sizes, but this is expected to have been dealt with prior to the competition
 
 ## Rules for Mixed Team Competitions

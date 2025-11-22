@@ -61,6 +61,14 @@
 		return num > 0 ? num.toFixed(2) : '-';
 	}
 
+	// Format score for display - uses precomputed isDefinitiveZero flag from backend
+	function formatScoreDisplay(value, isDefinitiveZero = false) {
+		const num = parseFormattedNumber(value);
+		if (num > 0) return num.toFixed(2);
+		if (isDefinitiveZero && num === 0) return '0.00';
+		return '-';
+	}
+
 	function isLotInList(list, lotNumber) {
 		if (!Array.isArray(list)) return false;
 		if (lotNumber === undefined || lotNumber === null) return false;
@@ -208,10 +216,10 @@ export function shouldRenderFlag(url) {
 							<div class="cell best" role="gridcell">{athlete.bestCleanJerk || '-'}</div>
 						<div class="cell v-spacer" aria-hidden="true"></div>
 						<div class="cell total" role="gridcell">{athlete.displayTotal ?? '-'}</div>
-						<div class="cell score" class:in-top4-current={isLotInList(team.top4CurrentLotNumbers, athlete.lotNumber)} role="gridcell">{formatScore(athlete.globalScore || athlete.sinclair)}</div>
+						<div class="cell score" class:in-top4-current={isLotInList(team.top4CurrentLotNumbers, athlete.lotNumber)} role="gridcell">{athlete.displayScore}</div>
 					<div class="cell v-spacer" aria-hidden="true"></div>
 					<div class="cell next-total" role="gridcell">{athlete.nextTotal ? athlete.nextTotal : '-'}</div>
-					<div class="cell next-score" class:in-top4-predicted={isLotInList(team.top4PredictedLotNumbers, athlete.lotNumber)} role="gridcell">{athlete.nextScore ? formatScore(athlete.nextScore) : '-'}</div>
+					<div class="cell next-score" class:in-top4-predicted={isLotInList(team.top4PredictedLotNumbers, athlete.lotNumber)} role="gridcell">{athlete.displayNextScore}</div>
 					</div>
 					{/each}
 
