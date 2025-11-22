@@ -120,23 +120,61 @@ function sinclairFactor(bodyWeight, coefficient, maxWeight) {
  * @param {string} gender - 'M' or 'F'
  * @returns {number} Sinclair score
  */
-export function calculateSinclairScore(total, bodyWeight, gender) {
-	if (!total || total <= 0) return 0;
+/**
+ * Unified Sinclair function: accepts either an actual total or a predicted total
+ * and returns the Sinclair score using the 2024 coefficients (default/latest).
+ * This is the single source of truth for Sinclair calculations used by plugins.
+ * @param {number} totalOrPredicted - Total (actual or predicted)
+ * @param {number} bodyWeight - Athlete bodyweight in kg
+ * @param {string} gender - 'M' or 'F'
+ * @returns {number} Sinclair score
+ */
+export function calculateSinclair(totalOrPredicted, bodyWeight, gender) {
+	if (!totalOrPredicted || totalOrPredicted <= 0) return 0;
+	if (!bodyWeight || bodyWeight <= 0) return 0;
 
 	const factor = getSinclairFactor(bodyWeight, gender);
+	return totalOrPredicted * factor;
+}
+
+/**
+ * Calculate Sinclair score using the 2024 official coefficients.
+ * Coefficients (2024):
+ *  - men.coefficient = 0.722762521, men.maxWeight = 193.609
+ *  - women.coefficient = 0.787004341, women.maxWeight = 153.757
+ *
+ * @param {number} total - total (snatch + clean & jerk)
+ * @param {number} bodyWeight - athlete bodyweight in kg
+ * @param {string} gender - 'M' or 'F'
+ * @returns {number} Sinclair score (0 if invalid input)
+ */
+export function CalculateSinclair2024(total, bodyWeight, gender) {
+	if (!total || total <= 0) return 0;
+	if (!bodyWeight || bodyWeight <= 0) return 0;
+
+	const coeffs = gender === 'M' ? SINCLAIR_COEFFICIENTS.men : SINCLAIR_COEFFICIENTS.women;
+	const factor = sinclairFactor(bodyWeight, coeffs.coefficient, coeffs.maxWeight);
 	return total * factor;
 }
 
 /**
- * Calculate predicted Sinclair score using predicted total
+ * Calculate Sinclair score using the 2020 coefficients (used for Masters SMF calculations).
+ * Coefficients (2020):
+ *  - men.coefficient = 0.751945030, men.maxWeight = 175.508
+ *  - women.coefficient = 0.783497476, women.maxWeight = 153.655
  *
- * @param {number} predictedTotal - Predicted snatch + C&J total
- * @param {number} bodyWeight - Athlete's bodyweight in kg
+ * @param {number} total - total (snatch + clean & jerk)
+ * @param {number} bodyWeight - athlete bodyweight in kg
  * @param {string} gender - 'M' or 'F'
- * @returns {number} Predicted Sinclair score
+ * @returns {number} Sinclair score (0 if invalid input)
  */
-export function calculatePredictedSinclair(predictedTotal, bodyWeight, gender) {
-	return calculateSinclairScore(predictedTotal, bodyWeight, gender);
+export function CalculateSinclair2020(total, bodyWeight, gender) {
+	if (!total || total <= 0) return 0;
+	if (!bodyWeight || bodyWeight <= 0) return 0;
+
+	const coeffs = gender === 'M' ? SINCLAIR_COEFFICIENTS_2020.men : SINCLAIR_COEFFICIENTS_2020.women;
+	const factor = sinclairFactor(bodyWeight, coeffs.coefficient, coeffs.maxWeight);
+	return total * factor;
 }
 
 /**

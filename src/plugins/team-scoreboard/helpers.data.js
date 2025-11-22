@@ -4,6 +4,7 @@
 
 import { competitionHub } from '$lib/server/competition-hub.js';
 import { getFlagUrl } from '$lib/server/flag-resolver.js';
+import { calculateSinclair } from '$lib/sinclair-coefficients.js';
 
 /**
  * Plugin-specific cache to avoid recomputing team data on every browser request
@@ -541,22 +542,8 @@ function formatAttempt(declaration, change1, change2, actualLift, automaticProgr
  * @param {string} gender - "M" or "F"
  * @returns {number} Sinclair score
  */
-function computeSinclair(total, bodyWeight, gender) {
-	if (!total || total === 0 || !bodyWeight) return 0;
-	
-	// Simplified Sinclair calculation using 2020+ coefficients
-	// For accurate results, should use OWLCMS precomputed values
-	const maxBodyWeight = gender === 'M' ? 175.508 : 153.757;
-	const coeffA = gender === 'M' ? 0.751945030 : 0.783497476;
-	const coeffB = gender === 'M' ? 175.508 : 153.757;
-	
-	if (bodyWeight >= maxBodyWeight) {
-		return total; // No coefficient for super-heavyweights
-	}
-	
-	const sinclairCoeff = Math.pow(10, coeffA * Math.pow(Math.log10(bodyWeight / coeffB), 2));
-	return total * sinclairCoeff;
-}
+// Sinclair calculations are provided by src/lib/sinclair-coefficients.js
+// Use `calculateSinclair` as the single source of truth for both actual and predicted totals.
 
 /**
  * Get top athletes from the competition state (SERVER-SIDE ONLY)

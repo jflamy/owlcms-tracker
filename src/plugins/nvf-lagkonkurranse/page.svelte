@@ -20,11 +20,16 @@
 
 	onMount(() => {
 		timer.start(data.timer);
+		// Add global listeners used to hide the custom context menu
+		document.addEventListener('click', handleDocClick);
+		document.addEventListener('keydown', handleKeydown);
 	});
 
 	onDestroy(() => {
 		timer.stop();
 		unsubscribe();
+		document.removeEventListener('click', handleDocClick);
+		document.removeEventListener('keydown', handleKeydown);
 	});
 
 	$: currentAttempt = data.currentAttempt;
@@ -33,6 +38,136 @@
 	// Sync timer with server when data changes
 	$: if (data.timer) {
 		timer.syncWithServer(data.timer);
+	}
+
+	// When a new lifting update arrives (currentAttempt changes), if the scoreboard
+	// is configured for single gender (M or F) and the athlete's gender differs,
+	// reload the scoreboard with the athlete's gender. Do nothing for MF.
+	$: if (data?.currentAttempt) {
+		const cur = data.currentAttempt;
+		// Build a stable key for the current attempt to detect changes
+		const key = `${cur.lotNumber ?? cur.startNumber ?? ''}-${cur.attemptNumber ?? ''}-${cur.fullName ?? ''}`;
+		if (key !== lastAttemptKey) {
+			lastAttemptKey = key;
+			let scoreboardGender = normalizeGenderClient(data.options?.gender);
+			if (scoreboardGender === 'M' || scoreboardGender === 'F') {
+				let athleteGender = normalizeGenderClient(cur.gender || cur.sex || cur.genderKey || cur.genderKey);
+				// Fallback to helper-detected athlete if currentAttempt lacks gender
+				if (!athleteGender && data.detectedAthlete?.gender) {
+					athleteGender = normalizeGenderClient(data.detectedAthlete.gender);
+				}
+				if (athleteGender && athleteGender !== scoreboardGender) {
+					console.log('[NVF] Auto-switching scoreboard gender from', scoreboardGender, 'to', athleteGender, 'based on currentAttempt', key);
+					updateQueryGender(athleteGender);
+				}
+			}
+		}
+	}
+
+	// UI gender selection (client-side). Default to server option or 'M'.
+	let selectedGender = data.options?.gender || 'M';
+
+	// Context menu state for right-click gender menu
+	let showContextMenu = false;
+	let menuX = 0;
+	let menuY = 0;
+
+	let lastSessionName = null;
+
+	// Persist lastAttemptKey across HMR to avoid false auto-switches during hot-replace
+	if (!globalThis.__nvf_state) globalThis.__nvf_state = {};
+	const __nvf_state = globalThis.__nvf_state;
+	let lastAttemptKey = __nvf_state.lastAttemptKey || null;
+
+	function normalizeGenderClient(g) {
+		if (!g) return null;
+		const s = String(g).trim().toLowerCase();
+		if (s === 'm' || s === 'male' || s === 'men') return 'M';
+		if (s === 'f' || s === 'female' || s === 'women') return 'F';
+		if (s === 'mf' || s === 'mixed') return 'MF';
+		return null;
+	}
+
+	function updateQueryGender(newGender) {
+		try {
+			console.log('[NVF] updateQueryGender ->', newGender);
+			const url = new URL(window.location.href);
+			const params = url.searchParams;
+			params.set('gender', newGender);
+			// Build full URL and force navigation + reload to ensure server-side render
+			const fullUrl = window.location.origin + url.pathname + '?' + params.toString();
+			// Use assign to navigate and then force a reload shortly after to avoid cached render
+			window.location.assign(fullUrl);
+			setTimeout(() => {
+				try { window.location.reload(); } catch (err) { /* ignore */ }
+			}, 250);
+		} catch (e) {
+			// fallback: build using pathname and current origin
+			const params = new URLSearchParams(window.location.search);
+			params.set('gender', newGender);
+			const fullUrl = window.location.origin + window.location.pathname + '?' + params.toString();
+			window.location.assign(fullUrl);
+			setTimeout(() => {
+				try { window.location.reload(); } catch (err) { /* ignore */ }
+			}, 250);
+		}
+	}
+
+		// Context menu helpers
+		function openGenderMenu(e) {
+			// Handler for contextmenu or click: show custom menu and prevent default browser menu
+			e.preventDefault();
+			e.stopPropagation();
+			showContextMenu = true;
+			// clamp menu position so it remains inside viewport
+			let x = e.clientX || (e.touches && e.touches[0] && e.touches[0].clientX) || 16;
+			let y = e.clientY || (e.touches && e.touches[0] && e.touches[0].clientY) || 16;
+			const margin = 12;
+			const maxX = Math.max(margin, window.innerWidth - 160);
+			const maxY = Math.max(margin, window.innerHeight - 120);
+			menuX = Math.min(Math.max(margin, x), maxX);
+			menuY = Math.min(Math.max(margin, y), maxY);
+		}
+
+		function closeContextMenu() {
+			showContextMenu = false;
+		}
+
+		function onSelectGender(g) {
+			closeContextMenu();
+			updateQueryGender(g);
+		}
+
+		function handleSessionKeydown(e) {
+			// Open menu on Enter, Space, or ContextMenu key
+			if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar' || e.key === 'ContextMenu') {
+				e.preventDefault();
+				openGenderMenu(e);
+			}
+		}
+
+	// When a new session starts, if the scoreboard gender is 'M' or 'F', reload with the current athlete's gender
+	// This runs only when the session name changes to avoid repeated reloads.
+	$: if (data?.competition?.session && data.competition.session !== lastSessionName) {
+		lastSessionName = data.competition.session;
+		const scoreboardGender = data.options?.gender;
+		if (scoreboardGender === 'M' || scoreboardGender === 'F') {
+			// Try to locate the current athlete in the returned athlete list to read their gender
+			const athletes = data.allAthletes || [];
+			const cur = data.currentAttempt;
+			if (cur) {
+				const match = athletes.find(a => String(a.startNumber) === String(cur.startNumber) || (a.fullName && cur.fullName && a.fullName === cur.fullName));
+				let athleteGender = normalizeGenderClient(match?.gender);
+				if (!athleteGender && data.detectedAthlete?.gender) {
+					athleteGender = normalizeGenderClient(data.detectedAthlete.gender);
+				}
+				if (athleteGender && athleteGender !== scoreboardGender) {
+					// reload with athlete gender
+					updateQueryGender(athleteGender);
+				}
+			}
+		}
+
 	}
 
 	function getAttemptClass(attempt) {
@@ -68,6 +203,15 @@
 		if (!normalized) return false;
 		return list.includes(normalized);
 	}
+
+	function isFemaleInMF(athlete) {
+		if (!athlete) return false;
+		const scoreboardGender = data?.options?.gender || data?.options?.gender;
+		const sg = normalizeGenderClient(scoreboardGender);
+		if (sg !== 'MF') return false;
+		const ag = normalizeGenderClient(athlete.gender || athlete.sex || athlete.genderKey);
+		return ag === 'F';
+	}
 </script>
 
 <script context="module">
@@ -85,30 +229,42 @@ export function shouldRenderFlag(url) {
 
 <div class="scoreboard">
 	{#if data.status !== 'waiting'}
-		<CurrentAttemptBar 
-			currentAttempt={data.currentAttempt}
-			timerState={timerState}
-			decisionState={{}}
-			scoreboardName={data.scoreboardName}
-			sessionStatus={data.sessionStatus}
-			competition={data.competition}
-			showDecisionLights={false}
-			showTimer={true}
-			compactMode={true}
-			showLifterInfo={data.options?.currentAttemptInfo ?? true}
-			translations={{
-				session: data.headers?.session || 'Session',
-				snatch: data.headers?.snatch || 'Snatch'
-			}}
-		/>
+		<div class="session-header-wrapper" role="button" aria-label="Open gender menu" on:contextmenu={openGenderMenu} on:click|preventDefault|stopPropagation={openGenderMenu} on:keydown={handleSessionKeydown} tabindex="0">
+			<CurrentAttemptBar 
+				currentAttempt={data.currentAttempt}
+				timerState={timerState}
+				decisionState={{}}
+				scoreboardName={data.scoreboardName}
+				sessionStatus={data.sessionStatus}
+				competition={data.competition}
+				showDecisionLights={false}
+				showTimer={true}
+				compactMode={true}
+				showLifterInfo={data.options?.currentAttemptInfo ?? true}
+				translations={{
+					session: data.headers?.session || 'Session',
+					snatch: data.headers?.snatch || 'Snatch'
+				}}
+			/>
+		</div>
 	{/if}
+
+	{#if showContextMenu}
+		<div class="nvf-context-menu" style="position:fixed; left:{menuX}px; top:{menuY}px; z-index:9999;">
+			<button type="button" class="menu-item" on:click|stopPropagation={() => onSelectGender('M')}>M</button>
+			<button type="button" class="menu-item" on:click|stopPropagation={() => onSelectGender('F')}>F</button>
+			<button type="button" class="menu-item" on:click|stopPropagation={() => onSelectGender('MF')}>MF</button>
+		</div>
+	{/if}
+
+	<!-- Right-click the header to open gender menu -->
 
 	<main class="main">
 		{#if data.status === 'waiting'}
 			<div class="waiting"><p>{data.message || 'Waiting for competition data...'}</p></div>
 		{:else}
 			<div class="scoreboard-grid" class:compact-team-column={data.compactTeamColumn} role="grid">
-				<div class="grid-row header header-primary" role="row">
+				<div class="grid-row header header-primary" role="row" tabindex="0" on:contextmenu={openGenderMenu} on:click|preventDefault|stopPropagation={openGenderMenu} on:keydown={handleSessionKeydown}>
 					<div class="cell header col-start span-two" role="columnheader">{data.headers?.order || 'Order'}</div>
 					<div class="cell header col-name span-two" role="columnheader">{data.headers?.name || 'Name'}</div>
 					<div class="cell header col-cat span-two" role="columnheader">{data.headers?.category || 'Cat.'}</div>
@@ -125,7 +281,7 @@ export function shouldRenderFlag(url) {
 					<div class="cell header col-next-total span-two" role="columnheader">{data.headers?.totalNextS || 'Total Next S'}</div>
 					<div class="cell header col-next-score span-two" role="columnheader">{data.headers?.scoreNextS || 'Score Next S'}</div>
 				</div>
-				<div class="grid-row header header-secondary" role="row">
+				<div class="grid-row header header-secondary" role="row" tabindex="0" on:contextmenu={openGenderMenu} on:click|preventDefault|stopPropagation={openGenderMenu} on:keydown={handleSessionKeydown}>
 					<div class="cell header col-name-portrait" role="columnheader">{data.headers?.name || 'Name'}</div>
 					<div class="cell header v-spacer v-spacer-snatch" aria-hidden="true"></div>
 					<div class="cell header col-attempt snatch-1" role="columnheader">1</div>
@@ -167,10 +323,11 @@ export function shouldRenderFlag(url) {
 					<div class="cell team-next-score" role="gridcell">{formatScore(team.teamNextScore)}</div>
 				</div>
 				{#each team.athletes as athlete}
-						<div
+							<div
 							class="grid-row data-row team-athlete"
 							class:current={athlete.classname && athlete.classname.includes('current')}
 							class:next={athlete.classname && athlete.classname.includes('next')}
+							class:female-mf={isFemaleInMF(athlete)}
 							role="row"
 						>
 							<div class="cell start-num" role="gridcell">{athlete.inCurrentSession ? (athlete.liftingOrder ?? '') : ''}</div>
@@ -423,6 +580,10 @@ export function shouldRenderFlag(url) {
 	.grid-row.data-row > .score.in-top4-current { background: #1b5e20 !important; color: #fff !important; font-weight: bold; }
 	.grid-row.data-row > .next-score.in-top4-predicted { background: #831843 !important; color: #fff !important; font-weight: bold; }
 
+	/* Mixed mode: slightly lighter highlight colors for female athletes */
+	.grid-row.data-row.female-mf > .score.in-top4-current { background: #57a05a !important; color: #fff !important; font-weight: bold; }
+	.grid-row.data-row.female-mf > .next-score.in-top4-predicted { background: #c06da0 !important; color: #fff !important; font-weight: bold; }
+
 	.grid-row.team-athlete > .cell:first-of-type { border-left: 8px solid #4a5568 !important; }
 	.grid-row.team-athlete > .cell:last-of-type { border-right: 8px solid #4a5568 !important; }
 	.grid-row.team-athlete > .cell { border-top: none; border-bottom: none; }
@@ -574,5 +735,31 @@ export function shouldRenderFlag(url) {
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+	}
+
+	/* Context menu for gender selection (right-click on header) */
+	.nvf-context-menu {
+		background: #111;
+		border: 1px solid #444;
+		padding: 0.25rem;
+		border-radius: 6px;
+		box-shadow: 0 6px 18px rgba(0,0,0,0.6);
+		min-width: 6rem;
+		display: flex;
+		flex-direction: column;
+	}
+
+	.nvf-context-menu .menu-item {
+		background: transparent;
+		color: #fff;
+		border: none;
+		padding: 0.45rem 0.6rem;
+		text-align: left;
+		cursor: pointer;
+		font-size: 1rem;
+	}
+
+	.nvf-context-menu .menu-item:hover {
+		background: #222;
 	}
 </style>

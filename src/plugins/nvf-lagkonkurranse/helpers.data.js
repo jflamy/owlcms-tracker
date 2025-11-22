@@ -4,7 +4,7 @@
 
 import { competitionHub } from '$lib/server/competition-hub.js';
 import { getFlagUrl } from '$lib/server/flag-resolver.js';
-import { calculatePredictedSinclair } from '$lib/sinclair-coefficients.js';
+import { CalculateSinclair2024 } from '$lib/sinclair-coefficients.js';
 
 /**
  * Plugin-specific cache to avoid recomputing team data on every browser request
@@ -35,6 +35,21 @@ function normalizeLotNumber(value) {
 	if (value === undefined || value === null) return '';
 	const normalized = String(value).trim();
 	return normalized;
+}
+
+/**
+ * Normalize gender values to 'M' or 'F'.
+ * Accepts: 'M','F','m','f','male','female','Male','Female', etc.
+ * Returns null for unknown or mixed values.
+ * @param {string} g
+ * @returns {'M'|'F'|null}
+ */
+function normalizeGender(g) {
+	if (g === undefined || g === null) return null;
+	const s = String(g).trim().toLowerCase();
+	if (s === 'm' || s === 'male' || s === 'men') return 'M';
+	if (s === 'f' || s === 'female' || s === 'women') return 'F';
+	return null;
 }
 
 /**
@@ -158,15 +173,19 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// Always sort teams by total score (sum of athlete scores: globalScore→sinclair)
 	const sortBy = 'score';
 	
-	// Determine gender: 
-	// - If 'gender' option is true (Mixed checkbox), use 'MF' to show both genders
-	// - Otherwise, auto-detect from current athlete (if available) to show only their gender
-	let gender = 'MF';  // Default to mixed
-	if (options.gender !== true) {
-		// Mixed checkbox is not checked, so auto-detect from current athlete
-		if (fopUpdate?.gender) {
-			gender = fopUpdate.gender;
-		}
+	// Determine gender:
+	// - If options.gender === true => Mixed ('MF')
+	// - If options.gender is a string ('M'/'F'/'MF') => use that (normalized)
+	// - Otherwise, auto-detect from fopUpdate (if available)
+	let gender = 'MF'; // default to mixed
+	if (options.gender === true) {
+		gender = 'MF';
+	} else if (typeof options.gender === 'string') {
+		const gnorm = normalizeGender(options.gender);
+		gender = gnorm || 'MF';
+	} else {
+		const detected = normalizeGender(fopUpdate?.gender);
+		gender = detected || 'MF';
 	}
 	
 	const currentAttemptInfo = options.currentAttemptInfo ?? false;
@@ -193,11 +212,29 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		best: translations.Best || '✔',
 		rank: translations.Rank || 'Rank',
 		session: language === 'no' ? 'Pulje' : (translations.Session || 'Session'),
-		top4scores: language === 'no' ? 'topp 4 poengsummer' : 'top 4 scores',
-		totalNextS: language === 'no' ? 'Total Neste S' : 'Total Next S',
-		scoreNextS: language === 'no' ? 'Poeng Neste S' : 'Score Next S'
+		top4scores: (gender === 'MF') ? (language === 'no' ? 'topp 2+2 poengsummer' : 'top 2+2 scores') : (language === 'no' ? 'topp 4 poengsummer' : 'top 4 scores'),
+		totalNextS: language === 'no' ? 'Total Neste F' : 'Total Next S',
+		scoreNextS: language === 'no' ? 'Poeng Neste F' : 'Score Next S'
 	};
-	console.log(`[NVF helpers] Built headers:`, headers);
+	// Diagnostic: pick the first non-spacer athlete and report name + normalized gender
+	let helperDetectedGender = 'unknown';
+	let helperDetectedAthlete = null;
+	try {
+		if (Array.isArray(fopUpdate?.groupAthletes) && fopUpdate.groupAthletes.length > 0) {
+			// Prefer the first non-spacer athlete that has a name or start number
+			helperDetectedAthlete = fopUpdate.groupAthletes.find(a => !a.isSpacer && (a.fullName || a.startNumber))
+				|| fopUpdate.groupAthletes.find(a => !a.isSpacer)
+				|| fopUpdate.groupAthletes[0];
+			helperDetectedGender = normalizeGender(helperDetectedAthlete?.gender) || normalizeGender(fopUpdate?.gender) || 'unknown';
+		} else {
+			helperDetectedGender = normalizeGender(fopUpdate?.gender) || 'unknown';
+		}
+	} catch (e) {
+		helperDetectedGender = 'unknown';
+		helperDetectedAthlete = null;
+	}
+	const helperName = helperDetectedAthlete?.fullName || helperDetectedAthlete?.startNumber || 'none';
+	console.log(`[NVF helpers] Detected session athlete: "${helperName}" gender: ${helperDetectedGender}`);
 	
 	// Get learning mode from environment
 	const learningMode = process.env.LEARNING_MODE === 'true' ? 'enabled' : 'disabled';
@@ -442,9 +479,9 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		});
 	}
 	
-	// Filter athletes by gender if not 'MF'
+	// Filter athletes by gender if not 'MF' (use normalized genders)
 	if (gender !== 'MF') {
-		allAthletes = allAthletes.filter(athlete => athlete.gender === gender);
+		allAthletes = allAthletes.filter(athlete => normalizeGender(athlete.gender) === gender);
 	}
 
 	// Always ignore athletes with no team (drop before grouping)
@@ -457,7 +494,8 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// database athletes have computed bestSnatch/bestCleanJerk from their raw lift records)
 	allAthletes = allAthletes.map(athlete => {
 		const nextTotal = calculatePredictedTotal(athlete);
-		const nextScore = nextTotal > 0 ? calculatePredictedSinclair(nextTotal, athlete.bodyWeight, athlete.gender) : 0;
+		const normalizedAthleteGender = normalizeGender(athlete.gender);
+		const nextScore = (nextTotal > 0 && normalizedAthleteGender) ? CalculateSinclair2024(nextTotal, athlete.bodyWeight, normalizedAthleteGender) : 0;
 		const bestSnatchValue = parseFormattedNumber(athlete.bestSnatch);
 		const bestCleanJerkValue = parseFormattedNumber(athlete.bestCleanJerk);
 		const hasBest = bestSnatchValue > 0 || bestCleanJerkValue > 0;
@@ -491,13 +529,35 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		// This happens BEFORE any topN filtering is applied to the display
 		// IMPORTANT: Select top 4 SEPARATELY for current score vs predicted score
 		
-		// Top 4 by CURRENT score (for teamScore)
-		const athletesByCurrentScore = [...allTeamAthletes].sort((a, b) => getAthleteScore(b) - getAthleteScore(a));
-		const top4ByCurrentScore = athletesByCurrentScore.slice(0, 4);
-		
-		// Top 4 by PREDICTED score (for teamNextScore)
-		const athletesByPredictedScore = [...allTeamAthletes].sort((a, b) => (b.nextScore || 0) - (a.nextScore || 0));
-		const top4ByPredictedScore = athletesByPredictedScore.slice(0, 4);
+		// Compute top contributors based on selected gender rules
+		let topCurrentContributors = [];
+		let topPredictedContributors = [];
+
+		if (gender === 'MF') {
+			// For mixed display: take top 2 men and top 2 women separately
+			const males = allTeamAthletes.filter(a => normalizeGender(a.gender) === 'M');
+			const females = allTeamAthletes.filter(a => normalizeGender(a.gender) === 'F');
+
+			males.sort((a, b) => getAthleteScore(b) - getAthleteScore(a));
+			females.sort((a, b) => getAthleteScore(b) - getAthleteScore(a));
+			const topMalesCurrent = males.slice(0, 2);
+			const topFemalesCurrent = females.slice(0, 2);
+			topCurrentContributors = [...topMalesCurrent, ...topFemalesCurrent];
+
+			// Predicted
+			males.sort((a, b) => (b.nextScore || 0) - (a.nextScore || 0));
+			females.sort((a, b) => (b.nextScore || 0) - (a.nextScore || 0));
+			const topMalesPred = males.slice(0, 2);
+			const topFemalesPred = females.slice(0, 2);
+			topPredictedContributors = [...topMalesPred, ...topFemalesPred];
+		} else {
+			// Single-gender board (M or F): take top 4 of the visible athletes
+			const athletesByCurrentScore = [...allTeamAthletes].sort((a, b) => getAthleteScore(b) - getAthleteScore(a));
+			topCurrentContributors = athletesByCurrentScore.slice(0, 4);
+
+			const athletesByPredictedScore = [...allTeamAthletes].sort((a, b) => (b.nextScore || 0) - (a.nextScore || 0));
+			topPredictedContributors = athletesByPredictedScore.slice(0, 4);
+		}
 		
 		// Now apply Top N filter per team if specified (for DISPLAY only)
 		let athletes = allTeamAthletes;
@@ -543,17 +603,17 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		
 		// Calculate team total (sum of all athlete totals)
 		const teamTotal = allTeamAthletes.reduce((sum, a) => sum + (a.total || 0), 0);
-		
-		// Calculate team score (sum of TOP 4 by CURRENT score)
-		const teamScore = top4ByCurrentScore.reduce((sum, a) => sum + getAthleteScore(a), 0);
-		
-		// Calculate team next score (sum of TOP 4 by PREDICTED score)
+
+		// Calculate team score based on selected contributors
+		const teamScore = topCurrentContributors.reduce((sum, a) => sum + getAthleteScore(a), 0);
+
+		// Calculate team next score (sum of selected predicted contributors)
 		const numericValue = (value) => {
 			const num = Number(value);
 			return Number.isFinite(num) ? num : 0;
 		};
-		const teamNextScore = top4ByPredictedScore.reduce((sum, a) => sum + numericValue(a.nextScore), 0);
-		const teamNextTotal = top4ByPredictedScore.reduce((sum, a) => sum + numericValue(a.nextTotal), 0);
+		const teamNextScore = topPredictedContributors.reduce((sum, a) => sum + numericValue(a.nextScore), 0);
+		const teamNextTotal = topPredictedContributors.reduce((sum, a) => sum + numericValue(a.nextTotal), 0);
 		
 		// Track which athletes contribute to each score for highlighting
 		const normalizeLotNumber = (value) => {
@@ -561,10 +621,10 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			const strValue = String(value).trim();
 			return strValue === '' ? null : strValue;
 		};
-		const top4CurrentLotNumbers = top4ByCurrentScore
+		const top4CurrentLotNumbers = topCurrentContributors
 			.map((athlete) => normalizeLotNumber(athlete.lotNumber))
 			.filter(Boolean);
-		const top4PredictedLotNumbers = top4ByPredictedScore
+		const top4PredictedLotNumbers = topPredictedContributors
 			.map((athlete) => normalizeLotNumber(athlete.lotNumber))
 			.filter(Boolean);
 		
@@ -596,6 +656,10 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	const result = {
 		competition,
 		currentAttempt,
+		detectedAthlete: {
+			fullName: helperDetectedAthlete?.fullName || helperDetectedAthlete?.startNumber || null,
+			gender: helperDetectedGender || null
+		},
 		timer,
 		sessionStatusMessage,  // Cleaned message for when session is done
 		teams, // Array of team objects with athletes
@@ -621,6 +685,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	nvfScoreboardCache.set(cacheKey, {
 		competition: result.competition,
 		currentAttempt: result.currentAttempt,
+		detectedAthlete: result.detectedAthlete,
 		teams: result.teams,
 		allAthletes: result.allAthletes,
 		stats: result.stats,
@@ -757,30 +822,8 @@ function formatAttempt(declaration, change1, change2, actualLift, automaticProgr
 	return { liftStatus: 'empty', stringValue: '' };
 }
 
-/**
- * Compute Sinclair coefficient (simplified version - should match OWLCMS)
- * Note: This is a basic approximation. OWLCMS has the authoritative calculation.
- * @param {number} total - Total lifted
- * @param {number} bodyWeight - Body weight in kg
- * @param {string} gender - "M" or "F"
- * @returns {number} Sinclair score
- */
-function computeSinclair(total, bodyWeight, gender) {
-	if (!total || total === 0 || !bodyWeight) return 0;
-	
-	// Simplified Sinclair calculation using 2020+ coefficients
-	// For accurate results, should use OWLCMS precomputed values
-	const maxBodyWeight = gender === 'M' ? 175.508 : 153.757;
-	const coeffA = gender === 'M' ? 0.751945030 : 0.783497476;
-	const coeffB = gender === 'M' ? 175.508 : 153.757;
-	
-	if (bodyWeight >= maxBodyWeight) {
-		return total; // No coefficient for super-heavyweights
-	}
-	
-	const sinclairCoeff = Math.pow(10, coeffA * Math.pow(Math.log10(bodyWeight / coeffB), 2));
-	return total * sinclairCoeff;
-}
+// Sinclair calculations use the shared implementation in
+// `src/lib/sinclair-coefficients.js` (use `calculateSinclair` or `CalculateSinclair2024/2020`).
 
 /**
  * Get top athletes from the competition state (SERVER-SIDE ONLY)

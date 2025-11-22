@@ -23,6 +23,14 @@ export default {
 	// User-configurable options
 	options: [
 		{
+			key: 'gender',
+			label: 'Gender',
+			type: 'select',
+			options: ['M', 'F', 'MF'],
+			default: 'M',
+			description: 'Select scoreboard gender: M, F or MF (mixed). Default: M. When set to M or F, the scoreboard will auto-switch to the current athlete gender when a new session starts.'
+		},
+		{
 			key: 'currentAttemptInfo',
 			label: 'Show Current Attempt Info',
 			type: 'boolean',
@@ -36,13 +44,6 @@ export default {
 			options: ['en', 'no'],
 			default: 'no',
 			description: 'Choose scoreboard text language (English or Norwegian)'
-		},
-		{
-			key: 'gender',
-			label: 'Mixed (both genders)',
-			type: 'boolean',
-			default: false,
-			description: 'Show both men and women (unchecked = show only current athlete gender)'
 		},
 	],
 	
