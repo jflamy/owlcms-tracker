@@ -21,7 +21,7 @@ Normal team competitions are gendered, separate men and women scores.
 
 ## Rules for Mixed Team Competitions
 
-(this has not been extensively tested)
+Mixed competitions are selected by adding `gender=MF` on the URL
 
 1. **"sub-sessions" are mapped directly to OWLCMS sessions.**
 2. **"sub-sessions" include a single gender, to avoid barbell loading issues**
@@ -29,10 +29,13 @@ Normal team competitions are gendered, separate men and women scores.
 4. **Team scores are computed by adding best two men scores with best two women scores.**
    - highlights show which two of each gender have been selected
 
-## URL / options
+## URL and Options
 
-- Route: `/nvf-lagkonkurranse?fop={FOP_NAME}&gender={M|F|MF}` 
+- Options can be selected on the entry page
+- Route: `/nvf-lagkonkurranse?fop={FOP_NAME}&gender={M|F|MF}&currentAttempt={true|false}`
   - fop means field of play -- the platform name if multiple platforms
-  - Gender is normally not used except when forcing a gender
+  - gender is normally not used except when forcing a gender
     - For example, if you want to display the Men score in a a broadcast during the women session, use gender=M
     - Using gender=MF forces Mixed mode with top 2 + 2 calculation.
+  - currentAttempt
+    - true means display the athlete at the top
