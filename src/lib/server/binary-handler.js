@@ -17,6 +17,7 @@ const __dirname = path.dirname(__filename);
 /**
  * Sanity check after flags extraction
  * Verifies flags directory and file count
+ * NOTE: Flags directory is cleared on server startup, count is since server startup
  */
 function verifySanityAfterFlags() {
 	try {
@@ -33,7 +34,7 @@ function verifySanityAfterFlags() {
 			return 0;
 		}
 
-		console.log(`[Sanity] ✅ Flags: ${flagCount} files extracted to /local/flags`);
+		console.log(`[Sanity] ✅ Flags: ${flagCount} total files in /local/flags (since server startup)`);
 		return flagCount;
 	} catch (error) {
 		console.error(`[Sanity] ❌ Flags verification failed:`, error.message);
@@ -199,17 +200,17 @@ function handleFlagsMessage(zipBuffer) {
 		});
 
 		const elapsed = Date.now() - startTime;
-		console.log(`[FLAGS] ✓ Extracted ${extractedCount} flag files in ${elapsed}ms`);
+		console.log(`[FLAGS] ✓ Extracted ${extractedCount} flag files in ${elapsed}ms (this message)`);
 		
-		// Log first 10 flags
+		// Log first 10 flags from this extraction
 		if (flagFileNames.length > 0) {
-			console.log(`[FLAGS] First ${Math.min(10, extractedCount)} flags:`);
+			console.log(`[FLAGS] First ${Math.min(10, extractedCount)} flags from this message:`);
 			flagFileNames.forEach((name, index) => {
 				console.log(`  ${index + 1}. ${name}`);
 			});
 		}
 		
-		// Run sanity check after successful extraction
+		// Run sanity check after successful extraction (shows cumulative count)
 		verifySanityAfterFlags();
 		competitionHub.markFlagsLoaded();
 	} catch (error) {

@@ -27,7 +27,9 @@ export default defineConfig({
 				
 				// Serve /local directory (flags, pictures, styles)
 				server.middlewares.use('/local', (req, res, next) => {
-					const filePath = path.join(__dirname, 'local', req.url);
+					// Decode URL-encoded paths (e.g., "AK%20Bj%C3%B8rgvin.png" → "AK Bjørgvin.png")
+					const decodedUrl = decodeURIComponent(req.url);
+					const filePath = path.join(__dirname, 'local', decodedUrl);
 					
 					// Security: prevent directory traversal
 					if (!filePath.startsWith(path.join(__dirname, 'local'))) {

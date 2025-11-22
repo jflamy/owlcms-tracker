@@ -9,6 +9,9 @@ const LEARNING_MODE = process.env.LEARNING_MODE === 'true';
 // Force competition hub initialization (this triggers the constructor and learning mode banner)
 const _ = competitionHub;
 
+// Flags are kept across restarts for convenience
+// The binary handler will overwrite any flags with the same name when new ones arrive
+
 // Show ready banner immediately on module load (server startup)
 console.log('');
 console.log('✅ ═══════════════════════════════════════════════════════');
@@ -100,6 +103,55 @@ export async function handle({ event, resolve }) {
     hasShownFirstRequest = true;
     console.log('🌐 Web server processing HTTP requests');
     console.log('');
+  }
+
+  // Serve /local directory files (flags, pictures, styles) in production
+  // Dev mode uses Vite middleware, production uses this hook
+  if (event.url.pathname.startsWith('/local/')) {
+    const fs = await import('fs');
+    const path = await import('path');
+    
+    // Decode URL-encoded path (e.g., "AK%20Bj%C3%B8rgvin.png" → "AK Bjørgvin.png")
+    const decodedPath = decodeURIComponent(event.url.pathname.slice(7)); // Remove '/local/' prefix
+    const filePath = path.join(process.cwd(), 'local', decodedPath);
+    
+    // Security: prevent directory traversal
+    const resolvedPath = path.resolve(filePath);
+    const resolvedDir = path.resolve(path.join(process.cwd(), 'local'));
+    if (!resolvedPath.startsWith(resolvedDir)) {
+      return new Response('Forbidden', { status: 403 });
+    }
+    
+    // Try to serve the file
+    try {
+      if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+        const fileBuffer = fs.readFileSync(filePath);
+        const ext = path.extname(filePath).toLowerCase();
+        const mimeTypes = {
+          '.svg': 'image/svg+xml',
+          '.png': 'image/png',
+          '.jpg': 'image/jpeg',
+          '.jpeg': 'image/jpeg',
+          '.gif': 'image/gif',
+          '.webp': 'image/webp',
+          '.css': 'text/css',
+          '.js': 'application/javascript'
+        };
+        const contentType = mimeTypes[ext] || 'application/octet-stream';
+        
+        return new Response(fileBuffer, {
+          status: 200,
+          headers: {
+            'Content-Type': contentType,
+            'Cache-Control': 'public, max-age=3600'
+          }
+        });
+      }
+    } catch (error) {
+      // Fall through to 404
+    }
+    
+    return new Response('Not Found', { status: 404 });
   }
   
   return resolve(event);

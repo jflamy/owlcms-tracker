@@ -20,16 +20,11 @@
 
 	onMount(() => {
 		timer.start(data.timer);
-		// Add global listeners used to hide the custom context menu
-		document.addEventListener('click', handleDocClick);
-		document.addEventListener('keydown', handleKeydown);
 	});
 
 	onDestroy(() => {
 		timer.stop();
 		unsubscribe();
-		document.removeEventListener('click', handleDocClick);
-		document.removeEventListener('keydown', handleKeydown);
 	});
 
 	$: currentAttempt = data.currentAttempt;
@@ -38,52 +33,6 @@
 	// Sync timer with server when data changes
 	$: if (data.timer) {
 		timer.syncWithServer(data.timer);
-	}
-
-	// UI gender selection (client-side). Use server option or stay unset if not provided.
-	let selectedGender = data.options?.gender;
-
-	// Context menu state for right-click gender menu
-	let showContextMenu = false;
-	let menuX = 0;
-	let menuY = 0;
-
-	let lastSessionName = null;
-
-	function openGenderMenu(e) {
-		// Handler for contextmenu or click: show custom menu and prevent default browser menu
-		e.preventDefault();
-		e.stopPropagation();
-		showContextMenu = true;
-		// clamp menu position so it remains inside viewport
-		let x = e.clientX || (e.touches && e.touches[0] && e.touches[0].clientX) || 16;
-		let y = e.clientY || (e.touches && e.touches[0] && e.touches[0].clientY) || 16;
-		const margin = 12;
-		const maxX = Math.max(margin, window.innerWidth - 160);
-		const maxY = Math.max(margin, window.innerHeight - 120);
-		menuX = Math.min(Math.max(margin, x), maxX);
-		menuY = Math.min(Math.max(margin, y), maxY);
-	}
-
-	function closeContextMenu() {
-		showContextMenu = false;
-	}
-
-	function onSelectGender(g) {
-		closeContextMenu();
-		const url = new URL(window.location.href);
-		const params = url.searchParams;
-		params.set('gender', g);
-		const fullUrl = window.location.origin + url.pathname + '?' + params.toString();
-		window.location.assign(fullUrl);
-	}
-
-	function handleSessionKeydown(e) {
-		// Open menu on Enter, Space, or ContextMenu key
-		if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar' || e.key === 'ContextMenu') {
-			e.preventDefault();
-			openGenderMenu(e);
-		}
 	}
 
 	function getAttemptClass(attempt) {
@@ -149,7 +98,7 @@ export function shouldRenderFlag(url) {
 
 <div class="scoreboard">
 	{#if data.status !== 'waiting' && !data.sessionStatus?.isDone}
-		<div class="session-header-wrapper" role="button" aria-label="Open gender menu" on:contextmenu={openGenderMenu} on:click|preventDefault|stopPropagation={openGenderMenu} on:keydown={handleSessionKeydown} tabindex="0">
+		<div class="session-header-wrapper" role="button" aria-label="Open gender menu" tabindex="0">
 			<CurrentAttemptBar 
 				currentAttempt={data.currentAttempt}
 				timerState={timerState}
@@ -169,22 +118,13 @@ export function shouldRenderFlag(url) {
 		</div>
 	{/if}
 
-	{#if showContextMenu}
-		<div class="nvf-context-menu" style="position:fixed; left:{menuX}px; top:{menuY}px; z-index:9999;">
-			<button type="button" class="menu-item" on:click|stopPropagation={() => onSelectGender('M')}>M</button>
-			<button type="button" class="menu-item" on:click|stopPropagation={() => onSelectGender('F')}>F</button>
-			<button type="button" class="menu-item" on:click|stopPropagation={() => onSelectGender('MF')}>MF</button>
-			<button type="button" class="menu-item" on:click|stopPropagation={() => onSelectGender('current')}>Current</button>
-		</div>
-	{/if}
-
-	<!-- Right-click the scoreboard to open gender menu when session is done -->
+	<!-- Context menu disabled for DOM inspection -->
 
 	<main class="main">
 		{#if data.status === 'waiting'}
 			<div class="waiting"><p>{data.message || 'Waiting for competition data...'}</p></div>
 		{:else}
-			<div class="scoreboard-grid" class:compact-team-column={data.compactTeamColumn} role="grid" tabindex="0" on:contextmenu={openGenderMenu} on:click|preventDefault|stopPropagation={openGenderMenu} on:keydown={handleSessionKeydown}>
+			<div class="scoreboard-grid" class:compact-team-column={data.compactTeamColumn} role="grid" tabindex="0">
 				<div class="grid-row header header-primary" role="row" tabindex="0" on:contextmenu={openGenderMenu} on:click|preventDefault|stopPropagation={openGenderMenu} on:keydown={handleSessionKeydown}>
 					<div class="cell header col-start span-two" role="columnheader">{data.headers?.order || 'Order'}</div>
 					<div class="cell header col-name span-two" role="columnheader">{data.headers?.name || 'Name'}</div>
@@ -257,14 +197,14 @@ export function shouldRenderFlag(url) {
 							<div class="cell born" role="gridcell">{athlete.yearOfBirth || ''}</div>
 							<div class="cell team-name" role="gridcell">{athlete.teamName || ''}</div>
 							<div class="cell v-spacer" aria-hidden="true"></div>
-							<div class="cell attempt {getAttemptClass(athlete.sattempts?.[0])} {athlete.sattempts?.[0]?.className || ''}" role="gridcell">{displayAttempt(athlete.sattempts?.[0])}</div>
-							<div class="cell attempt {getAttemptClass(athlete.sattempts?.[1])} {athlete.sattempts?.[1]?.className || ''}" role="gridcell">{displayAttempt(athlete.sattempts?.[1])}</div>
-							<div class="cell attempt {getAttemptClass(athlete.sattempts?.[2])} {athlete.sattempts?.[2]?.className || ''}" role="gridcell">{displayAttempt(athlete.sattempts?.[2])}</div>
+							<div class="cell attempt {getAttemptClass(athlete.sattempts?.[0])} {athlete.sattempts?.[0]?.className || ''}" role="gridcell"><span class="attempt-value">{displayAttempt(athlete.sattempts?.[0])}</span></div>
+							<div class="cell attempt {getAttemptClass(athlete.sattempts?.[1])} {athlete.sattempts?.[1]?.className || ''}" role="gridcell"><span class="attempt-value">{displayAttempt(athlete.sattempts?.[1])}</span></div>
+							<div class="cell attempt {getAttemptClass(athlete.sattempts?.[2])} {athlete.sattempts?.[2]?.className || ''}" role="gridcell"><span class="attempt-value">{displayAttempt(athlete.sattempts?.[2])}</span></div>
 							<div class="cell best" role="gridcell">{athlete.bestSnatch || '-'}</div>
 							<div class="cell v-spacer" aria-hidden="true"></div>
-							<div class="cell attempt {getAttemptClass(athlete.cattempts?.[0])} {athlete.cattempts?.[0]?.className || ''}" role="gridcell">{displayAttempt(athlete.cattempts?.[0])}</div>
-							<div class="cell attempt {getAttemptClass(athlete.cattempts?.[1])} {athlete.cattempts?.[1]?.className || ''}" role="gridcell">{displayAttempt(athlete.cattempts?.[1])}</div>
-							<div class="cell attempt {getAttemptClass(athlete.cattempts?.[2])} {athlete.cattempts?.[2]?.className || ''}" role="gridcell">{displayAttempt(athlete.cattempts?.[2])}</div>
+							<div class="cell attempt {getAttemptClass(athlete.cattempts?.[0])} {athlete.cattempts?.[0]?.className || ''}" role="gridcell"><span class="attempt-value">{displayAttempt(athlete.cattempts?.[0])}</span></div>
+							<div class="cell attempt {getAttemptClass(athlete.cattempts?.[1])} {athlete.cattempts?.[1]?.className || ''}" role="gridcell"><span class="attempt-value">{displayAttempt(athlete.cattempts?.[1])}</span></div>
+							<div class="cell attempt {getAttemptClass(athlete.cattempts?.[2])} {athlete.cattempts?.[2]?.className || ''}" role="gridcell"><span class="attempt-value">{displayAttempt(athlete.cattempts?.[2])}</span></div>
 							<div class="cell best" role="gridcell">{athlete.bestCleanJerk || '-'}</div>
 						<div class="cell v-spacer" aria-hidden="true"></div>
 						<div class="cell total" role="gridcell">{athlete.displayTotal ?? '-'}</div>
@@ -445,12 +385,30 @@ export function shouldRenderFlag(url) {
 	.attempt { font-weight: bold; white-space: nowrap; padding: 0 0.35rem; }
 	.header-secondary .col-attempt { white-space: nowrap; padding: 0 0.35rem; }
 	.attempt.empty { background: #4a4a4a !important; color: #aaa; }
-	.attempt.request { background: #4a4a4a !important; color: #ddd; }
+	.attempt.request { background: #4a4a4a; color: #ddd; }
 	.attempt.success { background: #fff !important; color: #000; }
 	.attempt.failed { background: #dc2626 !important; color: #fff; }
 
-	.grid-row.current > .attempt.request.current,
-	.grid-row.current > .attempt.request.blink { color: #fbbf24 !important; font-weight: bold !important; font-size: 1.3rem !important; }
+	:global(.cell.attempt.request.current),
+	:global(.cell.attempt.request.current.blink),
+	:global(.cell.attempt.request.blink) {
+		background: #ffd700;
+		color: #000000 !important;
+		font-weight: bold !important;
+		font-size: 1.3rem !important;
+	}
+
+	:global(.cell.attempt.request.current .attempt-value),
+	:global(.cell.attempt.request.current.blink .attempt-value),
+	:global(.cell.attempt.request.blink .attempt-value) {
+		display: inline-block;
+		animation: scoreboardRequestedBlink 1.5s steps(1, end) infinite;
+	}
+
+	@keyframes scoreboardRequestedBlink {
+		0%, 49% { opacity: 1; }
+		50%, 100% { opacity: 0; }
+	}
 
 	/* Data row grid column positioning */
 	.grid-row.data-row > .start-num { grid-column: 1; }
@@ -486,7 +444,7 @@ export function shouldRenderFlag(url) {
 		border-bottom: 4px solid #4a5568;
 	}
 	.grid-row.team-header > .team-name-header { grid-column: 1 / span 5; justify-content: flex-start; font-size: 1.6rem; text-shadow: 1px 1px 2px rgba(0,0,0,0.7); border-left: 8px solid #4a5568; display: flex; align-items: center; gap: 0.75rem; overflow: visible; white-space: nowrap; }
-	.grid-row.team-header > .team-name-header .team-flag { height: 1.5rem; max-width: 2rem; object-fit: contain; }
+	.grid-row.team-header > .team-name-header .team-flag { height: 1.5rem; max-width: 2rem; object-fit: contain; border: 1px solid white; }
 	.grid-row.team-header > .team-name-header .team-name-text { flex: 1; min-width: 0; white-space: nowrap; overflow: visible; }
 
 	/* Hide any data: URI flags (legacy placeholders) */
@@ -670,17 +628,5 @@ export function shouldRenderFlag(url) {
 		flex-direction: column;
 	}
 
-	.nvf-context-menu .menu-item {
-		background: transparent;
-		color: #fff;
-		border: none;
-		padding: 0.45rem 0.6rem;
-		text-align: left;
-		cursor: pointer;
-		font-size: 1rem;
-	}
-
-	.nvf-context-menu .menu-item:hover {
-		background: #222;
-	}
+	/* Context menu disabled for DOM inspection */
 </style>

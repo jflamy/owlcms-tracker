@@ -261,6 +261,22 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			options: { showRecords, sortBy, gender: requestedGender, currentAttemptInfo, topN }
 		};
 	}
+
+	// If no gender provided in URL and we can't detect the current session, return waiting state with blank scoreboard
+	if (!requestedGender && helperDetectedGender === 'unknown') {
+		return {
+			competition: { name: fopUpdate?.competitionName || databaseState?.competition?.name || 'Competition', fop: fopName },
+			currentAttempt: null,
+			detectedAthlete: { fullName: null, gender: null },
+			timer: { state: 'stopped', timeRemaining: 0 },
+			sessionStatus: { isDone: false, groupName: '', lastActivity: 0 },
+			teams: [],
+			headers,
+			status: 'waiting',
+			learningMode,
+			options: { showRecords, sortBy, gender: 'current', currentAttemptInfo, topN }
+		};
+	}
 	
 	if (!fopUpdate && !databaseState) {
 		return {

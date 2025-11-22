@@ -11,8 +11,8 @@ const FLAGS_DIR = path.join(process.cwd(), 'local', 'flags');
 
 /**
  * Resolve flag path by country/team code
- * Tries multiple extensions and returns first match or null
- * @param {string} countryCode - Country or team code (e.g., "USA", "COL", "CAN")
+ * Tries exact match first, then uppercase, then each extension and returns first match or null
+ * @param {string} countryCode - Country or team code (e.g., "USA", "COL", "CAN", "AK BJØRGVIN")
  * @returns {string|null} Relative path to flag (e.g., "local/flags/USA.svg") or null if not found
  */
 export function resolveFlagPath(countryCode) {
@@ -20,27 +20,46 @@ export function resolveFlagPath(countryCode) {
 		return null;
 	}
 
-	const cleanCode = countryCode.trim().toUpperCase();
-	if (!cleanCode) {
+	const trimmedCode = countryCode.trim();
+	if (!trimmedCode) {
 		return null;
 	}
 
-	// Try each extension in order
+	// Try exact case first (for team names like "AK BJØRGVIN")
 	for (const ext of FLAG_EXTENSIONS) {
-		const fileName = `${cleanCode}${ext}`;
+		const fileName = `${trimmedCode}${ext}`;
 		const fullPath = path.join(FLAGS_DIR, fileName);
 
 		try {
 			if (fs.existsSync(fullPath)) {
+				console.log(`[Flag] ✓ Found (exact case): ${fileName}`);
 				return `local/flags/${fileName}`;
 			}
 		} catch (error) {
-			// Silently continue to next extension
+			// Continue to next extension
+			continue;
+		}
+	}
+
+	// Try uppercase (for country codes like "USA")
+	const upperCode = trimmedCode.toUpperCase();
+	for (const ext of FLAG_EXTENSIONS) {
+		const fileName = `${upperCode}${ext}`;
+		const fullPath = path.join(FLAGS_DIR, fileName);
+
+		try {
+			if (fs.existsSync(fullPath)) {
+				console.log(`[Flag] ✓ Found (uppercase): ${fileName}`);
+				return `local/flags/${fileName}`;
+			}
+		} catch (error) {
+			// Continue to next extension
 			continue;
 		}
 	}
 
 	// Not found
+	console.log(`[Flag] ✗ Not found: "${trimmedCode}" (tried exact case and uppercase)`);
 	return null;
 }
 
