@@ -12,10 +12,11 @@ This is the first workable scoreboard generated with this "AI" approach.
 
 ![WhatsApp Image 2025-10-08 at 12 23 27_e98fafa4](https://github.com/user-attachments/assets/2e98bdc8-3ba6-43af-ae7d-85cee68cb11a)
 
-Since the tracker has the full database available + the current session, it can do team scoreboards.  In this example, the AI assistant was asked to implement grouping, filtering and score totals.
-Additional queries would allow creating buttons to export the data.
-<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/b61be0a7-650e-4c28-bdcf-3480bade0e0d" />
+Since the tracker has the full database available + the current session, it can do team scoreboards.  In this example, the AI assistant was asked to implement grouping, filtering, score totals. Given the engine runs in Node.js, it can do any sort of processing, in this case predicting the scores after the next lift.
 
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/cccf32f8-3ec9-450b-90ab-f4a76f2f244e" />
+
+Additional queries would allow creating buttons to export the data.
 
 ## Description
 
