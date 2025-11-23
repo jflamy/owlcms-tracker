@@ -59,12 +59,11 @@ function normalizeGender(g) {
  */
 function getAthleteScore(athlete) {
 	if (!athlete) return 0;
+	// Use only server-computed actualScore (no fallback to DB fields)
 	if (typeof athlete.actualScore === 'number' && Number.isFinite(athlete.actualScore)) {
 		return athlete.actualScore;
 	}
-	const globalScore = parseFormattedNumber(athlete.globalScore);
-	if (globalScore > 0) return globalScore;
-	return parseFormattedNumber(athlete.sinclair);
+	return 0;
 }
 
 /**
@@ -159,25 +158,65 @@ function getPredictedBestLift(attempts, bestAchieved) {
  * @param {Object} athlete - Athlete object with sattempts, cattempts, bestSnatch, bestCleanJerk
  * @returns {number} Predicted total or 0 if no prediction possible
  */
-function calculatePredictedTotal(athlete) {
+function calculatePredictedTotal(athlete, preferredLiftType = 'snatch', attemptsDone = 0) {
 	if (!athlete) return 0;
 	
 	const bestSnatch = parseFormattedNumber(athlete.bestSnatch) || 0;
 	const bestCJ = parseFormattedNumber(athlete.bestCleanJerk) || 0;
 	
-	// For snatch: if there's a request, use it; otherwise use best achieved
-	const nextSnatchRequest = getNextRequestedWeight(athlete.sattempts || []);
-	const predictedSnatch = nextSnatchRequest > 0 ? nextSnatchRequest : bestSnatch;
-	
-	// For C&J: if there's a request, use it; otherwise use best achieved
-	const nextCJRequest = getNextRequestedWeight(athlete.cattempts || []);
-	const predictedCJ = nextCJRequest > 0 ? nextCJRequest : bestCJ;
-	
-	// Only return a prediction if we have at least one predictable value
-	if (predictedSnatch === 0 && predictedCJ === 0) return 0;
-	
-	return predictedSnatch + predictedCJ;
+	// Determine the next declared weight according to rules (attemptsDone = completed attempts):
+	// - If liftType is snatch and attemptsDone is 0/1/2 -> next declaration is snatch at index attemptsDone
+	// - If liftType is snatch and attemptsDone is 3 -> next declaration is clean&jerk[0]
+	// - If liftType is cleanJerk and attemptsDone is 0/1/2 -> next declaration is clean&jerk at index attemptsDone
+	// - If liftType is cleanJerk and attemptsDone is 3 -> no next declaration (prediction uses base total)
+
+	let chosenRequest = 0;
+	let currentBestForChosen = 0;
+
+	if (preferredLiftType === 'snatch') {
+		// Map attemptsDone 0/1/2 -> snatch[0..2]
+		if (attemptsDone === 0 || attemptsDone === 1 || attemptsDone === 2) {
+			const idx = attemptsDone; // 0-based
+			const val = parseInt(athlete.sattempts?.[idx]?.stringValue || '', 10);
+			if (!isNaN(val) && val > 0) {
+				chosenRequest = val;
+				currentBestForChosen = bestSnatch;
+			}
+		} else if (attemptsDone === 3) {
+			// after snatch3 -> declaration is first CJ
+			const val = parseInt(athlete.cattempts?.[0]?.stringValue || '', 10);
+			if (!isNaN(val) && val > 0) {
+				chosenRequest = val;
+				currentBestForChosen = bestCJ;
+			}
+		}
+	} else {
+		// preferred is cleanJerk: map attemptsDone 0/1/2 -> cj[0..2]; 3 -> no next declaration
+		if (attemptsDone === 0 || attemptsDone === 1 || attemptsDone === 2) {
+			const idx = attemptsDone;
+			const val = parseInt(athlete.cattempts?.[idx]?.stringValue || '', 10);
+			if (!isNaN(val) && val > 0) {
+				chosenRequest = val;
+				currentBestForChosen = bestCJ;
+			}
+		} else if (attemptsDone === 3) {
+			chosenRequest = 0; // no next declaration after CJ3
+		}
+	}
+
+	// Base current total
+	const baseTotal = bestSnatch + bestCJ;
+
+	// If there's no next request at all, return base total (no prediction)
+	if (chosenRequest === 0) return baseTotal;
+
+	// If chosen requested weight is greater than current best for that lift, add the delta
+	const delta = Math.max(0, chosenRequest - (currentBestForChosen || 0));
+	return baseTotal + delta;
 }
+
+// Export the predicted-total helper for unit testing
+export { calculatePredictedTotal };
 
 /**
  * Get the latest UPDATE message for a specific FOP - SERVER-SIDE ONLY
@@ -571,8 +610,11 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	
 	// Calculate nextTotal and nextScore for each athlete (session athletes have attempt data from groupAthletes,
 	// database athletes have computed bestSnatch/bestCleanJerk from their raw lift records)
+	// Compute attemptsDone = number of completed attempts (attemptNumber - 1)
+	// If no attemptNumber provided, default to 0 completed attempts
+	const attemptsDone = Math.max(0, (parseInt(fopUpdate?.attemptNumber ?? fopUpdate?.attempt ?? 0, 10) || 0) - 1);
 	allAthletes = allAthletes.map(athlete => {
-		const nextTotal = calculatePredictedTotal(athlete);
+		const nextTotal = calculatePredictedTotal(athlete, liftType, attemptsDone);
 		const normalizedAthleteGender = normalizeGender(athlete.gender);
 		const nextScore = (nextTotal > 0 && normalizedAthleteGender) ? CalculateSinclair2024(nextTotal, athlete.bodyWeight, normalizedAthleteGender) : 0;
 		const bestSnatchValue = parseFormattedNumber(athlete.bestSnatch);
