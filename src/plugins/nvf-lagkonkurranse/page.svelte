@@ -110,11 +110,11 @@ export function shouldRenderFlag(url) {
 			<CurrentAttemptBar 
 				currentAttempt={data.currentAttempt}
 				timerState={timerState}
-				decisionState={{}}
+				decisionState={data.decision}
 				scoreboardName={data.scoreboardName}
 				sessionStatus={data.sessionStatus}
 				competition={data.competition}
-				showDecisionLights={false}
+				showDecisionLights={true}
 				showTimer={true}
 				compactMode={true}
 				showLifterInfo={data.options?.currentAttemptInfo ?? true}

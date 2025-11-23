@@ -35,9 +35,34 @@
 					</div>
 					<span class="attempt-label">{@html currentAttempt?.attempt || ''}</span>
 					<span class="weight">{currentAttempt?.weight || '-'} kg</span>
-					<div class="timer {timerState.isRunning ? 'running' : ''} {timerState.isWarning ? 'warning' : ''}">
-						{timerState.display}
-					</div>
+
+					{#if showTimer || showDecisionLights}
+						<div class="timer-decision-container compact-container">
+							{#if showTimer}
+								<div 
+									class="timer-slot"
+									class:visible={!decisionState?.visible}
+									class:running={timerState.isRunning}
+									class:warning={timerState.isWarning}
+								>
+									<span class="timer-display">{timerState.display}</span>
+								</div>
+							{/if}
+							{#if showDecisionLights}
+								<div class="decision-slot" class:visible={decisionState?.visible}>
+									<div class="decision-lights" aria-label="Referee decisions">
+										{#if !decisionState?.isSingleReferee}
+											<div class="referee-light {getRefereeClass(decisionState?.ref1)}"></div>
+										{/if}
+										<div class="referee-light {getRefereeClass(decisionState?.ref2)}"></div>
+										{#if !decisionState?.isSingleReferee}
+											<div class="referee-light {getRefereeClass(decisionState?.ref3)}"></div>
+										{/if}
+									</div>
+								</div>
+							{/if}
+						</div>
+					{/if}
 				</div>
 			{/if}
 		{/if}

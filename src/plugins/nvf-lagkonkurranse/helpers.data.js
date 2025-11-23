@@ -383,10 +383,11 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			sessionStatusMessage = (fopUpdate.fullName || '').replace(/&ndash;/g, '–').replace(/&mdash;/g, '—');
 		}
 		
-		// Return cached data with current timer state, session status, and status message
+		// Return cached data with current timer state, session status, decision and status message
 		return {
 			...cached,
 			timer: extractTimerState(fopUpdate),
+			decision: extractDecisionState(fopUpdate),
 			sessionStatus,  // Fresh session status
 			sessionStatusMessage,  // Fresh status message
 			learningMode
@@ -853,6 +854,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	return {
 		...result,
 		sessionStatus,  // Always include fresh session status
+		decision: extractDecisionState(fopUpdate),
 		learningMode
 	};
 }
@@ -871,6 +873,45 @@ function extractTimerState(fopUpdate) {
 		timeRemaining: fopUpdate?.athleteMillisRemaining ? parseInt(fopUpdate.athleteMillisRemaining) : 0,
 		duration: fopUpdate?.timeAllowed ? parseInt(fopUpdate.timeAllowed) : 60000,
 		startTime: null // Client will compute this
+	};
+}
+
+function extractDecisionState(fopUpdate) {
+	// Clear decisions when timer starts (new lift beginning)
+	const eventType = fopUpdate?.athleteTimerEventType;
+	if (eventType === 'StartTime') {
+		return {
+			visible: false,
+			type: null,
+			isSingleReferee: false,
+			ref1: null,
+			ref2: null,
+			ref3: null,
+			down: false
+		};
+	}
+
+	const isVisible = fopUpdate?.decisionsVisible === 'true' ||
+					  fopUpdate?.decisionEventType === 'FULL_DECISION' ||
+					  fopUpdate?.down === 'true';
+	const isSingleReferee = fopUpdate?.singleReferee === 'true' || fopUpdate?.singleReferee === true;
+
+	const mapDecision = (value) => {
+		if (value === 'true') return 'good';
+		if (value === 'false') return 'bad';
+		return null;
+	};
+
+	const isDownOnly = fopUpdate?.down === 'true' && fopUpdate?.decisionEventType !== 'FULL_DECISION';
+
+	return {
+		visible: Boolean(isVisible),
+		type: fopUpdate?.decisionEventType || null,
+		isSingleReferee,
+		ref1: isDownOnly ? null : mapDecision(fopUpdate?.d1),
+		ref2: isDownOnly ? null : mapDecision(fopUpdate?.d2),
+		ref3: isDownOnly ? null : mapDecision(fopUpdate?.d3),
+		down: fopUpdate?.down === 'true'
 	};
 }
 
