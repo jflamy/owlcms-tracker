@@ -11,6 +11,10 @@
  */
 
 import { logLearningModeStatus } from './learning-mode.js';
+import { detectFormat, isV2Format, isV1Format } from './format-detector.js';
+import { parseV1Database } from './parser-v1.js';
+import { parseV2Database } from './parser-v2.js';
+
 class CompetitionHub {
   constructor() {
     // Full database state (raw athlete data from /database)
@@ -859,9 +863,37 @@ class CompetitionHub {
   /**
    * Parse full competition database from OWLCMS
    * This handles the complete competition state sent via /database endpoint
+   * Automatically detects V1 (legacy) or V2 (new) format and routes to appropriate parser
    */
   parseFullCompetitionData(params) {
     console.log('[Hub] Parsing full competition database');
+    
+    // Detect format version
+    const format = detectFormat(params);
+    console.log(`[Hub] 📋 Detected format: ${format.toUpperCase()}`);
+    
+    // Route to appropriate parser
+    let result;
+    if (isV2Format(params)) {
+      result = parseV2Database(params);
+    } else {
+      result = parseV1Database(params);
+    }
+    
+    if (!result) {
+      console.error('[Hub] Failed to parse competition data');
+      return null;
+    }
+    
+    return result;
+  }
+
+  /**
+   * DEPRECATED: Legacy V1 parsing logic - replaced by parser-v1.js
+   * Kept for reference during transition period
+   */
+  parseFullCompetitionDataLegacy(params) {
+    console.log('[Hub] Using legacy parsing (DEPRECATED)');
     
     const providedChecksum = params?.databaseChecksum || params?.checksum || null;
 
