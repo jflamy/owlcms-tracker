@@ -1,3 +1,4 @@
+<!-- markdownlint-disable -->
 # Scoreboard Architecture - Multi-FOP, Multi-Scoreboard System
 
 ## Overview
@@ -9,6 +10,8 @@ This system targts **15+ different scoreboard types** with **up to 6 simultaneou
 - **No changes needed to OWLCMS** - just configure the WebSocket URL once
 - Competition Hub stores per-FOP data from WebSocket messages
 - Scoreboards pull processed data via `/api/scoreboard?type=...&fop=...`
+
+> **Terminology update:** The OWLCMS update payload now exposes the ordered session list as `startOrderAthletes` (formerly `groupAthletes`). Existing references to `groupAthletes` in this document describe the same structure.
 
 **Key Design Principles:**
 1. **Modular** - Each scoreboard type is self-contained in its folder
@@ -73,10 +76,17 @@ Timer Event: OWLCMS → WebSocket type="timer" (StartTime)
 ```
 
 **Benefits:**
-- ✅ **40× performance improvement** - Cache eliminates redundant processing
+- ✅ **Performance improvement** - Cache eliminates redundant processing
 - ✅ **Timer efficiency** - Timer events don't trigger recomputation
 - ✅ **Plugin-specific rules** - Each scoreboard implements custom caching
 - ✅ **Scalable to hundreds of browsers** - First browser computes, rest hit cache
+
+### Competition Hub State Stores
+
+The hub keeps two long-lived caches so every scoreboard request can be served without re-reading the raw WebSocket payloads:
+
+- `databaseState` – the full competition database supplied by OWLCMS `type="database"` messages. It holds every athlete, team, category, translation checksum, etc. `competition-hub.js` refreshes this structure whenever a new database payload arrives and also patches it with the latest `sessionAthletes` payload so long-running scoreboards see fresh attempt data even between full dumps. 
+- `fopUpdates` – a per-FOP map keyed by `fopName`. Each entry merges the latest `update`, `timer`, and `decision` payloads for that platform, so downstream helpers can grab the most recent lifting order, timer state, and decision lights in one read.  When an update is received, data about the `sessionAthletes` is received.  This is the database athlete info plus additional precomputed information to make display easier (which athlete is current, etc.). `startOrderAthletes` and `liftingOrderAthletes` lists are lightweight arrays of IDs (plus spacer rows) that point back to session athlete objects; they do not carry independent copies of athlete data.
 
 ### Update Event Flow (Standard Path)
 
@@ -89,6 +99,7 @@ Timer Event: OWLCMS → WebSocket type="timer" (StartTime)
    - Merges new data with existing FOP state
    - Preserves data from previous updates (e.g., timer state during athlete changes)
    - Stores in `fopUpdates[fopName]`
+  - Applies fresh session athlete info back into `databaseState` so the full competition dataset stays current between `/database` dumps
 
 3. **Hub broadcasts SSE message**
    - Simple notification: "FOP Platform_A has new data"
