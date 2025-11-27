@@ -16,6 +16,10 @@ This directory contains test scripts and utilities for the OWLCMS Tracker applic
 - **`test-sample-data.sh`** - Shell script to send sample OWLCMS data to the tracker
 - **`send-test-update.js`** - Sends test update messages to the tracker
 
+### Athlete Getter Tests
+
+- **`test-athlete-getters.js`** - Tests getCurrentAthlete(), getNextAthlete(), getPreviousAthlete() methods with V1/V2 format support
+
 ## Running Tests
 
 ### From Root Directory
@@ -34,6 +38,9 @@ node tests/test-load-sample.js
 
 # Send sample data (shell script)
 ./tests/test-sample-data.sh
+
+# Test athlete getter methods
+node tests/test-athlete-getters.js
 ```
 
 ### From Tests Directory

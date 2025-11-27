@@ -39,7 +39,7 @@ export function formatScoreboardData(competitionState) {
 		name: competitionState.competition?.name || 'Competition',
 		fop: competitionState.competition?.fop || 'A',
 		state: competitionState.competition?.state || 'INACTIVE',
-		session: competitionState.competition?.currentSession || competitionState.competition?.groupName || 'A',
+		session: competitionState.competition?.currentSession || competitionState.competition?.sessionName || 'A',
 		date: competitionState.competition?.date || new Date().toISOString().split('T')[0]
 	};
 

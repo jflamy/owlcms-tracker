@@ -51,7 +51,8 @@ export function initWebSocketServer(httpServer) {
 				// Capture message in learning mode using explicit WebSocket type
 				if (LEARNING_MODE) {
 					const explicitType = getCaptureLabel(messageType, message.payload);
-					captureMessage(message.payload || message, data.toString(), 'WEBSOCKET', explicitType);
+					// Do not include a redundant 'WEBSOCKET' token in sample filenames
+					captureMessage(message.payload || message, data.toString(), '', explicitType);
 				}
 				
 				if (!message.type || !message.payload) {

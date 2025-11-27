@@ -27,7 +27,7 @@ const normalUpdate = {
   payload: {
     uiEvent: 'LiftingOrderUpdated',
     fopName: 'A',
-    groupName: 'M1',
+    sessionName: 'M1',
     fullName: 'Test Athlete',
     attemptNumber: '1',
     weight: '120'
@@ -42,7 +42,7 @@ const groupDoneUpdate = {
     fopState: 'BREAK',
     break: 'true',
     breakType: 'GROUP_DONE',
-    groupName: '',
+    sessionName: '',
     liftsDone: ''
   }
 };
@@ -55,7 +55,7 @@ const timerAfterDone = {
     athleteMillisRemaining: '60000',
     timeAllowed: '60000',
     fullName: 'New Athlete',
-    groupName: 'M2'
+    sessionName: 'M2'
   }
 };
 

@@ -150,7 +150,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			fop: fopName
 		},
 		session: {
-			name: fopUpdate?.groupName || 'Session',
+			name: fopUpdate?.sessionName || 'Session',
 			fopState: fopUpdate?.fopState || 'UNKNOWN'
 		},
 		athletes,

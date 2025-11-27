@@ -57,7 +57,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			currentAttempt: null,
 			timer: { state: 'stopped', timeRemaining: 0, isActive: false },
 			decision: { visible: false, isSingleReferee: false, ref1: null, ref2: null, ref3: null, down: false },
-			sessionStatus: { isDone: false, groupName: '', lastActivity: 0 },
+			sessionStatus: { isDone: false, sessionName: '', lastActivity: 0 },
 			rankedAthletes: [],
 			groupAthletes: [],
 			stats: { totalAthletes: 0, activeAthletes: 0, completedAthletes: 0, categories: [], teams: [] },
@@ -69,12 +69,11 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// Get session status early (before cache check, so it's always fresh)
 	const sessionStatus = competitionHub.getSessionStatus(fopName);
 
-	// Check cache first - cache key based on athlete data, NOT timer events or UI preferences
-	// Use length + first item ID as quick hash instead of expensive JSON.stringify
-	// showRecords is just a UI preference (handled client-side like showLeaders)
-	const groupAthletesHash = fopUpdate?.groupAthletes ? 
-		`${fopUpdate.groupAthletes.length}-${fopUpdate.groupAthletes[0]?.id || 0}` : '';
-	const cacheKey = `${fopName}-${groupAthletesHash}`;
+	// Check cache first - cache key based on the last update timestamp from the Hub.
+	// This ensures all clients see the same data for a given update, 
+	// and invalidation is instant when a new update arrives.
+	const lastUpdate = fopUpdate?.lastDataUpdate || 0;
+	const cacheKey = `${fopName}-${lastUpdate}-${JSON.stringify(options)}`;
 	
 	if (rankingsCache.has(cacheKey)) {
 		const cached = rankingsCache.get(cacheKey);
@@ -123,7 +122,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		name: fopUpdate?.competitionName || databaseState?.competition?.name || 'Competition',
 		fop: fopName,
 		state: fopUpdate?.fopState || 'INACTIVE',
-		session: fopUpdate?.groupName || 'A',
+		session: fopUpdate?.sessionName || 'A',
 		groupInfo: (fopUpdate?.groupInfo || '').replace(/&ndash;/g, '–').replace(/&mdash;/g, '—'),
 		liftsDone: fopUpdate?.liftsDone || ''  // Pre-formatted string from OWLCMS
 	};

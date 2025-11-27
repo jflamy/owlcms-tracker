@@ -91,13 +91,13 @@ function getNextRequestedWeight(attempts) {
 }
 
 /**
- * Check if any attempts have been taken (good or failed)
+ * Check if any attempts have been taken (good or bad)
  * @param {Array} attempts - Array of attempt objects [{liftStatus, stringValue}, ...]
- * @returns {boolean} True if any attempt has liftStatus 'success' or 'failed'
+ * @returns {boolean} True if any attempt has liftStatus 'good' or 'bad'
  */
 function hasAttemptBeenTaken(attempts) {
 	if (!Array.isArray(attempts)) return false;
-	return attempts.some(a => a?.liftStatus === 'success' || a?.liftStatus === 'failed');
+	return attempts.some(a => a?.liftStatus === 'good' || a?.liftStatus === 'bad');
 }
 
 /**
@@ -220,7 +220,7 @@ export { calculatePredictedTotal };
 
 /**
  * Get the latest UPDATE message for a specific FOP - SERVER-SIDE ONLY
- * This contains precomputed presentation data like liftingOrderAthletes, groupAthletes, etc.
+ * This contains precomputed presentation data like liftingOrderAthletes, startOrderAthletes, etc.
  * @param {string} fopName - FOP name (default: 'A')
  * @returns {Object|null} Latest UPDATE message with precomputed data
  */
@@ -232,7 +232,7 @@ export function getFopUpdate(fopName = 'A') {
  * Get formatted scoreboard data for SSR/API (SERVER-SIDE ONLY)
  * For NVF team scoreboard: combines current session athletes with all other athletes from database
  * Groups by team and adds spacers between teams
- * Note: Session athletes are stored in the groupAthletes key (historical name)
+ * Note: Session athletes are stored in the startOrderAthletes key (historical name)
  * @param {string} fopName - FOP name (default: 'A')
  * @param {Object} options - User preferences (e.g., { showRecords: true, sortBy: 'total' })
  * @returns {Object} Formatted data ready for browser consumption
@@ -260,11 +260,17 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	let helperDetectedGender = 'unknown';
 	let helperDetectedAthlete = null;
 	try {
-		if (Array.isArray(fopUpdate?.groupAthletes) && fopUpdate.groupAthletes.length > 0) {
-			// Prefer the first non-spacer athlete that has a name or start number
-			helperDetectedAthlete = fopUpdate.groupAthletes.find(a => !a.isSpacer && (a.fullName || a.startNumber))
-				|| fopUpdate.groupAthletes.find(a => !a.isSpacer)
-				|| fopUpdate.groupAthletes[0];
+		const startOrderEntries = competitionHub.getStartOrderEntries(fopName, { includeSpacers: true }) || [];
+		if (Array.isArray(startOrderEntries) && startOrderEntries.length > 0) {
+			// startOrderEntries are now flat athlete objects (not { athlete: {...} })
+			helperDetectedAthlete = startOrderEntries.find(e => !e.isSpacer && (e.fullName || e.startNumber))
+				|| startOrderEntries.find(e => !e.isSpacer && e.athleteKey)
+				|| startOrderEntries.find(e => !e.isSpacer) || null;
+			helperDetectedGender = normalizeGender(helperDetectedAthlete?.gender) || normalizeGender(fopUpdate?.gender) || 'unknown';
+		} else if (Array.isArray(fopUpdate?.sessionAthletes) && fopUpdate.sessionAthletes.length > 0) {
+			// Fallback: raw sessionAthletes from fopUpdate (may still be V2 format)
+			const sa = fopUpdate.sessionAthletes.find(s => s && (s.athlete?.fullName || s.fullName || s.athlete?.startNumber || s.startNumber)) || fopUpdate.sessionAthletes[0];
+			helperDetectedAthlete = sa?.athlete || sa || null;
 			helperDetectedGender = normalizeGender(helperDetectedAthlete?.gender) || normalizeGender(fopUpdate?.gender) || 'unknown';
 		} else {
 			helperDetectedGender = normalizeGender(fopUpdate?.gender) || 'unknown';
@@ -287,7 +293,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	} else if (typeof options.gender === 'string') {
 		// If the user requested 'current', resolve to the detected gender for internal logic
 		if (String(options.gender).trim().toLowerCase() === 'current') {
-			// Use the robust helper-detected gender (scanned from groupAthletes)
+			// Use the robust helper-detected gender (scanned from startOrderAthletes)
 			gender = (helperDetectedGender && helperDetectedGender !== 'unknown') ? helperDetectedGender : 'MF';
 		} else {
 			const gnorm = normalizeGender(options.gender);
@@ -367,12 +373,11 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// Get session status early (before cache check, so it's always fresh)
 	const sessionStatus = competitionHub.getSessionStatus(fopName);
 
-	// Check cache first - cache key based on athlete data, NOT timer events
-	// Use a hash of groupAthletes to detect when athlete data actually changes
-	// groupAthletes is now a parsed object, so stringify it first for hashing
-	const groupAthletesHash = fopUpdate?.groupAthletes ? 
-		JSON.stringify(fopUpdate.groupAthletes) : ''; // Full JSON string as hash
-	const cacheKey = `${fopName}-${groupAthletesHash}-${gender}-${topN}-${sortBy}-${currentAttemptInfo}-${language}`;
+	// Check cache first - cache key based on the last update timestamp from the Hub.
+	// This ensures all clients see the same data for a given update, 
+	// and invalidation is instant when a new update arrives.
+	const lastUpdate = fopUpdate?.lastDataUpdate || 0;
+	const cacheKey = `${fopName}-${lastUpdate}-${JSON.stringify(options)}`;
 	
 	if (nvfScoreboardCache.has(cacheKey)) {
 		const cached = nvfScoreboardCache.get(cacheKey);
@@ -406,10 +411,10 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		name: fopUpdate?.competitionName || databaseState?.competition?.name || 'Competition',
 		fop: fopName,
 		state: fopUpdate?.fopState || 'INACTIVE',
-		session: fopUpdate?.groupName || 'A',
+		session: fopUpdate?.sessionName || 'A',
 		liftType: liftType,
 		// Always build custom groupInfo with translations (ignore OWLCMS groupInfo)
-		groupInfo: `${language === 'no' ? 'Pulje' : (translations.Session || 'Session')} ${fopUpdate?.groupName || 'A'} - ${liftTypeLabel}`
+		groupInfo: `${language === 'no' ? 'Pulje' : (translations.Session || 'Session')} ${fopUpdate?.sessionName || 'A'} - ${liftTypeLabel}`
 	};
 
 	// Extract current athlete info from UPDATE message
@@ -452,11 +457,11 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		startTime: null // Client will compute this
 	};
 
-	// Get precomputed session athletes from UPDATE message (stored in groupAthletes key)
-	// Note: groupAthletes is already a parsed object (nested JSON from WebSocket)
+	// Get precomputed session athletes from UPDATE message (stored in startOrderAthletes key)
+	// Note: startOrderAthletes is already a parsed object (nested JSON from WebSocket)
 	let sessionAthletes = [];
-	if (fopUpdate?.groupAthletes) {
-		sessionAthletes = fopUpdate.groupAthletes;
+	if (fopUpdate?.startOrderAthletes) {
+		sessionAthletes = fopUpdate.startOrderAthletes;
 		
 		// Find the current athlete (has 'current' in classname)
 		const currentAthlete = sessionAthletes.find(a => a.classname && a.classname.includes('current'));
@@ -609,7 +614,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		return teamRaw.length > 0;
 	});
 	
-	// Calculate nextTotal and nextScore for each athlete (session athletes have attempt data from groupAthletes,
+	// Calculate nextTotal and nextScore for each athlete (session athletes have attempt data from startOrderAthletes,
 	// database athletes have computed bestSnatch/bestCleanJerk from their raw lift records)
 	// Compute attemptsDone = number of completed attempts (attemptNumber - 1)
 	// If no attemptNumber provided, default to 0 completed attempts
@@ -816,7 +821,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		} : {},
 		isBreak: fopUpdate?.break === 'true' || false,
 		breakType: fopUpdate?.breakType,
-		sessionStatus,  // Include session status (isDone, groupName, lastActivity)
+		sessionStatus,  // Include session status (isDone, sessionName, lastActivity)
 		compactTeamColumn,  // Narrow team column if max team size < 7
 		status: (fopUpdate || databaseState) ? 'ready' : 'waiting',
 		lastUpdate: fopUpdate?.lastUpdate || Date.now(),
@@ -970,7 +975,7 @@ function computeBestLift(attempts) {
  * @param {string} change2 - Second change  
  * @param {string} actualLift - Actual lift result (with '-' prefix for fails)
  * @param {string} automaticProgression - Calculated automatic progression weight
- * @returns {Object} { liftStatus: 'empty'|'request'|'fail'|'good', stringValue: '120' }
+ * @returns {Object} { liftStatus: 'empty'|'request'|'bad'|'good', stringValue: '120' }
  */
 function formatAttempt(declaration, change1, change2, actualLift, automaticProgression) {
 	// Determine the displayed weight using OWLCMS priority order
@@ -981,11 +986,11 @@ function formatAttempt(declaration, change1, change2, actualLift, automaticProgr
 	if (actualLift && actualLift !== '') {
 		if (actualLift === '0') {
 			// No lift with 0 weight - display as dash to match session athlete formatting
-			return { liftStatus: 'fail', stringValue: '-' };
+			return { liftStatus: 'bad', stringValue: '-' };
 		} else if (actualLift.startsWith('-')) {
 			// Failed lift (negative weight)
 			const weight = actualLift.substring(1);
-			return { liftStatus: 'fail', stringValue: `(${weight})` };
+			return { liftStatus: 'bad', stringValue: `(${weight})` };
 		} else {
 			// Good lift
 			return { liftStatus: 'good', stringValue: actualLift };

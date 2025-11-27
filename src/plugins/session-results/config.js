@@ -44,7 +44,7 @@ export default {
 		'startNumber',
 		'teamName',
 		'categoryName',
-		'groupAthletes'
+		'startOrderAthletes'
 	],
 	
 	// AI prompt for modifications
@@ -52,7 +52,7 @@ export default {
 This scoreboard displays all athletes in the session sorted by standard order (category, lot number).
 
 Data Structure:
-- groupAthletes: Array of all athletes in the session with their attempts
+- startOrderAthletes: Array of all athletes in the session with their attempts (formerly groupAthletes)
 - status: 'ready' | 'waiting'
 
 To modify this scoreboard:

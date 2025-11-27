@@ -61,10 +61,11 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// Get session status early (before cache check, so it's always fresh)
 	const sessionStatus = competitionHub.getSessionStatus(fopName);
 
-	// Check cache first - cache key based on session athletes data, NOT timer events
-	const sessionAthletesHash = fopUpdate?.groupAthletes ? 
-		`${fopUpdate.groupAthletes.length}-${fopUpdate.groupAthletes[0]?.id || 0}` : '';
-	const cacheKey = `${fopName}-${sessionAthletesHash}`;
+	// Check cache first - cache key based on the last update timestamp from the Hub.
+	// This ensures all clients see the same data for a given update, 
+	// and invalidation is instant when a new update arrives.
+	const lastUpdate = fopUpdate?.lastDataUpdate || 0;
+	const cacheKey = `${fopName}-${lastUpdate}-${JSON.stringify(options)}`;
 	
 	if (attemptBoardCache.has(cacheKey)) {
 		const cached = attemptBoardCache.get(cacheKey);
@@ -114,7 +115,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		name: fopUpdate?.competitionName || databaseState?.competition?.name || 'Competition',
 		fop: fopName,
 		state: fopUpdate?.fopState || 'INACTIVE',
-		session: fopUpdate?.groupName || 'A',
+		session: fopUpdate?.sessionName || 'A',
 		groupInfo: (fopUpdate?.groupInfo || '').replace(/&ndash;/g, '–').replace(/&mdash;/g, '—'),
 		liftsDone: fopUpdate?.liftsDone || ''
 	};

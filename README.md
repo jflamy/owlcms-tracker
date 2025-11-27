@@ -1,41 +1,37 @@
+<!-- markdownlint-disable -->
 # OWLCMS Tracker
-
-This project aims at giving users of owlcms the capability to create their own scoreboards, TV graphics, and documents.  The program receives the database from owlcms and all lifting order, decisions and timer updates.  It is therefore able to track the state of the competition.
-
-> *Except for this note, everything in this repository has been generated without actual programming, strictly by providing instructions to a coding Agent*.
->
-> **The idea is that you should be able to open this repository in a development environment, start an "AI" Agent like Claude or ChatGPT, and argue with the agent until you get the scoreboard you want.** You can even paste screen shots of existing scoreboards, or of defects in the generated scoreboards to guide the evolution. The author did not write *any* JavaScript and does not know Svelte.
->
-> Of course, if you are a programmer you can actually change the code
-
-This is the first workable scoreboard generated with this "AI" approach.  
-
-![WhatsApp Image 2025-10-08 at 12 23 27_e98fafa4](https://github.com/user-attachments/assets/2e98bdc8-3ba6-43af-ae7d-85cee68cb11a)
-
-Since the tracker has the full database available + the current session, it can do team scoreboards.  In this example, the AI assistant was asked to implement grouping, filtering, score totals. Given the engine runs in Node.js, it can do any sort of processing, in this case predicting the scores after the next lift.
-
-<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/cccf32f8-3ec9-450b-90ab-f4a76f2f244e" />
-
-Additional queries would allow creating buttons to export the data.
 
 ## Description
 
-A SvelteKit application that receives real-time competition updates from OWLCMS and displays them through multiple scoreboard types. Runs on port 8096 (default).
+A SvelteKit application that receives real-time competition updates from OWLCMS and displays them through multiple scoreboard types.
+
+## **Goals**
+
+This project aims at giving users of owlcms the capability to create their own scoreboards, TV graphics, and documents.  The program receives the database from owlcms and all lifting order, decisions and timer updates.
+
+Scoreboards can be created using AI agents like ChatGPT, Claude, etc.  The examples in this repository have been built in this way.  The author spelled  provided screen shots of existing scoreboards to start the process, and spelled out the required modifications.
+
+## Example
+
+Since the tracker has the full database available and the current session, it can do team scoreboards.  In this example, the AI assistant was asked to implement grouping by teams, filtering by gender, score totals based on top athletes per team, and even next attempt predictions.  The teams are reordered based on the team score.  There was no actual programming used.  The translation strings are provided by owlcms as part of the initialization.
+
+![nvf](https://github.com/user-attachments/assets/cccf32f8-3ec9-450b-90ab-f4a76f2f244e)
+
+
 
 ## Documentation
 
 ### Getting Started
 - **[CREATE_YOUR_OWN.md](./CREATE_YOUR_OWN.md)** - Create custom scoreboards (step-by-step guide)
-- **[docs/README.md](./docs/README.md)** - Documentation index and navigation
 
 ### Core Reference
 - **[docs/SCOREBOARD_ARCHITECTURE.md](./docs/SCOREBOARD_ARCHITECTURE.md)** - Complete system architecture
-- **[docs/FIELD_MAPPING_OVERVIEW.md](./docs/FIELD_MAPPING_OVERVIEW.md)** - Data source quick reference
-- **[docs/CACHING_IMPLEMENTATION.md](./docs/CACHING_IMPLEMENTATION.md)** - Performance optimization guide
 - **[docs/WEBSOCKET_MESSAGE_SPEC.md](./docs/WEBSOCKET_MESSAGE_SPEC.md)** - OWLCMS message formats
 
 ### Examples
 - **[Plugin README](./src/plugins/lifting-order/README.md)** - Example scoreboard with AI prompts
+
+
 
 ## OWLCMS Configuration Required
 
@@ -62,7 +58,7 @@ OWLCMS sends messages in this format:
 
 **Message Types:**
 - **`database`** - Full competition data synchronization (athletes, FOPs, categories, databaseChecksum)
-- **`update`** - Lifting order changes, athlete switches, UI events (includes session athletes in `groupAthletes` field)
+- **`update`** - Lifting order changes, athlete switches, UI events (includes session athletes in `startOrderAthletes` field, formerly `groupAthletes`)
 - **`timer`** - Timer start/stop/set events
 - **`decision`** - Referee decisions and down signals
 
@@ -88,16 +84,13 @@ OWLCMS → Competition Hub → SSE Broadcast → Browsers
 
 **For complete architecture details**, see **[docs/SCOREBOARD_ARCHITECTURE.md](./docs/SCOREBOARD_ARCHITECTURE.md)**
 
-## Quick Start
+## Running the Tracker
 
 ### Prerequisites
 
 - **Node.js** 18+ installed
-- **Git Bash** for Windows (configured as default terminal in VS Code)
 
-### 1. Install and Run
-
-### Method 1: VS Code Launch Menu (Recommended)
+### Method 1: VS Code Launch Menu
 
 **This workspace is pre-configured for VS Code with Git Bash as the default shell.**
 
@@ -117,19 +110,15 @@ npm run dev
 
 # Learning mode - captures all OWLCMS messages to samples/ directory
 npm run dev:learning
-
-# Windows PowerShell learning mode
-$env:LEARNING_MODE="true"; npm run dev
-
-# Windows Command Prompt learning mode  
-set LEARNING_MODE=true && npm run dev
 ```
 
 The app will be available at **http://localhost:8096**
 
+
+
 ## Learning Mode
 
-**Learning mode is essential for the first runs** to understand what OWLCMS actually sends.
+Learning mode is used to understand what OWLCMS actually sends.  You can use learning mode to see what is actually received during updates. The tracker core was built in this fashion built by observing what was received.
 
 **Enable Learning Mode:**
 - VS Code: Use "OWLCMS Tracker - Learning Mode" launch configuration
@@ -142,208 +131,4 @@ The app will be available at **http://localhost:8096**
 - Message size and content
 - Saves to `samples/message-[timestamp].json`
 
-**Startup logs in learning mode:**
-```
-🔬 =============== LEARNING MODE ACTIVE ===============
-📁 Messages will be saved to: samples/
-🕐 Each message includes ISO8601 timestamp
-```
 
-```bash
-# Install dependencies
-npm install
-
-# Start the server
-npm run dev
-```
-
-### 2. Open a Scoreboard
-
-```
-http://localhost:8096/lifting-order?fop=A
-```
-
-Change `fop=A` to match your FOP name (e.g., `Platform_A`, `Platform_B`).
-
-### 3. Configure OWLCMS
-
-**IMPORTANT:** You must configure OWLCMS to send data to this tracker.
-
-In OWLCMS, go to:
-
-**Prepare Competition → Language and System Settings → Connections → URL for Video Data**
-
-Set to: `ws://localhost:8096/ws` (or `ws://your-tracker-host:8096/ws`)
-
-**No code changes to OWLCMS are needed** - just this one configuration setting.
-
-### 4. Create More Scoreboard Types
-
-See **[CREATE_YOUR_OWN.md](./CREATE_YOUR_OWN.md)** for step-by-step instructions on creating custom scoreboards.
-
-## Available Scoreboards
-
-### Lifting Order (`/lifting-order`)
-
-Shows current lifter and upcoming attempts with countdown timer.
-
-**URL:** `/lifting-order?fop=Platform_A&maxLifters=8`
-
-**Options:**
-- `fop` (required) - FOP name
-- `showRecords` (optional) - Show competition records (true/false)
-- `maxLifters` (optional) - Number of upcoming lifters (default: 8)
-
-## Creating Custom Scoreboards
-
-Want to create your own scoreboard types? See **[CREATE_YOUR_OWN.md](./CREATE_YOUR_OWN.md)** for step-by-step instructions.
-
-The plugin system makes it easy to create custom displays - whether you're a programmer or using AI assistance.
-
-## API Endpoints
-
-### `/api/scoreboard` (GET)
-Get processed data for any scoreboard type.
-
-**Parameters:**
-- `type` - Scoreboard type (e.g., `lifting-order`)
-- `fop` - FOP name (required)
-- Any other options defined in the scoreboard's config
-
-**Example:**
-```
-GET /api/scoreboard?type=lifting-order&fop=Platform_A&maxLifters=10
-```
-
-### `/api/scoreboard` (POST)
-Get metadata about available scoreboards and FOPs.
-
-**Actions:**
-- `list_scoreboards` - Get all registered scoreboard types
-- `list_fops` - Get available FOP names from current competition
-
-### `/api/client-stream` (GET)
-Server-Sent Events stream for browsers
-- Real-time updates to all connected clients
-- No authentication required (read-only)
-
-## Configuration
-
-### Environment Variables
-
-```bash
-# Optional: Logging level
-LOG_LEVEL=info
-
-# Optional: Enable learning mode
-LEARNING_MODE=true
-
-# TODO: Authentication key for OWLCMS connection (future feature)
-# OWLCMS_UPDATEKEY=your-secret-key-here
-```
-
-## Creating Custom Plugins
-
-Plugins are Svelte components in `src/plugins/[name]/page.svelte`.
-
-### Example Plugin
-
-```svelte
-<!-- src/plugins/myView/page.svelte -->
-<script>
-  import { athletes, competitionInfo } from '$lib/stores';
-  
-  // Reactive statement updates when data changes
-  $: myData = $athletes.filter(a => a.total > 200);
-</script>
-
-<h1>My Custom View</h1>
-<p>Competition: {$competitionInfo.name}</p>
-
-{#each myData as athlete}
-  <div>{athlete.fullName}: {athlete.total}kg</div>
-{/each}
-```
-
-### Available Stores
-
-```javascript
-import { 
-  athletes,        // Array of athlete data
-  currentAttempt,  // Current lifter info
-  timer,           // Timer state
-  competitionInfo, // Competition details
-  liftingOrder,    // Lifting order
-  leaders,         // Competition leaders
-  isBreak,         // Break status
-  records          // Record information
-} from '$lib/stores';
-```
-
-## Development
-
-### Project Structure
-
-```
-src/
-├── lib/
-│   ├── server/
-│   │   └── competition-hub.js    # OWLCMS integration
-│   ├── components/
-│   │   └── Timer.svelte          # Autonomous countdown timer
-│   └── stores.js                 # Client-side reactive stores
-├── routes/
-│   ├── api/                      # Server endpoints
-│   └── [plugin]/                 # Dynamic plugin loader
-└── plugins/                      # Plugin implementations
-    ├── leaderboard/
-    ├── currentLifter/
-    └── teamStandings/
-```
-
-### Data Flow
-
-1. **OWLCMS** sends WebSocket messages to `ws://localhost:8096/ws`
-2. **Competition Hub** parses OWLCMS data and caches state
-3. **Hub** broadcasts updates via Server-Sent Events
-4. **Browser stores** receive SSE messages and update reactively
-5. **Plugin components** re-render automatically
-
-### Adding New Plugins
-
-1. Create `src/plugins/[name]/page.svelte`
-2. Import needed stores from `$lib/stores`
-3. Use reactive statements (`$:`) for auto-updating data
-4. Plugin automatically appears in navigation
-
-### Debugging
-
-- Check browser console for SSE connection status
-- Verify OWLCMS WebSocket configuration is correct (`ws://localhost:8096/ws`)
-- Use learning mode to capture incoming messages
-- Check server console for WebSocket connection logs
-
-## License
-
-MIT License - see LICENSE file for details.
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test with real OWLCMS data
-5. Submit a pull request
-
-**Documentation:**
-- Keep permanent reference docs in `/docs` folder (committed to repo)
-- Use `/compliance` folder for temporary change logs (local only - files are gitignored except README.md)
-- See [docs/README.md](./docs/README.md) for documentation guidelines
-
-## Support
-
-For issues related to:
-- **OWLCMS integration**: Check OWLCMS documentation
-- **SvelteKit tracker**: Open GitHub issue
-- **Plugin development**: See plugin examples in `src/plugins/`
-- **Documentation**: Start with [docs/README.md](./docs/README.md)

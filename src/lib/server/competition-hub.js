@@ -21,7 +21,7 @@ class CompetitionHub {
     this.databaseState = null;
     
     // Per-FOP latest UPDATE messages (precomputed presentation data)
-    // Structure: { 'A': { liftingOrderAthletes, groupAthletes, fullName, weight, etc. }, 'B': {...}, ... }
+    // Structure: { 'A': { startOrderAthletes, liftingOrderAthletes, sessionAthletes, ... }, 'B': {...}, ... }
     this.fopUpdates = {};
     
     // Per-FOP session status tracking
@@ -45,6 +45,8 @@ class CompetitionHub {
     this._hasConfirmedFops = false;
     this.flagsLoaded = false;
     this.translationsReady = false;
+    this.databaseAthleteIndex = new Map();
+    this.databaseTeamMap = new Map();
     
     // Debounce state for broadcasts - per FOP and event type
     this.lastBroadcastTime = {};  // Structure: { 'fopName-eventType': timestamp }
@@ -88,20 +90,36 @@ class CompetitionHub {
       const fopName = params.fop || params.fopName || 'A';
       this._hasConfirmedFops = true;
       
+      // Normalize payload (parse JSON strings, ensure arrays)
+      const normalizedParams = this._sanitizeInboundPayload(params);
+
       // Store/merge the update data regardless of database state
       // This ensures we have current athlete, timer, etc. even while waiting for database
+      const isTimerOrDecision = normalizedParams.athleteTimerEventType || 
+                                normalizedParams.breakTimerEventType || 
+                                normalizedParams.decisionEventType;
+      const now = Date.now();
+      const prevDataUpdate = this.fopUpdates[fopName]?.lastDataUpdate || now;
+
       this.fopUpdates[fopName] = {
-        ...(this.fopUpdates[fopName] || {}), // Keep previous data
-        ...params,                             // Merge new data
-        lastUpdate: Date.now(),
+        ...this.fopUpdates[fopName], // Keep existing state (timer, etc.)
+        ...normalizedParams,                 // Merge new data
+        lastUpdate: now,
+        lastDataUpdate: isTimerOrDecision ? prevDataUpdate : now,
         fop: fopName
       };
+
+      // Rebuild derived state (session maps, ordered lists, etc.)
+      this._rebuildDerivedState(fopName);
+
+      // Use sessionAthletes payloads to keep database cache fresh
+      this._mergeSessionAthletesIntoDatabase(fopName);
       
       // Update session status tracking
-      this.updateSessionStatus(fopName, params);
+      this.updateSessionStatus(fopName, normalizedParams);
       
       // Also update legacy state for backward compatibility
-      const competitionState = this.parseOwlcmsUpdate(params);
+      const competitionState = this.parseOwlcmsUpdate(normalizedParams);
       this.state = {
         ...this.state,
         ...competitionState,
@@ -112,7 +130,7 @@ class CompetitionHub {
       this.broadcast({
         type: 'fop_update',
         fop: fopName,
-        data: params,
+        data: normalizedParams,
         timestamp: Date.now()
       });
       
@@ -140,10 +158,10 @@ class CompetitionHub {
       //   return { accepted: false, needsData: true, reason: 'switch_group_refresh' };
       // }
 
-      const eventType = params.uiEvent 
-        || params.decisionEventType 
-        || params.athleteTimerEventType 
-        || params.breakTimerEventType 
+      const eventType = normalizedParams.uiEvent 
+        || normalizedParams.decisionEventType 
+        || normalizedParams.athleteTimerEventType 
+        || normalizedParams.breakTimerEventType 
         || 'unknown';
       console.log(`[Hub] Update processed: ${eventType} for FOP ${fopName}`);
       return { accepted: true };
@@ -220,6 +238,9 @@ class CompetitionHub {
         initialized: true,
         databaseChecksum: incomingChecksum || fullState?.databaseChecksum || null
       };
+
+      // Rebuild database athlete index for fast lookup by key
+      this._reindexDatabaseAthletes();
       
       // Also update legacy state for backward compatibility
       this.state = this.databaseState;
@@ -271,7 +292,7 @@ class CompetitionHub {
         name: params.competitionName,
         fop: params.fop,
         state: params.fopState,
-        currentSession: params.groupName || 'A'
+        currentSession: params.sessionName || 'A'
       };
     }
 
@@ -329,10 +350,10 @@ class CompetitionHub {
       mode: params.mode
     };
 
-    // Group info
-    if (params.groupName) {
+    // Group/session info (V2 uses sessionName)
+    if (params.sessionName) {
       result.groupInfo = {
-        name: params.groupName,
+        name: params.sessionName,
         description: params.groupDescription,
         info: params.groupInfo,
         liftsDone: params.liftsDone
@@ -525,6 +546,51 @@ class CompetitionHub {
   getFopUpdate(fopName = 'A') {
     return this.fopUpdates[fopName] || null;
   }
+
+  /**
+   * Get ordered session entries (start order) with spacer markers (V2 only).
+   */
+  getStartOrderEntries(fopName = 'A', { includeSpacers = true } = {}) {
+    const update = this.getFopUpdate(fopName);
+    if (!update) return [];
+
+    // Use the resolved startOrderAthletes array (flat athlete objects with classname)
+    const entries = update.startOrderAthletes || [];
+    if (!entries.length) return [];
+    
+    if (includeSpacers) {
+      return entries;
+    }
+    // Filter out spacers
+    return entries.filter(entry => entry && !entry.isSpacer);
+  }
+
+  /**
+   * Convenience helper returning session athletes (no spacers) from the normalized start order.
+   * @returns {Array<Object>} Array of athlete payloads enriched with classname/athleteKey
+   */
+  getSessionAthletes(fopName = 'A') {
+    // Just return non-spacer entries - they're already flat athlete objects
+    return this.getStartOrderEntries(fopName, { includeSpacers: false });
+  }
+
+  /**
+   * Get ordered lifting queue entries with spacer markers (snatch vs clean & jerk split) using V2 data only.
+   */
+  getLiftingOrderEntries(fopName = 'A', { includeSpacers = true } = {}) {
+    const update = this.getFopUpdate(fopName);
+    if (!update) return [];
+
+    // Use the resolved liftingOrderAthletes array (flat athlete objects with classname)
+    const entries = update.liftingOrderAthletes || [];
+    if (!entries.length) return [];
+    
+    if (includeSpacers) {
+      return entries;
+    }
+    // Filter out spacers
+    return entries.filter(entry => entry && !entry.isSpacer);
+  }
   
   /**
    * Get all FOP updates
@@ -635,6 +701,886 @@ class CompetitionHub {
 
   hasConfirmedFops() {
     return this._hasConfirmedFops;
+  }
+
+  /**
+   * Get current athlete from FOP update
+   * @param {string} fopName - Name of the FOP (default 'A')
+   * @returns {Object|null} Current athlete with weight and attempt info, or null if not available
+   */
+  getCurrentAthlete(fopName = 'A') {
+    const update = this.getFopUpdate(fopName);
+    if (!update) return null;
+
+    if (!update.currentAthleteKey) {
+      return null;
+    }
+
+    const athlete = this._resolveAthleteByKey(update, update.currentAthleteKey);
+    if (!athlete) {
+      return null;
+    }
+
+    return this._enrichAthleteData(athlete, update);
+  }
+
+  /**
+   * Get next athlete from FOP update
+   * @param {string} fopName - Name of the FOP (default 'A')
+   * @returns {Object|null} Next athlete with weight and attempt info, or null if not available
+   */
+  getNextAthlete(fopName = 'A') {
+    const update = this.getFopUpdate(fopName);
+    if (!update) return null;
+
+    const nextKey = update.nextAthleteKey || this._findNeighborKeyInOrder(update, 1);
+    if (!nextKey) {
+      return null;
+    }
+
+    const athlete = this._resolveAthleteByKey(update, nextKey);
+    if (!athlete) {
+      return null;
+    }
+
+    return this._enrichAthleteData(athlete, update);
+  }
+
+  /**
+   * Get previous athlete from FOP update
+   * @param {string} fopName - Name of the FOP (default 'A')
+   * @returns {Object|null} Previous athlete with weight and attempt info, or null if not available
+   */
+  getPreviousAthlete(fopName = 'A') {
+    const update = this.getFopUpdate(fopName);
+    if (!update) return null;
+
+    const prevKey = update.previousAthleteKey || this._findNeighborKeyInOrder(update, -1);
+    if (!prevKey) {
+      return null;
+    }
+
+    const athlete = this._resolveAthleteByKey(update, prevKey);
+    if (!athlete) {
+      return null;
+    }
+
+    return this._enrichAthleteData(athlete, update);
+  }
+
+  /**
+   * Enrich athlete data with current weight and attempt information
+   * @private
+   * @param {Object} athlete - Raw athlete object
+   * @param {Object} update - FOP update object for context
+   * @returns {Object} Enriched athlete object with currentWeight, currentAttempt, currentLiftType
+   */
+  _enrichAthleteData(athlete, update) {
+    if (!athlete) return null;
+
+    // Handle V2 enriched format: { athlete: {...}, displayInfo: {...} }
+    // Unwrap the athlete data and merge displayInfo at the top level
+    let baseAthlete = athlete;
+    let displayInfo = null;
+    if (athlete.athlete && typeof athlete.athlete === 'object') {
+      baseAthlete = athlete.athlete;
+      displayInfo = athlete.displayInfo || null;
+    } else {
+      // Already flat or legacy format
+      baseAthlete = { ...athlete };
+    }
+
+    // Start with athlete's existing data
+    const enriched = { ...baseAthlete };
+
+    // Merge displayInfo if present (contains precomputed fields like total, ranks, attempts)
+    if (displayInfo && typeof displayInfo === 'object') {
+      Object.assign(enriched, displayInfo);
+    }
+
+    // Determine current lift type and attempt number
+    const attemptsDone = baseAthlete.attemptsDone || 0;
+    const currentLiftType = attemptsDone < 3 ? 'snatch' : 'cleanJerk';
+    const currentAttemptNum = (attemptsDone % 3) + 1; // 1, 2, or 3
+    
+    // Extract current weight based on lift type and attempt
+    let currentWeight = null;
+    
+    if (currentLiftType === 'snatch') {
+      const fieldPrefix = 'snatch' + currentAttemptNum;
+      currentWeight = this._extractWeight(baseAthlete, fieldPrefix);
+    } else {
+      const fieldPrefix = 'cleanJerk' + currentAttemptNum;
+      currentWeight = this._extractWeight(baseAthlete, fieldPrefix);
+    }
+
+    // Add computed fields
+    enriched.currentWeight = currentWeight;
+    enriched.currentAttempt = currentAttemptNum;
+    enriched.currentLiftType = currentLiftType;
+    enriched.attemptsDone = attemptsDone;
+
+    return enriched;
+  }
+
+  /**
+   * Extract weight for a specific attempt (V2 format)
+   * Priority: change2 > change1 > declaration > automaticProgression
+   * @private
+   * @param {Object} athlete - Athlete object
+   * @param {string} fieldPrefix - Field prefix (e.g., 'snatch1', 'cleanJerk2')
+   * @returns {number|null} Weight in kg, or null if not found
+   */
+  _extractWeight(athlete, fieldPrefix) {
+    // Check in order of priority
+    const change2 = this._parseNumeric(athlete[fieldPrefix + 'Change2']);
+    if (change2 !== null) {
+      return change2;
+    }
+
+    const change1 = this._parseNumeric(athlete[fieldPrefix + 'Change1']);
+    if (change1 !== null) {
+      return change1;
+    }
+
+    const declaration = this._parseNumeric(athlete[fieldPrefix + 'Declaration']);
+    if (declaration !== null) {
+      return declaration;
+    }
+
+    const automatic = this._parseNumeric(athlete[fieldPrefix + 'AutomaticProgression']);
+    if (automatic !== null) {
+      return automatic;
+    }
+
+    return null;
+  }
+
+  _extractWeightForContext(athlete, attemptContext) {
+    if (!attemptContext || !attemptContext.hasRemainingAttempt) {
+      return null;
+    }
+
+    const prefix = attemptContext.currentLiftType === 'snatch' ? 'snatch' : 'cleanJerk';
+    const attemptNumber = Math.min(Math.max(attemptContext.attemptNumber, 1), 3);
+    return this._extractWeight(athlete, `${prefix}${attemptNumber}`);
+  }
+
+  _determineAttemptContext(athlete) {
+    const snatchAttempts = this._countActualLifts([
+      athlete.snatch1ActualLift,
+      athlete.snatch2ActualLift,
+      athlete.snatch3ActualLift
+    ]);
+
+    const cleanJerkAttempts = this._countActualLifts([
+      athlete.cleanJerk1ActualLift,
+      athlete.cleanJerk2ActualLift,
+      athlete.cleanJerk3ActualLift
+    ]);
+
+    const totalAttemptsDone = snatchAttempts + cleanJerkAttempts;
+    const hasRemainingAttempt = totalAttemptsDone < 6;
+    const inSnatch = totalAttemptsDone < 3;
+    let attemptNumber = inSnatch ? snatchAttempts + 1 : cleanJerkAttempts + 1;
+    attemptNumber = Math.max(1, Math.min(attemptNumber, 3));
+
+    return {
+      snatchAttempts,
+      cleanJerkAttempts,
+      totalAttemptsDone,
+      hasRemainingAttempt,
+      currentLiftType: inSnatch ? 'snatch' : 'cleanJerk',
+      attemptNumber
+    };
+  }
+
+  _countActualLifts(values = []) {
+    return values.reduce((count, value) => (value !== null && value !== undefined ? count + 1 : count), 0);
+  }
+
+  _parseNumeric(value) {
+    if (value === null || value === undefined || value === '') {
+      return null;
+    }
+    if (typeof value === 'number') {
+      return Number.isNaN(value) ? null : value;
+    }
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed) return null;
+      const parsed = Number(trimmed);
+      return Number.isNaN(parsed) ? null : parsed;
+    }
+    return null;
+  }
+
+  _sanitizeInboundPayload(params) {
+    if (!params || typeof params !== 'object') {
+      return params;
+    }
+
+    const sanitized = { ...params };
+    // Only parse the V2-shaped JSON fields. Legacy names removed - V2 is canonical.
+    const jsonFields = [
+      'sessionAthletes',
+      'startOrderKeys',
+      'liftingOrderKeys',
+      'startOrderAthletes',
+      'liftingOrderAthletes',
+      'leaders',
+      'records'
+    ];
+
+    for (const field of jsonFields) {
+      if (field in sanitized) {
+        sanitized[field] = this._parseMaybeJson(sanitized[field]);
+      }
+    }
+
+    // Provide canonical V2 sources for start/lifting orders when present.
+    const startOrderSource = Array.isArray(sanitized.startOrderAthletes)
+      ? sanitized.startOrderAthletes
+      : (Array.isArray(sanitized.startOrderKeys) ? sanitized.startOrderKeys : null);
+
+    const liftingOrderSource = Array.isArray(sanitized.liftingOrderAthletes)
+      ? sanitized.liftingOrderAthletes
+      : (Array.isArray(sanitized.liftingOrderKeys) ? sanitized.liftingOrderKeys : null);
+
+    // Normalize startOrderKeys -> startOrderAthletes format: entries of { athleteKey } or { isSpacer: true }
+    if (Array.isArray(sanitized.startOrderKeys)) {
+      const normalized = [];
+      for (const e of sanitized.startOrderKeys) {
+        if (!e) continue;
+        if (typeof e === 'string' || typeof e === 'number') {
+          normalized.push({ athleteKey: e });
+        } else if (e.isSpacer || e.type === 'spacer') {
+          normalized.push({ isSpacer: true });
+        } else if (e.athleteKey || e.key) {
+          normalized.push({ athleteKey: e.athleteKey || e.key, classname: e.classname || e.className });
+        } else {
+          // unknown shape - push as-is
+          normalized.push(e);
+        }
+      }
+      // sanitized.startOrderAthletes = normalized; // DO NOT OVERWRITE if already present
+      if (!sanitized.startOrderAthletes) {
+        sanitized.startOrderAthletes = normalized;
+      }
+    }
+
+    if (Array.isArray(sanitized.liftingOrderKeys)) {
+      const normalized = [];
+      for (const e of sanitized.liftingOrderKeys) {
+        if (!e) continue;
+        if (typeof e === 'string' || typeof e === 'number') {
+          normalized.push({ athleteKey: e });
+        } else if (e.isSpacer || e.type === 'spacer') {
+          normalized.push({ isSpacer: true });
+        } else if (e.athleteKey || e.key) {
+          normalized.push({ athleteKey: e.athleteKey || e.key, classname: e.classname || e.className });
+        } else {
+          normalized.push(e);
+        }
+      }
+      // sanitized.liftingOrderAthletes = normalized; // DO NOT OVERWRITE if already present
+      if (!sanitized.liftingOrderAthletes) {
+        sanitized.liftingOrderAthletes = normalized;
+      }
+    }
+
+    if (liftingOrderSource) {
+      sanitized.liftingOrderAthletes = liftingOrderSource;
+      if (!sanitized.liftingOrderAthletesV2) {
+        sanitized.liftingOrderAthletesV2 = liftingOrderSource;
+      }
+    }
+
+    return sanitized;
+  }
+
+  _parseMaybeJson(value) {
+    if (value === null || value === undefined) {
+      return value;
+    }
+
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed) {
+        return value;
+      }
+      try {
+        return JSON.parse(trimmed);
+      } catch (error) {
+        console.warn('[Hub] Failed to parse JSON field from OWLCMS payload:', error.message);
+        return value;
+      }
+    }
+
+    return value;
+  }
+
+  _rebuildDerivedState(fopName) {
+    const update = this.fopUpdates[fopName];
+    if (!update) {
+      return;
+    }
+
+    if (typeof update.leaders === 'string') {
+      update.leaders = this._parseMaybeJson(update.leaders);
+    }
+
+    // Get currentAthleteKey to set classname on current athlete
+    const currentAthleteKey = this._normalizeAthleteKey(update.currentAthleteKey);
+
+    // Step 1: Flatten sessionAthletes - unwrap V2 { athlete, displayInfo } format
+    // and compute fullName. Store as both a map (by key) and array.
+    const { athletesByKey, athletesArray } = this._flattenSessionAthletes(update.sessionAthletes, currentAthleteKey);
+    update._sessionAthletesByKey = athletesByKey;
+    update._sessionAthletesFlat = athletesArray;
+
+    // Step 2: Build order arrays - just keys and spacers that reference _sessionAthletesByKey
+    // Use V2-only canonical fields (startOrderKeys, liftingOrderKeys)
+    const startOrderKeys = update.startOrderKeys || update.startOrderAthletes || null;
+    const liftingOrderKeys = update.liftingOrderKeys || update.liftingOrderAthletes || null;
+
+    update._startOrder = this._buildOrderKeys(startOrderKeys);
+    update._liftingOrder = this._buildOrderKeys(liftingOrderKeys);
+
+    // Step 3: For backwards compatibility, store resolved arrays with full athlete data
+    // Plugins can access fopUpdate.startOrderAthletes and get flat athlete objects
+    update.startOrderAthletes = this._resolveOrderToAthletes(update._startOrder, athletesByKey);
+    update.liftingOrderAthletes = this._resolveOrderToAthletes(update._liftingOrder, athletesByKey);
+  }
+
+  /**
+   * Flatten sessionAthletes array - unwrap V2 { athlete, displayInfo } format
+   * and compute fullName if missing.
+   * @returns {{ athletesByKey: Object, athletesArray: Array }}
+   */
+  _flattenSessionAthletes(sessionAthletes, currentAthleteKey = null) {
+    const athletesByKey = Object.create(null);
+    const athletesArray = [];
+
+    if (!Array.isArray(sessionAthletes) || sessionAthletes.length === 0) {
+      return { athletesByKey, athletesArray };
+    }
+
+    for (const entry of sessionAthletes) {
+      if (!entry) continue;
+
+      // Unwrap V2 format: { athlete: {...}, displayInfo: {...} }
+      // displayInfo contains all precomputed display values from OWLCMS:
+      // - fullName, teamName, yearOfBirth, gender, startNumber, lotNumber
+      // - category (with age group), bestSnatch, bestCleanJerk, total
+      // - snatchRank, cleanJerkRank, totalRank, sinclair, sinclairRank
+      // - classname ("current blink", "next", ""), group, subCategory
+      // - flagURL, flagClass, teamLength, custom1, custom2, membership
+      // - sattempts, cattempts (attempt arrays)
+      let flat;
+      let usedDisplayInfo = false;
+      if (entry.athlete && typeof entry.athlete === 'object') {
+        flat = { ...entry.athlete };
+        if (entry.displayInfo && typeof entry.displayInfo === 'object') {
+          // displayInfo values override athlete DTO values
+          Object.assign(flat, entry.displayInfo);
+          usedDisplayInfo = true;
+          // console.log('[Hub] Using displayInfo for athlete:', flat.fullName);
+        }
+      } else {
+        // Already flat or legacy format
+        flat = { ...entry };
+      }
+
+      // Fallback: Compute fullName if OWLCMS didn't provide it
+      if (!flat.fullName && (flat.firstName || flat.lastName)) {
+        const lastName = (flat.lastName || '').toUpperCase();
+        const firstName = flat.firstName || '';
+        flat.fullName = lastName && firstName ? `${lastName}, ${firstName}` : lastName || firstName;
+      }
+
+      // Fallback: Compute teamName from team ID if OWLCMS didn't provide it
+      if (!flat.teamName && flat.team) {
+        flat.teamName = this._getTeamNameById(flat.team);
+      }
+
+      // Fallback: Compute category display name from categoryCode if OWLCMS didn't provide it
+      if (!flat.category && flat.categoryCode) {
+        flat.category = flat.categoryCode;
+      }
+
+      // Fallback: Compute yearOfBirth from fullBirthDate if OWLCMS didn't provide it
+      if (!flat.yearOfBirth && flat.fullBirthDate) {
+        const year = flat.fullBirthDate.substring(0, 4);
+        if (year && year.length === 4) {
+          flat.yearOfBirth = year;
+        }
+      }
+
+      // Normalize sattempts and cattempts to standard format for display
+      // OWLCMS sends arrays like [50, -52, 52] where negative = failed
+      // If we used displayInfo, attempts are already in V2 object format { value, status }
+      // which the frontend can handle directly. We only normalize if NOT using displayInfo.
+      if (!usedDisplayInfo) {
+        if (Array.isArray(flat.sattempts)) {
+          flat.sattempts = flat.sattempts.map(v => this._normalizeAttemptValue(v));
+        }
+        if (Array.isArray(flat.cattempts)) {
+          flat.cattempts = flat.cattempts.map(v => this._normalizeAttemptValue(v));
+        }
+      } else {
+        // Even if using displayInfo, we might need to ensure the attempts are not double-normalized
+        // or if they are somehow strings that need parsing.
+        // But for now, let's assume they are correct objects.
+        // Debug log to see what we have
+        // if (flat.sattempts && flat.sattempts.length > 0) {
+        //    console.log('[Hub] V2 attempts for', flat.fullName, JSON.stringify(flat.sattempts[0]));
+        // }
+      }
+
+      // Fallback: Compute bestSnatch and bestCleanJerk if OWLCMS didn't provide them
+      if ((flat.bestSnatch === undefined || flat.bestSnatch === '-') && Array.isArray(flat.sattempts)) {
+        flat.bestSnatch = this._computeBestLift(flat.sattempts);
+      }
+      if ((flat.bestCleanJerk === undefined || flat.bestCleanJerk === '-') && Array.isArray(flat.cattempts)) {
+        flat.bestCleanJerk = this._computeBestLift(flat.cattempts);
+      }
+
+      // Get the key
+      const key = this._normalizeAthleteKey(flat.key ?? flat.id ?? flat.athleteKey);
+      if (!key) continue;
+
+      // Note: classname is now provided by OWLCMS displayInfo ("current blink", "next", "")
+      // We only need to set it as fallback if not already present
+      if (flat.classname === undefined && currentAthleteKey && key === currentAthleteKey) {
+        flat.classname = 'current';
+      }
+
+      flat.athleteKey = key;
+      athletesByKey[key] = flat;
+      athletesArray.push(flat);
+    }
+
+    return { athletesByKey, athletesArray };
+  }
+
+  /**
+   * Normalize an attempt value to standard format { stringValue, liftStatus }
+   * 
+   * OWLCMS V2 format sends objects: { value: 85, status: "good"|"fail"|"request"|"current"|"next"|null }
+   * Legacy format sends numbers: positive = good lift, negative = failed, 0 or null = not attempted
+   * 
+   * Output liftStatus values:
+   * - 'good' - successful lift
+   * - 'bad' - failed lift  
+   * - 'current' - pending attempt for current athlete (should blink)
+   * - 'next' - pending attempt for next athlete
+   * - 'request' - pending attempt (not current or next athlete)
+   * - 'empty' - no data (legacy only)
+   */
+  _normalizeAttemptValue(v) {
+    if (v === null || v === undefined) {
+      return { stringValue: '-', liftStatus: 'empty' };
+    }
+    
+    // V2 format: object with 'value' key from OWLCMS (status may or may not be present)
+    if (typeof v === 'object' && 'value' in v) {
+      if (v.value === null || v.value === undefined) {
+        return { stringValue: '-', liftStatus: 'empty' };
+      }
+      // Map null/missing status to 'request' (pending attempt, not yet lifted)
+      const status = v.status || 'request';
+      return { 
+        stringValue: String(v.value), 
+        liftStatus: status  // status: good, bad, request, current, next, empty
+      };
+    }
+    
+    // Already normalized to our format (stringValue + liftStatus)
+    if (typeof v === 'object' && (v.stringValue !== undefined || v.liftStatus !== undefined)) {
+      return v;
+    }
+    
+    // Legacy format: plain number
+    if (typeof v === 'number') {
+      if (v === 0) return { stringValue: '-', liftStatus: 'empty' };
+      if (v > 0) return { stringValue: String(v), liftStatus: 'good' };
+      // Negative = failed attempt
+      return { stringValue: String(Math.abs(v)), liftStatus: 'bad' };
+    }
+    
+    // String that might be a number
+    const str = String(v).trim();
+    if (str === '' || str === '-') return { stringValue: '-', liftStatus: 'empty' };
+    const n = parseFloat(str.replace(/[()]/g, ''));
+    if (!Number.isNaN(n)) {
+      const isFail = str.includes('(') || n < 0;
+      return { stringValue: String(Math.abs(n)), liftStatus: isFail ? 'bad' : 'good' };
+    }
+    return { stringValue: str, liftStatus: 'empty' };
+  }
+
+  /**
+   * Compute best lift from normalized attempts array
+   */
+  _computeBestLift(attempts) {
+    if (!Array.isArray(attempts)) return null;
+    let best = null;
+    for (const a of attempts) {
+      if (a && a.liftStatus === 'good' && a.stringValue) {
+        const val = parseFloat(a.stringValue);
+        if (!Number.isNaN(val) && (best === null || val > best)) {
+          best = val;
+        }
+      }
+    }
+    return best;
+  }
+
+  /**
+   * Build order keys array - normalize entries to { athleteKey } or { isSpacer: true }
+   * @returns {{ keys: Array, spacerIndices: Set }}
+   */
+  _buildOrderKeys(orderEntries) {
+    if (!Array.isArray(orderEntries) || orderEntries.length === 0) {
+      return { keys: [], spacerIndices: new Set() };
+    }
+
+    const keys = [];
+    const spacerIndices = new Set();
+
+    for (let i = 0; i < orderEntries.length; i++) {
+      const entry = orderEntries[i];
+      if (!entry) continue;
+
+      if (entry.isSpacer || entry.type === 'spacer') {
+        keys.push({ isSpacer: true });
+        spacerIndices.add(keys.length - 1);
+      } else if (typeof entry === 'string' || typeof entry === 'number') {
+        keys.push({ athleteKey: this._normalizeAthleteKey(entry) });
+      } else if (entry.athleteKey || entry.key || entry.athlete?.key) {
+        keys.push({ athleteKey: this._normalizeAthleteKey(entry.athleteKey ?? entry.key ?? entry.athlete?.key) });
+      } else {
+        // Unknown format, skip
+        continue;
+      }
+    }
+
+    return { keys, spacerIndices };
+  }
+
+  /**
+   * Resolve order keys to full athlete objects for backwards compatibility
+   * @returns {Array} Array of { isSpacer: true } or flat athlete objects with classname
+   */
+  _resolveOrderToAthletes(order, athletesByKey) {
+    if (!order?.keys?.length) {
+      return [];
+    }
+
+    return order.keys.map(entry => {
+      if (entry.isSpacer) {
+        return { isSpacer: true };
+      }
+      const athlete = athletesByKey[entry.athleteKey];
+      if (!athlete) {
+        // Athlete not found in session, return minimal entry
+        return { athleteKey: entry.athleteKey, isSpacer: false };
+      }
+      return athlete;
+    });
+  }
+
+  _buildSessionAthleteMap(sessionAthletes) {
+    if (!Array.isArray(sessionAthletes) || sessionAthletes.length === 0) {
+      return {};
+    }
+
+    const map = Object.create(null);
+    for (const athlete of sessionAthletes) {
+      if (!athlete) continue;
+      // Support both flat session-athlete records and V2 enriched objects:
+      // - flat: { key: '123', ... }
+      // - enriched: { athlete: { key: '123', ... }, displayInfo: { ... } }
+      const rawKey = athlete.key ?? athlete.id ?? athlete.athlete?.key ?? athlete.athlete?.id ?? athlete.athleteKey;
+      const key = this._normalizeAthleteKey(rawKey);
+      if (key) {
+        map[key] = athlete;
+      }
+    }
+    return map;
+  }
+
+  _mergeSessionAthletesIntoDatabase(fopName) {
+    const update = this.fopUpdates[fopName];
+    const sessionAthletes = update?.sessionAthletes;
+    if (!Array.isArray(sessionAthletes) || sessionAthletes.length === 0) {
+      return;
+    }
+
+    this._ensureDatabaseContainers(update);
+
+    let changed = false;
+
+    for (const sessionAthlete of sessionAthletes) {
+      if (!sessionAthlete || typeof sessionAthlete !== 'object') {
+        continue;
+      }
+
+      // Handle V2 enriched format: { athlete: {...}, displayInfo: {...} }
+      // Extract the actual athlete data and merge displayInfo
+      let athleteData = sessionAthlete;
+      if (sessionAthlete.athlete && typeof sessionAthlete.athlete === 'object') {
+        // Unwrap V2 format
+        athleteData = { ...sessionAthlete.athlete };
+        if (sessionAthlete.displayInfo && typeof sessionAthlete.displayInfo === 'object') {
+          Object.assign(athleteData, sessionAthlete.displayInfo);
+        }
+      }
+
+      const normalizedKey = this._normalizeAthleteKey(athleteData.key);
+      if (!normalizedKey) {
+        continue;
+      }
+
+      const existing = this.databaseAthleteIndex.get(normalizedKey);
+      if (existing) {
+        if (this._mergeAthleteRecords(existing, athleteData)) {
+          this._indexDatabaseAthleteRecord(existing);
+          changed = true;
+        }
+      } else {
+        const copy = this._cloneAthleteRecord(athleteData);
+        this.databaseState.athletes.push(copy);
+        this._indexDatabaseAthleteRecord(copy);
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      this.databaseState.initialized = true;
+      this.databaseState.lastUpdate = Date.now();
+      if (this.state) {
+        this.state.athletes = this.databaseState.athletes;
+        this.state.lastUpdate = Date.now();
+      }
+    }
+  }
+
+  _ensureDatabaseContainers(update = null) {
+    if (!this.databaseState || typeof this.databaseState !== 'object') {
+      this.databaseState = {
+        competition: update?.competition || {
+          name: update?.competitionName || this.state?.competition?.name || 'Competition'
+        },
+        athletes: [],
+        teams: [],
+        initialized: false,
+        lastUpdate: Date.now()
+      };
+    }
+
+    if (!Array.isArray(this.databaseState.athletes)) {
+      this.databaseState.athletes = [];
+    }
+
+    if (!Array.isArray(this.databaseState.teams)) {
+      this.databaseState.teams = [];
+    }
+
+    if (!(this.databaseAthleteIndex instanceof Map)) {
+      this.databaseAthleteIndex = new Map();
+    }
+
+    if (!(this.databaseTeamMap instanceof Map)) {
+      this.databaseTeamMap = new Map();
+    }
+  }
+
+  _mergeAthleteRecords(target, source) {
+    if (!target || !source) {
+      return false;
+    }
+
+    let changed = false;
+    for (const [key, value] of Object.entries(source)) {
+      if (target[key] !== value) {
+        target[key] = value;
+        changed = true;
+      }
+    }
+    return changed;
+  }
+
+  _cloneAthleteRecord(record) {
+    if (!record || typeof record !== 'object') {
+      return record;
+    }
+
+    if (typeof structuredClone === 'function') {
+      return structuredClone(record);
+    }
+
+    return JSON.parse(JSON.stringify(record));
+  }
+
+  _indexDatabaseAthleteRecord(athlete) {
+    if (!athlete) {
+      return;
+    }
+
+    const key = this._normalizeAthleteKey(athlete?.key);
+    if (key) {
+      this.databaseAthleteIndex.set(key, athlete);
+    }
+  }
+
+  _normalizeAthleteKey(key) {
+    if (key === null || key === undefined) {
+      return null;
+    }
+    if (typeof key === 'number') {
+      return key.toString();
+    }
+    if (typeof key === 'string') {
+      const trimmed = key.trim();
+      return trimmed.length > 0 ? trimmed : null;
+    }
+    return null;
+  }
+
+  _resolveAthleteByKey(update, key) {
+    if (!update) {
+      return null;
+    }
+
+    const normalizedKey = this._normalizeAthleteKey(key);
+    if (!normalizedKey) {
+      return null;
+    }
+
+    // Primary lookup: flattened session athletes map
+    if (update._sessionAthletesByKey && update._sessionAthletesByKey[normalizedKey]) {
+      return update._sessionAthletesByKey[normalizedKey];
+    }
+
+    // Fallback: search raw sessionAthletes array (before _rebuildDerivedState runs)
+    if (Array.isArray(update.sessionAthletes)) {
+      const found = update.sessionAthletes.find(ath => {
+        const candidate = ath?.key ?? ath?.id ?? ath?.athlete?.key ?? ath?.athlete?.id ?? ath?.athleteKey;
+        return this._normalizeAthleteKey(candidate) === normalizedKey;
+      });
+      if (found) {
+        // Cache the found athlete for future lookups
+        update._sessionAthletesByKey = update._sessionAthletesByKey || {};
+        update._sessionAthletesByKey[normalizedKey] = found;
+        return found;
+      }
+    }
+
+    return null;
+  }
+
+  _findNeighborKeyInOrder(update, offset = 1) {
+    // Use the resolved liftingOrderAthletes array (flat athlete objects)
+    const entries = update?.liftingOrderAthletes;
+    if (!Array.isArray(entries) || entries.length === 0 || !offset) {
+      return null;
+    }
+
+    // Filter to only athlete entries (no spacers)
+    const athleteEntries = entries.filter(entry => entry && !entry.isSpacer);
+    
+    const normalizedCurrent = this._normalizeAthleteKey(update.currentAthleteKey);
+    if (!normalizedCurrent) {
+      return null;
+    }
+
+    const currentIndex = athleteEntries.findIndex(entry => {
+      const key = this._normalizeAthleteKey(entry?.athleteKey ?? entry?.key);
+      return key && key === normalizedCurrent;
+    });
+
+    if (currentIndex === -1) {
+      return null;
+    }
+
+    const neighbor = athleteEntries[currentIndex + offset];
+    return neighbor?.athleteKey ?? neighbor?.key ?? null;
+  }
+
+  _composeFullName(athlete, dbAthlete) {
+    const last = athlete.lastName || dbAthlete?.lastName || '';
+    const first = athlete.firstName || dbAthlete?.firstName || '';
+    if (last && first) {
+      return `${last}, ${first}`;
+    }
+    if (last) {
+      return last;
+    }
+    if (first) {
+      return first;
+    }
+    return athlete.fullName || dbAthlete?.fullName || '';
+  }
+
+  _resolveTeamName(athlete, dbAthlete) {
+    if (athlete.teamName) {
+      return athlete.teamName;
+    }
+    if (dbAthlete?.teamName) {
+      return dbAthlete.teamName;
+    }
+    const teamId = athlete.team ?? dbAthlete?.team;
+    if (teamId === null || teamId === undefined) {
+      return null;
+    }
+    return this._getTeamNameById(teamId);
+  }
+
+  _getDatabaseAthleteByKey(key) {
+    if (!this.databaseAthleteIndex || this.databaseAthleteIndex.size === 0) {
+      return null;
+    }
+    const normalizedKey = this._normalizeAthleteKey(key);
+    if (!normalizedKey) {
+      return null;
+    }
+    return this.databaseAthleteIndex.get(normalizedKey) || null;
+  }
+
+  _getTeamNameById(teamId) {
+    if (teamId === null || teamId === undefined) {
+      return null;
+    }
+    if (!this.databaseTeamMap || this.databaseTeamMap.size === 0) {
+      return null;
+    }
+    const normalizedId = typeof teamId === 'number' ? teamId.toString() : `${teamId}`;
+    return this.databaseTeamMap.get(normalizedId) || null;
+  }
+
+  _reindexDatabaseAthletes() {
+    this.databaseAthleteIndex = new Map();
+    this.databaseTeamMap = new Map();
+
+    const athletes = this.databaseState?.athletes;
+    if (Array.isArray(athletes)) {
+      for (const athlete of athletes) {
+        this._indexDatabaseAthleteRecord(athlete);
+      }
+    }
+
+    // Teams may be at databaseState.teams or databaseState.database.teams depending on message format
+    const teams = this.databaseState?.teams || this.databaseState?.database?.teams;
+    if (Array.isArray(teams)) {
+      for (const team of teams) {
+        if (!team) continue;
+        if (team.id === null || team.id === undefined) continue;
+        const id = team.id.toString();
+        this.databaseTeamMap.set(id, team.name || team.fullName || team.code || null);
+      }
+    }
   }
 
   /**

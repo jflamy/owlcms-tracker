@@ -90,7 +90,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			competition: { name: 'No Competition Data', fop: 'unknown' },
 			currentAthlete: null,
 			timer: { state: 'stopped', timeRemaining: 0 },
-			sessionStatus: { isDone: false, groupName: '', lastActivity: 0 },  // Include default sessionStatus
+			sessionStatus: { isDone: false, sessionName: '', lastActivity: 0 },  // Include default sessionStatus
 			teams: [],
 			status: 'waiting',
 			learningMode
@@ -100,12 +100,11 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// Get session status early (before cache check, so it's always fresh)
 	const sessionStatus = competitionHub.getSessionStatus(fopName);
 
-	// Check cache first - cache key based on athlete data, NOT timer events
-	// Use a hash of groupAthletes to detect when athlete data actually changes
-	// groupAthletes is now a parsed object, so stringify it first for hashing
-	const groupAthletesHash = fopUpdate?.groupAthletes ? 
-		JSON.stringify(fopUpdate.groupAthletes).substring(0, 100) : ''; // First 100 chars as quick hash
-	const cacheKey = `${fopName}-${groupAthletesHash}-${gender}-${topN}-${sortBy}`;
+	// Check cache first - cache key based on the last update timestamp from the Hub.
+	// This ensures all clients see the same data for a given update, 
+	// and invalidation is instant when a new update arrives.
+	const lastUpdate = fopUpdate?.lastDataUpdate || 0;
+	const cacheKey = `${fopName}-${lastUpdate}-${JSON.stringify(options)}`;
 	
 	if (teamScoreboardCache.has(cacheKey)) {
 		const cached = teamScoreboardCache.get(cacheKey);
@@ -131,7 +130,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		name: fopUpdate?.competitionName || databaseState?.competition?.name || 'Competition',
 		fop: fopName,
 		state: fopUpdate?.fopState || 'INACTIVE',
-		session: fopUpdate?.groupName || 'A',
+		session: fopUpdate?.sessionName || 'A',
 		// Replace HTML entities with Unicode characters
 		groupInfo: (fopUpdate?.groupInfo || '').replace(/&ndash;/g, '–').replace(/&mdash;/g, '—')
 	};
@@ -176,15 +175,14 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		startTime: null // Client will compute this
 	};
 
-	// Get precomputed session athletes from UPDATE message (stored in groupAthletes key)
-	// Note: groupAthletes is already a parsed object (nested JSON from WebSocket)
-	let sessionAthletes = [];
-	if (fopUpdate?.groupAthletes) {
-		sessionAthletes = fopUpdate.groupAthletes;
-		
-		// Find the current athlete (has 'current' in classname)
-		const currentAthlete = sessionAthletes.find(a => a.classname && a.classname.includes('current'));
+	// Get precomputed session athletes from UPDATE message (start order array)
+	let sessionAthletes = startOrderAthletes;
+	if (!Array.isArray(sessionAthletes)) {
+		sessionAthletes = [];
 	}
+	
+	// Find the current athlete (has 'current' in classname)
+	const currentAthlete = sessionAthletes.find(a => a.classname && a.classname.includes('current'));
 	
 	// Get all athletes from database
 	let allAthletes = [];

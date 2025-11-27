@@ -51,6 +51,125 @@ All messages follow this JSON structure:
 
 **Frequency:** Sent on most UI events + keepalive every 15 seconds
 
+#### V2 Session Athletes Format
+
+UPDATE messages include a `sessionAthletes` array in V2 format. Each entry contains an `athlete` DTO with raw athlete data and a `displayInfo` object with precomputed display values that match OWLCMS internal scoreboards:
+
+```json
+{
+  "sessionAthletes": [
+    {
+      "athlete": {
+        "id": 123,
+        "key": "123",
+        "firstName": "John",
+        "lastName": "DOE",
+        "fullBirthDate": "1995-03-15",
+        "categoryCode": "M89",
+        "team": 456,
+        "gender": "M",
+        "startNumber": 5,
+        "lotNumber": 12,
+        "snatch1Declaration": 100,
+        "snatch1ActualLift": -100,
+        "snatch2Declaration": 100,
+        "snatch2ActualLift": 100,
+        ...
+      },
+      "displayInfo": {
+        "fullName": "DOE, John",
+        "teamName": "USA Weightlifting",
+        "yearOfBirth": "1995",
+        "gender": "M",
+        "startNumber": "5",
+        "lotNumber": "12",
+        "category": "M89 Senior",
+        "sattempts": [
+          {"value": 100, "status": "bad"},
+          {"value": 100, "status": "good"},
+          {"value": null, "status": null}
+        ],
+        "cattempts": [
+          {"value": 120, "status": "current"},
+          {"value": null, "status": null},
+          {"value": null, "status": null}
+        ],
+        "bestSnatch": "100",
+        "bestCleanJerk": "120",
+        "total": "220",
+        "snatchRank": "2",
+        "cleanJerkRank": "1",
+        "totalRank": "1",
+        "sinclair": "285.432",
+        "sinclairRank": "1",
+        "classname": "current blink",
+        "group": "A",
+        "subCategory": "",
+        "flagURL": "/local/flags/USA Weightlifting.svg",
+        "flagClass": "longTeam",
+        "teamLength": 16,
+        "custom1": "",
+        "custom2": "",
+        "membership": "123456"
+      }
+    }
+  ]
+}
+```
+
+**displayInfo fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `fullName` | string | Formatted as "LASTNAME, FirstName" |
+| `teamName` | string | Team/club name (resolved from team ID) |
+| `yearOfBirth` | string | Year only (e.g., "1995") |
+| `gender` | string | "M" or "F" |
+| `startNumber` | string | Start number as string |
+| `lotNumber` | string | Lot number as string |
+| `category` | string | Category name with age group (e.g., "M89 Senior") |
+| `sattempts` | array | Snatch attempts as objects `[{value, status}, ...]` - see below |
+| `cattempts` | array | Clean&jerk attempts as objects `[{value, status}, ...]` - see below |
+
+**Attempt object format:**
+
+Each attempt in `sattempts` and `cattempts` is an object with:
+- `value` - The weight in kg (integer), or `null` if no data
+- `status` - One of:
+  - `"good"` - Successful lift
+  - `"bad"` - Failed lift
+  - `"current"` - Pending attempt for current athlete (should blink)
+  - `"next"` - Pending attempt for next athlete
+  - `"request"` - Pending attempt for other athletes
+  - `null` - No data for this attempt
+
+| `bestSnatch` | string | Best successful snatch or "-" |
+| `bestCleanJerk` | string | Best successful clean&jerk or "-" |
+| `total` | string | Competition total or "-" |
+| `snatchRank` | string | Session rank in snatch or "-" |
+| `cleanJerkRank` | string | Session rank in clean&jerk or "-" |
+| `totalRank` | string | Session rank in total or "-" |
+| `sinclair` | string | Computed score (e.g., Sinclair) or "-" |
+| `sinclairRank` | string | Computed score rank or "-" |
+| `classname` | string | CSS class: "current blink", "next", or "" |
+| `group` | string | Session/group name |
+| `subCategory` | string | Subcategory if applicable |
+| `flagURL` | string | Path to team flag SVG |
+| `flagClass` | string | "shortTeam" or "longTeam" based on name length |
+| `teamLength` | number | Character length of team name |
+| `custom1` | string | Custom field 1 |
+| `custom2` | string | Custom field 2 |
+| `membership` | string | Membership/federation ID |
+
+**Key ordering arrays:**
+
+UPDATE messages also include ordering arrays that reference athletes by key:
+
+- `startOrderKeys` - Athletes in registration/start order with category spacers
+- `liftingOrderKeys` - Athletes in lifting order with snatch/C&J spacers
+- `currentAthleteKey` - Key of current lifting athlete
+- `nextAthleteKey` - Key of next athlete
+
 ---
 
 ### 2. TIMER Messages

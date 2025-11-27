@@ -54,7 +54,7 @@ export default {
 		'startNumber',
 		'teamName',
 		'categoryName',
-		'groupAthletes'
+		'startOrderAthletes'
 	],
 	
 	// AI prompt for modifications

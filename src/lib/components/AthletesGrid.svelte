@@ -16,18 +16,53 @@
 	}
 	
 	export function getAttemptClass(attempt) {
-		if (!attempt || !attempt.liftStatus || attempt.liftStatus === 'empty' || attempt.liftStatus === 'request') {
-			return 'empty';
+		if (!attempt) return 'empty';
+		
+		// Handle plain number (legacy format from old OWLCMS)
+		if (typeof attempt === 'number') {
+			if (attempt === 0) return 'empty';
+			if (attempt > 0) return 'success';
+			return 'failed';  // negative = failed
 		}
-		if (attempt.liftStatus === 'fail') return 'failed';
-		if (attempt.liftStatus === 'good') return 'success';
+		
+		// Handle object formats
+		const status = attempt.liftStatus || attempt.status;
+		if (!status || status === 'empty') return 'empty';
+		if (status === 'bad') return 'failed';
+		if (status === 'good') return 'success';
+		if (status === 'current') return 'current-attempt';
+		if (status === 'next') return 'next-attempt';
+		if (status === 'request') return 'request';
 		return 'empty';
 	}
 	
 	export function displayAttempt(attempt) {
-		if (!attempt || !attempt.stringValue || attempt.stringValue === '') return '-';
-		// Remove parentheses from failed attempts (OWLCMS sends "(62)" for failed 62kg)
-		return attempt.stringValue.replace(/[()]/g, '');
+		if (!attempt) return '-';
+		
+		// Handle plain number (legacy format from old OWLCMS)
+		if (typeof attempt === 'number') {
+			if (attempt === 0) return '-';
+			return String(Math.abs(attempt));
+		}
+		
+		// Handle string (shouldn't happen but be safe)
+		if (typeof attempt === 'string') {
+			return attempt || '-';
+		}
+		
+		// Handle object formats:
+		// V2 from OWLCMS: { value: 85, status: "good" }
+		// Normalized hub format: { stringValue: "85", liftStatus: "good" }
+		const val = attempt.stringValue ?? attempt.value;
+		
+		// Safety check: if val is an object, it will render as [object Object]
+		if (typeof val === 'object' && val !== null) {
+			console.warn('[AthletesGrid] Attempt value is an object:', val);
+			return '?';
+		}
+		
+		if (val === null || val === undefined || val === '' || val === '-') return '-';
+		return String(val);
 	}
 </script>
 
@@ -394,6 +429,30 @@
 	.attempt.failed {
 		background: #dc2626 !important;
 		color: #fff;
+	}
+
+	/* Current athlete's pending attempt - should blink */
+	.attempt.current-attempt {
+		background: #1e3a5f !important;
+		color: #fff;
+		animation: blink 1s ease-in-out infinite;
+	}
+
+	/* Next athlete's pending attempt */
+	.attempt.next-attempt {
+		background: #374151 !important;
+		color: #fff;
+	}
+
+	/* Other athletes' pending requests */
+	.attempt.request {
+		background: transparent;
+		color: #9ca3af;
+	}
+
+	@keyframes blink {
+		0%, 100% { opacity: 1; }
+		50% { opacity: 0.5; }
 	}
 
 	.grid-row.spacer > .cell {

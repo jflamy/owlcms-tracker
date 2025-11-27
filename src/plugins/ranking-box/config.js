@@ -46,7 +46,7 @@ export default {
 	
 	// Required FOP data fields
 	requiredFields: [
-		'groupName',
+		'sessionName',
 		'fullName',
 		'startNumber',
 		'teamName',
@@ -65,7 +65,7 @@ The SVG contains:
 
 Data Structure:
 - competitionName: Name of competition
-- groupName: Current session/group name
+- sessionName: Current session/group name
 - athletes: Array of current session athletes
 - pageInterval: Seconds between page transitions
 
