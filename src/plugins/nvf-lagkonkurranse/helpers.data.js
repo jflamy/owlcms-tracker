@@ -154,65 +154,45 @@ function getPredictedBestLift(attempts, bestAchieved) {
 
 /**
  * Calculate the predicted total
- * For each lift type: if there's a next request (liftStatus='request'), use it; else use bestAchieved
  * @param {Object} athlete - Athlete object with sattempts, cattempts, bestSnatch, bestCleanJerk
- * @returns {number} Predicted total or 0 if no prediction possible
+ * @param {string} preferredLiftType - 'snatch' or 'cleanJerk'
+ * @param {number} attemptsDone - Number of attempts completed (0-6)
+ *   attemptsDone=0: zero snatch done (about to do snatch 1)
+ *   attemptsDone=1: one snatch done (about to do snatch 2)
+ *   attemptsDone=2: two snatches done (about to do snatch 3)
+ *   attemptsDone=3: snatches finished (about to do C&J 1)
+ * @param {boolean} cjDecl - Whether to include first C&J declaration in predicted total (default: true)
+ *   When true (predicted total): uses CJ declaration even during snatches (attemptsDone 0-2)
+ *   When false (prediction after next lift): uses CJ declaration only after snatches finished (attemptsDone >= 3)
+ * @returns {number} Predicted total
  */
-function calculatePredictedTotal(athlete, preferredLiftType = 'snatch', attemptsDone = 0) {
+function calculatePredictedTotal(athlete, preferredLiftType = 'snatch', attemptsDone = 0, cjDecl = true) {
 	if (!athlete) return 0;
 	
 	const bestSnatch = parseFormattedNumber(athlete.bestSnatch) || 0;
 	const bestCJ = parseFormattedNumber(athlete.bestCleanJerk) || 0;
-	
-	// Determine the next declared weight according to rules (attemptsDone = completed attempts):
-	// - If liftType is snatch and attemptsDone is 0/1/2 -> next declaration is snatch at index attemptsDone
-	// - If liftType is snatch and attemptsDone is 3 -> next declaration is clean&jerk[0]
-	// - If liftType is cleanJerk and attemptsDone is 0/1/2 -> next declaration is clean&jerk at index attemptsDone
-	// - If liftType is cleanJerk and attemptsDone is 3 -> no next declaration (prediction uses base total)
 
-	let chosenRequest = 0;
-	let currentBestForChosen = 0;
+	// During snatches we predict the next snatch request; once snatches are finished we keep the achieved best snatch
+	const predictedSnatch = attemptsDone < 3
+		? getPredictedBestLift(athlete.sattempts, bestSnatch)
+		: bestSnatch;
 
-	if (preferredLiftType === 'snatch') {
-		// Map attemptsDone 0/1/2 -> snatch[0..2]
-		if (attemptsDone === 0 || attemptsDone === 1 || attemptsDone === 2) {
-			const idx = attemptsDone; // 0-based
-			const val = parseInt(athlete.sattempts?.[idx]?.stringValue || '', 10);
-			if (!isNaN(val) && val > 0) {
-				chosenRequest = val;
-				currentBestForChosen = bestSnatch;
-			}
-		} else if (attemptsDone === 3) {
-			// after snatch3 -> declaration is first CJ
-			const val = parseInt(athlete.cattempts?.[0]?.stringValue || '', 10);
-			if (!isNaN(val) && val > 0) {
-				chosenRequest = val;
-				currentBestForChosen = bestCJ;
+	let predictedCJ = bestCJ;
+
+	if (attemptsDone < 3) {
+		// Still in snatch phase – optional CJ prediction depends on cjDecl flag
+		if (cjDecl) {
+			const firstCJDecl = parseInt(athlete.cattempts?.[0]?.stringValue || '', 10);
+			if (!isNaN(firstCJDecl) && firstCJDecl > 0) {
+				predictedCJ = Math.max(bestCJ, firstCJDecl);
 			}
 		}
 	} else {
-		// preferred is cleanJerk: map attemptsDone 0/1/2 -> cj[0..2]; 3 -> no next declaration
-		if (attemptsDone === 0 || attemptsDone === 1 || attemptsDone === 2) {
-			const idx = attemptsDone;
-			const val = parseInt(athlete.cattempts?.[idx]?.stringValue || '', 10);
-			if (!isNaN(val) && val > 0) {
-				chosenRequest = val;
-				currentBestForChosen = bestCJ;
-			}
-		} else if (attemptsDone === 3) {
-			chosenRequest = 0; // no next declaration after CJ3
-		}
+		// Snatches finished or we are inside the C&J phase – always use predicted CJ (next request or best achieved)
+		predictedCJ = getPredictedBestLift(athlete.cattempts, bestCJ);
 	}
 
-	// Base current total
-	const baseTotal = bestSnatch + bestCJ;
-
-	// If there's no next request at all, return base total (no prediction)
-	if (chosenRequest === 0) return baseTotal;
-
-	// If chosen requested weight is greater than current best for that lift, add the delta
-	const delta = Math.max(0, chosenRequest - (currentBestForChosen || 0));
-	return baseTotal + delta;
+	return predictedSnatch + predictedCJ;
 }
 
 // Export the predicted-total helper for unit testing
@@ -252,6 +232,10 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// Get language preference from options (default: 'no')
 	// Accept both 'lang' (URL param) and 'language' (config option)
 	const language = options.lang || options.language || 'no';
+	
+	// Get cjDecl preference (include first C&J attempt in predicted total)
+	// Accept both 'cjDecl' (URL param) and from config (default: true)
+	const cjDecl = options.cjDecl !== 'false' && options.cjDecl !== false; // default true
 	
 	// Fetch translations from hub for the selected language
 	const translations = competitionHub.getTranslations(language);
@@ -331,7 +315,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			headers,
 			status: 'waiting',
 			learningMode,
-			options: { showRecords, sortBy, gender: requestedGender, currentAttemptInfo, topN }
+			options: { showRecords, sortBy, gender: requestedGender, currentAttemptInfo, topN, cjDecl }
 		};
 	}
 
@@ -347,7 +331,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			headers,
 			status: 'waiting',
 			learningMode,
-			options: { showRecords, sortBy, gender: 'current', currentAttemptInfo, topN }
+			options: { showRecords, sortBy, gender: 'current', currentAttemptInfo, topN, cjDecl }
 		};
 	}
 	
@@ -372,7 +356,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// groupAthletes is now a parsed object, so stringify it first for hashing
 	const groupAthletesHash = fopUpdate?.groupAthletes ? 
 		JSON.stringify(fopUpdate.groupAthletes) : ''; // Full JSON string as hash
-	const cacheKey = `${fopName}-${groupAthletesHash}-${gender}-${topN}-${sortBy}-${currentAttemptInfo}-${language}`;
+	const cacheKey = `${fopName}-${groupAthletesHash}-${gender}-${topN}-${sortBy}-${currentAttemptInfo}-${language}-${cjDecl}`;
 	
 	if (nvfScoreboardCache.has(cacheKey)) {
 		const cached = nvfScoreboardCache.get(cacheKey);
@@ -615,7 +599,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// If no attemptNumber provided, default to 0 completed attempts
 	const attemptsDone = Math.max(0, (parseInt(fopUpdate?.attemptNumber ?? fopUpdate?.attempt ?? 0, 10) || 0) - 1);
 	allAthletes = allAthletes.map(athlete => {
-		const nextTotal = calculatePredictedTotal(athlete, liftType, attemptsDone);
+		const nextTotal = calculatePredictedTotal(athlete, liftType, attemptsDone, cjDecl);
 		const normalizedAthleteGender = normalizeGender(athlete.gender);
 		const nextScore = (nextTotal > 0 && normalizedAthleteGender) ? CalculateSinclair2024(nextTotal, athlete.bodyWeight, normalizedAthleteGender) : 0;
 		const bestSnatchValue = parseFormattedNumber(athlete.bestSnatch);
@@ -823,7 +807,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		// Echo back the options used. Expose the raw requested gender if provided so the client
 		// can honor 'Current' as a distinct option. If the client did not request a gender explicitly
 		// we omit the gender field so the client treats it as "no gender" and can auto-switch.
-		options: { showRecords, sortBy, gender: requestedGender !== undefined ? requestedGender : undefined, currentAttemptInfo, topN }
+		options: { showRecords, sortBy, gender: requestedGender !== undefined ? requestedGender : undefined, currentAttemptInfo, topN, cjDecl }
 	};
 	
 	// Cache the result (excluding timer, learningMode, sessionStatus, and sessionStatusMessage which change frequently)
