@@ -3,20 +3,18 @@
  */
 
 import { competitionHub } from '$lib/server/competition-hub.js';
-import { getFlagUrl } from '$lib/server/flag-resolver.js';
 import { extractRecordsFromUpdate } from '$lib/server/records-extractor.js';
+import { getFlagUrl } from '$lib/server/flag-resolver.js';
+import { getCompetitionState } from './helpers.js';
+
+// Track timer visibility state per FOP so StopTime events behave like SetTime when clock is idle
+const timerStateMap = new Map();
 
 /**
  * Plugin-specific cache to avoid recomputing lifting order on every browser request
- * Structure: { 'cacheKey': { competition, currentAttempt, liftingOrderAthletes, ... } }
+ * Structure: { 'cacheKey': { competition, liftingOrderAthletes, rankings, ... } }
  */
 const liftingOrderCache = new Map();
-
-/**
- * Per-FOP timer state tracking (persistent across requests)
- * Structure: { 'fopName': { active: boolean|null, running: boolean } }
- */
-const timerStateMap = new Map();
 
 /**
  * Get the full database state (raw athlete data) - SERVER-SIDE ONLY
@@ -28,7 +26,7 @@ export function getDatabaseState() {
 
 /**
  * Get the latest UPDATE message for a specific FOP - SERVER-SIDE ONLY
- * This contains precomputed presentation data like liftingOrderAthletes, groupAthletes, etc.
+ * This contains precomputed presentation data like liftingOrderAthletes, startOrderAthletes, etc.
  * @param {string} fopName - FOP name (default: 'A')
  * @returns {Object|null} Latest UPDATE message with precomputed data
  */
@@ -38,7 +36,7 @@ export function getFopUpdate(fopName = 'A') {
 
 /**
  * Get formatted scoreboard data for SSR/API (SERVER-SIDE ONLY)
- * Uses the latest UPDATE message which already has precomputed liftingOrderAthletes
+ * Uses liftingOrderAthletes from UPDATE message (lifting order: next lifter first)
  * @param {string} fopName - FOP name (default: 'A')
  * @param {Object} options - User preferences (e.g., { showRecords: true })
  * @returns {Object} Formatted data ready for browser consumption
@@ -46,183 +44,268 @@ export function getFopUpdate(fopName = 'A') {
 export function getScoreboardData(fopName = 'A', options = {}) {
 	const fopUpdate = getFopUpdate(fopName);
 	const databaseState = getDatabaseState();
-	
-	// Extract options with defaults
-	const showRecords = options.showRecords ?? false;
-	
-	// Get learning mode from environment
+	const showRecords = options.showRecords ?? true;
 	const learningMode = process.env.LEARNING_MODE === 'true' ? 'enabled' : 'disabled';
+	const sessionStatus = competitionHub.getSessionStatus(fopName);
+	const timer = extractTimerState(fopUpdate, fopName);
+	const competition = {
+		name: fopUpdate?.competitionName || databaseState?.competition?.name || 'Competition',
+		fop: fopName,
+		state: fopUpdate?.fopState || 'INACTIVE',
+		session: fopUpdate?.sessionName || 'A',
+		groupInfo: (fopUpdate?.groupInfo || '').replace(/&ndash;/g, '\u2013').replace(/&mdash;/g, '\u2014'),
+		liftsDone: fopUpdate?.liftsDone || ''
+	};
 	
-	if (!fopUpdate && !databaseState) {
-		return {
-			competition: { name: 'No Competition Data', fop: 'unknown' },
-			currentAthlete: null,
-			timer: { state: 'stopped', timeRemaining: 0 },
-			sessionStatus: { isDone: false, groupName: '', lastActivity: 0 },  // Include default sessionStatus
-			liftingOrderAthletes: [],
-			groupAthletes: [],
-			rankings: [],
-			stats: { totalAthletes: 0, activeAthletes: 0, completedAthletes: 0, categories: [], teams: [] },
-			status: 'waiting',
-			learningMode
-		};
+	// Get lifting order entries from hub (includes spacers and resolved athlete payloads)
+	// fall back to raw liftingOrderAthletes/liftingOrderKeys if hub normalization not available
+	let liftingOrderEntries = [];
+	try {
+		liftingOrderEntries = competitionHub.getLiftingOrderEntries(fopName, { includeSpacers: true }) || [];
+	} catch (err) {
+		liftingOrderEntries = [];
 	}
 
-	// Get session status early (before cache check, so it's always fresh)
-	const sessionStatus = competitionHub.getSessionStatus(fopName);
-
+	// Backwards compatibility: if hub returned nothing, try raw fields from update
+	if ((!Array.isArray(liftingOrderEntries) || liftingOrderEntries.length === 0) && fopUpdate) {
+		let raw = fopUpdate?.liftingOrderAthletes ?? fopUpdate?.liftingOrderKeys ?? [];
+		if (typeof raw === 'string') {
+			try { raw = JSON.parse(raw); } catch (e) { raw = []; }
+		}
+		if (Array.isArray(raw) && raw.length > 0) {
+			// Normalize legacy array into entry objects: strings/numbers -> { athleteKey }
+			liftingOrderEntries = raw.map(e => {
+				if (!e) return { isSpacer: true };
+				if (typeof e === 'object' && (e.isSpacer || e.type === 'spacer')) return { isSpacer: true };
+				if (typeof e === 'string' || typeof e === 'number') return { athleteKey: e };
+				if (e.athlete || e.athleteKey || e.key) return { athlete: e.athlete || null, athleteKey: e.athleteKey || e.key || null, classname: e.classname || e.className || '' };
+				return { entry: e };
+			});
+		}
+	}
+	const records = extractRecordsFromUpdate(fopUpdate);
+	const decision = extractDecisionState(fopUpdate);
+	
 	// Check cache first - cache key based on the last update timestamp from the Hub.
 	// This ensures all clients see the same data for a given update, 
 	// and invalidation is instant when a new update arrives.
 	const lastUpdate = fopUpdate?.lastDataUpdate || 0;
 	const cacheKey = `${fopName}-${lastUpdate}-${JSON.stringify(options)}`;
 	
+	// Extract current athlete from liftingOrderAthletes (has classname="current" or "current blink")
+	let currentAttempt = null;
+	// Find current athlete from normalized entries (entry.athlete) or legacy array
+	let currentEntry = liftingOrderEntries.find(e => !e.isSpacer && ((e.classname && e.classname.includes('current')) || (e.athlete && e.athlete.classname && e.athlete.classname.includes('current'))));
+	if (!currentEntry && Array.isArray(liftingOrderEntries)) {
+		// fallback: find athlete object with classname
+		currentEntry = liftingOrderEntries.find(e => e && e.athlete && e.athlete.classname && e.athlete.classname.includes('current')) || null;
+	}
+	if (currentEntry && !currentAttempt) {
+		const athleteObj = currentEntry.athlete || currentEntry;
+		currentAttempt = {
+			fullName: athleteObj.fullName || `${athleteObj.firstName || ''} ${athleteObj.lastName || ''}`.trim(),
+			name: athleteObj.fullName || `${athleteObj.firstName || ''} ${athleteObj.lastName || ''}`.trim(),
+			teamName: athleteObj.teamName || athleteObj.team || null,
+			team: athleteObj.teamName || athleteObj.team || null,
+			flagUrl: getFlagUrl(athleteObj.teamName || athleteObj.team, true),
+			startNumber: athleteObj.startNumber,
+			categoryName: athleteObj.category || athleteObj.categoryName,
+			category: athleteObj.category || athleteObj.categoryName,
+			attempt: fopUpdate?.attempt || '',
+			attemptNumber: fopUpdate?.attemptNumber,
+			weight: fopUpdate?.weight || '-',
+			timeAllowed: fopUpdate?.timeAllowed,
+			startTime: null
+		};
+	}
+	
+	// Compute sessionStatusMessage from current fopUpdate
+	let sessionStatusMessage = null;
+	if (sessionStatus.isDone && fopUpdate?.fullName) {
+		sessionStatusMessage = (fopUpdate.fullName || '').replace(/&ndash;/g, '\u2013').replace(/&mdash;/g, '\u2014');
+	}
+
 	if (liftingOrderCache.has(cacheKey)) {
 		const cached = liftingOrderCache.get(cacheKey);
-		
-		// Compute sessionStatusMessage from current fopUpdate (even on cache hit)
-		let sessionStatusMessage = null;
-		if (sessionStatus.isDone && fopUpdate?.fullName) {
-			sessionStatusMessage = (fopUpdate.fullName || '').replace(/&ndash;/g, '–').replace(/&mdash;/g, '—');
-		}
-		
-		// Return cached data with current timer state, decision state, session status, and status message
 		return {
 			...cached,
-			timer: extractTimerState(fopUpdate, fopName),
-			decision: extractDecisionState(fopUpdate),
-			sessionStatus,  // Fresh session status
-			sessionStatusMessage,  // Fresh status message
+			timer,
+			decision,
+			sessionStatus,
+			sessionStatusMessage,
 			learningMode
 		};
 	}
 
-	// Extract basic competition info
-	const competition = {
-		name: fopUpdate?.competitionName || databaseState?.competition?.name || 'Competition',
-		fop: fopName,
-		state: fopUpdate?.fopState || 'INACTIVE',
-		session: fopUpdate?.groupName || 'A',
-		// Replace HTML entities with Unicode characters
-		groupInfo: (fopUpdate?.groupInfo || '').replace(/&ndash;/g, '–').replace(/&mdash;/g, '—'),
-		liftsDone: fopUpdate?.liftsDone || ''  // Pre-formatted string from OWLCMS
-	};
-
-	// Extract current athlete info from UPDATE message
-	let currentAttempt = null;
-	let sessionStatusMessage = null;  // For displaying when session is done
-	
-	if (fopUpdate?.fullName) {
-		// Clean up HTML entities in fullName (OWLCMS sends session status here when done)
-		const cleanFullName = (fopUpdate.fullName || '').replace(/&ndash;/g, '–').replace(/&mdash;/g, '—');
-		
-		currentAttempt = {
-			fullName: cleanFullName,
-			name: cleanFullName,
-			teamName: fopUpdate.teamName,
-			team: fopUpdate.teamName,
-			flagUrl: getFlagUrl(fopUpdate.teamName),
-			startNumber: fopUpdate.startNumber,
-			categoryName: fopUpdate.categoryName,
-			category: fopUpdate.categoryName,
-			attempt: fopUpdate.attempt,
-			attemptNumber: fopUpdate.attemptNumber,
-			weight: fopUpdate.weight,
-			timeAllowed: fopUpdate.timeAllowed,
-			startTime: fopUpdate.athleteTimerEventType === 'Start' ? Date.now() - (fopUpdate.timeAllowed - (fopUpdate.athleteMillisRemaining || 0)) : null
-		};
-		
-		// If session is done, save the cleaned message separately
-		if (sessionStatus.isDone) {
-			sessionStatusMessage = cleanFullName;
-		}
-	}
-
-	// Extract timer info from UPDATE message or keep previous timer state
-	// Extract timer state and decision state
-	const timer = extractTimerState(fopUpdate, fopName);
-	const decision = extractDecisionState(fopUpdate);
-
-	// Extract records from UPDATE message (shared extractor)
-	const records = extractRecordsFromUpdate(fopUpdate);
-
-	// Get precomputed liftingOrderAthletes from UPDATE message (already parsed as nested object)
-	let liftingOrderAthletes = [];
-	if (fopUpdate?.liftingOrderAthletes) {
-		liftingOrderAthletes = fopUpdate.liftingOrderAthletes.map(athlete => ({
-			...athlete,
-			flagUrl: getFlagUrl(athlete.teamName)
-		}));
-	}
-
-	// Get precomputed groupAthletes from UPDATE message (already parsed as nested object)
-	let groupAthletes = [];
-	if (fopUpdate?.groupAthletes) {
-		groupAthletes = fopUpdate.groupAthletes;
-	}
-	
-	// Get top athletes for leaderboard (from database state if needed for custom sorting)
-	const rankings = getTopAthletes(databaseState, 10);
-	
-	// Get competition stats
+	// Get competition stats (needed even for waiting status)
 	const stats = getCompetitionStats(databaseState);
 
-	
 	// Extract leaders from fopUpdate (now a proper JSON array from OWLCMS)
-	// KEEP spacers (isSpacer flag) so we can count rows and render category separators
+	// Keep OWLCMS spacers (isSpacer flag) for accurate grid row counting
 	let leaders = [];
 	if (fopUpdate?.leaders && Array.isArray(fopUpdate.leaders)) {
-		leaders = fopUpdate.leaders.map(leader => ({
-			...leader,
-			flagUrl: leader.teamName ? getFlagUrl(leader.teamName) : null
-		}));
+		leaders = fopUpdate.leaders
+			.map(leader => {
+				if (!leader) return null;
+				if (leader.isSpacer) {
+					return { isSpacer: true };
+				}
+				// V2 format: { athlete: {...}, displayInfo: {...} }
+				if (leader.athlete && leader.displayInfo) {
+					const flat = {
+						...leader.athlete,
+						...leader.displayInfo
+					};
+					flat.athlete = leader.athlete;
+					flat.displayInfo = leader.displayInfo;
+					flat.athleteKey = leader.athlete?.key ?? leader.athlete?.id ?? flat.athleteKey ?? null;
+					flat.flagUrl = flat.teamName ? getFlagUrl(flat.teamName, true) : null;
+					
+					// Ensure sattempts/cattempts arrays have 3 elements (same as sessionAthletes)
+					let sattempts = Array.isArray(flat.sattempts) ? [...flat.sattempts] : [];
+					let cattempts = Array.isArray(flat.cattempts) ? [...flat.cattempts] : [];
+					while (sattempts.length < 3) sattempts.push(null);
+					while (cattempts.length < 3) cattempts.push(null);
+					flat.sattempts = sattempts;
+					flat.cattempts = cattempts;
+					
+					return flat;
+				}
+
+				return {
+					...leader,
+					flagUrl: leader.teamName ? getFlagUrl(leader.teamName, true) : null
+				};
+			})
+			.filter(Boolean);
 	}
+	
+	// If no session athletes available, return waiting status
+	// We need the UPDATE message from OWLCMS with precomputed presentation data (stored in liftingOrderAthletes key)
+	if (liftingOrderEntries.length === 0) {
+		return {
+			competition,
+			currentAttempt,
+			timer,
+			decision,
+			records,
+			sessionStatus,  // Include session status even in waiting state
+			sessionStatusMessage,  // Include status message
+			liftingOrderAthletes: [],
+			startOrderAthletes: [],
+			stats,
+			status: 'waiting',
+			message: 'Waiting for competition update from OWLCMS...',
+			lastUpdate: fopUpdate?.lastUpdate || Date.now(),
+			learningMode,
+			options: { showRecords },
+			resultRows: 0,  // No athletes yet
+			leaderRows: 0   // No leaders yet
+		};
+	}
+	
+	// For lifting order, we use liftingOrderAthletes (lifting order: next lifter first)
+	// liftingOrderAthletes is already sorted by lifting order from OWLCMS
+	// The hub has already flattened session athletes with:
+	// - fullName, teamName, category, yearOfBirth computed
+	// - sattempts/cattempts normalized to { stringValue, liftStatus } format
+	// - bestSnatch, bestCleanJerk computed
+	// Just add flagUrl and ensure arrays have 3 elements
+	const athletesWithFlags = (Array.isArray(liftingOrderEntries) ? liftingOrderEntries : []).map(entry => {
+		if (!entry || entry.isSpacer) return { isSpacer: true };
+		
+		// Entry is now a flat athlete object from the hub's _flattenSessionAthletes
+		const classname = entry.classname || '';
+		
+		// Ensure sattempts/cattempts arrays have 3 elements
+		let sattempts = Array.isArray(entry.sattempts) ? [...entry.sattempts] : [];
+		let cattempts = Array.isArray(entry.cattempts) ? [...entry.cattempts] : [];
+		while (sattempts.length < 3) sattempts.push(null);
+		while (cattempts.length < 3) cattempts.push(null);
+		
+		return {
+			...entry,
+			classname,
+			sattempts,
+			cattempts,
+			flagUrl: getFlagUrl(entry.teamName, true)
+		};
+	});
+
+	// Determine status and message
+	const hasData = !!(fopUpdate || databaseState);
+	const status = hasData ? 'ready' : 'waiting';
+	const message = hasData ? null : `⏳ Waiting for competition data for platform "${fopName}"...`;
 	
 	// Calculate max team name length (for responsive layout)
 	// Narrow team column if longest team name is short (< 7 characters)
-	const maxTeamNameLength = Math.max(0, ...liftingOrderAthletes
+	const maxTeamNameLength = Math.max(0, ...athletesWithFlags
+		.filter(athlete => !athlete.isSpacer)
 		.map(athlete => (athlete.teamName || '').length)
 	);
 	const compactTeamColumn = maxTeamNameLength < 7; // Narrow team column if max name length < 7
-	
-	// Build grid-template-rows for a single-grid layout (headers are defined in CSS)
-	// Count session result rows (athletes + any spacers present)
-	let resultRows = 0;
-	for (const a of liftingOrderAthletes) {
-		resultRows += 1; // each entry is a row; OWLCMS may include spacers as {isSpacer:true}
-	}
 
-	// Count leader rows: 1 for the title row + each leader row + spacers
-	let leaderRows = 0;
-	if (leaders && leaders.length > 0) {
-		leaderRows = 1; // leaders title row
-		for (const l of leaders) {
-			leaderRows += 1; // each leader and spacer occupies one row
+	// Pre-calculate grid-template-rows with repeats for each section
+	// Header: 2 rows (primary + secondary)
+	const headerRows = 2;
+	
+	// Results: count all athlete/spacer rows in the session
+	let resultRows = 0;
+	let lastCategory = null;
+	for (const athlete of athletesWithFlags) {
+		if (athlete.isSpacer) {
+			resultRows++; // Spacer row (initial spacer or category separator)
+		} else {
+			resultRows++; // Athlete row
+			lastCategory = athlete.category;
 		}
 	}
-
-	// IMPORTANT: Header rows are defined in CSS, so only return rows AFTER the two header rows
+	
+	// Leaders: count leader rows (include spacers, title, and data rows)
+	let leaderRows = 0;
+	if (leaders && leaders.length > 0) {
+		leaderRows++; // Title row (leaders-header with leaders-title-cell)
+		let lastLeaderCategory = null;
+		for (const leader of leaders) {
+			if (leader.isSpacer) {
+				leaderRows++; // Spacer row
+			} else {
+				// Category spacer before first leader of new category
+				if (leader.category !== lastLeaderCategory && lastLeaderCategory !== null) {
+					leaderRows++; // Category separator
+				}
+				leaderRows++; // Leader row
+				lastLeaderCategory = leader.category;
+			}
+		}
+	}
+	
+	// Build grid-template-rows string with repeats
+	// IMPORTANT: Header rows are now defined in CSS using
+	//   grid-template-rows: var(--header-primary-height) var(--header-secondary-height) var(--template-rows)
+	// Therefore, DO NOT include header rows here; only include rows after headers.
+	// Format produced here (consumed as --template-rows):
+	//   "repeat(resultRows, minmax(10px, auto)) 1fr repeat(leaderRows, minmax(10px, auto))"
+	// Results: athlete rows + category spacers (NOT including the final spacer after last athlete)
+	// Leaders-spacer: 1fr (elastic spacing between results and leaders title)
+	// Leaders: title + athlete rows + category spacers
 	const gridTemplateRows = leaders && leaders.length > 0
 		? `repeat(${resultRows}, minmax(10px, auto)) 1fr repeat(${leaderRows}, minmax(10px, auto))`
 		: `repeat(${resultRows}, minmax(10px, auto))`;
+
 
 	const result = {
 		scoreboardName: 'Lifting Order',  // Scoreboard display name
 		competition,
 		currentAttempt,
 		timer,
-		decision,  // Decision state (lights, down signal)
+		decision,
 		sessionStatusMessage,  // Cleaned message for when session is done
-		sortedAthletes: liftingOrderAthletes, // Standardized field name (lifting order)
-		liftingOrderAthletes, // Keep for backwards compatibility
-		groupAthletes,         // Precomputed from OWLCMS UPDATE
-		leaders,               // Leaders from previous sessions (from OWLCMS)
-		rankings,              // Computed from database
-		records,               // Records from current session UPDATE
+		sortedAthletes: athletesWithFlags,        // Standardized field name (lifting order)
+		liftingOrderAthletes: athletesWithFlags, // Keep for backwards compatibility
+		startOrderAthletes: athletesWithFlags,   // Also keep for compatibility
+		leaders,                              // Leaders from previous sessions (from OWLCMS)
 		stats,
-		gridTemplateRows,
-		resultRows,            // Expose row count for results section (for frontend overrides)
-		leaderRows,            // Expose row count for leaders section (for frontend overrides)
 		displaySettings: fopUpdate?.showTotalRank || fopUpdate?.showSinclair ? {
 			showTotalRank: fopUpdate.showTotalRank === 'true',
 			showSinclair: fopUpdate.showSinclair === 'true',
@@ -231,9 +314,14 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		} : {},
 		isBreak: fopUpdate?.break === 'true' || false,
 		breakType: fopUpdate?.breakType,
-		sessionStatus,  // Include session status (isDone, groupName, lastActivity)
+		sessionStatus,  // Include session status (isDone, sessionName, lastActivity)
 		compactTeamColumn,  // Narrow team column if max team size < 7
-		status: (fopUpdate || databaseState) ? 'ready' : 'waiting',
+		gridTemplateRows,  // Pre-calculated grid template with repeats
+		resultRows,        // Expose row count for results section (for frontend overrides)
+		leaderRows,        // Expose row count for leaders section (for frontend overrides)
+		records,           // Records from current session UPDATE
+		status,
+		message,  // Add helpful waiting message
 		lastUpdate: fopUpdate?.lastUpdate || Date.now(),
 		options: { showRecords } // Echo back the options used
 	};
@@ -245,25 +333,25 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		currentAttempt: result.currentAttempt,
 		sortedAthletes: result.sortedAthletes,
 		liftingOrderAthletes: result.liftingOrderAthletes,
-		groupAthletes: result.groupAthletes,
+		startOrderAthletes: result.startOrderAthletes,
 		leaders: result.leaders,  // Include leaders in cache
-		rankings: result.rankings,
 		records: result.records,   // Include records in cache
 		stats: result.stats,
-		gridTemplateRows: result.gridTemplateRows,
-		resultRows: result.resultRows,  // Include result row count
-		leaderRows: result.leaderRows,  // Include leader row count
 		displaySettings: result.displaySettings,
 		isBreak: result.isBreak,
 		breakType: result.breakType,
 		status: result.status,
+		message: result.message,  // Include waiting message in cache
 		compactTeamColumn: result.compactTeamColumn,  // Include responsive layout flag
+		gridTemplateRows: result.gridTemplateRows,  // Include pre-calculated grid template
+		resultRows: result.resultRows,  // Include result row count
+		leaderRows: result.leaderRows,  // Include leader row count
 		lastUpdate: result.lastUpdate,
 		options: result.options
 	});
 	
-	// Cleanup old cache entries (keep last 3 - reduces memory footprint with multiple FOPs)
-	if (liftingOrderCache.size > 3) {
+	// Cleanup old cache entries (keep last 20)
+	if (liftingOrderCache.size > 20) {
 		const firstKey = liftingOrderCache.keys().next().value;
 		liftingOrderCache.delete(firstKey);
 	}
@@ -277,17 +365,12 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 
 /**
  * Extract timer state from FOP update (called separately since timer changes frequently)
- * @param {Object} fopUpdate - FOP update data
- * @returns {Object} Timer state
- */
-/**
- * Extract timer state from FOP update (called separately since timer changes frequently)
  * Timer visibility rules (same as session-results):
  * - Show when SetTime or StartTime is received
- * - Timer stays visible even after StopTime (until decision shown)
+ * - Hide ONLY when StopTime is received while timer is running
+ * - SetTime after StopTime makes timer visible again
  * - On page load, initialize from current timer event type
  * @param {Object} fopUpdate - FOP update data
- * @param {string} fopName - FOP name for state tracking
  * @returns {Object} Timer state with isActive flag
  */
 function extractTimerState(fopUpdate, fopName = 'A') {
@@ -322,7 +405,7 @@ function extractTimerState(fopUpdate, fopName = 'A') {
 	}
 
 	// State machine for timer visibility and running state
-	// For lifting order scoreboard: timer stays visible until decision is shown
+	// For session scoreboard: timer stays visible until decision is shown
 	if (eventType === 'SetTime') {
 		active = true;
 		running = false;
@@ -354,11 +437,6 @@ function extractTimerState(fopUpdate, fopName = 'A') {
 	};
 }
 
-/**
- * Extract decision state from FOP update
- * @param {Object} fopUpdate - FOP update data
- * @returns {Object} Decision state with visibility and referee decisions
- */
 function extractDecisionState(fopUpdate) {
 	// Clear decisions when timer starts (new lift beginning)
 	const eventType = fopUpdate?.athleteTimerEventType;
@@ -501,7 +579,3 @@ export function getCompetitionStats(competitionState = null) {
 		averageTotal: athletes.filter(a => a.total > 0).reduce((sum, a, _, arr) => sum + a.total / arr.length, 0) || 0
 	};
 }
-
-// NOTE: records extraction is handled by shared module at
-// `src/lib/server/records-extractor.js` and imported above. This ensures
-// `lifting-order` and `session-results` use identical parsing and normalization.

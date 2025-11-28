@@ -144,10 +144,39 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	let leaders = [];
 	if (fopUpdate?.leaders && Array.isArray(fopUpdate.leaders)) {
 		leaders = fopUpdate.leaders
-			.map(leader => ({
-				...leader,
-				flagUrl: leader.teamName ? getFlagUrl(leader.teamName, true) : null
-			}));
+			.map(leader => {
+				if (!leader) return null;
+				if (leader.isSpacer) {
+					return { isSpacer: true };
+				}
+				// V2 format: { athlete: {...}, displayInfo: {...} }
+				if (leader.athlete && leader.displayInfo) {
+					const flat = {
+						...leader.athlete,
+						...leader.displayInfo
+					};
+					flat.athlete = leader.athlete;
+					flat.displayInfo = leader.displayInfo;
+					flat.athleteKey = leader.athlete?.key ?? leader.athlete?.id ?? flat.athleteKey ?? null;
+					flat.flagUrl = flat.teamName ? getFlagUrl(flat.teamName, true) : null;
+					
+					// Ensure sattempts/cattempts arrays have 3 elements (same as sessionAthletes)
+					let sattempts = Array.isArray(flat.sattempts) ? [...flat.sattempts] : [];
+					let cattempts = Array.isArray(flat.cattempts) ? [...flat.cattempts] : [];
+					while (sattempts.length < 3) sattempts.push(null);
+					while (cattempts.length < 3) cattempts.push(null);
+					flat.sattempts = sattempts;
+					flat.cattempts = cattempts;
+					
+					return flat;
+				}
+
+				return {
+					...leader,
+					flagUrl: leader.teamName ? getFlagUrl(leader.teamName, true) : null
+				};
+			})
+			.filter(Boolean);
 	}
 	
 	// If no session athletes available, return waiting status

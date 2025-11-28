@@ -1,22 +1,20 @@
 /**
  * Server-side scoreboard helpers - Rankings scoreboard
- * Shows current session athletes sorted by total (highest first)
+ * Shows current session athletes sorted by rank (category + totalRank or snatchRank)
  */
 
 import { competitionHub } from '$lib/server/competition-hub.js';
+import { extractRecordsFromUpdate } from '$lib/server/records-extractor.js';
 import { getFlagUrl } from '$lib/server/flag-resolver.js';
+
+// Track timer visibility state per FOP so StopTime events behave like SetTime when clock is idle
+const timerStateMap = new Map();
 
 /**
  * Plugin-specific cache to avoid recomputing rankings on every browser request
- * Structure: { 'cacheKey': { competition, currentAttempt, rankedAthletes, ... } }
+ * Structure: { 'cacheKey': { competition, rankedAthletes, ... } }
  */
 const rankingsCache = new Map();
-
-/**
- * Per-FOP timer state tracking (persistent across requests)
- * Structure: { 'fopName': { active: boolean|null, running: boolean } }
- */
-const timerStateMap = new Map();
 
 /**
  * Get the full database state (raw athlete data) - SERVER-SIDE ONLY
@@ -37,6 +35,7 @@ export function getFopUpdate(fopName = 'A') {
 
 /**
  * Get formatted scoreboard data for SSR/API (SERVER-SIDE ONLY)
+ * Uses session athletes sorted by rank (category + totalRank or snatchRank)
  * @param {string} fopName - FOP name (default: 'A')
  * @param {Object} options - User preferences (e.g., { showRecords: true })
  * @returns {Object} Formatted data ready for browser consumption
@@ -44,109 +43,66 @@ export function getFopUpdate(fopName = 'A') {
 export function getScoreboardData(fopName = 'A', options = {}) {
 	const fopUpdate = getFopUpdate(fopName);
 	const databaseState = getDatabaseState();
-	
-	// Extract options with defaults
-	const showRecords = options.showRecords ?? false;
-	
-	// Get learning mode from environment
+	const showRecords = options.showRecords ?? true;
 	const learningMode = process.env.LEARNING_MODE === 'true' ? 'enabled' : 'disabled';
-	
-	if (!fopUpdate && !databaseState) {
-		return {
-			competition: { name: 'No Competition Data', fop: 'unknown' },
-			currentAttempt: null,
-			timer: { state: 'stopped', timeRemaining: 0, isActive: false },
-			decision: { visible: false, isSingleReferee: false, ref1: null, ref2: null, ref3: null, down: false },
-			sessionStatus: { isDone: false, sessionName: '', lastActivity: 0 },
-			rankedAthletes: [],
-			groupAthletes: [],
-			stats: { totalAthletes: 0, activeAthletes: 0, completedAthletes: 0, categories: [], teams: [] },
-			status: 'waiting',
-			learningMode
-		};
-	}
-
-	// Get session status early (before cache check, so it's always fresh)
 	const sessionStatus = competitionHub.getSessionStatus(fopName);
-
-	// Check cache first - cache key based on the last update timestamp from the Hub.
-	// This ensures all clients see the same data for a given update, 
-	// and invalidation is instant when a new update arrives.
-	const lastUpdate = fopUpdate?.lastDataUpdate || 0;
-	const cacheKey = `${fopName}-${lastUpdate}-${JSON.stringify(options)}`;
-	
-	if (rankingsCache.has(cacheKey)) {
-		const cached = rankingsCache.get(cacheKey);
-		
-		// Extract current athlete from groupAthletes (single source of truth)
-		let currentAttempt = null;
-		const groupAthletes = fopUpdate?.groupAthletes || [];
-		const currentAthlete = groupAthletes.find(a => a.classname && a.classname.includes('current'));
-		if (currentAthlete) {
-			currentAttempt = {
-				fullName: currentAthlete.fullName,
-				name: currentAthlete.fullName,
-				teamName: currentAthlete.teamName,
-				team: currentAthlete.teamName,
-				startNumber: currentAthlete.startNumber,
-				categoryName: currentAthlete.category,
-				category: currentAthlete.category,
-				attempt: fopUpdate?.attempt || '',
-				attemptNumber: fopUpdate?.attemptNumber,
-				weight: fopUpdate?.weight || '-',
-				timeAllowed: fopUpdate?.timeAllowed,
-				startTime: null
-			};
-		}
-		
-		// Compute sessionStatusMessage from current fopUpdate (even on cache hit)
-		let sessionStatusMessage = null;
-		if (sessionStatus.isDone && fopUpdate?.fullName) {
-			sessionStatusMessage = (fopUpdate.fullName || '').replace(/&ndash;/g, '–').replace(/&mdash;/g, '—');
-		}
-		
-		// Return cached data with current athlete, timer state, decision state, session status, and status message
-		return {
-			...cached,
-			currentAttempt,
-			timer: extractTimerState(fopUpdate, fopName),
-			decision: extractDecisionState(fopUpdate),
-			sessionStatus,
-			sessionStatusMessage,
-			learningMode
-		};
-	}
-
-	// Extract basic competition info
+	const timer = extractTimerState(fopUpdate, fopName);
 	const competition = {
 		name: fopUpdate?.competitionName || databaseState?.competition?.name || 'Competition',
 		fop: fopName,
 		state: fopUpdate?.fopState || 'INACTIVE',
 		session: fopUpdate?.sessionName || 'A',
-		groupInfo: (fopUpdate?.groupInfo || '').replace(/&ndash;/g, '–').replace(/&mdash;/g, '—'),
-		liftsDone: fopUpdate?.liftsDone || ''  // Pre-formatted string from OWLCMS
+		groupInfo: (fopUpdate?.groupInfo || '').replace(/&ndash;/g, '\u2013').replace(/&mdash;/g, '\u2014'),
+		liftsDone: fopUpdate?.liftsDone || ''
 	};
-
-	// Get groupAthletes from UPDATE message (already parsed as nested object)
-	let groupAthletes = [];
-	if (fopUpdate?.groupAthletes) {
-		// Filter out any spacers that OWLCMS might have included
-		groupAthletes = fopUpdate.groupAthletes.filter(a => !a.isSpacer);
+	
+	// Get session athletes from hub (includes spacers and resolved athlete payloads)
+	// Rankings uses start order as base, then re-sorts by rank
+	let sessionEntries = [];
+	try {
+		sessionEntries = competitionHub.getStartOrderEntries(fopName, { includeSpacers: false }) || [];
+	} catch (err) {
+		sessionEntries = [];
 	}
 
-	// Extract current athlete from groupAthletes
+	// Backwards compatibility: if hub returned nothing, try raw fields from update
+	if ((!Array.isArray(sessionEntries) || sessionEntries.length === 0) && fopUpdate) {
+		let raw = fopUpdate?.startOrderAthletes ?? fopUpdate?.groupAthletes ?? fopUpdate?.sessionAthletes ?? [];
+		if (typeof raw === 'string') {
+			try { raw = JSON.parse(raw); } catch (e) { raw = []; }
+		}
+		if (Array.isArray(raw) && raw.length > 0) {
+			// Normalize legacy array into entry objects
+			sessionEntries = raw.map(e => {
+				if (!e) return null;
+				if (typeof e === 'object' && (e.isSpacer || e.type === 'spacer')) return null; // Skip spacers
+				if (e.athlete || e.athleteKey || e.key) return { athlete: e.athlete || null, athleteKey: e.athleteKey || e.key || null, classname: e.classname || e.className || '', ...e };
+				return e;
+			}).filter(Boolean);
+		}
+	}
+	
+	const records = extractRecordsFromUpdate(fopUpdate);
+	const decision = extractDecisionState(fopUpdate);
+	
+	// Check cache first - cache key based on the last update timestamp from the Hub.
+	const lastUpdate = fopUpdate?.lastDataUpdate || 0;
+	const cacheKey = `${fopName}-${lastUpdate}-${JSON.stringify(options)}`;
+	
+	// Extract current athlete from session entries (has classname="current" or "current blink")
 	let currentAttempt = null;
-	const currentAthlete = groupAthletes.find(a => a.classname && a.classname.includes('current'));
-	if (currentAthlete) {
+	let currentEntry = sessionEntries.find(e => e && ((e.classname && e.classname.includes('current')) || (e.athlete && e.athlete.classname && e.athlete.classname.includes('current'))));
+	if (currentEntry) {
+		const athleteObj = currentEntry.athlete || currentEntry;
 		currentAttempt = {
-			fullName: currentAthlete.fullName,
-			name: currentAthlete.fullName,
-			teamName: currentAthlete.teamName,
-			team: currentAthlete.teamName,
-			flagUrl: getFlagUrl(currentAthlete.teamName),
-			startNumber: currentAthlete.startNumber,
-			categoryName: currentAthlete.category,
-			category: currentAthlete.category,
+			fullName: athleteObj.fullName || `${athleteObj.firstName || ''} ${athleteObj.lastName || ''}`.trim(),
+			name: athleteObj.fullName || `${athleteObj.firstName || ''} ${athleteObj.lastName || ''}`.trim(),
+			teamName: athleteObj.teamName || athleteObj.team || null,
+			team: athleteObj.teamName || athleteObj.team || null,
+			flagUrl: getFlagUrl(athleteObj.teamName || athleteObj.team, true),
+			startNumber: athleteObj.startNumber,
+			categoryName: athleteObj.category || athleteObj.categoryName,
+			category: athleteObj.category || athleteObj.categoryName,
 			attempt: fopUpdate?.attempt || '',
 			attemptNumber: fopUpdate?.attemptNumber,
 			weight: fopUpdate?.weight || '-',
@@ -154,45 +110,122 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			startTime: null
 		};
 	}
-
-	// Get competition stats
-	const stats = getCompetitionStats(databaseState);
 	
 	// Compute sessionStatusMessage from current fopUpdate
 	let sessionStatusMessage = null;
 	if (sessionStatus.isDone && fopUpdate?.fullName) {
-		sessionStatusMessage = (fopUpdate.fullName || '').replace(/&ndash;/g, '–').replace(/&mdash;/g, '—');
+		sessionStatusMessage = (fopUpdate.fullName || '').replace(/&ndash;/g, '\u2013').replace(/&mdash;/g, '\u2014');
+	}
+
+	if (rankingsCache.has(cacheKey)) {
+		const cached = rankingsCache.get(cacheKey);
+		return {
+			...cached,
+			currentAttempt,
+			timer,
+			decision,
+			sessionStatus,
+			sessionStatusMessage,
+			learningMode
+		};
+	}
+
+	// Get competition stats (needed even for waiting status)
+	const stats = getCompetitionStats(databaseState);
+
+	// Extract leaders from fopUpdate (V2 format: { athlete: {...}, displayInfo: {...} })
+	let leaders = [];
+	if (fopUpdate?.leaders && Array.isArray(fopUpdate.leaders)) {
+		leaders = fopUpdate.leaders
+			.map(leader => {
+				if (!leader) return null;
+				if (leader.isSpacer) {
+					return { isSpacer: true };
+				}
+				// V2 format: { athlete: {...}, displayInfo: {...} }
+				if (leader.athlete && leader.displayInfo) {
+					const flat = {
+						...leader.athlete,
+						...leader.displayInfo
+					};
+					flat.athlete = leader.athlete;
+					flat.displayInfo = leader.displayInfo;
+					flat.athleteKey = leader.athlete?.key ?? leader.athlete?.id ?? flat.athleteKey ?? null;
+					flat.flagUrl = flat.teamName ? getFlagUrl(flat.teamName, true) : null;
+					
+					// Ensure sattempts/cattempts arrays have 3 elements
+					let sattempts = Array.isArray(flat.sattempts) ? [...flat.sattempts] : [];
+					let cattempts = Array.isArray(flat.cattempts) ? [...flat.cattempts] : [];
+					while (sattempts.length < 3) sattempts.push(null);
+					while (cattempts.length < 3) cattempts.push(null);
+					flat.sattempts = sattempts;
+					flat.cattempts = cattempts;
+					
+					return flat;
+				}
+
+				return {
+					...leader,
+					flagUrl: leader.teamName ? getFlagUrl(leader.teamName, true) : null
+				};
+			})
+			.filter(Boolean);
 	}
 	
 	// If no session athletes available, return waiting status
-	if (groupAthletes.length === 0) {
+	if (sessionEntries.length === 0) {
 		return {
 			competition,
 			currentAttempt,
-			timer: extractTimerState(fopUpdate, fopName),
-			decision: extractDecisionState(fopUpdate),
+			timer,
+			decision,
+			records,
 			sessionStatus,
 			sessionStatusMessage,
 			rankedAthletes: [],
-			groupAthletes: [],
+			sortedAthletes: [],
+			leaders,
 			stats,
 			status: 'waiting',
 			message: 'Waiting for competition update from OWLCMS...',
 			lastUpdate: fopUpdate?.lastUpdate || Date.now(),
 			learningMode,
-			options: { showRecords }
+			options: { showRecords },
+			resultRows: 0,
+			leaderRows: 0
 		};
 	}
 	
+	// Process session athletes - add flagUrl and ensure arrays have 3 elements
+	const athletesWithFlags = sessionEntries.map(entry => {
+		if (!entry) return null;
+		
+		const classname = entry.classname || '';
+		
+		// Ensure sattempts/cattempts arrays have 3 elements
+		let sattempts = Array.isArray(entry.sattempts) ? [...entry.sattempts] : [];
+		let cattempts = Array.isArray(entry.cattempts) ? [...entry.cattempts] : [];
+		while (sattempts.length < 3) sattempts.push(null);
+		while (cattempts.length < 3) cattempts.push(null);
+		
+		return {
+			...entry,
+			classname,
+			sattempts,
+			cattempts,
+			flagUrl: getFlagUrl(entry.teamName, true)
+		};
+	}).filter(Boolean);
+	
 	// Determine competition phase: has C&J started?
 	// If ANY athlete has a bestCleanJerk that's not "-", C&J has started
-	const cjStarted = groupAthletes.some(a => a.bestCleanJerk && a.bestCleanJerk !== '-');
+	const cjStarted = athletesWithFlags.some(a => a.bestCleanJerk && a.bestCleanJerk !== '-');
 	
 	// Sort athletes based on competition phase
 	let rankedAthletes;
 	if (cjStarted) {
 		// C&J has started: sort by category, then by totalRank
-		rankedAthletes = [...groupAthletes].sort((a, b) => {
+		rankedAthletes = [...athletesWithFlags].sort((a, b) => {
 			// First sort by category
 			const catA = a.category || '';
 			const catB = b.category || '';
@@ -207,7 +240,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		});
 	} else {
 		// C&J not started yet: sort by category, then by snatchRank
-		rankedAthletes = [...groupAthletes].sort((a, b) => {
+		rankedAthletes = [...athletesWithFlags].sort((a, b) => {
 			// First sort by category
 			const catA = a.category || '';
 			const catB = b.category || '';
@@ -223,30 +256,22 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	}
 	
 	// Insert spacers between categories if there are multiple categories
-	const categories = [...new Set(groupAthletes.map(a => a.category).filter(Boolean))];
+	const categories = [...new Set(athletesWithFlags.map(a => a.category).filter(Boolean))];
 	if (categories.length > 1) {
 		const athletesWithSpacers = [];
-		let lastCategory = ''; // Start with empty string instead of null to avoid false match
+		let lastCategory = '';
 		
 		rankedAthletes.forEach(athlete => {
-			// Add spacer before new category (including first for visual consistency)
+			// Add spacer before new category
 			if (athlete.category && athlete.category !== lastCategory) {
-				athletesWithSpacers.push({ 
-					isSpacer: true,
-					displayRank: '',
-					startNumber: '',
-					fullName: '',
-					teamName: '',
-					category: ''
-				});
+				athletesWithSpacers.push({ isSpacer: true });
 			}
-			// Add display rank and flag URL to athlete (use appropriate rank based on competition phase)
+			// Add display rank to athlete (use appropriate rank based on competition phase)
 			const athleteWithDisplay = {
 				...athlete,
 				displayRank: cjStarted 
 					? (athlete.totalRank !== '-' ? athlete.totalRank : '-')
-					: (athlete.snatchRank !== '-' ? athlete.snatchRank : '-'),
-				flagUrl: getFlagUrl(athlete.teamName)
+					: (athlete.snatchRank !== '-' ? athlete.snatchRank : '-')
 			};
 			athletesWithSpacers.push(athleteWithDisplay);
 			lastCategory = athlete.category;
@@ -254,77 +279,66 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		
 		rankedAthletes = athletesWithSpacers;
 	} else {
-		// Single category - just add displayRank and flagUrl to each athlete
+		// Single category - just add displayRank to each athlete
 		rankedAthletes = rankedAthletes.map(athlete => ({
 			...athlete,
 			displayRank: cjStarted 
 				? (athlete.totalRank !== '-' ? athlete.totalRank : '-')
-				: (athlete.snatchRank !== '-' ? athlete.snatchRank : '-'),
-			flagUrl: getFlagUrl(athlete.teamName)
+				: (athlete.snatchRank !== '-' ? athlete.snatchRank : '-')
 		}));
 	}
 
-	// Extract timer and decision state
-	const timer = extractTimerState(fopUpdate, fopName);
-	const decision = extractDecisionState(fopUpdate);
-
-	
-	// Extract leaders from fopUpdate (now a proper JSON array from OWLCMS)
-	// Filter out OWLCMS spacers (isSpacer flag)
-	let leaders = [];
-	if (fopUpdate?.leaders && Array.isArray(fopUpdate.leaders)) {
-		leaders = fopUpdate.leaders
-			.filter(leader => !leader.isSpacer)
-			.map(leader => ({
-				...leader,
-				flagUrl: leader.teamName ? getFlagUrl(leader.teamName) : null
-			}));
-	}
+	// Determine status and message
+	const hasData = !!(fopUpdate || databaseState);
+	const status = hasData ? 'ready' : 'waiting';
+	const message = hasData ? null : `⏳ Waiting for competition data for platform "${fopName}"...`;
 	
 	// Calculate max team name length (for responsive layout)
-	// Narrow team column if longest team name is short (< 7 characters)
 	const maxTeamNameLength = Math.max(0, ...rankedAthletes
 		.filter(athlete => !athlete.isSpacer)
 		.map(athlete => (athlete.teamName || '').length)
 	);
-	const compactTeamColumn = maxTeamNameLength < 7; // Narrow team column if max name length < 7
+	const compactTeamColumn = maxTeamNameLength < 7;
 
-	// Calculate grid-template-rows: count all athlete/spacer rows + leaders section rows
-	// Pattern: repeat(resultRows, minmax(10px, auto)) [1fr] repeat(leaderRows, minmax(10px, auto))
-	// The 1fr elastic spacer is included if leaders exist
+	// Pre-calculate grid-template-rows with repeats for each section
 	let resultRows = 0;
 	for (const athlete of rankedAthletes) {
-		resultRows += 1; // Each athlete and spacer occupies one row
+		resultRows++;
 	}
-
+	
+	// Leaders: count leader rows (include spacers, title, and data rows)
 	let leaderRows = 0;
 	if (leaders && leaders.length > 0) {
-		leaderRows = 1; // leaders title row
-		for (const l of leaders) {
-			leaderRows += 1; // each leader and spacer occupies one row
+		leaderRows++; // Title row
+		let lastLeaderCategory = null;
+		for (const leader of leaders) {
+			if (leader.isSpacer) {
+				leaderRows++;
+			} else {
+				if (leader.category !== lastLeaderCategory && lastLeaderCategory !== null) {
+					leaderRows++;
+				}
+				leaderRows++;
+				lastLeaderCategory = leader.category;
+			}
 		}
 	}
-
-	// IMPORTANT: Header rows are defined in CSS, so only return rows AFTER the two header rows
+	
 	const gridTemplateRows = leaders && leaders.length > 0
 		? `repeat(${resultRows}, minmax(10px, auto)) 1fr repeat(${leaderRows}, minmax(10px, auto))`
 		: `repeat(${resultRows}, minmax(10px, auto))`;
-	
+
 	const result = {
-		scoreboardName: 'Rankings',  // Scoreboard display name
+		scoreboardName: 'Rankings',
 		competition,
 		currentAttempt,
 		timer,
 		decision,
 		sessionStatusMessage,
-		sortedAthletes: rankedAthletes,  // Standardized field name (sorted by category + rank)
-		rankedAthletes,  // Keep for backwards compatibility
-		groupAthletes,   // Original groupAthletes for reference
-		leaders,         // Leaders from previous sessions (from OWLCMS)
+		sortedAthletes: rankedAthletes,
+		rankedAthletes,
+		leaders,
 		stats,
-		gridTemplateRows,
-		resultRows,      // Expose row count for results section (for frontend overrides)
-		leaderRows,      // Expose row count for leaders section (for frontend overrides)
 		displaySettings: fopUpdate?.showTotalRank || fopUpdate?.showSinclair ? {
 			showTotalRank: fopUpdate.showTotalRank === 'true',
 			showSinclair: fopUpdate.showSinclair === 'true',
@@ -334,29 +348,35 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		isBreak: fopUpdate?.break === 'true' || false,
 		breakType: fopUpdate?.breakType,
 		sessionStatus,
-		compactTeamColumn,  // Narrow team column if max team size < 7
-		status: (fopUpdate || databaseState) ? 'ready' : 'waiting',
+		compactTeamColumn,
+		gridTemplateRows,
+		resultRows,
+		leaderRows,
+		records,
+		status,
+		message,
 		lastUpdate: fopUpdate?.lastUpdate || Date.now(),
 		options: { showRecords }
 	};
 	
-	// Cache the result (excluding timer, decision, learningMode, sessionStatus, currentAttempt, and sessionStatusMessage which change frequently)
+	// Cache the result
 	rankingsCache.set(cacheKey, {
 		scoreboardName: result.scoreboardName,
 		competition: result.competition,
 		sortedAthletes: result.sortedAthletes,
 		rankedAthletes: result.rankedAthletes,
-		groupAthletes: result.groupAthletes,
-		leaders: result.leaders,  // Include leaders in cache
+		leaders: result.leaders,
+		records: result.records,
 		stats: result.stats,
-		gridTemplateRows: result.gridTemplateRows,
-		resultRows: result.resultRows,  // Include result row count
-		leaderRows: result.leaderRows,  // Include leader row count
 		displaySettings: result.displaySettings,
 		isBreak: result.isBreak,
 		breakType: result.breakType,
 		status: result.status,
-		compactTeamColumn: result.compactTeamColumn,  // Include responsive layout flag
+		message: result.message,
+		compactTeamColumn: result.compactTeamColumn,
+		gridTemplateRows: result.gridTemplateRows,
+		resultRows: result.resultRows,
+		leaderRows: result.leaderRows,
 		lastUpdate: result.lastUpdate,
 		options: result.options
 	});
@@ -367,7 +387,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		rankingsCache.delete(firstKey);
 	}
 
- 	return {
+	return {
 		...result,
 		sessionStatus,
 		learningMode
@@ -375,14 +395,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 }
 
 /**
- * Extract timer state from FOP update (called separately since timer changes frequently)
- * Timer visibility rules (same as session-results):
- * - Show when SetTime or StartTime is received
- * - Timer stays visible even after StopTime (until decision shown)
- * - On page load, initialize from current timer event type
- * @param {Object} fopUpdate - FOP update data
- * @param {string} fopName - FOP name for state tracking
- * @returns {Object} Timer state with isActive flag
+ * Extract timer state from FOP update
  */
 function extractTimerState(fopUpdate, fopName = 'A') {
 	if (!timerStateMap.has(fopName)) {
@@ -395,7 +408,6 @@ function extractTimerState(fopUpdate, fopName = 'A') {
 	const eventType = fopUpdate?.athleteTimerEventType;
 	const timeRemaining = parseInt(fopUpdate?.athleteMillisRemaining || 0);
 
-	// Initialize state on first call from current fopUpdate data
 	if (active === null) {
 		if (eventType === 'StartTime') {
 			active = true;
@@ -415,8 +427,6 @@ function extractTimerState(fopUpdate, fopName = 'A') {
 		}
 	}
 
-	// State machine for timer visibility and running state
-	// For rankings scoreboard: timer stays visible until decision is shown
 	if (eventType === 'SetTime') {
 		active = true;
 		running = false;
@@ -424,8 +434,6 @@ function extractTimerState(fopUpdate, fopName = 'A') {
 		active = true;
 		running = true;
 	} else if (eventType === 'StopTime') {
-		// StopTime keeps timer visible (just stops counting)
-		// Decision display will hide it when referee decisions come
 		active = true;
 		running = false;
 	}
@@ -441,20 +449,14 @@ function extractTimerState(fopUpdate, fopName = 'A') {
 
 	return {
 		state,
-		isActive: active,  // Key flag: should timer be visible?
+		isActive: active,
 		timeRemaining,
 		duration: parseInt(fopUpdate?.timeAllowed || 60000),
 		startTime: null
 	};
 }
 
-/**
- * Extract decision state from FOP update
- * @param {Object} fopUpdate - FOP update data
- * @returns {Object} Decision state with visibility and referee decisions
- */
 function extractDecisionState(fopUpdate) {
-	// Clear decisions when timer starts (new lift beginning)
 	const eventType = fopUpdate?.athleteTimerEventType;
 	if (eventType === 'StartTime') {
 		return {
@@ -468,10 +470,6 @@ function extractDecisionState(fopUpdate) {
 		};
 	}
 	
-	// Decision is visible when:
-	// 1. decisionsVisible flag is true (referee decisions)
-	// 2. decisionEventType is FULL_DECISION (all refs decided)
-	// 3. down signal is true (bar lowered)
 	const isVisible = fopUpdate?.decisionsVisible === 'true' || 
 	                  fopUpdate?.decisionEventType === 'FULL_DECISION' ||
 	                  fopUpdate?.down === 'true';
@@ -483,8 +481,6 @@ function extractDecisionState(fopUpdate) {
 		return null;
 	};
 
-	// If down signal is true but no decisions yet, show pending (null) lights
-	// Otherwise use the actual referee decisions
 	const isDownOnly = fopUpdate?.down === 'true' && fopUpdate?.decisionEventType !== 'FULL_DECISION';
 	
 	return {
@@ -498,11 +494,6 @@ function extractDecisionState(fopUpdate) {
 	};
 }
 
-/**
- * Get competition statistics (SERVER-SIDE ONLY)
- * @param {Object} databaseState - Full database state
- * @returns {Object} Competition stats
- */
 function getCompetitionStats(databaseState) {
 	if (!databaseState?.athletes || !Array.isArray(databaseState.athletes)) {
 		return {

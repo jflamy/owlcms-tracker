@@ -76,7 +76,7 @@
 		<div class="cell header v-spacer v-spacer-snatch span-two" aria-hidden="true"></div>
 		<div class="cell header col-group col-group-snatch" role="columnheader">{translations.Snatch || 'Snatch'}</div>
 		<div class="cell header v-spacer v-spacer-middle span-two" aria-hidden="true"></div>
-		<div class="cell header col-group col-group-cj" role="columnheader">{translations.Clean_and_Jerk || 'Clean &amp; Jerk'}</div>
+		<div class="cell header col-group col-group-cj" role="columnheader">{@html translations.Clean_and_Jerk || 'Clean &amp; Jerk'}</div>
 		<div class="cell header v-spacer v-spacer-total span-two" aria-hidden="true"></div>
 		<div class="cell header col-total span-two" role="columnheader">{translations.TOTAL || 'Total'}</div>
 		<div class="cell header col-rank span-two" role="columnheader">{translations.Rank || 'Rank'}</div>
@@ -158,7 +158,7 @@
 		<!-- Leaders title row spanning all columns -->
 		<div class="grid-row leaders-header">
 			<div class="cell leaders-title-cell span-all">
-				{translations.Leaders || 'Leaders:'} {data.competition?.groupInfo ? data.competition.groupInfo.split('–')[0].trim() : ''}
+				{translations.Leaders || 'Leaders'}
 			</div>
 		</div>
 
@@ -496,7 +496,7 @@
 	.cell.leaders-title-cell {
 		background: transparent;
 		border: none;
-		padding: 0.25rem 0;
+		padding: 1.5rem 0 0.25rem 0;
 		font-weight: bold;
 		font-size: 1.2rem;
 		color: #ccc;
