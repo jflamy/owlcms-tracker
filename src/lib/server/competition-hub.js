@@ -601,6 +601,15 @@ class CompetitionHub {
   }
   
   /**
+   * Resolve team name from team ID using indexed teams from database
+   * @param {number|string} teamId - Team ID
+   * @returns {string|null} Team name or null if not found
+   */
+  getTeamNameById(teamId) {
+    return this._getTeamNameById(teamId);
+  }
+  
+  /**
    * Update session status tracking based on incoming message
    * Detects when a session is done (GroupDone event) and when it's reopened
    * 
@@ -1117,25 +1126,14 @@ class CompetitionHub {
         }
       }
 
-      // Normalize sattempts and cattempts to standard format for display
-      // OWLCMS sends arrays like [50, -52, 52] where negative = failed
-      // If we used displayInfo, attempts are already in V2 object format { value, status }
-      // which the frontend can handle directly. We only normalize if NOT using displayInfo.
-      if (!usedDisplayInfo) {
-        if (Array.isArray(flat.sattempts)) {
-          flat.sattempts = flat.sattempts.map(v => this._normalizeAttemptValue(v));
-        }
-        if (Array.isArray(flat.cattempts)) {
-          flat.cattempts = flat.cattempts.map(v => this._normalizeAttemptValue(v));
-        }
-      } else {
-        // Even if using displayInfo, we might need to ensure the attempts are not double-normalized
-        // or if they are somehow strings that need parsing.
-        // But for now, let's assume they are correct objects.
-        // Debug log to see what we have
-        // if (flat.sattempts && flat.sattempts.length > 0) {
-        //    console.log('[Hub] V2 attempts for', flat.fullName, JSON.stringify(flat.sattempts[0]));
-        // }
+      // Normalize sattempts and cattempts to standard format: { stringValue, liftStatus }
+      // OWLCMS V2 sends { value, status }, legacy sends numbers (positive=good, negative=bad)
+      // Always normalize so frontend can use liftStatus directly as CSS class
+      if (Array.isArray(flat.sattempts)) {
+        flat.sattempts = flat.sattempts.map(v => this._normalizeAttemptValue(v));
+      }
+      if (Array.isArray(flat.cattempts)) {
+        flat.cattempts = flat.cattempts.map(v => this._normalizeAttemptValue(v));
       }
 
       // Fallback: Compute bestSnatch and bestCleanJerk if OWLCMS didn't provide them
@@ -1167,16 +1165,16 @@ class CompetitionHub {
   /**
    * Normalize an attempt value to standard format { stringValue, liftStatus }
    * 
-   * OWLCMS V2 format sends objects: { value: 85, status: "good"|"fail"|"request"|"current"|"next"|null }
+   * OWLCMS V2 format sends objects: { value: 85, status: "good"|"bad"|"request"|"current"|"next"|null }
    * Legacy format sends numbers: positive = good lift, negative = failed, 0 or null = not attempted
    * 
-   * Output liftStatus values:
-   * - 'good' - successful lift
-   * - 'bad' - failed lift  
+   * Output liftStatus values (can be used directly as CSS classes):
+   * - 'good' - successful lift (green)
+   * - 'bad' - failed lift (red)
    * - 'current' - pending attempt for current athlete (should blink)
-   * - 'next' - pending attempt for next athlete
+   * - 'next' - pending attempt for next athlete (highlighted)
    * - 'request' - pending attempt (not current or next athlete)
-   * - 'empty' - no data (legacy only)
+   * - 'empty' - no data
    */
   _normalizeAttemptValue(v) {
     if (v === null || v === undefined) {
@@ -1192,12 +1190,12 @@ class CompetitionHub {
       const status = v.status || 'request';
       return { 
         stringValue: String(v.value), 
-        liftStatus: status  // status: good, bad, request, current, next, empty
+        liftStatus: status  // Directly use OWLCMS status: good, bad, request, current, next
       };
     }
     
     // Already normalized to our format (stringValue + liftStatus)
-    if (typeof v === 'object' && (v.stringValue !== undefined || v.liftStatus !== undefined)) {
+    if (typeof v === 'object' && v.stringValue !== undefined && v.liftStatus !== undefined) {
       return v;
     }
     
@@ -1365,6 +1363,59 @@ class CompetitionHub {
         this.state.lastUpdate = Date.now();
       }
     }
+
+    // TEMPORARY DEBUG: Verify session athletes match database athletes by key
+    this._verifySessionAthleteKeys(fopName);
+  }
+
+  /**
+   * TEMPORARY DEBUG: Verify all session athletes can be found in database by key
+   * This helps debug key matching issues between session and database athletes
+   */
+  _verifySessionAthleteKeys(fopName) {
+    const update = this.fopUpdates[fopName];
+    const sessionAthletes = update?.sessionAthletes;
+    if (!Array.isArray(sessionAthletes) || sessionAthletes.length === 0) {
+      return;
+    }
+    if (!this.databaseAthleteIndex || this.databaseAthleteIndex.size === 0) {
+      console.log(`[Hub DEBUG] No database athletes indexed yet`);
+      return;
+    }
+
+    let matched = 0;
+    let unmatched = 0;
+    const unmatchedKeys = [];
+
+    for (const sessionAthlete of sessionAthletes) {
+      // Extract key from session athlete (handle V2 nested format)
+      let key;
+      if (sessionAthlete?.athlete?.key) {
+        key = this._normalizeAthleteKey(sessionAthlete.athlete.key);
+      } else if (sessionAthlete?.key) {
+        key = this._normalizeAthleteKey(sessionAthlete.key);
+      }
+      
+      if (!key) continue;
+
+      const dbAthlete = this.databaseAthleteIndex.get(key);
+      if (dbAthlete) {
+        matched++;
+      } else {
+        unmatched++;
+        const name = sessionAthlete?.displayInfo?.fullName || sessionAthlete?.athlete?.lastName || 'Unknown';
+        unmatchedKeys.push({ key, name });
+      }
+    }
+
+    if (unmatched > 0) {
+      console.log(`[Hub DEBUG] Session→Database key matching for FOP ${fopName}: ${matched} matched, ${unmatched} UNMATCHED`);
+      console.log(`[Hub DEBUG] Unmatched athletes:`, unmatchedKeys.slice(0, 5).map(u => `${u.name} (key=${u.key})`).join(', '));
+      console.log(`[Hub DEBUG] Database has ${this.databaseAthleteIndex.size} athletes indexed. Sample keys:`, 
+        Array.from(this.databaseAthleteIndex.keys()).slice(0, 5));
+    } else if (matched > 0) {
+      console.log(`[Hub DEBUG] ✓ All ${matched} session athletes match database by key`);
+    }
   }
 
   _ensureDatabaseContainers(update = null) {
@@ -1378,6 +1429,7 @@ class CompetitionHub {
         initialized: false,
         lastUpdate: Date.now()
       };
+
     }
 
     if (!Array.isArray(this.databaseState.athletes)) {
@@ -1755,16 +1807,24 @@ class CompetitionHub {
   }
 
   /**
-   * Force refresh (clear state to trigger 428)
+   * Force refresh (clear ALL state to trigger 428 and show "waiting for competition data")
+   * Called when OWLCMS disconnects - clears everything so browsers show waiting state
    */
   refresh() {
-    console.log('[Hub] Forcing refresh - clearing state');
+    console.log('[Hub] Forcing refresh - clearing ALL state (database, session, translations, flags)');
     this.state = null;
+    this.databaseState = null;
+    this.fopUpdates = {};
+    this.databaseAthleteIndex = new Map();
+    this.databaseTeamMap = new Map();
+    this.lastDatabaseChecksum = null;
+    this.lastDatabaseLoad = 0;
     this.flagsLoaded = false;
     this.translationsReady = false;
+    this._hasConfirmedFops = false;
     this.broadcast({
       type: 'waiting',
-      message: 'Competition data refresh in progress...',
+      message: 'Waiting for competition data...',
       timestamp: Date.now()
     });
   }

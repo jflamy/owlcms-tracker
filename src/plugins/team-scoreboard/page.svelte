@@ -40,12 +40,10 @@
 		timer.syncWithServer(data.timer);
 	}
 
+	// liftStatus values from hub can be used directly as CSS classes:
+	// 'good', 'bad', 'current', 'next', 'request', 'empty'
 	function getAttemptClass(attempt) {
-		if (!attempt || !attempt.liftStatus || attempt.liftStatus === 'empty') return 'empty';
-		if (attempt.liftStatus === 'request') return 'request';
-		if (attempt.liftStatus === 'fail') return 'failed';
-		if (attempt.liftStatus === 'good') return 'success';
-		return 'empty';
+		return attempt?.liftStatus || 'empty';
 	}
 
 	function displayAttempt(attempt) {
@@ -162,14 +160,14 @@ export function shouldRenderFlag(url) {
 							<div class="cell born" role="gridcell">{athlete.yearOfBirth || ''}</div>
 							<div class="cell team-name" role="gridcell">{athlete.teamName || ''}</div>
 							<div class="cell v-spacer" aria-hidden="true"></div>
-							<div class="cell attempt {getAttemptClass(athlete.sattempts?.[0])} {athlete.sattempts?.[0]?.className || ''}" role="gridcell">{displayAttempt(athlete.sattempts?.[0])}</div>
-							<div class="cell attempt {getAttemptClass(athlete.sattempts?.[1])} {athlete.sattempts?.[1]?.className || ''}" role="gridcell">{displayAttempt(athlete.sattempts?.[1])}</div>
-							<div class="cell attempt {getAttemptClass(athlete.sattempts?.[2])} {athlete.sattempts?.[2]?.className || ''}" role="gridcell">{displayAttempt(athlete.sattempts?.[2])}</div>
+							<div class="cell attempt {getAttemptClass(athlete.sattempts?.[0])}" role="gridcell">{displayAttempt(athlete.sattempts?.[0])}</div>
+							<div class="cell attempt {getAttemptClass(athlete.sattempts?.[1])}" role="gridcell">{displayAttempt(athlete.sattempts?.[1])}</div>
+							<div class="cell attempt {getAttemptClass(athlete.sattempts?.[2])}" role="gridcell">{displayAttempt(athlete.sattempts?.[2])}</div>
 							<div class="cell best" role="gridcell">{athlete.bestSnatch || '-'}</div>
 							<div class="cell v-spacer" aria-hidden="true"></div>
-							<div class="cell attempt {getAttemptClass(athlete.cattempts?.[0])} {athlete.cattempts?.[0]?.className || ''}" role="gridcell">{displayAttempt(athlete.cattempts?.[0])}</div>
-							<div class="cell attempt {getAttemptClass(athlete.cattempts?.[1])} {athlete.cattempts?.[1]?.className || ''}" role="gridcell">{displayAttempt(athlete.cattempts?.[1])}</div>
-							<div class="cell attempt {getAttemptClass(athlete.cattempts?.[2])} {athlete.cattempts?.[2]?.className || ''}" role="gridcell">{displayAttempt(athlete.cattempts?.[2])}</div>
+							<div class="cell attempt {getAttemptClass(athlete.cattempts?.[0])}" role="gridcell">{displayAttempt(athlete.cattempts?.[0])}</div>
+							<div class="cell attempt {getAttemptClass(athlete.cattempts?.[1])}" role="gridcell">{displayAttempt(athlete.cattempts?.[1])}</div>
+							<div class="cell attempt {getAttemptClass(athlete.cattempts?.[2])}" role="gridcell">{displayAttempt(athlete.cattempts?.[2])}</div>
 							<div class="cell best" role="gridcell">{athlete.bestCleanJerk || '-'}</div>
 							<div class="cell v-spacer" aria-hidden="true"></div>
 							<div class="cell total" role="gridcell">{athlete.total || '-'}</div>
@@ -331,13 +329,15 @@ export function shouldRenderFlag(url) {
 
 	.attempt { font-weight: bold; white-space: nowrap; padding: 0 0.35rem; }
 	.header-secondary .col-attempt { white-space: nowrap; padding: 0 0.35rem; }
+	/* liftStatus values from hub: 'good', 'bad', 'current', 'next', 'request', 'empty' */
 	.attempt.empty { background: #4a4a4a !important; color: #aaa; }
 	.attempt.request { background: #4a4a4a !important; color: #ddd; }
-	.attempt.success { background: #fff !important; color: #000; }
-	.attempt.failed { background: #dc2626 !important; color: #fff; }
+	.attempt.good { background: #fff !important; color: #000; }
+	.attempt.bad { background: #dc2626 !important; color: #fff; }
+	.attempt.next { background: #f97316; color: #000; font-weight: bold; }
 
-	.grid-row.current > .attempt.request.current,
-	.grid-row.current > .attempt.request.blink { color: #fbbf24 !important; font-weight: bold !important; font-size: 1.3rem !important; }
+	/* Current attempt - highlighted */
+	.attempt.current { color: #fbbf24 !important; font-weight: bold !important; font-size: 1.3rem !important; }
 
 	.grid-row.team-header > .cell {
 		background: #4a5568 !important;

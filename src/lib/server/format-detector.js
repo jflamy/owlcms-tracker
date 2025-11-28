@@ -13,7 +13,9 @@
  */
 export function detectFormat(params) {
   // V2 format has explicit formatVersion field
-  if (params.formatVersion === '2.0' || params.formatVersion === 2.0) {
+  // Check both top level and nested database (OWLCMS sends { database: { formatVersion: "2.0", ... } })
+  const formatVersion = params.formatVersion || params.database?.formatVersion;
+  if (formatVersion === '2.0' || formatVersion === 2.0) {
     return 'v2';
   }
   

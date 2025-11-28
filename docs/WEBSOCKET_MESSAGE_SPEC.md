@@ -1,10 +1,13 @@
 # OWLCMS WebSocket Event Forwarding - Message Format Specification
 
 ## Overview
+
 OWLCMS can send competition events over WebSocket connections when configured with `ws://` or `wss://` URLs. All messages use a consistent wrapper format with a type indicator and payload.
 
 ## Message Structure
+
 All messages follow this JSON structure:
+
 ```json
 {
   "type": "update|timer|decision|database",
@@ -18,11 +21,13 @@ All messages follow this JSON structure:
 ## Message Types
 
 ### 1. UPDATE Messages
+
 **Type:** `"update"`
 
 **Purpose:** General competition state updates including athlete changes, lifting order, group information
 
 **Key Payload Fields:**
+
 - `uiEvent` - Event class name that triggered the update (e.g., "LiftingOrderUpdated", "SwitchGroup", "GroupDone")
 - `updateKey` - Validation key
 - `competitionName` - Name of the competition
@@ -38,6 +43,7 @@ All messages follow this JSON structure:
 - Plus additional athlete, group, and competition data
 
 **Special Events:**
+
 - **`uiEvent: "GroupDone"`** - Indicates the current session/group has completed
   - `fopState` will be "BREAK"
   - `breakType` will be "GROUP_DONE"
@@ -134,6 +140,7 @@ UPDATE messages include a `sessionAthletes` array in V2 format. Each entry conta
 **Attempt object format:**
 
 Each attempt in `sattempts` and `cattempts` is an object with:
+
 - `value` - The weight in kg (integer), or `null` if no data
 - `status` - One of:
   - `"good"` - Successful lift
@@ -173,11 +180,13 @@ UPDATE messages also include ordering arrays that reference athletes by key:
 ---
 
 ### 2. TIMER Messages
+
 **Type:** `"timer"`
 
 **Purpose:** Clock countdown updates for athlete timer and break timer
 
 **Key Payload Fields:**
+
 - `updateKey` - Validation key
 - `fopName` - Field of play name
 - `mode` - Board display mode
@@ -196,11 +205,13 @@ UPDATE messages also include ordering arrays that reference athletes by key:
 ---
 
 ### 3. DECISION Messages
+
 **Type:** `"decision"`
 
 **Purpose:** Referee decision lights and down signal
 
 **Key Payload Fields:**
+
 - `decisionEventType` - Type of decision event:
   - `FULL_DECISION` - All three referees have decided
   - `RESET` - Decisions cleared
@@ -223,6 +234,7 @@ UPDATE messages also include ordering arrays that reference athletes by key:
 ---
 
 ### 4. DATABASE Messages
+
 **Type:** `"database"`
 
 **Purpose:** Full competition state synchronization - complete data dump
@@ -242,6 +254,7 @@ Frame layout (preferred format):
 - Remaining bytes: binary payload (typically a ZIP archive)
 
 Notes:
+
 - The `typeLength` is read using big-endian (network) byte order. The receiver must use `readUInt32BE(0)` to parse it correctly.
 - The payload is usually a ZIP archive; handlers will parse ZIP entries and extract files to `./local/{flags,pictures,styles}` or will parse `translations.json` inside a translations ZIP.
 - For robustness, the tracker also supports a fallback: when `typeLength` appears malformed but the buffer begins with the ZIP magic bytes (`50 4B 03 04`), the frame is treated as a `flags_zip` (legacy behavior seen in some integrations).
@@ -254,6 +267,7 @@ Supported binary message types:
 - `translations_zip`: ZIP archive expected to contain a single file named `translations.json`.
 
 Translations ZIP details:
+
 - `translations.json` may have one of two wrapper formats:
   - Wrapper form: `{ "locales": { "en": {...}, "fr": {...} }, "translationsChecksum": "..." }`
   - Direct form: `{ "en": {...}, "fr": {...} }`
@@ -261,11 +275,13 @@ Translations ZIP details:
 - If `translationsChecksum` is provided and matches the hub's `lastTranslationsChecksum`, the tracker will skip reprocessing to save CPU/time.
 
 Server behavior and sanity checks:
+
 - After extracting flags or translations, the tracker runs lightweight sanity checks (file counts, locale/key counts) and logs the result.
 - When translations are loaded for the first time the hub logs `TRANSLATIONS INITIALIZED` and caches the checksum.
 - When the tracker cannot find `translations.json` inside a `translations_zip`, it logs an error and ignores the payload.
 
 Security and size considerations:
+
 - The tracker validates `typeLength` against an upper bound (to avoid attempting to allocate huge buffers). If the reported length is unreasonably large, the tracker attempts ZIP-detection before rejecting the frame.
 - ZIP entries are written to disk under `./local/*` using their entry names; ensure OWLCMS produces safe file names.
 
@@ -284,6 +300,7 @@ Security and size considerations:
 ## Example Messages
 
 **Update Message:**
+
 ```json
 {
   "type": "update",
@@ -302,6 +319,7 @@ Security and size considerations:
 ```
 
 **Timer Message:**
+
 ```json
 {
   "type": "timer",
@@ -316,6 +334,7 @@ Security and size considerations:
 ```
 
 **Decision Message:**
+
 ```json
 {
   "type": "decision",
@@ -338,10 +357,12 @@ Security and size considerations:
 The tracker **only** supports WebSocket connections from OWLCMS. Legacy HTTP POST endpoints have been removed.
 
 **OWLCMS Configuration:**
+
 - Set "URL for Video Data" to: `ws://localhost:8096/ws` (or `wss://` for secure connections)
 - No code changes needed in OWLCMS - just the URL configuration
 
 **WebSocket Message Types:**
+
 - `type="database"` - Full competition data (athletes, categories, FOPs)
 - `type="update"` - Lifting order changes, athlete switches, UI events
 - `type="timer"` - Timer start/stop/set events
@@ -354,6 +375,7 @@ The tracker **only** supports WebSocket connections from OWLCMS. Legacy HTTP POS
 The tracker sends JSON responses back to OWLCMS over the WebSocket connection:
 
 ### Success Response (200 OK)
+
 ```json
 {
   "status": 200,
@@ -375,18 +397,21 @@ When the tracker needs additional data before processing messages, it returns a 
 ```
 
 **Preconditions:**
+
 - `"database"` - Full competition data (athletes, categories, FOPs) - **Currently implemented**
 - `"flags"` - Country/team flag images - **Future**
 - `"styles"` - Custom CSS stylesheets - **Future**
 - `"pictures"` - Athlete photos - **Future**
 
 **OWLCMS Response:** When receiving a 428 status, OWLCMS should send the missing data types. The `missing` array indicates which data types are needed. For example:
+
 - If `missing: ["database"]`, send a `type="database"` message
 - If `missing: ["database", "flags"]`, send both `type="database"` and `type="flags"` messages
 
 **Note:** The WebSocket connection remains open after a 428 response - this is NOT a termination code.
 
 ### Error Response (500 Internal Server Error)
+
 ```json
 {
   "status": 500,
@@ -394,4 +419,3 @@ When the tracker needs additional data before processing messages, it returns a 
   "reason": "database_parsing_error"
 }
 ```
-

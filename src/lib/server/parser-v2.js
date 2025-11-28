@@ -17,57 +17,59 @@
 export function parseV2Database(params) {
   console.log('[V2 Parser] Parsing V2 format database');
   
-  const providedChecksum = params?.databaseChecksum || params?.checksum || null;
+  // Handle nested database structure: { databaseChecksum, database: { ... } }
+  const db = params.database || params;
+  const providedChecksum = params?.databaseChecksum || params?.checksum || db?.databaseChecksum || null;
   
-  if (!params.athletes || !Array.isArray(params.athletes)) {
+  if (!db.athletes || !Array.isArray(db.athletes)) {
     console.error('[V2 Parser] No athletes array found in V2 format');
     return null;
   }
   
-  console.log(`[V2 Parser] Processing ${params.athletes.length} athletes`);
-  console.log(`[V2 Parser] Has ageGroups:`, !!params.ageGroups, 'count:', params.ageGroups?.length || 0);
-  console.log(`[V2 Parser] Has competition:`, !!params.competition);
-  console.log(`[V2 Parser] Has platforms:`, !!params.platforms, 'count:', params.platforms?.length || 0);
-  console.log(`[V2 Parser] Has teams:`, !!params.teams, 'count:', params.teams?.length || 0);
+  console.log(`[V2 Parser] Processing ${db.athletes.length} athletes`);
+  console.log(`[V2 Parser] Has ageGroups:`, !!db.ageGroups, 'count:', db.ageGroups?.length || 0);
+  console.log(`[V2 Parser] Has competition:`, !!db.competition);
+  console.log(`[V2 Parser] Has platforms:`, !!db.platforms, 'count:', db.platforms?.length || 0);
+  console.log(`[V2 Parser] Has teams:`, !!db.teams, 'count:', db.teams?.length || 0);
   
   // Build team lookup map (V2 uses numeric team IDs)
-  const teamMap = buildTeamMap(params.teams || []);
+  const teamMap = buildTeamMap(db.teams || []);
   
   // Parse athletes from V2 format
-  const athletes = params.athletes.map(athlete => normalizeV2Athlete(athlete, teamMap));
+  const athletes = db.athletes.map(athlete => normalizeV2Athlete(athlete, teamMap));
   
   // Parse age groups and categories
-  const categories = extractV2Categories(params.ageGroups || []);
+  const categories = extractV2Categories(db.ageGroups || []);
   
   // Parse platforms/FOPs
-  const fops = extractV2FOPs(params.platforms || []);
+  const fops = extractV2FOPs(db.platforms || []);
   
   // Parse sessions
-  const sessions = params.sessions || [];
+  const sessions = db.sessions || [];
   
   // Build normalized result
   const result = {
     formatVersion: '2.0',
     athletes,
-    ageGroups: params.ageGroups || [],
+    ageGroups: db.ageGroups || [],
     categories,
     fops,
     sessions,
-    platforms: params.platforms || [],
-    teams: params.teams || [],
+    platforms: db.platforms || [],
+    teams: db.teams || [],
     competition: {
-      name: params.competition?.competitionName || 'Competition',
-      city: params.competition?.competitionCity || '',
-      date: formatV2Date(params.competition?.competitionDate),
-      organizer: params.competition?.competitionOrganizer || '',
-      federation: params.competition?.federation || '',
-      scoringSystem: params.competition?.scoringSystem || '',
-      ...params.competition
+      name: db.competition?.competitionName || 'Competition',
+      city: db.competition?.competitionCity || '',
+      date: formatV2Date(db.competition?.competitionDate),
+      organizer: db.competition?.competitionOrganizer || '',
+      federation: db.competition?.federation || '',
+      scoringSystem: db.competition?.scoringSystem || '',
+      ...db.competition
     },
-    config: params.config || {},
+    config: db.config || {},
     initialized: true,
     lastUpdate: Date.now(),
-    databaseChecksum: providedChecksum || params.databaseChecksum || null
+    databaseChecksum: providedChecksum || db.databaseChecksum || null
   };
   
   console.log(`[V2 Parser] ✅ Parsed ${athletes.length} athletes, ${categories.length} categories, ${fops.length} FOPs`);
@@ -208,8 +210,9 @@ function normalizeV2Athlete(athlete, teamMap) {
     
     // ===== DERIVED DATA (computed by tracker for convenience) =====
     
-    // Derived: Athlete key (lotNumber or hash of lastName|firstName|teamName)
+    // Derived: Athlete key (from OWLCMS key field)
     id: athleteKey,
+    key: athleteKey, // Alias for consistency - both 'id' and 'key' contain the same value
     
     // Derived: Full name from firstName + lastName
     fullName: `${athlete.firstName || ''} ${athlete.lastName || ''}`.trim(),

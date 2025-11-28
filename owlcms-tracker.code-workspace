@@ -2,6 +2,9 @@
 	"folders": [
 		{
 			"path": "."
+		},
+		{
+			"path": "../owlcms_v23"
 		}
 	],
 	"settings": {

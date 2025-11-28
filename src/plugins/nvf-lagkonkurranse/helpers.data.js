@@ -1,21 +1,41 @@
 /**
- * Server-side scoreboard helpers - these run on the server and access the competition hub directly
+ * Server-side scoreboard helpers for NVF Lagkonkurranse
+ * 
+ * ARCHITECTURE: Layered data processing
+ * 
+ * Layer 1: Raw DTOs (unmodified from source)
+ *   - Session athletes: from competitionHub.getStartOrderEntries() - already flattened by hub
+ *   - Database athletes: from competitionHub.getDatabaseState().athletes (future)
+ * 
+ * Layer 2: TeamAthlete creation (enriched for team scoring)
+ *   - teamAthleteFromSession(): creates TeamAthlete from session data
+ *   - teamAthleteFromDatabase(): creates TeamAthlete from database data
+ * 
+ * Layer 3: Team grouping and scoring
+ *   - Groups wrapped athletes by team
+ *   - Computes team totals, top contributors, etc.
  */
 
 import { competitionHub } from '$lib/server/competition-hub.js';
 import { getFlagUrl } from '$lib/server/flag-resolver.js';
 import { CalculateSinclair2024 } from '$lib/sinclair-coefficients.js';
 
+// =============================================================================
+// CACHE
+// =============================================================================
+
 /**
  * Plugin-specific cache to avoid recomputing team data on every browser request
- * Structure: { 'fopName-lastUpdate-gender-topN-sortBy': { teams, allAthletes, ... } }
  */
 const nvfScoreboardCache = new Map();
 
+// =============================================================================
+// UTILITY FUNCTIONS
+// =============================================================================
+
 /**
  * Parse a formatted number that may be a string with decimal comma or point
- * Handles: "96.520", "96,520", "-", null, undefined, 0
- * @param {*} value - Value to parse (can be string, number, null, undefined)
+ * @param {*} value - Value to parse
  * @returns {number} Parsed number or 0 if invalid
  */
 function parseFormattedNumber(value) {
@@ -25,23 +45,51 @@ function parseFormattedNumber(value) {
 	if (typeof value === 'number') {
 		return value;
 	}
-	// Convert string: replace comma with period, then parse
 	const normalized = String(value).replace(',', '.');
 	const parsed = parseFloat(normalized);
 	return isNaN(parsed) ? 0 : parsed;
 }
 
-function normalizeLotNumber(value) {
+/**
+ * Normalize athlete key to string for consistent lookups
+ * Keys can be negative numbers in OWLCMS
+ */
+function normalizeKey(value) {
 	if (value === undefined || value === null) return '';
-	const normalized = String(value).trim();
-	return normalized;
+	return String(value).trim();
 }
 
 /**
- * Normalize gender values to 'M' or 'F'.
- * Accepts: 'M','F','m','f','male','female','Male','Female', etc.
- * Returns null for unknown or mixed values.
- * @param {string} g
+ * Extract year of birth from fullBirthDate
+ * Database format can be array [2001, 1, 18] or string "2001-01-18"
+ * @param {Array|string} fullBirthDate - Birth date in database format
+ * @returns {string} Year as string (e.g., "2001") or empty string
+ */
+function extractYearOfBirth(fullBirthDate) {
+	if (!fullBirthDate) return '';
+	// Array format: [2001, 1, 18]
+	if (Array.isArray(fullBirthDate) && fullBirthDate.length > 0) {
+		return String(fullBirthDate[0]);
+	}
+	// String format: "2001-01-18"
+	if (typeof fullBirthDate === 'string') {
+		return fullBirthDate.substring(0, 4);
+	}
+	return '';
+}
+
+/**
+ * Normalize lot number to string for consistent lookups
+ * @deprecated Use normalizeKey() with athlete.key instead
+ */
+function normalizeLotNumber(value) {
+	if (value === undefined || value === null) return '';
+	return String(value).trim();
+}
+
+/**
+ * Normalize gender values to 'M' or 'F'
+ * @param {string} g - Gender string
  * @returns {'M'|'F'|null}
  */
 function normalizeGender(g) {
@@ -52,22 +100,12 @@ function normalizeGender(g) {
 	return null;
 }
 
-/**
- * Get score from athlete (tries globalScore first, then sinclair)
- * @param {Object} athlete - Athlete object
- * @returns {number} Score value or 0
- */
-function getAthleteScore(athlete) {
-	if (!athlete) return 0;
-	// Use only server-computed actualScore (no fallback to DB fields)
-	if (typeof athlete.actualScore === 'number' && Number.isFinite(athlete.actualScore)) {
-		return athlete.actualScore;
-	}
-	return 0;
-}
+// =============================================================================
+// LAYER 1: RAW DTO ACCESS
+// =============================================================================
 
 /**
- * Get the full database state (raw athlete data) - SERVER-SIDE ONLY
+ * Get the full database state - SERVER-SIDE ONLY
  * @returns {Object|null} Raw database state from OWLCMS
  */
 export function getDatabaseState() {
@@ -75,152 +113,7 @@ export function getDatabaseState() {
 }
 
 /**
- * Extract the next requested weight from an attempt array
- * Finds the first attempt with liftStatus === 'request' and returns its weight
- * @param {Array} attempts - Array of attempt objects [{liftStatus, stringValue, className}, ...]
- * @returns {number} Next requested weight or 0 if no more requests
- */
-function getNextRequestedWeight(attempts) {
-	if (!Array.isArray(attempts)) return 0;
-	const nextAttempt = attempts.find(a => a?.liftStatus === 'request');
-	if (!nextAttempt) return 0;
-	
-	// Parse the weight from stringValue (should be a number string)
-	const weight = parseInt(nextAttempt.stringValue, 10);
-	return isNaN(weight) ? 0 : weight;
-}
-
-/**
- * Check if any attempts have been taken (good or bad)
- * @param {Array} attempts - Array of attempt objects [{liftStatus, stringValue}, ...]
- * @returns {boolean} True if any attempt has liftStatus 'good' or 'bad'
- */
-function hasAttemptBeenTaken(attempts) {
-	if (!Array.isArray(attempts)) return false;
-	return attempts.some(a => a?.liftStatus === 'good' || a?.liftStatus === 'bad');
-}
-
-/**
- * Determine if an athlete's total is definitively zero
- * Total is definitive 0 when all lifts have been taken (or are explicitly 0)
- * @param {Object} athlete - Athlete object with sattempts, cattempts, and total
- * @returns {boolean} True if total is definitively zero (all attempts completed and total is 0)
- */
-function isDefinitiveTotalZero(athlete) {
-	if (!athlete) return false;
-	const total = parseFormattedNumber(athlete.total ?? athlete.displayTotal ?? 0);
-	if (total !== 0) return false;
-
-	// Collect all attempt objects (snatch + clean&jerk)
-	const attempts = [];
-	if (Array.isArray(athlete.sattempts)) attempts.push(...athlete.sattempts);
-	if (Array.isArray(athlete.cattempts)) attempts.push(...athlete.cattempts);
-
-	// If any attempt is 'request' or 'empty' then session not completed -> not definitive
-	for (const a of attempts) {
-		if (!a) return false; // missing attempt info -> be conservative
-		const status = (a.liftStatus || '').toString().toLowerCase();
-		if (status === 'request' || status === 'empty') return false;
-	}
-
-	// All attempts present and none are request/empty -> definitive
-	return true;
-}
-
-/**
- * Get the predicted best lift for a lift type
- * Logic: If there's a next requested weight (not yet attempted), use it as the projection
- *        Otherwise, use the best achieved weight
- * @param {Array} attempts - Array of attempt objects for one lift type
- * @param {number} bestAchieved - Best weight already achieved
- * @returns {number} Predicted best weight or 0
- */
-function getPredictedBestLift(attempts, bestAchieved) {
-	// Check if there's a next requested weight (attempt not yet taken)
-	const nextRequested = getNextRequestedWeight(attempts);
-	if (nextRequested > 0) {
-		// There's still an attempt to come - use the requested weight as projection
-		return nextRequested;
-	}
-	
-	// No more attempts remaining - use best achieved weight
-	if (bestAchieved && bestAchieved > 0) {
-		return bestAchieved;
-	}
-	
-	// No prediction possible (no requests and no successful lifts)
-	return 0;
-}
-
-/**
- * Calculate the predicted total
- * For each lift type: if there's a next request (liftStatus='request'), use it; else use bestAchieved
- * @param {Object} athlete - Athlete object with sattempts, cattempts, bestSnatch, bestCleanJerk
- * @returns {number} Predicted total or 0 if no prediction possible
- */
-function calculatePredictedTotal(athlete, preferredLiftType = 'snatch', attemptsDone = 0) {
-	if (!athlete) return 0;
-	
-	const bestSnatch = parseFormattedNumber(athlete.bestSnatch) || 0;
-	const bestCJ = parseFormattedNumber(athlete.bestCleanJerk) || 0;
-	
-	// Determine the next declared weight according to rules (attemptsDone = completed attempts):
-	// - If liftType is snatch and attemptsDone is 0/1/2 -> next declaration is snatch at index attemptsDone
-	// - If liftType is snatch and attemptsDone is 3 -> next declaration is clean&jerk[0]
-	// - If liftType is cleanJerk and attemptsDone is 0/1/2 -> next declaration is clean&jerk at index attemptsDone
-	// - If liftType is cleanJerk and attemptsDone is 3 -> no next declaration (prediction uses base total)
-
-	let chosenRequest = 0;
-	let currentBestForChosen = 0;
-
-	if (preferredLiftType === 'snatch') {
-		// Map attemptsDone 0/1/2 -> snatch[0..2]
-		if (attemptsDone === 0 || attemptsDone === 1 || attemptsDone === 2) {
-			const idx = attemptsDone; // 0-based
-			const val = parseInt(athlete.sattempts?.[idx]?.stringValue || '', 10);
-			if (!isNaN(val) && val > 0) {
-				chosenRequest = val;
-				currentBestForChosen = bestSnatch;
-			}
-		} else if (attemptsDone === 3) {
-			// after snatch3 -> declaration is first CJ
-			const val = parseInt(athlete.cattempts?.[0]?.stringValue || '', 10);
-			if (!isNaN(val) && val > 0) {
-				chosenRequest = val;
-				currentBestForChosen = bestCJ;
-			}
-		}
-	} else {
-		// preferred is cleanJerk: map attemptsDone 0/1/2 -> cj[0..2]; 3 -> no next declaration
-		if (attemptsDone === 0 || attemptsDone === 1 || attemptsDone === 2) {
-			const idx = attemptsDone;
-			const val = parseInt(athlete.cattempts?.[idx]?.stringValue || '', 10);
-			if (!isNaN(val) && val > 0) {
-				chosenRequest = val;
-				currentBestForChosen = bestCJ;
-			}
-		} else if (attemptsDone === 3) {
-			chosenRequest = 0; // no next declaration after CJ3
-		}
-	}
-
-	// Base current total
-	const baseTotal = bestSnatch + bestCJ;
-
-	// If there's no next request at all, return base total (no prediction)
-	if (chosenRequest === 0) return baseTotal;
-
-	// If chosen requested weight is greater than current best for that lift, add the delta
-	const delta = Math.max(0, chosenRequest - (currentBestForChosen || 0));
-	return baseTotal + delta;
-}
-
-// Export the predicted-total helper for unit testing
-export { calculatePredictedTotal };
-
-/**
  * Get the latest UPDATE message for a specific FOP - SERVER-SIDE ONLY
- * This contains precomputed presentation data like liftingOrderAthletes, startOrderAthletes, etc.
  * @param {string} fopName - FOP name (default: 'A')
  * @returns {Object|null} Latest UPDATE message with precomputed data
  */
@@ -229,646 +122,706 @@ export function getFopUpdate(fopName = 'A') {
 }
 
 /**
- * Get formatted scoreboard data for SSR/API (SERVER-SIDE ONLY)
- * For NVF team scoreboard: combines current session athletes with all other athletes from database
- * Groups by team and adds spacers between teams
- * Note: Session athletes are stored in the startOrderAthletes key (historical name)
- * @param {string} fopName - FOP name (default: 'A')
- * @param {Object} options - User preferences (e.g., { showRecords: true, sortBy: 'total' })
- * @returns {Object} Formatted data ready for browser consumption
+ * Get session athletes (already flattened by hub)
+ * These are athletes in the current lifting session with OWLCMS-computed display values
+ * @param {string} fopName - FOP name
+ * @returns {Array} Array of flat athlete objects (no spacers)
  */
-export function getScoreboardData(fopName = 'A', options = {}) {
-	const fopUpdate = getFopUpdate(fopName);
-	const databaseState = getDatabaseState();
-	
-	// Extract options with defaults
-	const showRecords = options.showRecords ?? false;
-	// Always sort teams by total score (sum of athlete scores: globalScore→sinclair)
-	const sortBy = 'score';
-	
-	const currentAttemptInfo = options.currentAttemptInfo ?? false;
-	const topN = options.topN ?? 0;
-	
-	// Get language preference from options (default: 'no')
-	// Accept both 'lang' (URL param) and 'language' (config option)
-	const language = options.lang || options.language || 'no';
-	
-	// Fetch translations from hub for the selected language
-	const translations = competitionHub.getTranslations(language);
+function getSessionAthletes(fopName) {
+	return competitionHub.getSessionAthletes(fopName) || [];
+}
 
-	// Diagnostic: Detect session athlete gender EARLY (used for 'current' resolution and returned diagnostic)
-	let helperDetectedGender = 'unknown';
-	let helperDetectedAthlete = null;
-	try {
-		const startOrderEntries = competitionHub.getStartOrderEntries(fopName, { includeSpacers: true }) || [];
-		if (Array.isArray(startOrderEntries) && startOrderEntries.length > 0) {
-			// startOrderEntries are now flat athlete objects (not { athlete: {...} })
-			helperDetectedAthlete = startOrderEntries.find(e => !e.isSpacer && (e.fullName || e.startNumber))
-				|| startOrderEntries.find(e => !e.isSpacer && e.athleteKey)
-				|| startOrderEntries.find(e => !e.isSpacer) || null;
-			helperDetectedGender = normalizeGender(helperDetectedAthlete?.gender) || normalizeGender(fopUpdate?.gender) || 'unknown';
-		} else if (Array.isArray(fopUpdate?.sessionAthletes) && fopUpdate.sessionAthletes.length > 0) {
-			// Fallback: raw sessionAthletes from fopUpdate (may still be V2 format)
-			const sa = fopUpdate.sessionAthletes.find(s => s && (s.athlete?.fullName || s.fullName || s.athlete?.startNumber || s.startNumber)) || fopUpdate.sessionAthletes[0];
-			helperDetectedAthlete = sa?.athlete || sa || null;
-			helperDetectedGender = normalizeGender(helperDetectedAthlete?.gender) || normalizeGender(fopUpdate?.gender) || 'unknown';
-		} else {
-			helperDetectedGender = normalizeGender(fopUpdate?.gender) || 'unknown';
-		}
-	} catch (e) {
-		helperDetectedGender = 'unknown';
-		helperDetectedAthlete = null;
+/**
+ * Get session entries including spacers (for order preservation)
+ * @param {string} fopName - FOP name
+ * @returns {Array} Array of athlete objects and spacer markers
+ */
+function getSessionEntries(fopName) {
+	return competitionHub.getStartOrderEntries(fopName, { includeSpacers: true }) || [];
+}
+
+// =============================================================================
+// LAYER 2: ATHLETE ENRICHMENT (WRAPPING)
+// =============================================================================
+
+/**
+ * Extract next requested weight from attempts array
+ * @param {Array} attempts - Array of attempt objects [{liftStatus, stringValue}, ...]
+ * @returns {number} Next requested weight or 0
+ */
+function getNextRequestedWeight(attempts) {
+	if (!Array.isArray(attempts)) return 0;
+	// V2 format: attempts have { value, status } structure
+	// Hub-normalized format: attempts have { stringValue, liftStatus } structure
+	const nextAttempt = attempts.find(a => {
+		if (!a) return false;
+		const status = a.liftStatus || a.status;
+		return status === 'request' || status === 'current' || status === 'next';
+	});
+	if (!nextAttempt) return 0;
+	
+	// Parse weight from value (V2) or stringValue (hub-normalized)
+	const weight = parseInt(nextAttempt.value ?? nextAttempt.stringValue, 10);
+	return isNaN(weight) ? 0 : weight;
+}
+
+/**
+ * Count how many snatch attempts have been completed (good or bad) for this athlete
+ * @param {Object} athlete - Athlete with sattempts array
+ * @returns {number} Number of completed snatch attempts (0-3)
+ */
+function countCompletedSnatches(athlete) {
+	if (!athlete?.sattempts || !Array.isArray(athlete.sattempts)) return 0;
+	let count = 0;
+	for (const a of athlete.sattempts) {
+		if (!a) continue;
+		const status = (a.liftStatus || a.status || '').toString().toLowerCase();
+		if (status === 'good' || status === 'bad') count++;
 	}
-	const helperName = helperDetectedAthlete?.fullName || helperDetectedAthlete?.startNumber || 'none';
-	console.log(`[NVF helpers] Detected session athlete: "${helperName}" gender: ${helperDetectedGender}`);
+	return count;
+}
 
-	// Determine gender:
-	// - Preserve the raw requested gender (if provided) so the client can see 'current'
-	// - Normalize a gender value for server-side logic and caching
-	// - If no gender provided, treat it like 'current' mode
-	const requestedGender = (typeof options.gender === 'string' || options.gender === true) ? options.gender : undefined;
-	let gender = 'MF'; // normalized gender used for server logic (default to mixed)
-	if (options.gender === true) {
-		gender = 'MF';
-	} else if (typeof options.gender === 'string') {
-		// If the user requested 'current', resolve to the detected gender for internal logic
-		if (String(options.gender).trim().toLowerCase() === 'current') {
-			// Use the robust helper-detected gender (scanned from startOrderAthletes)
-			gender = (helperDetectedGender && helperDetectedGender !== 'unknown') ? helperDetectedGender : 'MF';
-		} else {
-			const gnorm = normalizeGender(options.gender);
-			gender = gnorm || 'MF';
+/**
+ * Count how many clean & jerk attempts have been completed (good or bad) for this athlete
+ * @param {Object} athlete - Athlete with cattempts array
+ * @returns {number} Number of completed C&J attempts (0-3)
+ */
+function countCompletedCleanJerks(athlete) {
+	if (!athlete?.cattempts || !Array.isArray(athlete.cattempts)) return 0;
+	let count = 0;
+	for (const a of athlete.cattempts) {
+		if (!a) continue;
+		const status = (a.liftStatus || a.status || '').toString().toLowerCase();
+		if (status === 'good' || status === 'bad') count++;
+	}
+	return count;
+}
+
+/**
+ * Get the next requested weight from an attempts array (first attempt with pending status)
+ * @param {Array} attempts - Array of attempt objects
+ * @returns {number} Next requested weight or 0
+ */
+function getNextRequest(attempts) {
+	if (!Array.isArray(attempts)) return 0;
+	for (const a of attempts) {
+		if (!a) continue;
+		const status = (a.liftStatus || a.status || '').toString().toLowerCase();
+		if (status === 'request' || status === 'current' || status === 'next') {
+			const weight = parseInt(a.value ?? a.stringValue, 10);
+			return isNaN(weight) ? 0 : weight;
 		}
-	} else {
-		// No gender provided in URL - treat like 'current' mode: detect session gender
-		gender = (helperDetectedGender && helperDetectedGender !== 'unknown') ? helperDetectedGender : 'MF';
+	}
+	return 0;
+}
+
+/**
+ * Calculate predicted total IF the next lift succeeds (for THIS athlete)
+ * 
+ * Rules - "if next lift succeeds":
+ * - 0 attempts done (no lifts): first declared snatch (snatch only, no CJ)
+ * - 1-2 attempts done (in snatch): next requested snatch (snatch only, no CJ)
+ * - 3 attempts done (snatch complete): best snatch + first requested C&J  
+ * - 4-5 attempts done (in C&J): best snatch + next requested C&J
+ * - 6 attempts done (complete): best snatch + best C&J (actual final total)
+ * 
+ * @param {Object} athlete - Athlete with sattempts, cattempts, bestSnatch, bestCleanJerk
+ * @returns {number} Predicted total if next lift succeeds
+ */
+function calculatePredictedIfNext(athlete) {
+	if (!athlete) return 0;
+	
+	const bestSnatch = parseFormattedNumber(athlete.bestSnatch) || 0;
+	const bestCJ = parseFormattedNumber(athlete.bestCleanJerk) || 0;
+	
+	const snatchesDone = countCompletedSnatches(athlete);
+	const cjsDone = countCompletedCleanJerks(athlete);
+	const totalAttemptsDone = snatchesDone + cjsDone;
+	
+	// 6 attempts done - competition complete, return actual total
+	if (totalAttemptsDone >= 6) {
+		return bestSnatch + bestCJ;
+	}
+	
+	// 4-5 attempts done (in C&J phase) - predict with next C&J request
+	if (totalAttemptsDone >= 4 && totalAttemptsDone < 6) {
+		const nextCJ = getNextRequest(athlete.cattempts);
+		if (nextCJ > 0) {
+			// If next C&J succeeds, total = bestSnatch + nextCJ
+			return bestSnatch + nextCJ;
+		}
+		// No next request (shouldn't happen), return current total
+		return bestSnatch + bestCJ;
+	}
+	
+	// 3 attempts done (snatch complete, starting C&J) - predict with first C&J request
+	if (totalAttemptsDone === 3) {
+		const firstCJ = getNextRequest(athlete.cattempts);
+		if (firstCJ > 0) {
+			return bestSnatch + firstCJ;
+		}
+		// No C&J request yet
+		return bestSnatch;
+	}
+	
+	// 1-2 attempts done (in snatch phase) - predict with next snatch ONLY (no CJ)
+	if (totalAttemptsDone >= 1 && totalAttemptsDone < 3) {
+		const nextSnatch = getNextRequest(athlete.sattempts);
+		if (nextSnatch > 0) {
+			// If next snatch succeeds, predicted = nextSnatch (no CJ yet)
+			return nextSnatch;
+		}
+		// No next snatch request (shouldn't happen)
+		return bestSnatch;
+	}
+	
+	// 0 attempts done - predict with first snatch ONLY (no CJ)
+	if (totalAttemptsDone === 0) {
+		const firstSnatch = getNextRequest(athlete.sattempts);
+		if (firstSnatch > 0) {
+			return firstSnatch;
+		}
+		return 0; // No declarations yet
+	}
+	
+	// Fallback
+	return bestSnatch + bestCJ;
+}
+
+/**
+ * Check if athlete's total is definitively zero (all attempts completed with no successful lifts)
+ * @param {Object} athlete - Athlete object
+ * @returns {boolean}
+ */
+function isDefinitiveTotalZero(athlete) {
+	if (!athlete) return false;
+	const total = parseFormattedNumber(athlete.total ?? athlete.displayTotal ?? 0);
+	if (total !== 0) return false;
+
+	const attempts = [];
+	if (Array.isArray(athlete.sattempts)) attempts.push(...athlete.sattempts);
+	if (Array.isArray(athlete.cattempts)) attempts.push(...athlete.cattempts);
+
+	// If any attempt is still pending, not definitive
+	for (const a of attempts) {
+		if (!a) return false;
+		const status = (a.liftStatus || a.status || '').toString().toLowerCase();
+		if (status === 'request' || status === 'empty' || status === 'current' || status === 'next') return false;
 	}
 
-	// Build header labels from translations with fallbacks
-	const headers = {
-		order: language === 'no' ? 'Rekke\u00ADfølge' : (translations.Start || translations.Order || 'Order'),
-		name: translations.Name || 'Name',
-		category: translations.Category || 'Cat.',
-		birth: translations['Scoreboard.Birth'] || translations.Birth || 'Born',
-		team: translations.Team || 'Team',
-		snatch: translations.Snatch || 'Snatch',
-		cleanJerk: translations.Clean_and_Jerk || 'Clean & Jerk',
-		total: translations['Scoreboard.Total'] || translations.TOTAL || 'Total',
-		score: translations.Score || 'Score',
-		best: translations.Best || '✔',
-		rank: translations.Rank || 'Rank',
-		session: language === 'no' ? 'Pulje' : (translations.Session || 'Session'),
-		top4scores: (gender === 'MF') ? (language === 'no' ? 'topp 2+2 poengsummer' : 'top 2+2 scores') : (language === 'no' ? 'topp 4 poengsummer' : 'top 4 scores'),
-		totalNextS: language === 'no' ? 'Total Neste F' : 'Total Next S',
-		scoreNextS: language === 'no' ? 'Poeng Neste F' : 'Score Next S'
+	return true;
+}
+
+/**
+ * Create a TeamAthlete from a session athlete (from OWLCMS UPDATE message)
+ * Session athletes already have OWLCMS-computed fields (bestSnatch, bestCleanJerk, sattempts/cattempts with status)
+ * Does NOT mutate the original DTO - returns a new TeamAthlete object
+ * 
+ * @param {Object} sessionAthlete - Raw session athlete from hub (already flattened)
+ * @param {Object} context - Context for enrichment
+ * @param {number|null} context.liftingOrder - Position in lifting order
+ * @param {number|null} context.bodyWeight - Body weight (from database if not in session)
+ * @returns {Object} TeamAthlete with uniform structure for team scoring
+ */
+function teamAthleteFromSession(sessionAthlete, context = {}) {
+	const { liftingOrder = null, bodyWeight = null } = context;
+	
+	// Use body weight from context (merged from database) or from session athlete
+	const athleteBodyWeight = bodyWeight ?? sessionAthlete.bodyWeight ?? 0;
+	const normalizedGender = normalizeGender(sessionAthlete.gender);
+	
+	// Calculate actual values from session athlete data
+	const bestSnatchValue = parseFormattedNumber(sessionAthlete.bestSnatch);
+	const bestCleanJerkValue = parseFormattedNumber(sessionAthlete.bestCleanJerk);
+	const actualTotal = bestSnatchValue + bestCleanJerkValue;
+	const hasResults = bestSnatchValue > 0 || bestCleanJerkValue > 0;
+	
+	// Calculate actual score (Sinclair)
+	const actualScore = (actualTotal > 0 && normalizedGender && athleteBodyWeight > 0)
+		? CalculateSinclair2024(actualTotal, athleteBodyWeight, normalizedGender)
+		: 0;
+	
+	// Calculate predicted total if next lift succeeds
+	const predictedIfNext = calculatePredictedIfNext(sessionAthlete);
+	const predictedScore = (predictedIfNext > 0 && normalizedGender && athleteBodyWeight > 0)
+		? CalculateSinclair2024(predictedIfNext, athleteBodyWeight, normalizedGender)
+		: 0;
+	
+	// Determine if total is definitively zero
+	const definitiveZero = isDefinitiveTotalZero(sessionAthlete);
+	
+	// Format display values
+	const displayTotal = hasResults ? actualTotal : '-';
+	const displayScore = actualScore > 0 ? actualScore.toFixed(2) : (definitiveZero ? '0.00' : '-');
+	const displayPredictedScore = predictedScore > 0 ? predictedScore.toFixed(2) : (definitiveZero ? '0.00' : '-');
+	
+	// Return wrapped athlete - original DTO is preserved, enrichments are added
+	const athleteKey = normalizeKey(sessionAthlete.key ?? sessionAthlete.athleteKey);
+	return {
+		// Original session athlete data (spread to preserve all fields)
+		...sessionAthlete,
+		
+		// Key for lookups (normalized)
+		athleteKey,
+		
+		// Mark source
+		_source: 'session',
+		_originalDto: sessionAthlete,
+		
+		// Body weight (may be enriched from database)
+		bodyWeight: athleteBodyWeight,
+		
+		// Enrichment: actual computed values
+		actualTotal,
+		actualScore,
+		
+		// Enrichment: predicted values (if next lift succeeds)
+		nextTotal: predictedIfNext,
+		nextScore: predictedScore,
+		
+		// Enrichment: display values
+		displayTotal,
+		displayScore,
+		displayNextScore: displayPredictedScore,
+		isDefinitiveZero: definitiveZero,
+		
+		// Enrichment: ordering
+		liftingOrder,
+		
+		// Markers
+		inCurrentSession: true
 	};
-	// Get learning mode from environment
-	const learningMode = process.env.LEARNING_MODE === 'true' ? 'enabled' : 'disabled';
+}
 
-	// If user requested 'current' but no session is detected, return waiting state with blank scoreboard
-	if (requestedGender && String(requestedGender).trim().toLowerCase() === 'current' && helperDetectedGender === 'unknown') {
-		return {
-			competition: { name: fopUpdate?.competitionName || databaseState?.competition?.name || 'Competition', fop: fopName },
-			currentAttempt: null,
-			detectedAthlete: { fullName: null, gender: null },
-			timer: { state: 'stopped', timeRemaining: 0 },
-			sessionStatus: { isDone: false, groupName: '', lastActivity: 0 },
-			teams: [],
-			headers,
-			status: 'waiting',
-			learningMode,
-			options: { showRecords, sortBy, gender: requestedGender, currentAttemptInfo, topN }
-		};
+/**
+ * Compute best lift from raw attempt values (database format)
+ * @param {Array<string|number>} attempts - Array of actual lift values (e.g., [100, -105, 105])
+ * @returns {number} Best successful lift or 0
+ */
+function computeBestLift(attempts) {
+	let best = 0;
+	for (const attempt of attempts) {
+		if (attempt === null || attempt === undefined || attempt === '' || attempt === '-') continue;
+		const val = parseInt(attempt, 10);
+		if (isNaN(val) || val <= 0) continue; // Skip failed lifts (negative) and invalid
+		if (val > best) best = val;
 	}
+	return best;
+}
 
-	// If no gender provided in URL and we can't detect the current session, return waiting state with blank scoreboard
-	if (!requestedGender && helperDetectedGender === 'unknown') {
-		return {
-			competition: { name: fopUpdate?.competitionName || databaseState?.competition?.name || 'Competition', fop: fopName },
-			currentAttempt: null,
-			detectedAthlete: { fullName: null, gender: null },
-			timer: { state: 'stopped', timeRemaining: 0 },
-			sessionStatus: { isDone: false, groupName: '', lastActivity: 0 },
-			teams: [],
-			headers,
-			status: 'waiting',
-			learningMode,
-			options: { showRecords, sortBy, gender: 'current', currentAttemptInfo, topN }
-		};
-	}
-	
-	if (!fopUpdate && !databaseState) {
-		return {
-			competition: { name: 'No Competition Data', fop: 'unknown' },
-			currentAthlete: null,
-			timer: { state: 'stopped', timeRemaining: 0 },
-			sessionStatus: { isDone: false, groupName: '', lastActivity: 0 },  // Include default sessionStatus
-			teams: [],
-			headers,
-			status: 'waiting',
-			learningMode
-		};
-	}
-
-	// Get session status early (before cache check, so it's always fresh)
-	const sessionStatus = competitionHub.getSessionStatus(fopName);
-
-	// Check cache first - cache key based on the last update timestamp from the Hub.
-	// This ensures all clients see the same data for a given update, 
-	// and invalidation is instant when a new update arrives.
-	const lastUpdate = fopUpdate?.lastDataUpdate || 0;
-	const cacheKey = `${fopName}-${lastUpdate}-${JSON.stringify(options)}`;
-	
-	if (nvfScoreboardCache.has(cacheKey)) {
-		const cached = nvfScoreboardCache.get(cacheKey);
-		
-		// Compute sessionStatusMessage from current fopUpdate (even on cache hit)
-		let sessionStatusMessage = null;
-		if (sessionStatus.isDone && fopUpdate?.fullName) {
-			sessionStatusMessage = (fopUpdate.fullName || '').replace(/&ndash;/g, '–').replace(/&mdash;/g, '—');
-		}
-		
-		// Return cached data with current timer state, session status, decision and status message
-		return {
-			...cached,
-			timer: extractTimerState(fopUpdate),
-			decision: extractDecisionState(fopUpdate),
-			sessionStatus,  // Fresh session status
-			sessionStatusMessage,  // Fresh status message
-			learningMode
-		};
-	}
-
-	// Determine current lift type from OWLCMS liftTypeKey field
-	const liftTypeKey = fopUpdate?.liftTypeKey || 'Snatch';
-	const liftType = liftTypeKey === 'Snatch' ? 'snatch' : 'cleanJerk';
-	const liftTypeLabel = liftType === 'snatch' ? 
-		(translations.Snatch || 'Snatch') : 
-		(translations.Clean_and_Jerk || 'Clean & Jerk');
-	
-	// Extract basic competition info
-	const competition = {
-		name: fopUpdate?.competitionName || databaseState?.competition?.name || 'Competition',
-		fop: fopName,
-		state: fopUpdate?.fopState || 'INACTIVE',
-		session: fopUpdate?.sessionName || 'A',
-		liftType: liftType,
-		// Always build custom groupInfo with translations (ignore OWLCMS groupInfo)
-		groupInfo: `${language === 'no' ? 'Pulje' : (translations.Session || 'Session')} ${fopUpdate?.sessionName || 'A'} - ${liftTypeLabel}`
-	};
-
-	// Extract current athlete info from UPDATE message
-	let currentAttempt = null;
-	let sessionStatusMessage = null;  // For displaying when session is done
-	
-	if (fopUpdate?.fullName) {
-		// Clean up HTML entities in fullName (OWLCMS sends session status here when done)
-		const cleanFullName = (fopUpdate.fullName || '').replace(/&ndash;/g, '–').replace(/&mdash;/g, '—');
-		
-		currentAttempt = {
-			fullName: cleanFullName,
-			name: cleanFullName,
-			teamName: fopUpdate.teamName,
-			team: fopUpdate.teamName,
-			startNumber: fopUpdate.startNumber,
-			categoryName: fopUpdate.categoryName,
-			category: fopUpdate.categoryName,
-			attempt: fopUpdate.attempt,
-			attemptNumber: fopUpdate.attemptNumber,
-			weight: fopUpdate.weight,
-			timeAllowed: fopUpdate.timeAllowed,
-			startTime: fopUpdate.athleteTimerEventType === 'Start' ? Date.now() - (fopUpdate.timeAllowed - (fopUpdate.athleteMillisRemaining || 0)) : null
-		};
-		
-		// If session is done, save the cleaned message separately
-		if (sessionStatus.isDone) {
-			sessionStatusMessage = cleanFullName;
-		}
-	}
-
-	// Extract timer info from UPDATE message or keep previous timer state
-	const timer = {
-		state: fopUpdate?.athleteTimerEventType === 'StartTime' ? 'running' : 
-		       fopUpdate?.athleteTimerEventType === 'StopTime' ? 'stopped' : 
-		       fopUpdate?.athleteTimerEventType === 'SetTime' ? 'set' :
-		       fopUpdate?.athleteTimerEventType ? fopUpdate.athleteTimerEventType.toLowerCase() : 'stopped',
-		timeRemaining: fopUpdate?.athleteMillisRemaining ? parseInt(fopUpdate.athleteMillisRemaining) : 0,
-		duration: fopUpdate?.timeAllowed ? parseInt(fopUpdate.timeAllowed) : 60000,
-		startTime: null // Client will compute this
-	};
-
-	// Get precomputed session athletes from UPDATE message (stored in startOrderAthletes key)
-	// Note: startOrderAthletes is already a parsed object (nested JSON from WebSocket)
-	let sessionAthletes = [];
-	if (fopUpdate?.startOrderAthletes) {
-		sessionAthletes = fopUpdate.startOrderAthletes;
-		
-		// Find the current athlete (has 'current' in classname)
-		const currentAthlete = sessionAthletes.find(a => a.classname && a.classname.includes('current'));
-	}
-
-	const liftingOrderMap = new Map();
-	if (Array.isArray(fopUpdate?.liftingOrderAthletes)) {
-		let orderPosition = 1;
-		for (const orderEntry of fopUpdate.liftingOrderAthletes) {
-			if (!orderEntry || orderEntry.isSpacer) continue;
-			const lotKey = normalizeLotNumber(orderEntry.lotNumber ?? orderEntry.startNumber);
-			if (!lotKey) continue;
-			if (!liftingOrderMap.has(lotKey)) {
-				liftingOrderMap.set(lotKey, orderPosition);
+/**
+ * Format a single attempt from database raw fields into display format
+ * Priority: actualLift > change2 > change1 > declaration
+ * 
+ * @param {string|number} declaration - Initial declared weight
+ * @param {string|number} change1 - First change
+ * @param {string|number} change2 - Second change
+ * @param {string|number} actualLift - Actual lift result (negative = fail)
+ * @returns {Object} { stringValue, liftStatus } matching hub normalized format
+ */
+function formatAttemptFromDatabase(declaration, change1, change2, actualLift) {
+	// If actual lift exists, it's been attempted
+	if (actualLift !== null && actualLift !== undefined && actualLift !== '' && actualLift !== 0) {
+		const val = parseInt(actualLift, 10);
+		if (!isNaN(val)) {
+			if (val > 0) {
+				return { stringValue: String(val), liftStatus: 'good' };
+			} else {
+				// Negative = failed lift
+				return { stringValue: String(Math.abs(val)), liftStatus: 'bad' };
 			}
-			orderPosition += 1;
 		}
 	}
 	
-	// Get all athletes from database
-	let allAthletes = [];
-	if (databaseState?.athletes && Array.isArray(databaseState.athletes)) {
-		// Build a map of database athletes by lot number for quick lookup
-		const databaseAthletesByLot = new Map();
-		databaseState.athletes.forEach(dbAthlete => {
-			const lotKey = normalizeLotNumber(dbAthlete.lotNumber);
-			if (lotKey) {
-				databaseAthletesByLot.set(lotKey, dbAthlete);
-			}
-		});
-		
-		// Extract lot numbers from current session to identify who's in the session
-		// Note: sessionAthletes now has lotNumber field (as of latest OWLCMS version)
-		const currentSessionLotNumbers = new Set(
-			sessionAthletes.map(a => normalizeLotNumber(a.lotNumber)).filter(Boolean)
-		);
-		
-		// STRATEGY: Use session athletes data FIRST (they have computed fields), 
-		// then add database-only athletes (those not in current session)
-		
-		// Step 1: Start with all session athletes (they have all the computed OWLCMS data)
-		// IMPORTANT: Merge in bodyWeight from database so we can calculate Sinclair
-		allAthletes = sessionAthletes.map(sa => {
-			const lotKey = normalizeLotNumber(sa.lotNumber ?? sa.startNumber);
-			const dbAthlete = lotKey ? databaseAthletesByLot.get(lotKey) : null;
-			return {
-				...sa,
-				bodyWeight: dbAthlete?.bodyWeight || 0,
-				inCurrentSession: true,
-				liftingOrder: lotKey ? liftingOrderMap.get(lotKey) ?? null : null
-			};
-		});
-		
-		// Step 2: Add athletes from database that are NOT in the current session
-		const databaseOnlyAthletes = databaseState.athletes
-			.filter(dbAthlete => !currentSessionLotNumbers.has(normalizeLotNumber(dbAthlete.lotNumber)))
-			.map(dbAthlete => {
-				// Format database athlete to match session athlete structure
-				const categoryName = dbAthlete.categoryName || getCategoryName(dbAthlete.category, databaseState);
-				const lotKey = normalizeLotNumber(dbAthlete.lotNumber);
-				
-				// Format name as "LASTNAME, Firstname" to match OWLCMS format
-				const lastName = (dbAthlete.lastName || '').toUpperCase();
-				const firstName = dbAthlete.firstName || '';
-				const fullName = lastName && firstName ? `${lastName}, ${firstName}` : 
-				                 lastName || firstName || '';
-				
-				// Compute best lifts from actual lift results
-				const bestSnatch = computeBestLift([
-					dbAthlete.snatch1ActualLift,
-					dbAthlete.snatch2ActualLift,
-					dbAthlete.snatch3ActualLift
-				]);
-				const bestCleanJerk = computeBestLift([
-					dbAthlete.cleanJerk1ActualLift,
-					dbAthlete.cleanJerk2ActualLift,
-					dbAthlete.cleanJerk3ActualLift
-				]);
-				// Total is bestSnatch + bestCleanJerk (for this scoreboard)
-				const total = bestSnatch + bestCleanJerk;
-				
-				return {
-					fullName,
-					firstName: dbAthlete.firstName,
-					lastName: dbAthlete.lastName,
-					teamName: dbAthlete.team || dbAthlete.club,
-					team: dbAthlete.team || dbAthlete.club,
-					flagUrl: getFlagUrl(dbAthlete.team || dbAthlete.club, true),
-					startNumber: dbAthlete.startNumber,
-					lotNumber: dbAthlete.lotNumber,
-					categoryName: categoryName,
-					category: categoryName,
-					gender: dbAthlete.gender,
-					bodyWeight: dbAthlete.bodyWeight,
-					yearOfBirth: dbAthlete.fullBirthDate?.[0] || '',
-					
-					// Format snatch attempts in OWLCMS display format
-					sattempts: [
-						formatAttempt(dbAthlete.snatch1Declaration, dbAthlete.snatch1Change1, dbAthlete.snatch1Change2, dbAthlete.snatch1ActualLift, dbAthlete.snatch1AutomaticProgression),
-						formatAttempt(dbAthlete.snatch2Declaration, dbAthlete.snatch2Change1, dbAthlete.snatch2Change2, dbAthlete.snatch2ActualLift, dbAthlete.snatch2AutomaticProgression),
-						formatAttempt(dbAthlete.snatch3Declaration, dbAthlete.snatch3Change1, dbAthlete.snatch3Change2, dbAthlete.snatch3ActualLift, dbAthlete.snatch3AutomaticProgression)
-					],
-					
-					// Format clean & jerk attempts in OWLCMS display format
-					cattempts: [
-						formatAttempt(dbAthlete.cleanJerk1Declaration, dbAthlete.cleanJerk1Change1, dbAthlete.cleanJerk1Change2, dbAthlete.cleanJerk1ActualLift, dbAthlete.cleanJerk1AutomaticProgression),
-						formatAttempt(dbAthlete.cleanJerk2Declaration, dbAthlete.cleanJerk2Change1, dbAthlete.cleanJerk2Change2, dbAthlete.cleanJerk2ActualLift, dbAthlete.cleanJerk2AutomaticProgression),
-						formatAttempt(dbAthlete.cleanJerk3Declaration, dbAthlete.cleanJerk3Change1, dbAthlete.cleanJerk3Change2, dbAthlete.cleanJerk3ActualLift, dbAthlete.cleanJerk3AutomaticProgression)
-					],
-					
-					// Best lifts and total (computed from actual lift results)
-					bestSnatch,
-					bestCleanJerk,
-					total,
-					
-					// Scoring fields from OWLCMS
-					totalRank: 0,
-					sinclair: dbAthlete.sinclair || 0,
-					globalScore: dbAthlete.globalScore || null,
-					
-					// No classname (not in current session)
-					inCurrentSession: false,
-					liftingOrder: lotKey ? liftingOrderMap.get(lotKey) ?? null : null
-				};
-			});
-		
-		// Step 3: Combine session athletes + database-only athletes
-		allAthletes = [...allAthletes, ...databaseOnlyAthletes];
-		
-	} else {
-		// No database available, use only session athletes
-		allAthletes = sessionAthletes.map(a => {
-			const lotKey = normalizeLotNumber(a.lotNumber ?? a.startNumber);
-			return {
-				...a,
-				inCurrentSession: true,
-				liftingOrder: lotKey ? liftingOrderMap.get(lotKey) ?? null : null
-			};
-		});
+	// Not yet attempted - find the current request weight
+	const requestWeight = change2 || change1 || declaration;
+	if (requestWeight !== null && requestWeight !== undefined && requestWeight !== '' && requestWeight !== 0) {
+		const val = parseInt(requestWeight, 10);
+		if (!isNaN(val) && val > 0) {
+			return { stringValue: String(val), liftStatus: 'request' };
+		}
 	}
 	
-	// Filter athletes by gender if not 'MF' (use normalized genders)
-	if (gender !== 'MF') {
-		allAthletes = allAthletes.filter(athlete => normalizeGender(athlete.gender) === gender);
-	}
+	// No data
+	return { stringValue: '', liftStatus: 'empty' };
+}
 
-	// Always ignore athletes with no team (drop before grouping)
-	allAthletes = allAthletes.filter((athlete) => {
-		const teamRaw = (athlete.teamName ?? athlete.team ?? '').toString().trim();
-		return teamRaw.length > 0;
+/**
+ * Create a TeamAthlete from a database athlete (from OWLCMS DATABASE message)
+ * Database athletes lack OWLCMS-computed fields, so we compute them here
+ * Does NOT mutate the original DTO - returns a new TeamAthlete object
+ * 
+ * @param {Object} dbAthlete - Raw database athlete from databaseState.athletes
+ * @param {Object} context - Context for enrichment
+ * @param {number|null} context.liftingOrder - Position in lifting order (if known)
+ * @returns {Object} TeamAthlete with uniform structure for team scoring (same as teamAthleteFromSession)
+ */
+function teamAthleteFromDatabase(dbAthlete, context = {}) {
+	const { liftingOrder = null } = context;
+	
+	if (!dbAthlete) return null;
+	
+	const normalizedGender = normalizeGender(dbAthlete.gender);
+	const athleteBodyWeight = parseFormattedNumber(dbAthlete.bodyWeight) || 0;
+	
+	// Format name as "LASTNAME, Firstname" to match OWLCMS session format
+	const lastName = (dbAthlete.lastName || '').toUpperCase();
+	const firstName = dbAthlete.firstName || '';
+	const fullName = lastName && firstName ? `${lastName}, ${firstName}` : lastName || firstName || '';
+	
+	// Use teamName from V2 parser (already resolved) or fall back to resolving from team ID
+	const teamName = dbAthlete.teamName || competitionHub.getTeamNameById(dbAthlete.team) || '';
+	
+	// Build sattempts array from raw database fields
+	const sattempts = [
+		formatAttemptFromDatabase(dbAthlete.snatch1Declaration, dbAthlete.snatch1Change1, dbAthlete.snatch1Change2, dbAthlete.snatch1ActualLift),
+		formatAttemptFromDatabase(dbAthlete.snatch2Declaration, dbAthlete.snatch2Change1, dbAthlete.snatch2Change2, dbAthlete.snatch2ActualLift),
+		formatAttemptFromDatabase(dbAthlete.snatch3Declaration, dbAthlete.snatch3Change1, dbAthlete.snatch3Change2, dbAthlete.snatch3ActualLift)
+	];
+	
+	// Build cattempts array from raw database fields
+	const cattempts = [
+		formatAttemptFromDatabase(dbAthlete.cleanJerk1Declaration, dbAthlete.cleanJerk1Change1, dbAthlete.cleanJerk1Change2, dbAthlete.cleanJerk1ActualLift),
+		formatAttemptFromDatabase(dbAthlete.cleanJerk2Declaration, dbAthlete.cleanJerk2Change1, dbAthlete.cleanJerk2Change2, dbAthlete.cleanJerk2ActualLift),
+		formatAttemptFromDatabase(dbAthlete.cleanJerk3Declaration, dbAthlete.cleanJerk3Change1, dbAthlete.cleanJerk3Change2, dbAthlete.cleanJerk3ActualLift)
+	];
+	
+	// Compute best lifts from actual lift results
+	const bestSnatch = computeBestLift([
+		dbAthlete.snatch1ActualLift,
+		dbAthlete.snatch2ActualLift,
+		dbAthlete.snatch3ActualLift
+	]);
+	const bestCleanJerk = computeBestLift([
+		dbAthlete.cleanJerk1ActualLift,
+		dbAthlete.cleanJerk2ActualLift,
+		dbAthlete.cleanJerk3ActualLift
+	]);
+	
+	// Build a normalized athlete object that looks like a session athlete
+	// This allows calculatePredictedIfNext to work the same way
+	const normalizedAthlete = {
+		sattempts,
+		cattempts,
+		bestSnatch,
+		bestCleanJerk
+	};
+	
+	// Calculate actual total
+	const actualTotal = bestSnatch + bestCleanJerk;
+	const hasResults = bestSnatch > 0 || bestCleanJerk > 0;
+	
+	// Calculate actual score (Sinclair)
+	const actualScore = (actualTotal > 0 && normalizedGender && athleteBodyWeight > 0)
+		? CalculateSinclair2024(actualTotal, athleteBodyWeight, normalizedGender)
+		: 0;
+	
+	// Calculate predicted total if next lift succeeds
+	const predictedIfNext = calculatePredictedIfNext(normalizedAthlete);
+	const predictedScore = (predictedIfNext > 0 && normalizedGender && athleteBodyWeight > 0)
+		? CalculateSinclair2024(predictedIfNext, athleteBodyWeight, normalizedGender)
+		: 0;
+	
+	// Determine if total is definitively zero
+	const definitiveZero = isDefinitiveTotalZero(normalizedAthlete);
+	
+	// Format display values
+	const displayTotal = hasResults ? actualTotal : '-';
+	const displayScore = actualScore > 0 ? actualScore.toFixed(2) : (definitiveZero ? '0.00' : '-');
+	const displayPredictedScore = predictedScore > 0 ? predictedScore.toFixed(2) : (definitiveZero ? '0.00' : '-');
+	
+	// Return TeamAthlete - same structure as teamAthleteFromSession
+	const athleteKey = normalizeKey(dbAthlete.key);
+	
+	// Format category for display - replace underscores with spaces
+	const categoryDisplay = (dbAthlete.categoryCode || '').replace(/_/g, ' ');
+	
+	return {
+		// Key for lookups (OWLCMS unique identifier)
+		key: dbAthlete.key,
+		athleteKey,
+		
+		// Computed display fields (matching session athlete format)
+		fullName,
+		firstName: dbAthlete.firstName,
+		lastName: dbAthlete.lastName,
+		teamName,  // Resolved from team ID using hub's indexed teams
+		team: dbAthlete.team,  // Original team ID
+		startNumber: dbAthlete.startNumber,
+		lotNumber: dbAthlete.lotNumber,
+		category: categoryDisplay,
+		categoryName: categoryDisplay,
+		gender: dbAthlete.gender,
+		bodyWeight: athleteBodyWeight,
+		yearOfBirth: extractYearOfBirth(dbAthlete.fullBirthDate),
+		sessionName: dbAthlete.sessionName || '',
+		group: dbAthlete.sessionName || '',
+		
+		// Computed attempts arrays (same format as session athlete)
+		sattempts,
+		cattempts,
+		
+		// Computed best lifts
+		bestSnatch,
+		bestCleanJerk,
+		total: actualTotal,
+		
+		// Mark source
+		_source: 'database',
+		_originalDto: dbAthlete,
+		
+		// Enrichment: actual computed values
+		actualTotal,
+		actualScore,
+		
+		// Enrichment: predicted values (if next lift succeeds)
+		nextTotal: predictedIfNext,
+		nextScore: predictedScore,
+		
+		// Enrichment: display values
+		displayTotal,
+		displayScore,
+		displayNextScore: displayPredictedScore,
+		isDefinitiveZero: definitiveZero,
+		
+		// Enrichment: ordering
+		liftingOrder,
+		
+		// Markers
+		inCurrentSession: false
+	};
+}
+
+// Export for testing
+export { calculatePredictedIfNext, teamAthleteFromSession, teamAthleteFromDatabase };
+
+// =============================================================================
+// LAYER 3: TEAM GROUPING AND SCORING
+// =============================================================================
+
+/**
+ * Get score from TeamAthlete for team scoring
+ * Uses actualScore (computed Sinclair)
+ * @param {Object} athlete - TeamAthlete
+ * @returns {number}
+ */
+function getAthleteScore(athlete) {
+	if (!athlete) return 0;
+	if (typeof athlete.actualScore === 'number' && Number.isFinite(athlete.actualScore)) {
+		return athlete.actualScore;
+	}
+	return 0;
+}
+
+/**
+ * Compare two athletes for sorting within a team
+ * Sort order: session name/number, then start number (if in current session), then lot number
+ * @param {Object} a - First TeamAthlete
+ * @param {Object} b - Second TeamAthlete
+ * @returns {number} Comparison result
+ */
+function compareAthletesForTeamOrder(a, b) {
+	// 1. Sort by session name/number (alphabetical/numerical)
+	const sessionA = (a.group || a.sessionName || '').toString();
+	const sessionB = (b.group || b.sessionName || '').toString();
+	if (sessionA !== sessionB) {
+		return sessionA.localeCompare(sessionB, undefined, { numeric: true });
+	}
+	
+	// 2. Within same session, sort by start number (only current session athletes have start numbers)
+	const startA = parseInt(a.startNumber, 10) || 999999;
+	const startB = parseInt(b.startNumber, 10) || 999999;
+	if (startA !== startB) {
+		return startA - startB;
+	}
+	
+	// 3. Fallback to lot number
+	const lotA = parseInt(a.lotNumber, 10) || 999999;
+	const lotB = parseInt(b.lotNumber, 10) || 999999;
+	return lotA - lotB;
+}
+
+/**
+ * Get predicted score from TeamAthlete
+ * @param {Object} athlete - TeamAthlete
+ * @returns {number}
+ */
+function getAthletePredictedScore(athlete) {
+	if (!athlete) return 0;
+	if (typeof athlete.nextScore === 'number' && Number.isFinite(athlete.nextScore)) {
+		return athlete.nextScore;
+	}
+	return parseFormattedNumber(athlete.nextScore) || 0;
+}
+
+/**
+ * Determine top contributors for a team (for actual or predicted scores)
+ * 
+ * @param {Array} athletes - Array of TeamAthlete objects for this team
+ * @param {string} gender - Gender filter ('M', 'F', or 'MF')
+ * @param {Function} scoreFn - Function to get score from athlete
+ * @returns {Set} Set of athlete keys for top contributors
+ */
+function findTopContributors(athletes, gender, scoreFn) {
+	let topContributors = [];
+	
+	if (gender === 'MF') {
+		// Mixed: top 2 men + top 2 women
+		const males = athletes.filter(a => normalizeGender(a.gender) === 'M');
+		const females = athletes.filter(a => normalizeGender(a.gender) === 'F');
+		
+		// Sort each gender by score (highest first)
+		males.sort((a, b) => scoreFn(b) - scoreFn(a));
+		females.sort((a, b) => scoreFn(b) - scoreFn(a));
+		
+		topContributors = [...males.slice(0, 2), ...females.slice(0, 2)];
+	} else {
+		// Single gender: top 4 by score
+		const byScore = [...athletes].sort((a, b) => scoreFn(b) - scoreFn(a));
+		topContributors = byScore.slice(0, 4);
+	}
+	
+	// Use athleteKey for identification (OWLCMS unique key)
+	return new Set(
+		topContributors.map(a => normalizeKey(a.athleteKey ?? a.key)).filter(Boolean)
+	);
+}
+
+/**
+ * Group TeamAthletes by team and compute team scores
+ * 
+ * Team score = sum of top 4 contributors' actualScore (Sinclair)
+ *   - Single gender: top 4 by actualScore
+ *   - Mixed (MF): top 2 men + top 2 women by actualScore
+ * 
+ * All highlighting is precomputed as CSS class names on each athlete:
+ *   - scoreHighlightClass: CSS class for actual score cell (e.g., 'top-contributor-m', 'top-contributor-f', 'top-contributor')
+ *   - nextScoreHighlightClass: CSS class for predicted score cell
+ * 
+ * Athletes within team are sorted by: session, start number, lot number
+ * Teams are sorted by: team score (highest first)
+ * 
+ * @param {Array} teamAthletes - Array of TeamAthlete objects
+ * @param {string} gender - Gender filter ('M', 'F', or 'MF')
+ * @param {Object} headers - Translated headers
+ * @returns {Array} Array of team objects ready for frontend display
+ */
+function groupByTeams(teamAthletes, gender, headers) {
+	console.log(`[NVF groupByTeams] Input: ${teamAthletes.length} athletes, gender filter: ${gender}`);
+	
+	// Filter athletes with no team
+	const athletesWithTeams = teamAthletes.filter(a => {
+		const teamName = (a.teamName ?? a.team ?? '').toString().trim();
+		return teamName.length > 0;
 	});
 	
-	// Calculate nextTotal and nextScore for each athlete (session athletes have attempt data from startOrderAthletes,
-	// database athletes have computed bestSnatch/bestCleanJerk from their raw lift records)
-	// Compute attemptsDone = number of completed attempts (attemptNumber - 1)
-	// If no attemptNumber provided, default to 0 completed attempts
-	const attemptsDone = Math.max(0, (parseInt(fopUpdate?.attemptNumber ?? fopUpdate?.attempt ?? 0, 10) || 0) - 1);
-	allAthletes = allAthletes.map(athlete => {
-		const nextTotal = calculatePredictedTotal(athlete, liftType, attemptsDone);
-		const normalizedAthleteGender = normalizeGender(athlete.gender);
-		const nextScore = (nextTotal > 0 && normalizedAthleteGender) ? CalculateSinclair2024(nextTotal, athlete.bodyWeight, normalizedAthleteGender) : 0;
-		const bestSnatchValue = parseFormattedNumber(athlete.bestSnatch);
-		const bestCleanJerkValue = parseFormattedNumber(athlete.bestCleanJerk);
-		const hasBest = bestSnatchValue > 0 || bestCleanJerkValue > 0;
-		const combinedBest = bestSnatchValue + bestCleanJerkValue;
-		const displayTotal = hasBest ? combinedBest : '-';
-		const actualTotalNumeric = hasBest ? combinedBest : 0;
-		
-		// Compute definitive zero flag
-		const isDefinitiveZero = isDefinitiveTotalZero(athlete);
-		
-		// Pre-format actual score using Sinclair formula for consistency with predicted score
-		const currentScoreNum = (actualTotalNumeric > 0 && normalizedAthleteGender)
-			? CalculateSinclair2024(actualTotalNumeric, athlete.bodyWeight, normalizedAthleteGender)
-			: 0;
-		const displayScore = currentScoreNum > 0 ? currentScoreNum.toFixed(2) : 
-		                     (isDefinitiveZero && currentScoreNum === 0) ? '0.00' : '-';
-		
-		const nextScoreNum = parseFormattedNumber(nextScore);
-		const displayNextScore = nextScoreNum > 0 ? nextScoreNum.toFixed(2) : 
-		                         (isDefinitiveZero && nextScoreNum === 0) ? '0.00' : '-';
-		
-		return {
-			...athlete,
-			nextTotal,
-			nextScore,
-			actualScore: currentScoreNum,
-			displayTotal,
-			isDefinitiveZero,
-			displayScore,
-			displayNextScore
-		};
-	});
+	console.log(`[NVF groupByTeams] After team filter: ${athletesWithTeams.length} athletes with teams`);
 	
-	// Group athletes by team
+	// Filter by gender if not mixed
+	const filteredAthletes = gender !== 'MF' 
+		? athletesWithTeams.filter(a => normalizeGender(a.gender) === gender)
+		: athletesWithTeams;
+	
+	console.log(`[NVF groupByTeams] After gender filter: ${filteredAthletes.length} athletes`);
+	
+	// Group by team
 	const teamMap = new Map();
-	allAthletes.forEach(athlete => {
+	filteredAthletes.forEach(athlete => {
 		const teamName = (athlete.teamName ?? athlete.team ?? '').toString().trim();
-		if (!teamName) return; // skip empty teams entirely
 		if (!teamMap.has(teamName)) {
 			teamMap.set(teamName, []);
 		}
 		teamMap.get(teamName).push(athlete);
 	});
 	
-	// Convert to array and sort teams
-	let teams = Array.from(teamMap.entries()).map(([teamName, allTeamAthletesRaw]) => {
-		// IMPORTANT: Filter out spacer athletes (isSpacer === true) before any processing
-		const allTeamAthletes = allTeamAthletesRaw.filter(a => !a.isSpacer);
+	// Build team objects with scores
+	const teams = Array.from(teamMap.entries()).map(([teamName, allTeamAthletes]) => {
+		// Filter out spacers
+		const athletes = allTeamAthletes.filter(a => !a.isSpacer);
 		
-		// Calculate team scores using the BEST 4 athletes from the FULL team
-		// This happens BEFORE any topN filtering is applied to the display
-		// IMPORTANT: Select top 4 SEPARATELY for current score vs predicted score
+		// Find top contributors for ACTUAL score
+		const actualTopContributors = findTopContributors(athletes, gender, getAthleteScore);
 		
-		// Compute top contributors based on selected gender rules
-		let topCurrentContributors = [];
-		let topPredictedContributors = [];
-
-		if (gender === 'MF') {
-			// For mixed display: take top 2 men and top 2 women separately
-			const males = allTeamAthletes.filter(a => normalizeGender(a.gender) === 'M');
-			const females = allTeamAthletes.filter(a => normalizeGender(a.gender) === 'F');
-
-			males.sort((a, b) => getAthleteScore(b) - getAthleteScore(a));
-			females.sort((a, b) => getAthleteScore(b) - getAthleteScore(a));
-			const topMalesCurrent = males.slice(0, 2);
-			const topFemalesCurrent = females.slice(0, 2);
-			topCurrentContributors = [...topMalesCurrent, ...topFemalesCurrent];
-
-			// Predicted
-			males.sort((a, b) => (b.nextScore || 0) - (a.nextScore || 0));
-			females.sort((a, b) => (b.nextScore || 0) - (a.nextScore || 0));
-			const topMalesPred = males.slice(0, 2);
-			const topFemalesPred = females.slice(0, 2);
-			topPredictedContributors = [...topMalesPred, ...topFemalesPred];
-		} else {
-			// Single-gender board (M or F): take top 4 of the visible athletes
-			const athletesByCurrentScore = [...allTeamAthletes].sort((a, b) => getAthleteScore(b) - getAthleteScore(a));
-			topCurrentContributors = athletesByCurrentScore.slice(0, 4);
-
-			const athletesByPredictedScore = [...allTeamAthletes].sort((a, b) => (b.nextScore || 0) - (a.nextScore || 0));
-			topPredictedContributors = athletesByPredictedScore.slice(0, 4);
-		}
+		// Find top contributors for PREDICTED score (may differ from actual!)
+		const predictedTopContributors = findTopContributors(athletes, gender, getAthletePredictedScore);
 		
-		// Now apply Top N filter per team if specified (for DISPLAY only)
-		let athletes = allTeamAthletes;
-		if (topN > 0) {
-			// Separate by gender within this team
-			const maleAthletes = athletes.filter(a => a.gender === 'M');
-			const femaleAthletes = athletes.filter(a => a.gender === 'F');
+		// Calculate team scores
+		let teamScore = 0;
+		let teamNextScore = 0;
+		
+		athletes.forEach(a => {
+			const athleteKey = normalizeKey(a.athleteKey ?? a.key);
+			if (actualTopContributors.has(athleteKey)) {
+				teamScore += getAthleteScore(a);
+			}
+			if (predictedTopContributors.has(athleteKey)) {
+				teamNextScore += getAthletePredictedScore(a);
+			}
+		});
+		
+		// Precompute highlight class names for each athlete
+		const athletesWithHighlighting = athletes.map(a => {
+			const athleteKey = normalizeKey(a.athleteKey ?? a.key);
+			const isActualContributor = actualTopContributors.has(athleteKey);
+			const isPredictedContributor = predictedTopContributors.has(athleteKey);
+			const athleteGender = normalizeGender(a.gender);
 			
-			// Sort each by score (globalScore or sinclair)
-			maleAthletes.sort((a, b) => {
-				const scoreA = getAthleteScore(a);
-				const scoreB = getAthleteScore(b);
-				return scoreB - scoreA;
-			});
+			// Determine CSS class for actual score highlight
+			let scoreHighlightClass = '';
+			if (isActualContributor) {
+				if (gender === 'MF') {
+					// In MF mode, differentiate by gender
+					scoreHighlightClass = athleteGender === 'F' ? 'top-contributor-f' : 'top-contributor-m';
+				} else {
+					scoreHighlightClass = 'top-contributor';
+				}
+			}
 			
-			femaleAthletes.sort((a, b) => {
-				const scoreA = getAthleteScore(a);
-				const scoreB = getAthleteScore(b);
-				return scoreB - scoreA;
-			});
+			// Determine CSS class for predicted score highlight
+			let nextScoreHighlightClass = '';
+			if (isPredictedContributor) {
+				if (gender === 'MF') {
+					nextScoreHighlightClass = athleteGender === 'F' ? 'top-contributor-f' : 'top-contributor-m';
+				} else {
+					nextScoreHighlightClass = 'top-contributor';
+				}
+			}
 			
-			// Take top N from each gender in this team
-			const topMales = maleAthletes.slice(0, topN);
-			const topFemales = femaleAthletes.slice(0, topN);
-			
-			// Combine back together
-			athletes = [...topMales, ...topFemales];
-		}
+			return {
+				...a,
+				scoreHighlightClass,
+				nextScoreHighlightClass
+			};
+		});
 		
-		// Sort athletes within team
-		// If topN is active, sort by score (already done above, just preserve it)
-		// Otherwise, sort by total
-		if (topN === 0) {
-			athletes.sort((a, b) => (b.total || 0) - (a.total || 0));
-		} else {
-			// Re-sort the combined list by score (since we combined males and females)
-			athletes.sort((a, b) => {
-				const scoreA = getAthleteScore(a);
-				const scoreB = getAthleteScore(b);
-				return scoreB - scoreA;
-			});
-		}
+		// Sort athletes within team by: session, start number, lot number
+		athletesWithHighlighting.sort(compareAthletesForTeamOrder);
 		
-		// Calculate team total (sum of all athlete totals)
-		const teamTotal = allTeamAthletes.reduce((sum, a) => sum + (a.total || 0), 0);
-
-		// Calculate team score based on selected contributors
-		const teamScore = topCurrentContributors.reduce((sum, a) => sum + getAthleteScore(a), 0);
-
-		// Calculate team next score (sum of selected predicted contributors)
-		const numericValue = (value) => {
-			const num = Number(value);
-			return Number.isFinite(num) ? num : 0;
-		};
-		const teamNextScore = topPredictedContributors.reduce((sum, a) => sum + numericValue(a.nextScore), 0);
-		const teamNextTotal = topPredictedContributors.reduce((sum, a) => sum + numericValue(a.nextTotal), 0);
-		
-		// Track which athletes contribute to each score for highlighting
-		const normalizeLotNumber = (value) => {
-			if (value === undefined || value === null) return null;
-			const strValue = String(value).trim();
-			return strValue === '' ? null : strValue;
-		};
-		const top4CurrentLotNumbers = topCurrentContributors
-			.map((athlete) => normalizeLotNumber(athlete.lotNumber))
-			.filter(Boolean);
-		const top4PredictedLotNumbers = topPredictedContributors
-			.map((athlete) => normalizeLotNumber(athlete.lotNumber))
-			.filter(Boolean);
+		// Count contributors (for display label)
+		const contributorCount = actualTopContributors.size;
 		
 		return {
 			teamName,
 			flagUrl: getFlagUrl(teamName, true),
-			athletes,
-			teamTotal,
+			athletes: athletesWithHighlighting,
+			athleteCount: athletes.length,
 			teamScore,
 			teamNextScore,
-			teamNextTotal,
-			athleteCount: headers.top4scores,
-			top4CurrentLotNumbers,
-			top4PredictedLotNumbers
+			contributorCount,
+			contributorLabel: headers?.top4scores || (gender === 'MF' ? 'top 2+2 scores' : 'top 4 scores')
 		};
 	});
 	
-	// Sort teams by total score (highest first)
+	// Sort teams by actual score (highest first)
 	teams.sort((a, b) => b.teamScore - a.teamScore);
 	
-	// Calculate max team name length (for responsive layout)
-	// Narrow team column if longest team name is short (< 7 characters)
-	const maxTeamNameLength = Math.max(0, ...teams.map(t => (t.teamName || '').length));
-	const compactTeamColumn = maxTeamNameLength < 7; // Narrow team column if max name length < 7
-	
-	// Get competition stats
-	const stats = getCompetitionStats(databaseState);
-
-	const result = {
-		competition,
-		currentAttempt,
-		detectedAthlete: {
-			fullName: helperDetectedAthlete?.fullName || helperDetectedAthlete?.startNumber || null,
-			gender: helperDetectedGender || null
-		},
-		timer,
-		sessionStatusMessage,  // Cleaned message for when session is done
-		teams, // Array of team objects with athletes
-		allAthletes, // Flat list if needed
-		stats,
-		headers,  // Translated header labels
-		displaySettings: fopUpdate?.showTotalRank || fopUpdate?.showSinclair ? {
-			showTotalRank: fopUpdate.showTotalRank === 'true',
-			showSinclair: fopUpdate.showSinclair === 'true',
-			showLiftRanks: fopUpdate.showLiftRanks === 'true',
-			showSinclairRank: fopUpdate.showSinclairRank === 'true'
-		} : {},
-		isBreak: fopUpdate?.break === 'true' || false,
-		breakType: fopUpdate?.breakType,
-		sessionStatus,  // Include session status (isDone, sessionName, lastActivity)
-		compactTeamColumn,  // Narrow team column if max team size < 7
-		status: (fopUpdate || databaseState) ? 'ready' : 'waiting',
-		lastUpdate: fopUpdate?.lastUpdate || Date.now(),
-		// Echo back the options used. Expose the raw requested gender if provided so the client
-		// can honor 'Current' as a distinct option. If the client did not request a gender explicitly
-		// we omit the gender field so the client treats it as "no gender" and can auto-switch.
-		options: { showRecords, sortBy, gender: requestedGender !== undefined ? requestedGender : undefined, currentAttemptInfo, topN }
-	};
-	
-	// Cache the result (excluding timer, learningMode, sessionStatus, and sessionStatusMessage which change frequently)
-	nvfScoreboardCache.set(cacheKey, {
-		competition: result.competition,
-		currentAttempt: result.currentAttempt,
-		detectedAthlete: result.detectedAthlete,
-		teams: result.teams,
-		allAthletes: result.allAthletes,
-		stats: result.stats,
-		displaySettings: result.displaySettings,
-		headers: result.headers,
-		isBreak: result.isBreak,
-		breakType: result.breakType,
-		status: result.status,
-		lastUpdate: result.lastUpdate,
-		options: result.options
-	});
-	console.log(`[NVF] Cache now has ${nvfScoreboardCache.size} entries`);
-	
-	// Cleanup old cache entries (keep last 3 - with 6 FOPs max and 2-3 options = ~18 entries worst case)
-	// Reducing from 20 to 3 to avoid memory bloat when multiple scoreboards/FOPs loaded
-	if (nvfScoreboardCache.size > 3) {
-		const firstKey = nvfScoreboardCache.keys().next().value;
-		nvfScoreboardCache.delete(firstKey);
-	}
-
-	return {
-		...result,
-		sessionStatus,  // Always include fresh session status
-		decision: extractDecisionState(fopUpdate),
-		learningMode
-	};
+	return teams;
 }
 
-/**
- * Extract timer state from FOP update (called separately since timer changes frequently)
- * @param {Object} fopUpdate - FOP update data
- * @returns {Object} Timer state
- */
+// =============================================================================
+// TIMER AND DECISION EXTRACTION
+// =============================================================================
+
 function extractTimerState(fopUpdate) {
 	return {
 		state: fopUpdate?.athleteTimerEventType === 'StartTime' ? 'running' : 
@@ -877,22 +830,16 @@ function extractTimerState(fopUpdate) {
 		       fopUpdate?.athleteTimerEventType ? fopUpdate.athleteTimerEventType.toLowerCase() : 'stopped',
 		timeRemaining: fopUpdate?.athleteMillisRemaining ? parseInt(fopUpdate.athleteMillisRemaining) : 0,
 		duration: fopUpdate?.timeAllowed ? parseInt(fopUpdate.timeAllowed) : 60000,
-		startTime: null // Client will compute this
+		startTime: null
 	};
 }
 
 function extractDecisionState(fopUpdate) {
-	// Clear decisions when timer starts (new lift beginning)
 	const eventType = fopUpdate?.athleteTimerEventType;
 	if (eventType === 'StartTime') {
 		return {
-			visible: false,
-			type: null,
-			isSingleReferee: false,
-			ref1: null,
-			ref2: null,
-			ref3: null,
-			down: false
+			visible: false, type: null, isSingleReferee: false,
+			ref1: null, ref2: null, ref3: null, down: false
 		};
 	}
 
@@ -920,184 +867,360 @@ function extractDecisionState(fopUpdate) {
 	};
 }
 
+// =============================================================================
+// MAIN SCOREBOARD DATA FUNCTION
+// =============================================================================
+
 /**
- * Get category name by ID from database state
- * @param {number} categoryId - Category ID
- * @param {Object} databaseState - Database state
- * @returns {string} Category name
+ * Get formatted scoreboard data for SSR/API (SERVER-SIDE ONLY)
+ * 
+ * For NVF team scoreboard:
+ * - Uses session athletes from hub (already flattened, OWLCMS-computed values)
+ * - Wraps each athlete with enrichment (sinclair, predictions)
+ * - Groups by team and computes team scores
+ * 
+ * @param {string} fopName - FOP name (default: 'A')
+ * @param {Object} options - User preferences
+ * @returns {Object} Formatted data ready for browser consumption
  */
-function getCategoryName(categoryId, databaseState) {
-	if (!categoryId || !databaseState?.ageGroups) {
-		return '';
+export function getScoreboardData(fopName = 'A', options = {}) {
+	const fopUpdate = getFopUpdate(fopName);
+	const databaseState = getDatabaseState();
+	
+	// Options
+	const showRecords = options.showRecords ?? false;
+	const sortBy = 'score';
+	const currentAttemptInfo = options.currentAttemptInfo ?? false;
+	const topN = options.topN ?? 0;
+	const language = options.lang || options.language || 'no';
+	const translations = competitionHub.getTranslations(language);
+	const learningMode = process.env.LEARNING_MODE === 'true' ? 'enabled' : 'disabled';
+	const sessionStatus = competitionHub.getSessionStatus(fopName);
+
+	// Detect session gender from session athletes
+	let helperDetectedGender = 'unknown';
+	let helperDetectedAthlete = null;
+	
+	const sessionAthletes = getSessionAthletes(fopName);
+	if (sessionAthletes.length > 0) {
+		helperDetectedAthlete = sessionAthletes.find(a => a.fullName || a.startNumber) || sessionAthletes[0];
+		helperDetectedGender = normalizeGender(helperDetectedAthlete?.gender) || normalizeGender(fopUpdate?.gender) || 'unknown';
+	} else {
+		helperDetectedGender = normalizeGender(fopUpdate?.gender) || 'unknown';
 	}
 	
-	for (const ageGroup of databaseState.ageGroups) {
-		if (ageGroup.categories) {
-			const category = ageGroup.categories.find(c => c.id === categoryId);
-			if (category) {
-				return category.name || category.code || '';
+	console.log(`[NVF helpers] Detected session athlete: "${helperDetectedAthlete?.fullName || 'none'}" gender: ${helperDetectedGender}`);
+
+	// Resolve gender option
+	const requestedGender = (typeof options.gender === 'string' || options.gender === true) ? options.gender : undefined;
+	let gender = 'MF';
+	
+	if (options.gender === true) {
+		gender = 'MF';
+	} else if (typeof options.gender === 'string') {
+		if (String(options.gender).trim().toLowerCase() === 'current') {
+			gender = (helperDetectedGender && helperDetectedGender !== 'unknown') ? helperDetectedGender : 'MF';
+		} else {
+			gender = normalizeGender(options.gender) || 'MF';
+		}
+	} else {
+		gender = (helperDetectedGender && helperDetectedGender !== 'unknown') ? helperDetectedGender : 'MF';
+	}
+
+	// Build headers from translations
+	const headers = {
+		order: language === 'no' ? 'Rekke\u00ADfølge' : (translations.Start || translations.Order || 'Order'),
+		name: translations.Name || 'Name',
+		category: translations.Category || 'Cat.',
+		birth: translations['Scoreboard.Birth'] || translations.Birth || 'Born',
+		team: translations.Team || 'Team',
+		snatch: translations.Snatch || 'Snatch',
+		cleanJerk: translations.Clean_and_Jerk || 'Clean & Jerk',
+		total: translations['Scoreboard.Total'] || translations.TOTAL || 'Total',
+		score: translations.Score || 'Score',
+		best: translations.Best || '✔',
+		rank: translations.Rank || 'Rank',
+		session: language === 'no' ? 'Pulje' : (translations.Session || 'Session'),
+		top4scores: (gender === 'MF') 
+			? (language === 'no' ? 'topp 2+2 poengsummer' : 'top 2+2 scores') 
+			: (language === 'no' ? 'topp 4 poengsummer' : 'top 4 scores'),
+		totalNextS: language === 'no' ? 'Total Neste F' : 'Total Next S',
+		scoreNextS: language === 'no' ? 'Poeng Neste F' : 'Score Next S'
+	};
+
+	// Early return for waiting states - but only if we have NO data at all
+	// If we have database data, show it even without an active session
+	if (!fopUpdate && !databaseState) {
+		return {
+			competition: { name: 'No Competition Data', fop: 'unknown' },
+			currentAthlete: null,
+			timer: { state: 'stopped', timeRemaining: 0 },
+			sessionStatus: { isDone: false, groupName: '', lastActivity: 0 },
+			teams: [],
+			headers,
+			status: 'waiting',
+			learningMode
+		};
+	}
+	
+	// If gender='current' but no session is active, default to 'M' (show all)
+	// This allows displaying teams from database even before a session starts
+	if (gender === 'MF' && helperDetectedGender === 'unknown' && databaseState?.athletes?.length > 0) {
+		gender = 'M';
+		console.log(`[NVF helpers] No active session, defaulting to M (show men from database)`);
+	}
+
+	// Check cache - include resolved gender in cache key
+	const lastUpdate = fopUpdate?.lastDataUpdate || 0;
+	const cacheKey = `${fopName}-${lastUpdate}-${gender}-${JSON.stringify(options)}`;
+	
+	console.log(`[NVF helpers] Cache check: key=${cacheKey.substring(0, 60)}..., gender=${gender}`);
+	
+	if (nvfScoreboardCache.has(cacheKey)) {
+		const cached = nvfScoreboardCache.get(cacheKey);
+		console.log(`[NVF helpers] Cache HIT - returning cached data with ${cached.teams?.length || 0} teams`);
+		let sessionStatusMessage = null;
+		if (sessionStatus.isDone && fopUpdate?.fullName) {
+			sessionStatusMessage = (fopUpdate.fullName || '').replace(/&ndash;/g, '–').replace(/&mdash;/g, '—');
+		}
+		
+		return {
+			...cached,
+			timer: extractTimerState(fopUpdate),
+			decision: extractDecisionState(fopUpdate),
+			sessionStatus,
+			sessionStatusMessage,
+			learningMode
+		};
+	}
+	
+	console.log(`[NVF helpers] Cache MISS - computing data for gender=${gender}`);
+
+	// Determine current lift type
+	const liftTypeKey = fopUpdate?.liftTypeKey || 'Snatch';
+	const liftType = liftTypeKey === 'Snatch' ? 'snatch' : 'cleanJerk';
+	const liftTypeLabel = liftType === 'snatch' 
+		? (translations.Snatch || 'Snatch') 
+		: (translations.Clean_and_Jerk || 'Clean & Jerk');
+	
+	// Build lifting order map for ordering info (keyed by athleteKey)
+	const liftingOrderMap = new Map();
+	if (Array.isArray(fopUpdate?.liftingOrderAthletes)) {
+		let orderPosition = 1;
+		for (const entry of fopUpdate.liftingOrderAthletes) {
+			if (!entry || entry.isSpacer) continue;
+			const athleteKey = normalizeKey(entry.athleteKey ?? entry.key);
+			if (athleteKey && !liftingOrderMap.has(athleteKey)) {
+				liftingOrderMap.set(athleteKey, orderPosition);
+			}
+			orderPosition += 1;
+		}
+	}
+	
+	// =========================================================================
+	// LAYER 2: Build ALL team athletes (session + database)
+	// Session athletes have live data, database athletes have historical data
+	// =========================================================================
+	
+	// Build session athletes map by key (for merging)
+	const sessionAthletesByKey = new Map();
+	sessionAthletes
+		.filter(athlete => !athlete.isSpacer)
+		.forEach(sessionAthlete => {
+			const athleteKey = normalizeKey(sessionAthlete.athleteKey ?? sessionAthlete.key);
+			if (athleteKey) {
+				sessionAthletesByKey.set(athleteKey, sessionAthlete);
+			}
+		});
+	
+	// Process ALL database athletes - use session data if available, else database data
+	const allTeamAthletes = [];
+	
+	console.log(`[NVF helpers] Database has ${databaseState?.athletes?.length || 0} athletes, session has ${sessionAthletesByKey.size} athletes`);
+	
+	if (databaseState?.athletes && Array.isArray(databaseState.athletes)) {
+		for (const dbAthlete of databaseState.athletes) {
+			const athleteKey = normalizeKey(dbAthlete.key);
+			if (!athleteKey) {
+				console.log(`[NVF helpers] Skipping athlete with no key:`, dbAthlete?.lastName);
+				continue;
+			}
+			
+			// Check if this athlete is in the current session
+			const sessionAthlete = sessionAthletesByKey.get(athleteKey);
+			
+			if (sessionAthlete) {
+				// Athlete is in current session - use session data (has live updates)
+				const wrapped = teamAthleteFromSession(sessionAthlete, {
+					liftType,
+					liftingOrder: liftingOrderMap.get(athleteKey) ?? null,
+					bodyWeight: dbAthlete.bodyWeight || sessionAthlete.bodyWeight || 0
+				});
+				allTeamAthletes.push(wrapped);
+			} else {
+				// Athlete is NOT in current session - use database data
+				const wrapped = teamAthleteFromDatabase(dbAthlete, {
+					liftingOrder: null // Not in current lifting order
+				});
+				if (wrapped) {
+					allTeamAthletes.push(wrapped);
+				} else {
+					console.log(`[NVF helpers] teamAthleteFromDatabase returned null for:`, dbAthlete?.lastName);
+				}
 			}
 		}
 	}
-	return '';
-}
+	
+	console.log(`[NVF helpers] Built ${allTeamAthletes.length} team athletes from database`);
+	
+	// Add flag URLs
+	const athletesWithFlags = allTeamAthletes.map(athlete => ({
+		...athlete,
+		flagUrl: getFlagUrl(athlete.teamName || athlete.team, true)
+	}));
+	
+	// =========================================================================
+	// LAYER 3: Group by teams
+	// =========================================================================
+	const teams = groupByTeams(athletesWithFlags, gender, headers);
+	
+	console.log(`[NVF helpers] Grouped ${allTeamAthletes.length} athletes into ${teams.length} teams (gender=${gender})`);
+	if (teams.length > 0) {
+		teams.forEach(t => console.log(`[NVF helpers]   Team "${t.teamName}": ${t.athleteCount} athletes, score=${t.teamScore?.toFixed(2)}`));
+	}
+	
+	// Extract competition info
+	const competition = {
+		name: fopUpdate?.competitionName || databaseState?.competition?.name || 'Competition',
+		fop: fopName,
+		state: fopUpdate?.fopState || 'INACTIVE',
+		session: fopUpdate?.sessionName || 'A',
+		liftType: liftType,
+		groupInfo: `${language === 'no' ? 'Pulje' : (translations.Session || 'Session')} ${fopUpdate?.sessionName || 'A'} - ${liftTypeLabel}`
+	};
 
-/**
- * Compute best lift from attempt strings
- * @param {Array<string>} attempts - Array of attempt strings (e.g., "120", "-125", "")
- * @returns {number} Best successful lift or 0
- */
-function computeBestLift(attempts) {
-	let best = 0;
-	attempts.forEach(attempt => {
-		// Treat "-" (dash) as 0, skip null/undefined/empty
-		if (!attempt || attempt === '' || attempt === '-') {
-			return;
+	// Extract current attempt
+	let currentAttempt = null;
+	let sessionStatusMessage = null;
+	
+	if (fopUpdate?.fullName) {
+		const cleanFullName = (fopUpdate.fullName || '').replace(/&ndash;/g, '–').replace(/&mdash;/g, '—');
+		
+		currentAttempt = {
+			fullName: cleanFullName,
+			name: cleanFullName,
+			teamName: fopUpdate.teamName,
+			team: fopUpdate.teamName,
+			startNumber: fopUpdate.startNumber,
+			categoryName: fopUpdate.categoryName,
+			category: fopUpdate.categoryName,
+			attempt: fopUpdate.attempt,
+			attemptNumber: fopUpdate.attemptNumber,
+			weight: fopUpdate.weight,
+			timeAllowed: fopUpdate.timeAllowed,
+			startTime: null
+		};
+		
+		if (sessionStatus.isDone) {
+			sessionStatusMessage = cleanFullName;
 		}
-		// Skip failed lifts (negative prefix or "0" meaning no lift)
-		if (attempt.startsWith('-') || attempt === '0') {
-			return;
-		}
-		// Parse successful lift weight
-		const weight = parseInt(attempt);
-		if (!isNaN(weight) && weight > best) {
-			best = weight;
-		}
+	}
+
+	const timer = extractTimerState(fopUpdate);
+	
+	// Compute max team name length for responsive layout
+	const maxTeamNameLength = Math.max(0, ...teams.map(t => (t.teamName || '').length));
+	const compactTeamColumn = maxTeamNameLength < 7;
+
+	const result = {
+		competition,
+		currentAttempt,
+		detectedAthlete: {
+			fullName: helperDetectedAthlete?.fullName || helperDetectedAthlete?.startNumber || null,
+			gender: helperDetectedGender || null
+		},
+		timer,
+		sessionStatusMessage,
+		teams,
+		allAthletes: athletesWithFlags,
+		stats: getCompetitionStats(databaseState),
+		headers,
+		displaySettings: fopUpdate?.showTotalRank || fopUpdate?.showSinclair ? {
+			showTotalRank: fopUpdate.showTotalRank === 'true',
+			showSinclair: fopUpdate.showSinclair === 'true',
+			showLiftRanks: fopUpdate.showLiftRanks === 'true',
+			showSinclairRank: fopUpdate.showSinclairRank === 'true'
+		} : {},
+		isBreak: fopUpdate?.break === 'true' || false,
+		breakType: fopUpdate?.breakType,
+		sessionStatus,
+		compactTeamColumn,
+		status: (fopUpdate || databaseState) ? 'ready' : 'waiting',
+		lastUpdate: fopUpdate?.lastUpdate || Date.now(),
+		options: { showRecords, sortBy, gender: requestedGender !== undefined ? requestedGender : undefined, currentAttemptInfo, topN }
+	};
+	
+	// Cache result (excluding frequently changing fields)
+	nvfScoreboardCache.set(cacheKey, {
+		competition: result.competition,
+		currentAttempt: result.currentAttempt,
+		detectedAthlete: result.detectedAthlete,
+		teams: result.teams,
+		allAthletes: result.allAthletes,
+		stats: result.stats,
+		displaySettings: result.displaySettings,
+		headers: result.headers,
+		isBreak: result.isBreak,
+		breakType: result.breakType,
+		status: result.status,
+		lastUpdate: result.lastUpdate,
+		options: result.options
 	});
-	return best;
-}
-
-/**
- * Format attempt for display using OWLCMS priority order
- * Priority: actualLift > change2 > change1 > declaration > automaticProgression
- * @param {string} declaration - Initial declared weight
- * @param {string} change1 - First change
- * @param {string} change2 - Second change  
- * @param {string} actualLift - Actual lift result (with '-' prefix for fails)
- * @param {string} automaticProgression - Calculated automatic progression weight
- * @returns {Object} { liftStatus: 'empty'|'request'|'bad'|'good', stringValue: '120' }
- */
-function formatAttempt(declaration, change1, change2, actualLift, automaticProgression) {
-	// Determine the displayed weight using OWLCMS priority order
-	let displayWeight = null;
 	
-	// Priority 1: actualLift (if lift has been attempted)
-	// Note: actualLift of "0" means "no lift" (all red lights) and has precedence over requested weight
-	if (actualLift && actualLift !== '') {
-		if (actualLift === '0') {
-			// No lift with 0 weight - display as dash to match session athlete formatting
-			return { liftStatus: 'bad', stringValue: '-' };
-		} else if (actualLift.startsWith('-')) {
-			// Failed lift (negative weight)
-			const weight = actualLift.substring(1);
-			return { liftStatus: 'bad', stringValue: `(${weight})` };
-		} else {
-			// Good lift
-			return { liftStatus: 'good', stringValue: actualLift };
-		}
-	}
+	console.log(`[NVF] Cache now has ${nvfScoreboardCache.size} entries`);
 	
-	// Priority 2: change2 (most recent change)
-	if (change2 && change2 !== '' && change2 !== '0') {
-		displayWeight = change2;
+	// Cleanup old cache entries
+	if (nvfScoreboardCache.size > 3) {
+		const firstKey = nvfScoreboardCache.keys().next().value;
+		nvfScoreboardCache.delete(firstKey);
 	}
-	// Priority 3: change1 (earlier change)
-	else if (change1 && change1 !== '' && change1 !== '0') {
-		displayWeight = change1;
-	}
-	// Priority 4: declaration (original weight)
-	else if (declaration && declaration !== '' && declaration !== '0') {
-		displayWeight = declaration;
-	}
-	// Priority 5: automaticProgression (calculated default)
-	else if (automaticProgression && automaticProgression !== '' && automaticProgression !== '0' && automaticProgression !== '-') {
-		displayWeight = automaticProgression;
-	}
-	
-	// If we have a display weight (request not yet attempted)
-	if (displayWeight) {
-		return { liftStatus: 'request', stringValue: displayWeight };
-	}
-	
-	// No weight declared or attempted = empty
-	return { liftStatus: 'empty', stringValue: '' };
+
+	return {
+		...result,
+		sessionStatus,
+		decision: extractDecisionState(fopUpdate),
+		learningMode
+	};
 }
 
-// Sinclair calculations use the shared implementation in
-// `src/lib/sinclair-coefficients.js` (use `calculateSinclair` or `CalculateSinclair2024/2020`).
-
 /**
- * Get top athletes from the competition state (SERVER-SIDE ONLY)
- * @param {Object} competitionState - Full competition state
- * @param {number} limit - Number of athletes to return
- * @returns {Array} Top athletes sorted by total
+ * Create a waiting response for when session data is not available
  */
-export function getTopAthletes(competitionState, limit = 10) {
-	if (!competitionState?.athletes || !Array.isArray(competitionState.athletes)) {
-		return [];
-	}
-
-	return competitionState.athletes
-		.filter(athlete => athlete && (athlete.total > 0 || athlete.bestSnatch > 0 || athlete.bestCleanJerk > 0))
-		.sort((a, b) => {
-			// Sort by total first, then by Sinclair, then by best snatch
-			const totalA = a.total || 0;
-			const totalB = b.total || 0;
-			if (totalA !== totalB) return totalB - totalA;
-			
-			const sinclairA = a.sinclair || 0;
-			const sinclairB = b.sinclair || 0;
-			if (sinclairA !== sinclairB) return sinclairB - sinclairA;
-			
-			const snatchA = a.bestSnatch || 0;
-			const snatchB = b.bestSnatch || 0;
-			return snatchB - snatchA;
-		})
-		.slice(0, limit);
+function createWaitingResponse(fopName, fopUpdate, databaseState, headers, learningMode, gender, currentAttemptInfo, topN, showRecords, sortBy) {
+	return {
+		competition: { name: fopUpdate?.competitionName || databaseState?.competition?.name || 'Competition', fop: fopName },
+		currentAttempt: null,
+		detectedAthlete: { fullName: null, gender: null },
+		timer: { state: 'stopped', timeRemaining: 0 },
+		sessionStatus: { isDone: false, groupName: '', lastActivity: 0 },
+		teams: [],
+		headers,
+		status: 'waiting',
+		learningMode,
+		options: { showRecords, sortBy, gender, currentAttemptInfo, topN }
+	};
 }
 
-/**
- * Get team rankings computed from the hub (SERVER-SIDE ONLY)
- * @returns {Array} Team rankings with scores
- */
-export function getTeamRankings() {
-	return competitionHub.getTeamRankings();
-}
+// =============================================================================
+// STATISTICS AND UTILITIES
+// =============================================================================
 
 /**
- * Get athletes by weight class (SERVER-SIDE ONLY)
- * @param {string} weightClass - Weight class to filter by (e.g., "73kg")
- * @param {string} gender - Gender to filter by ("M" or "F")
- * @returns {Array} Athletes in the specified category
- */
-export function getAthletesByCategory(weightClass = null, gender = null) {
-	const state = getCompetitionState();
-	if (!state?.athletes) return [];
-
-	return state.athletes.filter(athlete => {
-		if (weightClass && athlete.category !== weightClass) return false;
-		if (gender && athlete.gender !== gender) return false;
-		return true;
-	});
-}
-
-/**
- * Get lifting order from the competition state (SERVER-SIDE ONLY)
- * @returns {Array} Current lifting order
- */
-export function getLiftingOrder() {
-	const state = getCompetitionState();
-	return state?.liftingOrder || [];
-}
-
-/**
- * Get competition metrics and statistics (SERVER-SIDE ONLY)
- * @param {Object} competitionState - Competition state (optional, will fetch if not provided)
- * @returns {Object} Competition statistics
+ * Get competition statistics
  */
 export function getCompetitionStats(competitionState = null) {
 	if (!competitionState) {
-		competitionState = getCompetitionState();
+		competitionState = getDatabaseState();
 	}
 	
 	if (!competitionState?.athletes) {
@@ -1112,14 +1235,45 @@ export function getCompetitionStats(competitionState = null) {
 
 	const athletes = competitionState.athletes;
 	const categories = [...new Set(athletes.map(a => a.categoryName || a.category).filter(Boolean))];
-	const teams = [...new Set(athletes.map(a => a.teamName || a.team).filter(Boolean))];
+	const teamsSet = [...new Set(athletes.map(a => a.teamName || a.team).filter(Boolean))];
 
 	return {
 		totalAthletes: athletes.length,
 		activeAthletes: athletes.filter(a => a.total > 0 || a.bestSnatch > 0 || a.bestCleanJerk > 0).length,
 		completedAthletes: athletes.filter(a => a.total > 0).length,
 		categories,
-		teams,
+		teams: teamsSet,
 		averageTotal: athletes.filter(a => a.total > 0).reduce((sum, a, _, arr) => sum + a.total / arr.length, 0) || 0
 	};
+}
+
+/**
+ * Get top athletes from competition state
+ */
+export function getTopAthletes(competitionState, limit = 10) {
+	if (!competitionState?.athletes || !Array.isArray(competitionState.athletes)) {
+		return [];
+	}
+
+	return competitionState.athletes
+		.filter(athlete => athlete && (athlete.total > 0 || athlete.bestSnatch > 0 || athlete.bestCleanJerk > 0))
+		.sort((a, b) => {
+			const totalA = a.total || 0;
+			const totalB = b.total || 0;
+			if (totalA !== totalB) return totalB - totalA;
+			
+			const sinclairA = a.sinclair || 0;
+			const sinclairB = b.sinclair || 0;
+			if (sinclairA !== sinclairB) return sinclairB - sinclairA;
+			
+			return (b.bestSnatch || 0) - (a.bestSnatch || 0);
+		})
+		.slice(0, limit);
+}
+
+/**
+ * Get team rankings
+ */
+export function getTeamRankings() {
+	return competitionHub.getTeamRankings();
 }

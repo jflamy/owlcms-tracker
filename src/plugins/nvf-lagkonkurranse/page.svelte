@@ -35,12 +35,10 @@
 		timer.syncWithServer(data.timer);
 	}
 
+	// liftStatus values from hub can be used directly as CSS classes:
+	// 'good', 'bad', 'current', 'next', 'request', 'empty'
 	function getAttemptClass(attempt) {
-		if (!attempt || !attempt.liftStatus || attempt.liftStatus === 'empty') return 'empty';
-		if (attempt.liftStatus === 'request') return 'request';
-		if (attempt.liftStatus === 'fail') return 'failed';
-		if (attempt.liftStatus === 'good') return 'success';
-		return 'empty';
+		return attempt?.liftStatus || 'empty';
 	}
 
 	function displayAttempt(attempt) {
@@ -67,26 +65,6 @@
 		if (num > 0) return num.toFixed(2);
 		if (isDefinitiveZero && num === 0) return '0.00';
 		return '-';
-	}
-
-	function isLotInList(list, lotNumber) {
-		if (!Array.isArray(list)) return false;
-		if (lotNumber === undefined || lotNumber === null) return false;
-		const normalized = String(lotNumber).trim();
-		if (!normalized) return false;
-		return list.includes(normalized);
-	}
-
-	function isFemaleInMF(athlete) {
-		if (!athlete) return false;
-		const scoreboardGender = data?.options?.gender;
-		// Check if scoreboard is in MF mode
-		if (!scoreboardGender || String(scoreboardGender).toLowerCase() !== 'mf') return false;
-		// Check if athlete is female
-		const athleteGender = athlete.gender || athlete.sex || athlete.genderKey;
-		if (!athleteGender) return false;
-		const s = String(athleteGender).toLowerCase();
-		return s === 'f' || s === 'female' || s === 'women';
 	}
 
 </script>
@@ -196,7 +174,6 @@ export function shouldRenderFlag(url) {
 							class="grid-row data-row team-athlete"
 							class:current={athlete.classname && athlete.classname.includes('current')}
 							class:next={athlete.classname && athlete.classname.includes('next')}
-							class:female-mf={isFemaleInMF(athlete)}
 							role="row"
 						>
 							<div class="cell start-num" role="gridcell">{athlete.inCurrentSession ? (athlete.liftingOrder ?? '') : ''}</div>
@@ -205,21 +182,21 @@ export function shouldRenderFlag(url) {
 							<div class="cell born" role="gridcell">{athlete.yearOfBirth || ''}</div>
 							<div class="cell team-name" role="gridcell">{athlete.teamName || ''}</div>
 							<div class="cell v-spacer" aria-hidden="true"></div>
-							<div class="cell attempt {getAttemptClass(athlete.sattempts?.[0])} {athlete.sattempts?.[0]?.className || ''}" role="gridcell"><span class="attempt-value">{displayAttempt(athlete.sattempts?.[0])}</span></div>
-							<div class="cell attempt {getAttemptClass(athlete.sattempts?.[1])} {athlete.sattempts?.[1]?.className || ''}" role="gridcell"><span class="attempt-value">{displayAttempt(athlete.sattempts?.[1])}</span></div>
-							<div class="cell attempt {getAttemptClass(athlete.sattempts?.[2])} {athlete.sattempts?.[2]?.className || ''}" role="gridcell"><span class="attempt-value">{displayAttempt(athlete.sattempts?.[2])}</span></div>
+							<div class="cell attempt {getAttemptClass(athlete.sattempts?.[0])}" role="gridcell"><span class="attempt-value">{displayAttempt(athlete.sattempts?.[0])}</span></div>
+							<div class="cell attempt {getAttemptClass(athlete.sattempts?.[1])}" role="gridcell"><span class="attempt-value">{displayAttempt(athlete.sattempts?.[1])}</span></div>
+							<div class="cell attempt {getAttemptClass(athlete.sattempts?.[2])}" role="gridcell"><span class="attempt-value">{displayAttempt(athlete.sattempts?.[2])}</span></div>
 							<div class="cell best" role="gridcell">{athlete.bestSnatch || '-'}</div>
 							<div class="cell v-spacer" aria-hidden="true"></div>
-							<div class="cell attempt {getAttemptClass(athlete.cattempts?.[0])} {athlete.cattempts?.[0]?.className || ''}" role="gridcell"><span class="attempt-value">{displayAttempt(athlete.cattempts?.[0])}</span></div>
-							<div class="cell attempt {getAttemptClass(athlete.cattempts?.[1])} {athlete.cattempts?.[1]?.className || ''}" role="gridcell"><span class="attempt-value">{displayAttempt(athlete.cattempts?.[1])}</span></div>
-							<div class="cell attempt {getAttemptClass(athlete.cattempts?.[2])} {athlete.cattempts?.[2]?.className || ''}" role="gridcell"><span class="attempt-value">{displayAttempt(athlete.cattempts?.[2])}</span></div>
+							<div class="cell attempt {getAttemptClass(athlete.cattempts?.[0])}" role="gridcell"><span class="attempt-value">{displayAttempt(athlete.cattempts?.[0])}</span></div>
+							<div class="cell attempt {getAttemptClass(athlete.cattempts?.[1])}" role="gridcell"><span class="attempt-value">{displayAttempt(athlete.cattempts?.[1])}</span></div>
+							<div class="cell attempt {getAttemptClass(athlete.cattempts?.[2])}" role="gridcell"><span class="attempt-value">{displayAttempt(athlete.cattempts?.[2])}</span></div>
 							<div class="cell best" role="gridcell">{athlete.bestCleanJerk || '-'}</div>
 						<div class="cell v-spacer" aria-hidden="true"></div>
 						<div class="cell total" role="gridcell">{athlete.displayTotal ?? '-'}</div>
-						<div class="cell score" class:in-top4-current={isLotInList(team.top4CurrentLotNumbers, athlete.lotNumber)} role="gridcell">{athlete.displayScore}</div>
+						<div class="cell score {athlete.scoreHighlightClass || ''}" role="gridcell">{athlete.displayScore}</div>
 					<div class="cell v-spacer" aria-hidden="true"></div>
 					<div class="cell next-total" role="gridcell">{athlete.nextTotal ? athlete.nextTotal : '-'}</div>
-					<div class="cell next-score" class:in-top4-predicted={isLotInList(team.top4PredictedLotNumbers, athlete.lotNumber)} role="gridcell">{athlete.displayNextScore}</div>
+					<div class="cell next-score {athlete.nextScoreHighlightClass || ''}" role="gridcell">{athlete.displayNextScore}</div>
 					</div>
 					{/each}
 
@@ -392,23 +369,21 @@ export function shouldRenderFlag(url) {
 
 	.attempt { font-weight: bold; white-space: nowrap; padding: 0 0.35rem; }
 	.header-secondary .col-attempt { white-space: nowrap; padding: 0 0.35rem; }
+	/* liftStatus values from hub: 'good', 'bad', 'current', 'next', 'request', 'empty' */
 	.attempt.empty { background: #4a4a4a !important; color: #aaa; }
 	.attempt.request { background: #4a4a4a; color: #ddd; }
-	.attempt.success { background: #fff !important; color: #000; }
-	.attempt.failed { background: #dc2626 !important; color: #fff; }
+	.attempt.good { background: #fff !important; color: #000; }
+	.attempt.bad { background: #dc2626 !important; color: #fff; }
+	.attempt.next { background: #f97316; color: #000; font-weight: bold; }
 
-	:global(.cell.attempt.request.current),
-	:global(.cell.attempt.request.current.blink),
-	:global(.cell.attempt.request.blink) {
+	/* Current attempt - highlighted and blinking */
+	.attempt.current {
 		background: #ffd700;
 		color: #000000 !important;
 		font-weight: bold !important;
 		font-size: 1.3rem !important;
 	}
-
-	:global(.cell.attempt.request.current .attempt-value),
-	:global(.cell.attempt.request.current.blink .attempt-value),
-	:global(.cell.attempt.request.blink .attempt-value) {
+	.attempt.current .attempt-value {
 		display: inline-block;
 		animation: scoreboardRequestedBlink 1.5s steps(1, end) infinite;
 	}
@@ -464,12 +439,15 @@ export function shouldRenderFlag(url) {
 	.grid-row.team-header > .team-next-score { grid-column: 21; justify-content: center; font-size: 1.4rem; font-weight: bold; border-right: 8px solid #4a5568; background: #831843 !important; color: #fff; border: none !important; border-right: 8px solid #4a5568 !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 	/* Highlight athlete scores that contribute to team score */
-	.grid-row.data-row > .score.in-top4-current { background: #1b5e20 !important; color: #fff !important; font-weight: bold; }
-	.grid-row.data-row > .next-score.in-top4-predicted { background: #831843 !important; color: #fff !important; font-weight: bold; }
+	/* Single gender mode or MF mode male contributors */
+	.grid-row.data-row > .score.top-contributor,
+	.grid-row.data-row > .score.top-contributor-m { background: #1b5e20 !important; color: #fff !important; font-weight: bold; }
+	.grid-row.data-row > .next-score.top-contributor,
+	.grid-row.data-row > .next-score.top-contributor-m { background: #831843 !important; color: #fff !important; font-weight: bold; }
 
-	/* Mixed mode: slightly lighter highlight colors for female athletes */
-	.grid-row.data-row.female-mf > .score.in-top4-current { background: #57a05a !important; color: #fff !important; font-weight: bold; }
-	.grid-row.data-row.female-mf > .next-score.in-top4-predicted { background: #c06da0 !important; color: #fff !important; font-weight: bold; }
+	/* MF mode: lighter highlight colors for female contributors */
+	.grid-row.data-row > .score.top-contributor-f { background: #57a05a !important; color: #fff !important; font-weight: bold; }
+	.grid-row.data-row > .next-score.top-contributor-f { background: #c06da0 !important; color: #fff !important; font-weight: bold; }
 
 	.grid-row.team-athlete > .cell:first-of-type { border-left: 8px solid #4a5568 !important; }
 	.grid-row.team-athlete > .cell:last-of-type { border-right: 8px solid #4a5568 !important; }
