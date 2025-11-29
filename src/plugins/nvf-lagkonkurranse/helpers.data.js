@@ -155,31 +155,32 @@ function getPredictedBestLift(attempts, bestAchieved) {
 /**
  * Calculate the predicted total
  * @param {Object} athlete - Athlete object with sattempts, cattempts, bestSnatch, bestCleanJerk
- * @param {string} preferredLiftType - 'snatch' or 'cleanJerk'
- * @param {number} attemptsDone - Number of attempts completed (0-6)
- *   attemptsDone=0: zero snatch done (about to do snatch 1)
- *   attemptsDone=1: one snatch done (about to do snatch 2)
- *   attemptsDone=2: two snatches done (about to do snatch 3)
- *   attemptsDone=3: snatches finished (about to do C&J 1)
+ * @param {string} liftType - Current lift type from OWLCMS: 'snatch' or 'cleanJerk'
+ * @param {number} attemptsDone - Number of attempts completed within the current lift type (0-2)
+ *   For snatch: 0 = about to do snatch 1, 1 = snatch 1 done, 2 = snatches 1&2 done
+ *   For cleanJerk: 0 = about to do C&J 1, 1 = C&J 1 done, 2 = C&J 1&2 done
  * @param {boolean} cjDecl - Whether to include first C&J declaration in predicted total (default: true)
- *   When true (predicted total): uses CJ declaration even during snatches (attemptsDone 0-2)
- *   When false (prediction after next lift): uses CJ declaration only after snatches finished (attemptsDone >= 3)
+ *   When true (predicted total): uses CJ declaration even during snatches
+ *   When false (prediction after next lift): uses CJ declaration only in C&J phase
  * @returns {number} Predicted total
  */
-function calculatePredictedTotal(athlete, preferredLiftType = 'snatch', attemptsDone = 0, cjDecl = true) {
+function calculatePredictedTotal(athlete, liftType = 'snatch', attemptsDone = 0, cjDecl = true) {
 	if (!athlete) return 0;
 	
 	const bestSnatch = parseFormattedNumber(athlete.bestSnatch) || 0;
 	const bestCJ = parseFormattedNumber(athlete.bestCleanJerk) || 0;
+	
+	// Determine if we're in snatch phase based on liftType, not attemptsDone
+	const inSnatchPhase = liftType === 'snatch';
 
 	// During snatches we predict the next snatch request; once snatches are finished we keep the achieved best snatch
-	const predictedSnatch = attemptsDone < 3
+	const predictedSnatch = inSnatchPhase
 		? getPredictedBestLift(athlete.sattempts, bestSnatch)
 		: bestSnatch;
 
 	let predictedCJ = bestCJ;
 
-	if (attemptsDone < 3) {
+	if (inSnatchPhase) {
 		// Still in snatch phase – optional CJ prediction depends on cjDecl flag
 		if (cjDecl) {
 			const firstCJDecl = parseInt(athlete.cattempts?.[0]?.stringValue || '', 10);
@@ -188,7 +189,7 @@ function calculatePredictedTotal(athlete, preferredLiftType = 'snatch', attempts
 			}
 		}
 	} else {
-		// Snatches finished or we are inside the C&J phase – always use predicted CJ (next request or best achieved)
+		// In C&J phase – always use predicted CJ (next request or best achieved)
 		predictedCJ = getPredictedBestLift(athlete.cattempts, bestCJ);
 	}
 
