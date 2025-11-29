@@ -82,8 +82,10 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		console.error('[SessionResults] Error logging records payload:', err?.message || err);
 	}
 	const decision = extractDecisionState(fopUpdate);
-	const groupAthletesHash = groupAthletes.map(athlete => athlete?.lotNumber || athlete?.startNumber || athlete?.fullName).join('-');
-	const cacheKey = `${fopName}-${groupAthletesHash}`;
+	// Use per-FOP hub state version for cache key so plugins invalidate when hub bumps version
+	// Avoid using JSON/string-derived hashes which can vary with formatting
+	const hubFopVersion = competitionHub.getFopStateVersion(fopName);
+	const cacheKey = `${fopName}-v${hubFopVersion}-${showRecords}`;
 	
 	// Extract current athlete from groupAthletes (has classname="current" or "current blink")
 	let currentAttempt = null;

@@ -44,7 +44,10 @@
 	}
 
 	function displayAttempt(attempt) {
-		if (!attempt || !attempt.stringValue || attempt.stringValue === '') return '-';
+		// For empty attempts emit a Unicode non-breaking space so the grid cell
+		// remains layout-stable and CSS targeting for `.attempt.empty` works.
+		// Note: failed attempts (actualLift === '0') are rendered as '-' elsewhere
+		if (!attempt || !attempt.stringValue || attempt.stringValue === '') return '\u00A0';
 		return attempt.stringValue.replace(/[()]/g, '');
 	}
 

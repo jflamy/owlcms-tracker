@@ -71,11 +71,12 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// Get session status early (before cache check, so it's always fresh)
 	const sessionStatus = competitionHub.getSessionStatus(fopName);
 
-	// Check cache first - cache key based on lifting order data ONLY (no UI preferences)
-	// Use a hash of liftingOrderAthletes to detect when athlete data actually changes
-	const liftingOrderHash = fopUpdate?.liftingOrderAthletes ? 
-		`${fopUpdate.liftingOrderAthletes.length}-${fopUpdate.liftingOrderAthletes[0]?.id || 0}` : ''; // Quick hash based on length + first ID
-	const cacheKey = `${fopName}-${liftingOrderHash}`;
+	// Check cache first - use per-FOP hub version + options
+	// Avoid including the liftingOrderAthletes content in the key so we maintain
+	// exactly one cache entry per (fop + options + hubVersion). The hub FOP
+	// version will be incremented when relevant messages arrive.
+	const hubFopVersion = (competitionHub.getFopStateVersion && typeof competitionHub.getFopStateVersion === 'function') ? competitionHub.getFopStateVersion(fopName) : ((competitionHub.getStateVersion && typeof competitionHub.getStateVersion === 'function') ? competitionHub.getStateVersion() : 0);
+	const cacheKey = `${fopName}-v${hubFopVersion}-${showRecords}`;
 	
 	if (liftingOrderCache.has(cacheKey)) {
 		const cached = liftingOrderCache.get(cacheKey);

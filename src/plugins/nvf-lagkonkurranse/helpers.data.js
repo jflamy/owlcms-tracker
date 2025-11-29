@@ -298,7 +298,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		rank: translations.Rank || 'Rank',
 		session: language === 'no' ? 'Pulje' : (translations.Session || 'Session'),
 		top4scores: (gender === 'MF') ? (language === 'no' ? 'topp 2+2 poengsummer' : 'top 2+2 scores') : (language === 'no' ? 'topp 4 poengsummer' : 'top 4 scores'),
-		totalNextS: language === 'no' ? 'Total Neste F' : 'Total Next S',
+		totalNextS: language === 'no' ? 'Saml. Neste F' : 'Total Next S',
 		scoreNextS: language === 'no' ? 'Poeng Neste F' : 'Score Next S'
 	};
 	// Get learning mode from environment
@@ -352,15 +352,19 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// Get session status early (before cache check, so it's always fresh)
 	const sessionStatus = competitionHub.getSessionStatus(fopName);
 
-	// Check cache first - cache key based on athlete data, NOT timer events
-	// Use a hash of groupAthletes to detect when athlete data actually changes
-	// groupAthletes is now a parsed object, so stringify it first for hashing
-	const groupAthletesHash = fopUpdate?.groupAthletes ? 
-		JSON.stringify(fopUpdate.groupAthletes) : ''; // Full JSON string as hash
-	const cacheKey = `${fopName}-${groupAthletesHash}-${gender}-${topN}-${sortBy}-${currentAttemptInfo}-${language}-${cjDecl}`;
+	// Check cache first - cache key based on FOP + hub FOP version + options (NOT timer events)
+	// We intentionally avoid including a full groupAthletes JSON/string hash here so the
+	// plugin keeps exactly one cache entry per (fop + options + hubVersion). The
+	// hub FOP version will change when any update/timer/decision/database message is
+	// processed, so this is sufficient to detect data changes while avoiding accidental
+	// duplicates caused by minor payload formatting differences.
+	const hubFopVersion = (competitionHub.getFopStateVersion && typeof competitionHub.getFopStateVersion === 'function') ? competitionHub.getFopStateVersion(fopName) : ((competitionHub.getStateVersion && typeof competitionHub.getStateVersion === 'function') ? competitionHub.getStateVersion() : 0);
+
+	// Cache key format: <fop>-v<version>-<gender>-<topN>-<language>
+	const cacheKeyWithVersion = `${fopName}-v${hubFopVersion}-${gender}-${topN}-${language}`;
 	
-	if (nvfScoreboardCache.has(cacheKey)) {
-		const cached = nvfScoreboardCache.get(cacheKey);
+	if (nvfScoreboardCache.has(cacheKeyWithVersion)) {
+		const cached = nvfScoreboardCache.get(cacheKeyWithVersion);
 		
 		// Compute sessionStatusMessage from current fopUpdate (even on cache hit)
 		let sessionStatusMessage = null;
@@ -812,7 +816,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	};
 	
 	// Cache the result (excluding timer, learningMode, sessionStatus, and sessionStatusMessage which change frequently)
-	nvfScoreboardCache.set(cacheKey, {
+		nvfScoreboardCache.set(cacheKeyWithVersion, {
 		competition: result.competition,
 		currentAttempt: result.currentAttempt,
 		detectedAthlete: result.detectedAthlete,
@@ -831,10 +835,10 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	
 	// Cleanup old cache entries (keep last 3 - with 6 FOPs max and 2-3 options = ~18 entries worst case)
 	// Reducing from 20 to 3 to avoid memory bloat when multiple scoreboards/FOPs loaded
-	if (nvfScoreboardCache.size > 3) {
-		const firstKey = nvfScoreboardCache.keys().next().value;
-		nvfScoreboardCache.delete(firstKey);
-	}
+		if (nvfScoreboardCache.size > 3) {
+			const firstKey = nvfScoreboardCache.keys().next().value;
+			nvfScoreboardCache.delete(firstKey);
+		}
 
 	return {
 		...result,

@@ -100,12 +100,13 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// Get session status early (before cache check, so it's always fresh)
 	const sessionStatus = competitionHub.getSessionStatus(fopName);
 
-	// Check cache first - cache key based on athlete data, NOT timer events
-	// Use a hash of groupAthletes to detect when athlete data actually changes
-	// groupAthletes is now a parsed object, so stringify it first for hashing
-	const groupAthletesHash = fopUpdate?.groupAthletes ? 
-		JSON.stringify(fopUpdate.groupAthletes).substring(0, 100) : ''; // First 100 chars as quick hash
-	const cacheKey = `${fopName}-${groupAthletesHash}-${gender}-${topN}-${sortBy}`;
+	// Check cache first - cache key based on FOP + hub FOP version + options (NOT timer events)
+	// Avoid including a full groupAthletes JSON/string hash so we keep exactly one cache
+	// entry per (fop + options + hubVersion). The hub FOP version will be bumped when
+	// relevant messages arrive (update/timer/decision/database) so this is sufficient
+	// to detect changes while avoiding accidental duplicates from payload formatting.
+	const hubFopVersion = (competitionHub.getFopStateVersion && typeof competitionHub.getFopStateVersion === 'function') ? competitionHub.getFopStateVersion(fopName) : ((competitionHub.getStateVersion && typeof competitionHub.getStateVersion === 'function') ? competitionHub.getStateVersion() : 0);
+	const cacheKey = `${fopName}-v${hubFopVersion}-${gender}-${topN}-${sortBy}`;
 	
 	if (teamScoreboardCache.has(cacheKey)) {
 		const cached = teamScoreboardCache.get(cacheKey);

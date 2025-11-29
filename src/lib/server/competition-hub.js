@@ -50,6 +50,11 @@ class CompetitionHub {
     // Structure: { 'en': { 'Start': 'Start', 'Total': 'Total', ... }, 'fr': {...}, ... }
     this.translations = {};
     this.lastTranslationsChecksum = null;  // Track checksum to avoid reprocessing identical translations
+    // Incrementing counter used by plugins to detect any incoming message that should
+    // invalidate plugin-level caches. Plugins should include this value in their cache keys.
+    this.stateVersion = 0;
+    // Per-FOP state version map — increment per FOP when update/timer/decision messages arrive
+    this.fopStateVersion = {}; // { 'A': 0, 'Platform_B': 2 }
     
     // Log learning mode status on startup
     logLearningModeStatus();
@@ -67,21 +72,52 @@ class CompetitionHub {
     this.metrics.messagesReceived++;
     
     try {
+      // Extract FOP name and compute event type early so we can always invalidate plugin caches
+      const fopName = params.fop || params.fopName || 'A';
+      const eventTypeEarly = params.uiEvent 
+        || params.decisionEventType 
+        || params.athleteTimerEventType 
+        || params.breakTimerEventType 
+        || params.type || 'unknown';
+
+      // If we're currently loading the database or waiting for the database, we still
+      // WANT to invalidate plugin caches for update-like messages (updates/timers/decisions).
+      // Compute whether this message is an update-like event that should always invalidate caches.
+      // Treat presence of groupAthletes, liftingOrderAthletes, weight, fullName or attemptNumber as update-like
+      const isUpdateLike = Boolean(
+        params.uiEvent ||
+        params.decisionEventType ||
+        params.athleteTimerEventType ||
+        params.breakTimerEventType ||
+        params.groupAthletes ||
+        params.liftingOrderAthletes ||
+        params.weight ||
+        params.fullName ||
+        params.attemptNumber
+      );
+
+      // If update-like, bump versions immediately to ensure caches are invalidated even
+      // if we later defer processing or debounce broadcasting.
+      let versionBumpedEarly = false;
+      if (isUpdateLike) {
+        this.stateVersion += 1;
+        this.fopStateVersion[fopName] = (this.fopStateVersion[fopName] || 0) + 1;
+        versionBumpedEarly = true;
+        console.log(`[Hub] (early) Update received: ${eventTypeEarly} for FOP ${fopName} (stateVersion=${this.stateVersion}, fopState=${this.fopStateVersion[fopName]})`);
+      }
+
       // Check if database is currently being loaded
       if (this.isLoadingDatabase) {
         console.log('[Hub] Database load in progress, deferring update');
         return { accepted: false, reason: 'database_loading', retry: true };
       }
-      
+
       // Check if we recently requested database via 428 (within last 1 second) - wait for it to arrive
       const timeSinceDatabaseRequested = Date.now() - this.databaseRequested;
       if (this.databaseRequested > 0 && timeSinceDatabaseRequested < 1000) {
         console.log(`[Hub] Database was requested ${timeSinceDatabaseRequested}ms ago, waiting for arrival (returning 202)`);
         return { accepted: false, reason: 'waiting_for_database', retry: true };
       }
-      
-      // Extract FOP name early so we can process the update even if we need database
-      const fopName = params.fop || params.fopName || 'A';
       this._hasConfirmedFops = true;
       
       // Store/merge the update data regardless of database state
@@ -103,7 +139,22 @@ class CompetitionHub {
         ...competitionState,
         lastUpdate: Date.now()
       };
-      
+
+      // Determine event type for logging and debounce
+      const eventType = params.uiEvent 
+        || params.decisionEventType 
+        || params.athleteTimerEventType 
+        || params.breakTimerEventType 
+        || 'unknown';
+
+      // Log that update processing reached the broadcast stage. If versions were not
+      // bumped early (non-update-like messages), bump them now so caches still invalidate.
+      if (!versionBumpedEarly && (params.type === 'database' || params.type === 'update' || params.type === 'timer' || params.type === 'decision')) {
+        this.stateVersion += 1;
+        this.fopStateVersion[fopName] = (this.fopStateVersion[fopName] || 0) + 1;
+      }
+      console.log(`[Hub] Update processed: ${eventType} for FOP ${fopName} (stateVersion=${this.stateVersion}, fopState=${this.fopStateVersion[fopName]})`);
+
       // Broadcast to browsers - even if we're requesting database
       this.broadcast({
         type: 'fop_update',
@@ -111,7 +162,7 @@ class CompetitionHub {
         data: params,
         timestamp: Date.now()
       });
-      
+
       // Check if we have initialized database state
       if (!this.databaseState || !this.databaseState.athletes || this.databaseState.athletes.length === 0) {
         // Only request database at this point - translations/flags will arrive via OWLCMS startup callback
@@ -124,10 +175,10 @@ class CompetitionHub {
           missing: ['database']
         };
       }
-      
+
       // Database is present - OWLCMS has already sent translations_zip and flags_zip via startup callback
       // Don't request them again unless explicitly missing from binary handler
-      
+
       // DISABLED: SwitchGroup refresh - causes issues with category display
       // Request fresh database on SwitchGroup events (new group = new athletes)
       // if (params.uiEvent === 'SwitchGroup') {
@@ -136,12 +187,6 @@ class CompetitionHub {
       //   return { accepted: false, needsData: true, reason: 'switch_group_refresh' };
       // }
 
-      const eventType = params.uiEvent 
-        || params.decisionEventType 
-        || params.athleteTimerEventType 
-        || params.breakTimerEventType 
-        || 'unknown';
-      console.log(`[Hub] Update processed: ${eventType} for FOP ${fopName}`);
       return { accepted: true };
 
     } catch (error) {
@@ -227,6 +272,11 @@ class CompetitionHub {
         timestamp: Date.now()
       });
 
+      // For traceability, log that a competition-initialized broadcast was attempted
+      try {
+        console.log(`[Hub] competition_initialized broadcast attempted (stateVersion=${this.stateVersion})`);
+      } catch (e) {}
+
       console.log(`[Hub] Full competition data loaded: ${this.databaseState.competition?.name || 'unknown competition'}`);
       console.log(`[Hub] Athletes loaded: ${this.databaseState.athletes?.length || 0}`);
       
@@ -242,7 +292,14 @@ class CompetitionHub {
       this.lastDatabaseLoad = Date.now();
       this.databaseRequested = 0; // Reset request flag since database has arrived
       this.lastDatabaseChecksum = this.databaseState.databaseChecksum;
-      
+
+      // Bump global state version and all known per-FOP versions so plugins invalidate caches
+      this.stateVersion += 1;
+      for (const fopKey of Object.keys(this.fopUpdates || {})) {
+        this.fopStateVersion[fopKey] = (this.fopStateVersion[fopKey] || 0) + 1;
+      }
+      console.log(`[Hub] Full competition data processed (stateVersion=${this.stateVersion})`);
+
       return { accepted: true };
 
     } catch (error) {
@@ -429,15 +486,34 @@ class CompetitionHub {
     // Debounce only identical event types for same FOP
     // Example: stop-stop can be debounced, but stop-start-stop should all go through
     const fopName = message.fop || 'global';
-    const eventType = message.data?.athleteTimerEventType || message.data?.uiEvent || message.type || 'unknown';
+    // Prefer UI event names for debounce keys so LiftingOrderUpdated bypass works
+    const eventType = message.data?.uiEvent || message.data?.athleteTimerEventType || message.data?.decisionEventType || message.type || 'unknown';
+    // Allowlist of event types which should ALWAYS be broadcast (bypass debounce)
+    const ALWAYS_BROADCAST = new Set(['LiftingOrderUpdated', 'StartLifting', 'SwitchGroup', 'GroupDone']);
     const debounceKey = `${fopName}-${eventType}`;
+
+    // Also consider any update-like message (has uiEvent, decision, timer fields, or payload changes)
+    // as always-broadcast. Also treat server-internal 'fop_update' messages as update-like.
+    const isUpdateLike = Boolean(
+      message.type === 'fop_update' ||
+      message.data?.uiEvent ||
+      message.data?.decisionEventType ||
+      message.data?.athleteTimerEventType ||
+      message.data?.breakTimerEventType ||
+      message.data?.groupAthletes ||
+      message.data?.liftingOrderAthletes ||
+      message.data?.weight ||
+      message.data?.fullName ||
+      message.data?.attemptNumber
+    );
     
     const now = Date.now();
     const lastBroadcast = this.lastBroadcastTime[debounceKey] || 0;
     const timeSinceLastBroadcast = now - lastBroadcast;
     
-    // Skip broadcast if same event type for same FOP occurred too recently
-    if (timeSinceLastBroadcast < this.broadcastDebounceMs) {
+    // Skip broadcast if same event type for same FOP occurred too recently, unless it's on the allow-list
+    // OR the message is update-like (update/timer/decision) which must always be broadcast
+    if (!isUpdateLike && !ALWAYS_BROADCAST.has(eventType) && timeSinceLastBroadcast < this.broadcastDebounceMs) {
       console.log(`[Hub] Debouncing ${eventType} for ${fopName} (${timeSinceLastBroadcast}ms since last)`);
       return;
     }
@@ -445,14 +521,25 @@ class CompetitionHub {
     this.lastBroadcastTime[debounceKey] = now;
     this.metrics.messagesBroadcast++;
     
+    let sentCount = 0;
     for (const callback of this.subscribers) {
       try {
         callback(message);
+        sentCount += 1;
       } catch (error) {
         console.error('[Hub] Error broadcasting to subscriber:', error);
         this.subscribers.delete(callback);
         this.metrics.activeClients--;
       }
+    }
+
+    // Log that SSE was sent and how many subscribers received it (for traceability)
+    try {
+      const fopLog = (message.fop || 'global');
+      const eventLog = (message.data?.athleteTimerEventType || message.data?.uiEvent || message.type || 'unknown');
+      console.log(`[Hub] SSE sent: ${eventLog} for ${fopLog} → subscribers=${sentCount} (stateVersion=${this.stateVersion}, fopState=${this.fopStateVersion?.[fopLog] || 0})`);
+    } catch (e) {
+      // Don't allow logging errors to interrupt broadcasting
     }
   }
 
@@ -475,6 +562,27 @@ class CompetitionHub {
    */
   getDatabaseState() {
     return this.databaseState;
+  }
+
+  /**
+   * Get current hub state version counter. This increments whenever an update, timer,
+   * decision or full database message is processed. Plugins should include this
+   * value in their cache keys so they can be invalidated on new messages.
+   * @returns {number}
+   */
+  getStateVersion() {
+    return this.stateVersion || 0;
+  }
+
+  /**
+   * Get per-FOP state version. Increments whenever a message affecting that FOP
+   * is processed (update/timer/decision) or when the full database is loaded.
+   * Plugins should use this for per-FOP cache keys.
+   * @param {string} fopName
+   * @returns {number}
+   */
+  getFopStateVersion(fopName = 'A') {
+    return this.fopStateVersion?.[fopName] || 0;
   }
   
   /**
