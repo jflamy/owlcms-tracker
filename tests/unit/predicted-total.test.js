@@ -10,101 +10,261 @@ import { calculatePredictedTotal } from '../../src/plugins/nvf-lagkonkurranse/he
  * - attemptsDone: Number of attempts done within current lift type (0-2)
  * - cjDecl: Whether to include first C&J declaration during snatch phase (default: true)
  */
-describe('calculatePredictedTotal', () => {
-  it('uses snatch[0] when in snatch phase with 0 attempts done', () => {
+
+function logAndTest(description, athlete, liftType, attemptsDone, cjDecl, expected) {
+  const result = calculatePredictedTotal(athlete, liftType, attemptsDone, cjDecl);
+  
+  // Find the next snatch request (first attempt with status 'request')
+  const nextSnatchRequest = athlete.sattempts?.find(a => a.liftStatus === 'request')?.stringValue || 'none';
+  // Find the next CJ request
+  const nextCJRequest = athlete.cattempts?.find(a => a.liftStatus === 'request')?.stringValue || 'none';
+  // First CJ declaration (always cattempts[0].stringValue if available)
+  const firstCJDecl = athlete.cattempts?.[0]?.stringValue || 'none';
+  
+  console.log(`${description}:`);
+  console.log(`  Parameters: liftType=${liftType}, attemptsDone=${attemptsDone}, cjDecl=${cjDecl}`);
+  console.log(`  Best lifts: bestSnatch=${athlete.bestSnatch}, bestCJ=${athlete.bestCleanJerk}`);
+  console.log(`  Next snatch request: ${nextSnatchRequest}`);
+  console.log(`  First CJ declaration: ${firstCJDecl}`);
+  console.log(`  Next CJ request: ${nextCJRequest}`);
+  console.log(`  sattempts: ${athlete.sattempts?.map(a => `${a.liftStatus}:${a.stringValue || '-'}`).join(', ') || 'none'}`);
+  console.log(`  cattempts: ${athlete.cattempts?.map(a => `${a.liftStatus}:${a.stringValue || '-'}`).join(', ') || 'none'}`);
+  console.log(`  => RESULT: predictedTotal=${result} (expected=${expected})`);
+  console.log('');
+  return result;
+}
+
+describe('calculatePredictedTotal - Snatch Phase with cjDecl=true', () => {
+  it('before snatch (0 attempts done): uses snatch[0] + CJ declaration', () => {
     const athlete = {
       bestSnatch: 0,
       bestCleanJerk: 0,
-      sattempts: [ { liftStatus: 'request', stringValue: '120' }, { liftStatus: 'empty', stringValue: '' }, { liftStatus: 'empty', stringValue: '' } ],
-      cattempts: [ { liftStatus: 'empty', stringValue: '' }, { liftStatus: 'empty', stringValue: '' }, { liftStatus: 'empty', stringValue: '' } ]
+      sattempts: [ { liftStatus: 'request', stringValue: '100' }, { liftStatus: 'empty', stringValue: '' }, { liftStatus: 'empty', stringValue: '' } ],
+      cattempts: [ { liftStatus: 'request', stringValue: '120' }, { liftStatus: 'empty', stringValue: '' }, { liftStatus: 'empty', stringValue: '' } ]
     };
-    const total = calculatePredictedTotal(athlete, 'snatch', 0);
-    expect(total).toBe(120);
+    const total = logAndTest('Snatch cjDecl=true: before snatch (0 done)', athlete, 'snatch', 0, true, 220);
+    expect(total).toBe(220);
   });
 
-  it('uses snatch[1] when in snatch phase with 1 attempt done', () => {
+  it('during snatch (1 attempt done): uses snatch[1] + CJ declaration', () => {
     const athlete = {
-      bestSnatch: 120,
+      bestSnatch: 100,
       bestCleanJerk: 0,
-      sattempts: [ { liftStatus: 'good', stringValue: '120' }, { liftStatus: 'request', stringValue: '125' }, { liftStatus: 'empty', stringValue: '' } ],
-      cattempts: [ { liftStatus: 'empty', stringValue: '' }, { liftStatus: 'empty', stringValue: '' }, { liftStatus: 'empty', stringValue: '' } ]
+      sattempts: [ { liftStatus: 'good', stringValue: '100' }, { liftStatus: 'request', stringValue: '105' }, { liftStatus: 'empty', stringValue: '' } ],
+      cattempts: [ { liftStatus: 'request', stringValue: '120' }, { liftStatus: 'empty', stringValue: '' }, { liftStatus: 'empty', stringValue: '' } ]
     };
-    const total = calculatePredictedTotal(athlete, 'snatch', 1);
-    // predictedSnatch=125 (next request), predictedCJ=0 (no declaration) => 125
-    expect(total).toBe(125);
+    const total = logAndTest('Snatch cjDecl=true: during snatch (1 done)', athlete, 'snatch', 1, true, 225);
+    expect(total).toBe(225);
   });
 
-  it('uses first C&J declaration during snatch phase when cjDecl=true (default)', () => {
+  it('during snatch (2 attempts done): uses snatch[2] + CJ declaration', () => {
     const athlete = {
-      bestSnatch: 130,
+      bestSnatch: 105,
       bestCleanJerk: 0,
-      sattempts: [ { liftStatus: 'good', stringValue: '120' }, { liftStatus: 'good', stringValue: '125' }, { liftStatus: 'good', stringValue: '130' } ],
-      cattempts: [ { liftStatus: 'request', stringValue: '150' }, { liftStatus: 'empty', stringValue: '' }, { liftStatus: 'empty', stringValue: '' } ]
+      sattempts: [ { liftStatus: 'good', stringValue: '100' }, { liftStatus: 'good', stringValue: '105' }, { liftStatus: 'request', stringValue: '110' } ],
+      cattempts: [ { liftStatus: 'request', stringValue: '120' }, { liftStatus: 'empty', stringValue: '' }, { liftStatus: 'empty', stringValue: '' } ]
     };
-    // During snatch phase with all snatches done (no more requests), uses bestSnatch + CJ declaration
-    const total = calculatePredictedTotal(athlete, 'snatch', 2, true);
-    // predictedSnatch=130 (no more requests), predictedCJ=150 (first declaration) => 280
-    expect(total).toBe(280);
+    const total = logAndTest('Snatch cjDecl=true: during snatch (2 done)', athlete, 'snatch', 2, true, 230);
+    expect(total).toBe(230);
   });
 
-  it('uses cleanJerk next request during C&J phase', () => {
+  it('after 3 snatches (all done, no more requests): uses bestSnatch + CJ declaration', () => {
     const athlete = {
-      bestSnatch: 120,
-      bestCleanJerk: 130,
-      sattempts: [ { liftStatus: 'good', stringValue: '120' }, { liftStatus: 'good', stringValue: '120' }, { liftStatus: 'good', stringValue: '120' } ],
-      cattempts: [ { liftStatus: 'good', stringValue: '120' }, { liftStatus: 'good', stringValue: '130' }, { liftStatus: 'request', stringValue: '140' } ]
+      bestSnatch: 110,
+      bestCleanJerk: 0,
+      sattempts: [ { liftStatus: 'good', stringValue: '100' }, { liftStatus: 'good', stringValue: '105' }, { liftStatus: 'good', stringValue: '110' } ],
+      cattempts: [ { liftStatus: 'request', stringValue: '120' }, { liftStatus: 'empty', stringValue: '' }, { liftStatus: 'empty', stringValue: '' } ]
     };
-    const total = calculatePredictedTotal(athlete, 'cleanJerk', 2);
-    // predictedSnatch=120 (snatches done), predictedCJ=140 (next request) => 260
-    expect(total).toBe(260);
+    const total = logAndTest('Snatch cjDecl=true: after 3 snatches', athlete, 'snatch', 2, true, 230);
+    expect(total).toBe(230);
+  });
+});
+
+describe('calculatePredictedTotal - Snatch Phase with cjDecl=false', () => {
+  it('before snatch (0 attempts done): uses snatch[0] only, no CJ', () => {
+    const athlete = {
+      bestSnatch: 0,
+      bestCleanJerk: 0,
+      sattempts: [ { liftStatus: 'request', stringValue: '100' }, { liftStatus: 'empty', stringValue: '' }, { liftStatus: 'empty', stringValue: '' } ],
+      cattempts: [ { liftStatus: 'request', stringValue: '120' }, { liftStatus: 'empty', stringValue: '' }, { liftStatus: 'empty', stringValue: '' } ]
+    };
+    const total = logAndTest('Snatch cjDecl=false: before snatch (0 done)', athlete, 'snatch', 0, false, 100);
+    expect(total).toBe(100);
   });
 
-  it('uses cleanJerk[1] when C&J phase with 1 attempt done', () => {
+  it('during snatch (1 attempt done): uses snatch[1] only, no CJ', () => {
     const athlete = {
-      bestSnatch: 120,
+      bestSnatch: 100,
+      bestCleanJerk: 0,
+      sattempts: [ { liftStatus: 'good', stringValue: '100' }, { liftStatus: 'request', stringValue: '105' }, { liftStatus: 'empty', stringValue: '' } ],
+      cattempts: [ { liftStatus: 'request', stringValue: '120' }, { liftStatus: 'empty', stringValue: '' }, { liftStatus: 'empty', stringValue: '' } ]
+    };
+    const total = logAndTest('Snatch cjDecl=false: during snatch (1 done)', athlete, 'snatch', 1, false, 105);
+    expect(total).toBe(105);
+  });
+
+  it('during snatch (2 attempts done): uses snatch[2] only, no CJ', () => {
+    const athlete = {
+      bestSnatch: 105,
+      bestCleanJerk: 0,
+      sattempts: [ { liftStatus: 'good', stringValue: '100' }, { liftStatus: 'good', stringValue: '105' }, { liftStatus: 'request', stringValue: '110' } ],
+      cattempts: [ { liftStatus: 'request', stringValue: '120' }, { liftStatus: 'empty', stringValue: '' }, { liftStatus: 'empty', stringValue: '' } ]
+    };
+    const total = logAndTest('Snatch cjDecl=false: during snatch (2 done)', athlete, 'snatch', 2, false, 110);
+    expect(total).toBe(110);
+  });
+
+  it('after 3 snatches (all done): uses bestSnatch only, no CJ', () => {
+    const athlete = {
+      bestSnatch: 110,
+      bestCleanJerk: 0,
+      sattempts: [ { liftStatus: 'good', stringValue: '100' }, { liftStatus: 'good', stringValue: '105' }, { liftStatus: 'good', stringValue: '110' } ],
+      cattempts: [ { liftStatus: 'request', stringValue: '120' }, { liftStatus: 'empty', stringValue: '' }, { liftStatus: 'empty', stringValue: '' } ]
+    };
+    const total = logAndTest('Snatch cjDecl=false: after 3 snatches', athlete, 'snatch', 2, false, 110);
+    expect(total).toBe(110);
+  });
+});
+
+describe('calculatePredictedTotal - C&J Phase with cjDecl=true', () => {
+  it('on first C&J (0 C&J attempts done): uses bestSnatch + CJ[0]', () => {
+    const athlete = {
+      bestSnatch: 110,
+      bestCleanJerk: 0,
+      sattempts: [ { liftStatus: 'good', stringValue: '100' }, { liftStatus: 'good', stringValue: '105' }, { liftStatus: 'good', stringValue: '110' } ],
+      cattempts: [ { liftStatus: 'request', stringValue: '120' }, { liftStatus: 'empty', stringValue: '' }, { liftStatus: 'empty', stringValue: '' } ]
+    };
+    const total = logAndTest('C&J cjDecl=true: first C&J (0 done)', athlete, 'cleanJerk', 0, true, 230);
+    expect(total).toBe(230);
+  });
+
+  it('during C&J (1 C&J attempt done): uses bestSnatch + CJ[1]', () => {
+    const athlete = {
+      bestSnatch: 110,
       bestCleanJerk: 120,
-      sattempts: [ { liftStatus: 'good', stringValue: '120' }, { liftStatus: 'good', stringValue: '120' }, { liftStatus: 'good', stringValue: '120' } ],
-      cattempts: [ { liftStatus: 'good', stringValue: '120' }, { liftStatus: 'request', stringValue: '130' }, { liftStatus: 'empty', stringValue: '' } ]
+      sattempts: [ { liftStatus: 'good', stringValue: '100' }, { liftStatus: 'good', stringValue: '105' }, { liftStatus: 'good', stringValue: '110' } ],
+      cattempts: [ { liftStatus: 'good', stringValue: '120' }, { liftStatus: 'request', stringValue: '125' }, { liftStatus: 'empty', stringValue: '' } ]
     };
-    const total = calculatePredictedTotal(athlete, 'cleanJerk', 1);
-    // predictedSnatch=120, predictedCJ=130 (next request) => 250
-    expect(total).toBe(250);
+    const total = logAndTest('C&J cjDecl=true: during C&J (1 done)', athlete, 'cleanJerk', 1, true, 235);
+    expect(total).toBe(235);
   });
 
-  it('uses cleanJerk[0] when C&J phase with 0 attempts done', () => {
+  it('at last C&J (2 C&J attempts done): uses bestSnatch + CJ[2]', () => {
     const athlete = {
-      bestSnatch: 120,
+      bestSnatch: 110,
+      bestCleanJerk: 125,
+      sattempts: [ { liftStatus: 'good', stringValue: '100' }, { liftStatus: 'good', stringValue: '105' }, { liftStatus: 'good', stringValue: '110' } ],
+      cattempts: [ { liftStatus: 'good', stringValue: '120' }, { liftStatus: 'good', stringValue: '125' }, { liftStatus: 'request', stringValue: '130' } ]
+    };
+    const total = logAndTest('C&J cjDecl=true: last C&J (2 done)', athlete, 'cleanJerk', 2, true, 240);
+    expect(total).toBe(240);
+  });
+
+  it('after all C&J done (no more requests): uses bestSnatch + bestCJ', () => {
+    const athlete = {
+      bestSnatch: 110,
+      bestCleanJerk: 130,
+      sattempts: [ { liftStatus: 'good', stringValue: '100' }, { liftStatus: 'good', stringValue: '105' }, { liftStatus: 'good', stringValue: '110' } ],
+      cattempts: [ { liftStatus: 'good', stringValue: '120' }, { liftStatus: 'good', stringValue: '125' }, { liftStatus: 'good', stringValue: '130' } ]
+    };
+    const total = logAndTest('C&J cjDecl=true: after all C&J', athlete, 'cleanJerk', 2, true, 240);
+    expect(total).toBe(240);
+  });
+});
+
+describe('calculatePredictedTotal - C&J Phase with cjDecl=false', () => {
+  it('on first C&J (0 C&J attempts done): uses bestSnatch + CJ[0]', () => {
+    const athlete = {
+      bestSnatch: 110,
       bestCleanJerk: 0,
-      sattempts: [ { liftStatus: 'good', stringValue: '120' }, { liftStatus: 'good', stringValue: '120' }, { liftStatus: 'good', stringValue: '120' } ],
-      cattempts: [ { liftStatus: 'request', stringValue: '150' }, { liftStatus: 'empty', stringValue: '' }, { liftStatus: 'empty', stringValue: '' } ]
+      sattempts: [ { liftStatus: 'good', stringValue: '100' }, { liftStatus: 'good', stringValue: '105' }, { liftStatus: 'good', stringValue: '110' } ],
+      cattempts: [ { liftStatus: 'request', stringValue: '120' }, { liftStatus: 'empty', stringValue: '' }, { liftStatus: 'empty', stringValue: '' } ]
     };
-    const total = calculatePredictedTotal(athlete, 'cleanJerk', 0);
-    // predictedSnatch=120, predictedCJ=150 (next request) => 270
-    expect(total).toBe(270);
+    const total = logAndTest('C&J cjDecl=false: first C&J (0 done)', athlete, 'cleanJerk', 0, false, 230);
+    expect(total).toBe(230);
   });
 
-  it('returns predicted snatch when next declaration is less than current best during snatch', () => {
+  it('during C&J (1 C&J attempt done): uses bestSnatch + CJ[1]', () => {
     const athlete = {
-      bestSnatch: 130,
-      bestCleanJerk: 140,
-      sattempts: [ { liftStatus: 'good', stringValue: '130' }, { liftStatus: 'request', stringValue: '120' }, { liftStatus: 'empty', stringValue: '' } ],
-      cattempts: [ { liftStatus: 'empty', stringValue: '' }, { liftStatus: 'empty', stringValue: '' }, { liftStatus: 'empty', stringValue: '' } ]
+      bestSnatch: 110,
+      bestCleanJerk: 120,
+      sattempts: [ { liftStatus: 'good', stringValue: '100' }, { liftStatus: 'good', stringValue: '105' }, { liftStatus: 'good', stringValue: '110' } ],
+      cattempts: [ { liftStatus: 'good', stringValue: '120' }, { liftStatus: 'request', stringValue: '125' }, { liftStatus: 'empty', stringValue: '' } ]
     };
-    const total = calculatePredictedTotal(athlete, 'snatch', 1);
-    // predictedSnatch=120 (next request, even if lower), predictedCJ=140 (best, no declaration) => 260
-    // Note: getPredictedBestLift returns the request even if lower than best
-    expect(total).toBe(260);
+    const total = logAndTest('C&J cjDecl=false: during C&J (1 done)', athlete, 'cleanJerk', 1, false, 235);
+    expect(total).toBe(235);
   });
 
-  it('when no next declaration exists for CJ returns best achieved', () => {
+  it('at last C&J (2 C&J attempts done): uses bestSnatch + CJ[2]', () => {
     const athlete = {
-      bestSnatch: 120,
-      bestCleanJerk: 140,
-      sattempts: [ { liftStatus: 'good', stringValue: '120' }, { liftStatus: 'good', stringValue: '120' }, { liftStatus: 'good', stringValue: '120' } ],
-      cattempts: [ { liftStatus: 'good', stringValue: '120' }, { liftStatus: 'good', stringValue: '130' }, { liftStatus: 'good', stringValue: '140' } ]
+      bestSnatch: 110,
+      bestCleanJerk: 125,
+      sattempts: [ { liftStatus: 'good', stringValue: '100' }, { liftStatus: 'good', stringValue: '105' }, { liftStatus: 'good', stringValue: '110' } ],
+      cattempts: [ { liftStatus: 'good', stringValue: '120' }, { liftStatus: 'good', stringValue: '125' }, { liftStatus: 'request', stringValue: '130' } ]
     };
-    const total = calculatePredictedTotal(athlete, 'cleanJerk', 2);
-    // predictedSnatch=120, predictedCJ=140 (no more requests, use best) => 260
-    expect(total).toBe(260);
+    const total = logAndTest('C&J cjDecl=false: last C&J (2 done)', athlete, 'cleanJerk', 2, false, 240);
+    expect(total).toBe(240);
+  });
+
+  it('after all C&J done (no more requests): uses bestSnatch + bestCJ', () => {
+    const athlete = {
+      bestSnatch: 110,
+      bestCleanJerk: 130,
+      sattempts: [ { liftStatus: 'good', stringValue: '100' }, { liftStatus: 'good', stringValue: '105' }, { liftStatus: 'good', stringValue: '110' } ],
+      cattempts: [ { liftStatus: 'good', stringValue: '120' }, { liftStatus: 'good', stringValue: '125' }, { liftStatus: 'good', stringValue: '130' } ]
+    };
+    const total = logAndTest('C&J cjDecl=false: after all C&J', athlete, 'cleanJerk', 2, false, 240);
+    expect(total).toBe(240);
+  });
+});
+
+describe('calculatePredictedTotal - Edge Cases', () => {
+  it('handles failed snatches correctly', () => {
+    const athlete = {
+      bestSnatch: 100,
+      bestCleanJerk: 0,
+      sattempts: [ { liftStatus: 'good', stringValue: '100' }, { liftStatus: 'fail', stringValue: '(105)' }, { liftStatus: 'request', stringValue: '105' } ],
+      cattempts: [ { liftStatus: 'request', stringValue: '120' }, { liftStatus: 'empty', stringValue: '' }, { liftStatus: 'empty', stringValue: '' } ]
+    };
+    const total = logAndTest('Edge: failed snatches', athlete, 'snatch', 2, true, 225);
+    expect(total).toBe(225);
+  });
+
+  it('handles failed C&J correctly', () => {
+    const athlete = {
+      bestSnatch: 110,
+      bestCleanJerk: 120,
+      sattempts: [ { liftStatus: 'good', stringValue: '100' }, { liftStatus: 'good', stringValue: '105' }, { liftStatus: 'good', stringValue: '110' } ],
+      cattempts: [ { liftStatus: 'good', stringValue: '120' }, { liftStatus: 'fail', stringValue: '(125)' }, { liftStatus: 'request', stringValue: '125' } ]
+    };
+    const total = logAndTest('Edge: failed C&J', athlete, 'cleanJerk', 2, true, 235);
+    expect(total).toBe(235);
+  });
+
+  it('handles null/undefined athlete', () => {
+    console.log('Edge: null athlete => 0');
+    console.log('Edge: undefined athlete => 0');
+    expect(calculatePredictedTotal(null, 'snatch', 0, true)).toBe(0);
+    expect(calculatePredictedTotal(undefined, 'snatch', 0, true)).toBe(0);
+  });
+
+  it('handles missing attempts arrays', () => {
+    const athlete = {
+      bestSnatch: 100,
+      bestCleanJerk: 120
+    };
+    const total = logAndTest('Edge: missing attempts arrays', athlete, 'snatch', 0, true, 220);
+    expect(total).toBe(220);
+  });
+
+  it('uses bestCJ when CJ declaration is lower during snatch phase', () => {
+    const athlete = {
+      bestSnatch: 100,
+      bestCleanJerk: 130,
+      sattempts: [ { liftStatus: 'good', stringValue: '100' }, { liftStatus: 'request', stringValue: '105' }, { liftStatus: 'empty', stringValue: '' } ],
+      cattempts: [ { liftStatus: 'request', stringValue: '120' }, { liftStatus: 'empty', stringValue: '' }, { liftStatus: 'empty', stringValue: '' } ]
+    };
+    const total = logAndTest('Edge: bestCJ > CJ declaration', athlete, 'snatch', 1, true, 235);
+    expect(total).toBe(235);
   });
 });
