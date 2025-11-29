@@ -13,6 +13,7 @@ export function createTimer() {
 	let timerStartTime = null; // When timer was started (client time)
 	let timerInitialRemaining = 0; // Initial time remaining from server
 	let lastTimerState = null; // Track last known timer state to detect changes
+	let lastNotifiedState = null; // Track last notified state to avoid duplicate updates
 	let subscribers = [];
 
 	/**
@@ -133,7 +134,15 @@ export function createTimer() {
 	 */
 	function notifySubscribers() {
 		const state = getState();
-		subscribers.forEach(callback => callback(state));
+		
+		// Only notify if state actually changed
+		const stateKey = `${state.seconds}-${state.isRunning}`;
+		const lastKey = lastNotifiedState ? `${lastNotifiedState.seconds}-${lastNotifiedState.isRunning}` : null;
+		
+		if (stateKey !== lastKey) {
+			lastNotifiedState = state;
+			subscribers.forEach(callback => callback(state));
+		}
 	}
 
 	/**

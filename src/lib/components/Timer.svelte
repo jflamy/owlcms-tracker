@@ -1,13 +1,18 @@
 <script>
-  import { timer } from '$lib/stores';
+  import { timer as storeTimer } from '$lib/stores';
   import { onDestroy } from 'svelte';
+  export let timer = null; // optional prop; if provided, use this instead of store
+  export let variant = 'athlete'; // 'athlete' or 'break' (turquoise)
   
   let remainingMs = 0;
   let interval;
   
-  $: if ($timer?.state === 'running') {
+  // Choose timer source: prop `timer` (from parent component) or shared store
+  $: activeTimer = timer || $storeTimer;
+
+  $: if (activeTimer?.state === 'running') {
     startCountdown();
-  } else if ($timer?.state === 'stopped') {
+  } else if (activeTimer?.state === 'stopped') {
     stopCountdown();
   }
   
@@ -15,8 +20,8 @@
     stopCountdown();
     
     interval = setInterval(() => {
-      const elapsed = Date.now() - $timer.startTime;
-      remainingMs = Math.max(0, $timer.duration - elapsed);
+      const elapsed = activeTimer?.startTime ? Date.now() - activeTimer.startTime : 0;
+      remainingMs = Math.max(0, (activeTimer?.duration || 0) - elapsed);
       
       if (remainingMs <= 0) {
         stopCountdown();
@@ -41,8 +46,8 @@
   $: urgent = seconds > 0 && seconds <= 10;
 </script>
 
-<div class="timer" class:warning class:urgent>
-  {#if $timer?.state === 'running'}
+<div class="timer {variant}" class:warning class:urgent>
+  {#if activeTimer?.state === 'running'}
     {seconds}s
   {:else}
     --
@@ -65,6 +70,11 @@
   .urgent {
     color: #f44336;
     animation: pulse 1s infinite;
+  }
+
+  /* Break timer variant (turquoise) */
+  .break {
+    color: #06c2b6; /* turquoise */
   }
   
   @keyframes pulse {

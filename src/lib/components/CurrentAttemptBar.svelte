@@ -1,18 +1,28 @@
 <script>
 	// Current attempt information bar component - shared across all scoreboards
 	// Displays: start number, athlete name, team, attempt label, weight, timer, and decision lights
+	// NO TIMER STATE HERE - just passes data to CountdownTimer components
 	
+	import CountdownTimer from './CountdownTimer.svelte';
+
 	export let currentAttempt = {};
-	export let timerState = { seconds: 0, isRunning: false, isWarning: false, display: '0:00' };
 	export let decisionState = {};
+	export let timerData = null;      // Athlete timer data from parent
+	export let breakTimerData = null; // Break timer data from parent
 	export let scoreboardName = 'Scoreboard';
 	export let sessionStatus = {};
 	export let competition = {};
-	export let showDecisionLights = true;  // For grid scoreboards, false for simpler scoreboards
-	export let showTimer = true;  // Control whether to show timer slot
-	export let compactMode = false;  // Simpler layout for team scoreboard
-	export let showLifterInfo = true;  // Toggle athlete/attempt info display
-	export let translations = {};  // Translated strings (session, snatch, etc.)
+	export let showDecisionLights = true;
+	export let showTimer = true;
+	export let compactMode = false;
+	export let showLifterInfo = true;
+	export let translations = {};
+	
+	// Timer colors (no state, just constants)
+	const ATHLETE_TIMER_COLOR = '#4ade80';    // Green
+	const ATHLETE_TIMER_WARNING = '#fbbf24';  // Yellow
+	const BREAK_TIMER_COLOR = '#00d4d4';      // Turquoise
+	const BREAK_TIMER_WARNING = '#00d4d4';    // Keep turquoise
 	
 	function getRefereeClass(value) {
 		if (value === 'good') return 'good';
@@ -38,18 +48,23 @@
 
 					{#if showTimer || showDecisionLights}
 						<div class="timer-decision-container compact-container">
-							{#if showTimer}
-								<div 
-									class="timer-slot"
-									class:visible={!decisionState?.visible}
-									class:running={timerState.isRunning}
-									class:warning={timerState.isWarning}
-								>
-									<span class="timer-display">{timerState.display}</span>
-								</div>
-							{/if}
-							{#if showDecisionLights}
-								<div class="decision-slot" class:visible={decisionState?.visible}>
+							<!-- All three occupy same space, CSS display:none controls visibility -->
+							<div class="timer-slot">
+								<CountdownTimer 
+									{timerData}
+									color={ATHLETE_TIMER_COLOR} 
+									warningColor={ATHLETE_TIMER_WARNING}
+								/>
+							</div>
+							<div class="break-slot">
+								<CountdownTimer 
+									timerData={breakTimerData} 
+									color={BREAK_TIMER_COLOR} 
+									warningColor={BREAK_TIMER_WARNING}
+								/>
+							</div>
+						{#if showDecisionLights}
+							<div class="decision-slot">
 									<div class="decision-lights" aria-label="Referee decisions">
 										{#if !decisionState?.isSingleReferee}
 											<div class="referee-light {getRefereeClass(decisionState?.ref1)}"></div>
@@ -86,20 +101,25 @@
 					</div>
 					<span class="attempt-label">{@html currentAttempt?.attempt || ''}</span>
 					<span class="weight">{currentAttempt?.weight || '-'} kg</span>
-					{#if showTimer || showDecisionLights}
-						<div class="timer-decision-container">
-							{#if showTimer}
-								<div 
-									class="timer-slot"
-									class:visible={!decisionState?.visible}
-									class:running={timerState.isRunning}
-									class:warning={timerState.isWarning}
-								>
-									<span class="timer-display">{timerState.display}</span>
-								</div>
-							{/if}
-							{#if showDecisionLights}
-								<div class="decision-slot" class:visible={decisionState?.visible}>
+				{#if showTimer || showDecisionLights}
+					<div class="timer-decision-container">
+						<!-- All three occupy same space, CSS display:none controls visibility -->
+						<div class="timer-slot">
+							<CountdownTimer 
+								{timerData}
+								color={ATHLETE_TIMER_COLOR} 
+								warningColor={ATHLETE_TIMER_WARNING}
+							/>
+						</div>
+						<div class="break-slot">
+							<CountdownTimer 
+								timerData={breakTimerData} 
+								color={BREAK_TIMER_COLOR} 
+								warningColor={BREAK_TIMER_WARNING}
+							/>
+						</div>
+						{#if showDecisionLights}
+								<div class="decision-slot">
 									<div class="decision-lights" aria-label="Referee decisions">
 										{#if !decisionState?.isSingleReferee}
 											<div class="referee-light {getRefereeClass(decisionState?.ref1)}"></div>
@@ -203,59 +223,35 @@
 		background: rgba(239, 68, 68, 0.2);
 	}
 
+	/* Container for timer/break/decision - only one visible at a time via display:none/flex */
 	.timer-decision-container {
-		display: flex;
-		align-items: center;
-		justify-content: flex-end;
-		width: 9rem;
-		min-width: 9rem;
-		height: 2.5rem;
-		gap: 0.5rem;
 		flex-shrink: 0;
 	}
 
+	/* All three slots: same size, only one visible at a time */
 	.timer-slot,
+	.break-slot,
 	.decision-slot {
 		display: none;
 		align-items: center;
 		justify-content: center;
-		width: 100%;
-		height: 100%;
+		width: 9rem;
+		height: 2.5rem;
 		border-radius: 0.25rem;
-		padding: 0.35rem 0.75rem;
-	}
-
-	.timer-slot {
 		background: #1a1a1a;
-		color: #fbbf24;
 		font-weight: bold;
 	}
 
-	.timer-slot.visible {
-		display: flex;
-	}
-
-	.timer-slot.running {
+	.timer-slot {
 		color: #4ade80;
 	}
 
-	.timer-slot.warning {
-		color: #fbbf24;
-		background: rgba(239, 68, 68, 0.2);
-	}
-
-	.timer-display {
-		font-size: 1.5rem;
-		font-family: 'Courier New', monospace;
-		letter-spacing: 2px;
+	.break-slot {
+		color: #00d4d4;
 	}
 
 	.decision-slot {
 		background: rgba(26, 26, 26, 0.95);
-	}
-
-	.decision-slot.visible {
-		display: flex;
 	}
 
 	.decision-lights {

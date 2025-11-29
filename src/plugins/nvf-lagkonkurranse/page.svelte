@@ -1,39 +1,23 @@
 <script>
-	import { createTimer } from '$lib/timer-logic.js';
 	import { onMount, onDestroy } from 'svelte';
 	import CurrentAttemptBar from '$lib/components/CurrentAttemptBar.svelte';
 
 	// Props passed from parent route
 	export let data = {};
 
-	// Timer state using reusable timer logic
-	let timerState = { seconds: 0, isRunning: false, isWarning: false, display: '0:00' };
-
-	// Create timer instance
-	const timer = createTimer();
-	const unsubscribe = timer.subscribe((state) => {
-		timerState = state;
-	});
-
 	// Language is handled server-side via data.headers
 	// No client-side translation needed
 
 	onMount(() => {
-		timer.start(data.timer);
+		// Component mounted
 	});
 
 	onDestroy(() => {
-		timer.stop();
-		unsubscribe();
+		// Component cleanup
 	});
 
 	$: currentAttempt = data.currentAttempt;
 	$: teams = data.teams || [];
-
-	// Sync timer with server when data changes
-	$: if (data.timer) {
-		timer.syncWithServer(data.timer);
-	}
 
 	function getAttemptClass(attempt) {
 		if (!attempt || !attempt.liftStatus || attempt.liftStatus === 'empty') return 'empty';
@@ -107,29 +91,28 @@ export function shouldRenderFlag(url) {
 	<title>{data.scoreboardName || 'NVF Lagkonkurranse'} - {data.competition?.name || 'OWLCMS'}</title>
 </svelte:head>
 
-<div class="scoreboard">
-	{#if data.status !== 'waiting' && !data.sessionStatus?.isDone}
-		<div class="session-header-wrapper" role="button" aria-label="Open gender menu" tabindex="0">
-			<CurrentAttemptBar 
-				currentAttempt={data.currentAttempt}
-				timerState={timerState}
-				decisionState={data.decision}
-				scoreboardName={data.scoreboardName}
-				sessionStatus={data.sessionStatus}
-				competition={data.competition}
-				showDecisionLights={true}
-				showTimer={true}
-				compactMode={true}
-				showLifterInfo={data.options?.currentAttemptInfo ?? true}
-				translations={{
-					session: data.headers?.session || 'Session',
-					snatch: data.headers?.snatch || 'Snatch'
-				}}
-			/>
-		</div>
-	{/if}
-
-	<!-- Context menu disabled for DOM inspection -->
+	<div class="scoreboard">
+		{#if data.status !== 'waiting' && !data.sessionStatus?.isDone}
+			<div class="session-header-wrapper {data.displayClass}" role="button" aria-label="Open gender menu" tabindex="0">
+				<CurrentAttemptBar 
+					currentAttempt={data.currentAttempt}
+					timerData={data.timer}
+					breakTimerData={data.breakTimer}
+					decisionState={data.decision}
+					scoreboardName={data.scoreboardName}
+					sessionStatus={data.sessionStatus}
+					competition={data.competition}
+					showDecisionLights={true}
+					showTimer={true}
+					compactMode={true}
+					showLifterInfo={data.options?.currentAttemptInfo ?? true}
+					translations={{
+						session: data.headers?.session || 'Session',
+						snatch: data.headers?.snatch || 'Snatch'
+					}}
+				/>
+			</div>
+		{/if}	<!-- Context menu disabled for DOM inspection -->
 
 	<main class="main">
 		{#if data.status === 'waiting'}
@@ -637,6 +620,41 @@ export function shouldRenderFlag(url) {
 		min-width: 6rem;
 		display: flex;
 		flex-direction: column;
+	}
+
+	/* Backend-controlled display modes: only one of decision/athlete/break is shown at a time.
+	   The backend sets `displayClass` on the `.session-header-wrapper` (show-decision/show-break/show-athlete).
+	   These rules enforce display:none for the two inactive slots and color the break timer turquoise. */
+
+	:global(.session-header-wrapper.show-decision .timer-slot),
+	:global(.session-header-wrapper.show-decision .break-slot) {
+		display: none !important;
+	}
+	:global(.session-header-wrapper.show-decision .decision-slot) {
+		display: flex !important;
+	}
+
+	:global(.session-header-wrapper.show-athlete .decision-slot),
+	:global(.session-header-wrapper.show-athlete .break-slot) {
+		display: none !important;
+	}
+	:global(.session-header-wrapper.show-athlete .timer-slot) {
+		display: flex !important;
+	}
+
+	:global(.session-header-wrapper.show-break .decision-slot),
+	:global(.session-header-wrapper.show-break .timer-slot) {
+		display: none !important;
+	}
+	:global(.session-header-wrapper.show-break .break-slot) {
+		display: flex !important;
+	}
+
+	/* Explicit none: hide all three slots when backend requests no display */
+	:global(.session-header-wrapper.show-none .decision-slot),
+	:global(.session-header-wrapper.show-none .timer-slot),
+	:global(.session-header-wrapper.show-none .break-slot) {
+		display: none !important;
 	}
 
 	/* Context menu disabled for DOM inspection */

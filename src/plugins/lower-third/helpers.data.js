@@ -25,65 +25,82 @@ import { getFlagUrl } from '$lib/server/flag-resolver.js';
 let isTimerActive = null; // null = uninitialized, true = visible, false = hidden
 let isTimerRunning = false; // Track if timer is counting down
 
-function extractTimerState(fopUpdate) {
-	const eventType = fopUpdate?.athleteTimerEventType;
-	const timeRemaining = parseInt(fopUpdate?.athleteMillisRemaining || 0);
-	
-	// Initialize state on first call from current fopUpdate data
+function extractTimers(fopUpdate) {
+	const athleteEvent = fopUpdate?.athleteTimerEventType;
+	const athleteTimeRemaining = parseInt(fopUpdate?.athleteMillisRemaining || 0);
+
+	// Athlete timer state (shared mutable state is preserved across calls)
 	if (isTimerActive === null) {
-		if (eventType === 'StartTime') {
+		if (athleteEvent === 'StartTime') {
 			isTimerActive = true;
 			isTimerRunning = true;
-		} else if (eventType === 'SetTime') {
+		} else if (athleteEvent === 'SetTime') {
 			isTimerActive = true;
 			isTimerRunning = false;
-		} else if (eventType === 'StopTime') {
+		} else if (athleteEvent === 'StopTime') {
 			isTimerActive = false;
 			isTimerRunning = false;
-		} else if (timeRemaining > 0) {
-			// Has time but no event - assume timer is set
+		} else if (athleteTimeRemaining > 0) {
 			isTimerActive = true;
 			isTimerRunning = false;
 		} else {
-			// No timer data at all
 			isTimerActive = false;
 			isTimerRunning = false;
 		}
 	}
-	
-	// State machine for timer visibility and running state
-	if (eventType === 'SetTime') {
-		// Timer loaded - make it active (even after being stopped)
+
+	if (athleteEvent === 'SetTime') {
 		isTimerActive = true;
 		isTimerRunning = false;
-	} else if (eventType === 'StartTime') {
-		// Timer started - active and running
+	} else if (athleteEvent === 'StartTime') {
 		isTimerActive = true;
 		isTimerRunning = true;
-	} else if (eventType === 'StopTime' && isTimerRunning) {
-		// StopTime while running - hide timer (lift completed)
+	} else if (athleteEvent === 'StopTime' && isTimerRunning) {
 		isTimerActive = false;
 		isTimerRunning = false;
-	} else if (eventType === 'StopTime' && !isTimerRunning) {
-		// StopTime while not running - acts like SetTime (OWLCMS uses this to set timer)
+	} else if (athleteEvent === 'StopTime' && !isTimerRunning) {
 		isTimerActive = true;
 		isTimerRunning = false;
 	}
-	// If no event, preserve state
-	
-	// Determine display state
-	let state = 'stopped';
-	if (isTimerActive && isTimerRunning) {
-		state = 'running';
-	} else if (isTimerActive) {
-		state = 'set';
-	}
-	
-	return {
-		state,
-		timeRemaining,
+
+	let athleteState = 'stopped';
+	if (isTimerActive && isTimerRunning) athleteState = 'running';
+	else if (isTimerActive) athleteState = 'set';
+
+	const athleteTimer = {
+		type: 'athlete',
+		state: athleteState,
+		isActive: isTimerActive,
+		visible: Boolean(athleteEvent || athleteTimeRemaining > 0),
+		timeRemaining: athleteTimeRemaining,
 		duration: parseInt(fopUpdate?.timeAllowed || 60000)
 	};
+
+	// Break timer
+	const breakEvent = fopUpdate?.breakTimerEventType;
+	const breakRemaining = parseInt(fopUpdate?.breakMillisRemaining || 0);
+	const decisionEvent = fopUpdate?.decisionEventType || fopUpdate?.decisionsVisible === 'true' || fopUpdate?.down === 'true';
+
+	const breakRequested = Boolean(breakEvent || breakRemaining > 0);
+	// Decisions and athlete timer events hide break timer
+	const breakVisible = breakRequested && !decisionEvent && !athleteEvent;
+
+	// Normalize break event names (BreakStarted, BreakPaused)
+	const normBreakEvent = (breakEvent || '').toString().toLowerCase();
+	let breakState = 'stopped';
+	if (normBreakEvent.includes('start') || normBreakEvent === 'breakstarted') breakState = 'running';
+	else if (normBreakEvent.includes('pause') || normBreakEvent === 'breakpaused' || breakRemaining > 0) breakState = 'set';
+
+	const breakTimer = {
+		type: 'break',
+		state: breakState,
+		isActive: breakRequested,
+		visible: breakVisible,
+		timeRemaining: breakRemaining,
+		duration: parseInt(fopUpdate?.breakTimeAllowed || fopUpdate?.timeAllowed || 60000)
+	};
+
+	return { timer: athleteTimer, breakTimer };
 }
 
 /**
@@ -155,14 +172,15 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		};
 	}
 
-	// Extract timer and decision states
-	const timer = extractTimerState(fopUpdate);
+	// Extract timer(s) and decision states
+	const { timer, breakTimer } = extractTimers(fopUpdate);
 	const decision = extractDecisionState(fopUpdate);
 
 	return {
 		competition,
 		currentAthleteInfo,
 		timer,
+		breakTimer,
 		decision,
 		sessionStatus,
 		status: 'ready',

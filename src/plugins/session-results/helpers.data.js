@@ -47,7 +47,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	const showRecords = options.showRecords ?? true;
 	const learningMode = process.env.LEARNING_MODE === 'true' ? 'enabled' : 'disabled';
 	const sessionStatus = competitionHub.getSessionStatus(fopName);
-	const timer = extractTimerState(fopUpdate, fopName);
+	const { timer, breakTimer } = extractTimerState(fopUpdate, fopName);
 	const competition = {
 		name: fopUpdate?.competitionName || databaseState?.competition?.name || 'Competition',
 		fop: fopName,
@@ -119,6 +119,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		return {
 			...cached,
 			timer,
+			breakTimer,
 			decision,
 			sessionStatus,
 			sessionStatusMessage,
@@ -147,6 +148,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			competition,
 			currentAttempt,
 			timer,
+			breakTimer,
 			decision,
 			records,
 			sessionStatus,  // Include session status even in waiting state
@@ -317,17 +319,22 @@ export function getScoreboardData(fopName = 'A', options = {}) {
  * @returns {Object} Timer state with isActive flag
  */
 function extractTimerState(fopUpdate, fopName = 'A') {
+	const athleteEvent = fopUpdate?.athleteTimerEventType;
+	const decisionEvent = Boolean(fopUpdate?.decisionEventType || fopUpdate?.decisionsVisible === 'true' || fopUpdate?.down === 'true');
+
+	const athleteTimeRemaining = parseInt(fopUpdate?.athleteMillisRemaining || 0);
+	const breakTimeRemaining = parseInt(fopUpdate?.breakMillisRemaining || 0);
+
+	// Compute athlete timer object
 	if (!timerStateMap.has(fopName)) {
 		timerStateMap.set(fopName, { active: null, running: false });
 	}
-
 	const stateRef = timerStateMap.get(fopName);
 	let { active, running } = stateRef;
 
-	const eventType = fopUpdate?.athleteTimerEventType;
-	const timeRemaining = parseInt(fopUpdate?.athleteMillisRemaining || 0);
+	const eventType = athleteEvent;
+	const timeRemaining = athleteTimeRemaining;
 
-	// Initialize state on first call from current fopUpdate data
 	if (active === null) {
 		if (eventType === 'StartTime') {
 			active = true;
@@ -347,8 +354,6 @@ function extractTimerState(fopUpdate, fopName = 'A') {
 		}
 	}
 
-	// State machine for timer visibility and running state
-	// For session scoreboard: timer stays visible until decision is shown
 	if (eventType === 'SetTime') {
 		active = true;
 		running = false;
@@ -356,28 +361,55 @@ function extractTimerState(fopUpdate, fopName = 'A') {
 		active = true;
 		running = true;
 	} else if (eventType === 'StopTime') {
-		// StopTime keeps timer visible (just stops counting)
-		// Decision display will hide it when referee decisions come
 		active = true;
 		running = false;
 	}
 
 	timerStateMap.set(fopName, { active, running });
 
-	let state = 'stopped';
+	let athleteState = 'stopped';
 	if (active && running) {
-		state = 'running';
+		athleteState = 'running';
 	} else if (active) {
-		state = 'set';
+		athleteState = 'set';
 	}
 
-	return {
-		state,
-		isActive: active,  // Key flag: should timer be visible?
+	const athleteTimer = {
+		type: 'athlete',
+		state: athleteState,
+		isActive: active,
+		visible: Boolean(eventType || timeRemaining > 0),
 		timeRemaining,
 		duration: parseInt(fopUpdate?.timeAllowed || 60000),
 		startTime: null
 	};
+
+	// Compute break timer object - may exist independently
+	const breakEventType = fopUpdate?.breakTimerEventType;
+	const breakRequestedRaw = Boolean(breakEventType || breakTimeRemaining > 0);
+	// Hide break timer when decisions or athlete timer events occur
+	const breakVisible = breakRequestedRaw && !decisionEvent && !athleteEvent;
+
+	// Normalize common OWLCMS break event names (e.g., BreakStarted, BreakPaused)
+	const normBreakEvent = (breakEventType || '').toString().toLowerCase();
+	let breakState = 'stopped';
+	if (normBreakEvent.includes('start') || normBreakEvent === 'breakstarted') {
+		breakState = 'running';
+	} else if (normBreakEvent.includes('pause') || normBreakEvent === 'breakpaused' || breakTimeRemaining > 0) {
+		breakState = 'set';
+	}
+
+	const breakTimer = {
+		type: 'break',
+		state: breakState,
+		isActive: breakRequestedRaw,
+		visible: breakVisible,
+		timeRemaining: breakTimeRemaining,
+		duration: parseInt(fopUpdate?.breakTimeAllowed || fopUpdate?.timeAllowed || 60000),
+		startTime: null
+	};
+
+	return { timer: athleteTimer, breakTimer };
 }
 
 function extractDecisionState(fopUpdate) {

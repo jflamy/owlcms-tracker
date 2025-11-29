@@ -122,12 +122,36 @@ class CompetitionHub {
       
       // Store/merge the update data regardless of database state
       // This ensures we have current athlete, timer, etc. even while waiting for database
-      this.fopUpdates[fopName] = {
-        ...(this.fopUpdates[fopName] || {}), // Keep previous data
-        ...params,                             // Merge new data
+      const previousFopData = this.fopUpdates[fopName] || {};
+      
+      // Handle break timer field persistence:
+      // - If breakPaused is detected, clear all break timer fields
+      // - If new break timer fields are provided, use them (reset)
+      // - If no new break timer fields and not paused, preserve previous values
+      let mergedData = {
+        ...previousFopData,
+        ...params,
         lastUpdate: Date.now(),
         fop: fopName
       };
+      
+      const breakPaused = String(params?.breakTimerEventType || '').toLowerCase().includes('pause');
+      if (breakPaused) {
+        // Clear all break timer fields when pause is detected
+        mergedData.breakTimerEventType = params.breakTimerEventType;
+        mergedData.breakMillisRemaining = undefined;
+        mergedData.breakStartTimeMillis = undefined;
+        mergedData.breakStartTime = undefined;
+      } else if (!params.breakMillisRemaining && !params.breakStartTimeMillis && previousFopData.breakMillisRemaining) {
+        // No new break timer fields provided, but we have previous ones and not paused
+        // Preserve the previous break timer fields
+        mergedData.breakMillisRemaining = previousFopData.breakMillisRemaining;
+        mergedData.breakStartTimeMillis = previousFopData.breakStartTimeMillis;
+        mergedData.breakStartTime = previousFopData.breakStartTime;
+        mergedData.breakTimerEventType = previousFopData.breakTimerEventType;
+      }
+      
+      this.fopUpdates[fopName] = mergedData;
       
       // Update session status tracking
       this.updateSessionStatus(fopName, params);

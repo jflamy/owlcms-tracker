@@ -315,6 +315,8 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			teams: [],
 			headers,
 			status: 'waiting',
+			displayMode: 'none',
+			displayClass: 'show-none',
 			learningMode,
 			options: { showRecords, sortBy, gender: requestedGender, currentAttemptInfo, topN, cjDecl }
 		};
@@ -331,6 +333,8 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			teams: [],
 			headers,
 			status: 'waiting',
+			displayMode: 'none',
+			displayClass: 'show-none',
 			learningMode,
 			options: { showRecords, sortBy, gender: 'current', currentAttemptInfo, topN, cjDecl }
 		};
@@ -345,6 +349,8 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			teams: [],
 			headers,
 			status: 'waiting',
+			displayMode: 'none',
+			displayClass: 'show-none',
 			learningMode
 		};
 	}
@@ -360,8 +366,11 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// duplicates caused by minor payload formatting differences.
 	const hubFopVersion = (competitionHub.getFopStateVersion && typeof competitionHub.getFopStateVersion === 'function') ? competitionHub.getFopStateVersion(fopName) : ((competitionHub.getStateVersion && typeof competitionHub.getStateVersion === 'function') ? competitionHub.getStateVersion() : 0);
 
-	// Cache key format: <fop>-v<version>-<gender>-<topN>-<language>
-	const cacheKeyWithVersion = `${fopName}-v${hubFopVersion}-${gender}-${topN}-${language}`;
+	// Cache key format: <fop>-v<version>-<gender>-<topN>-<language>-<currentAttemptInfo>-<cjDecl>
+	// Include `currentAttemptInfo` and `cjDecl` because they affect what is returned
+	// (we don't want a prior cached response with currentAttemptInfo=false to be returned
+	// when the client requests currentAttemptInfo=true).
+	const cacheKeyWithVersion = `${fopName}-v${hubFopVersion}-${gender}-${topN}-${language}-${currentAttemptInfo}-${cjDecl}`;
 	
 	if (nvfScoreboardCache.has(cacheKeyWithVersion)) {
 		const cached = nvfScoreboardCache.get(cacheKeyWithVersion);
@@ -373,9 +382,30 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		}
 		
 		// Return cached data with current timer state, session status, decision and status message
+		const { timer, breakTimer } = extractTimers(fopUpdate, language);
+		const decisionStateCached = extractDecisionState(fopUpdate);
+		const decisionPresent = Boolean(decisionStateCached?.visible);
+		let displayMode = decisionPresent ? 'decision' : (breakTimer.visible ? 'break' : (timer.visible ? 'athlete' : 'none'));
+		// Defensive rule: if break timer is actively running and there's no visible decision,
+		// prefer the break display even if other flags are inconsistent (protect against stale flags).
+		if (!decisionPresent && breakTimer && breakTimer.state === 'running') {
+			displayMode = 'break';
+			// Ensure visibility flags align with forced display mode
+			try {
+				if (breakTimer) breakTimer.visible = true;
+				if (timer) timer.visible = false;
+			} catch (e) {
+				// ignore immaterial errors modifying timer objects
+			}
+		}
+		const displayClass = `show-${displayMode}`;
+		const activeTimer = displayMode === 'break' ? breakTimer : timer;
 		return {
 			...cached,
-			timer: extractTimerState(fopUpdate),
+			timer: activeTimer,
+			breakTimer,
+			displayMode,
+			displayClass,
 			decision: extractDecisionState(fopUpdate),
 			sessionStatus,  // Fresh session status
 			sessionStatusMessage,  // Fresh status message
@@ -430,16 +460,8 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		}
 	}
 
-	// Extract timer info from UPDATE message or keep previous timer state
-	const timer = {
-		state: fopUpdate?.athleteTimerEventType === 'StartTime' ? 'running' : 
-		       fopUpdate?.athleteTimerEventType === 'StopTime' ? 'stopped' : 
-		       fopUpdate?.athleteTimerEventType === 'SetTime' ? 'set' :
-		       fopUpdate?.athleteTimerEventType ? fopUpdate.athleteTimerEventType.toLowerCase() : 'stopped',
-		timeRemaining: fopUpdate?.athleteMillisRemaining ? parseInt(fopUpdate.athleteMillisRemaining) : 0,
-		duration: fopUpdate?.timeAllowed ? parseInt(fopUpdate.timeAllowed) : 60000,
-		startTime: null // Client will compute this
-	};
+	// Extract timer info from UPDATE message (athlete timer + break timer)
+	const { timer, breakTimer } = extractTimers(fopUpdate, language);
 
 	// Get precomputed session athletes from UPDATE message (stored in groupAthletes key)
 	// Note: groupAthletes is already a parsed object (nested JSON from WebSocket)
@@ -792,6 +814,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			gender: helperDetectedGender || null
 		},
 		timer,
+		breakTimer,
 		sessionStatusMessage,  // Cleaned message for when session is done
 		teams, // Array of team objects with athletes
 		allAthletes, // Flat list if needed
@@ -840,10 +863,32 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			nvfScoreboardCache.delete(firstKey);
 		}
 
+	// Compute which of the three displays should be shown: decision > break > athlete > none
+	const decisionStateFinal = extractDecisionState(fopUpdate);
+	const decisionPresentFinal = Boolean(decisionStateFinal?.visible);
+	let displayModeFinal = decisionPresentFinal ? 'decision' : (breakTimer.visible ? 'break' : (timer.visible ? 'athlete' : 'none'));
+	// Defensive override: if break timer is running and no decision is visible, force break display
+	if (!decisionPresentFinal && breakTimer && breakTimer.state === 'running') {
+		displayModeFinal = 'break';
+		// Align visibility flags with forced display mode
+		try {
+			if (breakTimer) breakTimer.visible = true;
+			if (timer) timer.visible = false;
+		} catch (e) {
+			// ignore immaterial errors
+		}
+	}
+	const displayClassFinal = `show-${displayModeFinal}`;
+	const activeTimerFinal = displayModeFinal === 'break' ? breakTimer : timer;
+
 	return {
 		...result,
+		timer: activeTimerFinal,
+		breakTimer,
 		sessionStatus,  // Always include fresh session status
 		decision: extractDecisionState(fopUpdate),
+		displayMode: displayModeFinal,
+		displayClass: displayClassFinal,
 		learningMode
 	};
 }
@@ -853,16 +898,89 @@ export function getScoreboardData(fopName = 'A', options = {}) {
  * @param {Object} fopUpdate - FOP update data
  * @returns {Object} Timer state
  */
-function extractTimerState(fopUpdate) {
-	return {
-		state: fopUpdate?.athleteTimerEventType === 'StartTime' ? 'running' : 
-		       fopUpdate?.athleteTimerEventType === 'StopTime' ? 'stopped' : 
-		       fopUpdate?.athleteTimerEventType === 'SetTime' ? 'set' :
-		       fopUpdate?.athleteTimerEventType ? fopUpdate.athleteTimerEventType.toLowerCase() : 'stopped',
-		timeRemaining: fopUpdate?.athleteMillisRemaining ? parseInt(fopUpdate.athleteMillisRemaining) : 0,
+/**
+ * Extract both athlete and break timers from a FOP update.
+ * Returns { timer, breakTimer } where each object contains:
+ * { type: 'athlete'|'break', state: 'running'|'set'|'stopped', isActive, visible, timeRemaining, duration, startTime }
+ */
+function extractTimers(fopUpdate, language = 'en') {
+	const athleteEvent = fopUpdate?.athleteTimerEventType;
+	const athleteTimeRemaining = parseInt(fopUpdate?.athleteMillisRemaining || 0);
+
+	// Athlete timer state - simple mapping
+	const athleteState = athleteEvent === 'StartTime' ? 'running' : athleteEvent === 'StopTime' ? 'stopped' : athleteEvent === 'SetTime' ? 'set' : (athleteEvent ? String(athleteEvent).toLowerCase() : 'stopped');
+	const athleteTimer = {
+		type: 'athlete',
+		state: athleteState,
+		isActive: Boolean(athleteEvent || athleteTimeRemaining > 0),
+		visible: Boolean(athleteEvent || athleteTimeRemaining > 0),
+		timeRemaining: athleteTimeRemaining,
 		duration: fopUpdate?.timeAllowed ? parseInt(fopUpdate.timeAllowed) : 60000,
-		startTime: null // Client will compute this
+		startTime: null
 	};
+
+	// Break timer state
+	const breakEvent = fopUpdate?.breakTimerEventType;
+	const breakRemainingReported = parseInt(fopUpdate?.breakMillisRemaining || 0);
+	const breakStartMillisReported = parseInt(fopUpdate?.breakStartTimeMillis || fopUpdate?.breakStartTime || 0);
+	const decisionEvent = Boolean(fopUpdate?.decisionEventType || fopUpdate?.decisionsVisible === 'true' || fopUpdate?.down === 'true');
+	const fopState = String(fopUpdate?.fopState || '').toUpperCase();
+	const mode = String(fopUpdate?.mode || '').toUpperCase();
+
+	const normBreakEvent = (breakEvent || '').toString().toLowerCase();
+	const breakPaused = normBreakEvent.includes('pause') || normBreakEvent === 'breakpaused';
+
+	// If athlete timer starts, we exit break state
+	const athleteTimerStarting = athleteEvent === 'StartTime';
+
+	// Determine if we're in a break state:
+	// - fopState === 'BREAK' means we're in a break
+	// - breakTimerEventType with 'start' or 'breakstarted' means break started
+	// - If explicitly paused, we're NOT in break state
+	// - If athlete timer starts, we're NOT in break state anymore
+	const inBreakState = !breakPaused && !athleteTimerStarting && (fopState === 'BREAK' || normBreakEvent.includes('start') || normBreakEvent === 'breakstarted');
+
+	// Compute remaining milliseconds using reported timing data
+	let computedBreakRemaining = 0;
+	let breakDisplayText = null;  // Text to display instead of time (e.g., "STOP" / "STOPP")
+
+	// Check if this is an INTERRUPTION mode break
+	if (mode === 'INTERRUPTION' && inBreakState) {
+		// Compute display text based on language
+		breakDisplayText = language === 'no' ? 'STOPP' : 'STOP';
+	} else if (inBreakState) {
+		// Normal break with countdown
+		if (breakRemainingReported > 0 && breakStartMillisReported > 0) {
+			// We have current timing: compute remaining based on start + duration
+			const expectedEnd = breakStartMillisReported + breakRemainingReported;
+			const now = Date.now();
+			computedBreakRemaining = Math.max(0, expectedEnd - now);
+		} else if (!breakRemainingReported && breakStartMillisReported > 0) {
+			// We have persisted start time but no remaining duration reported
+			// Estimate: assume 600000ms (10 minutes) duration
+			const now = Date.now();
+			const elapsed = now - breakStartMillisReported;
+			const assumedDuration = 600000;
+			computedBreakRemaining = Math.max(0, assumedDuration - elapsed);
+		}
+		// Otherwise computedBreakRemaining stays 0 (no timing data available)
+	}
+
+	const breakTimer = {
+		type: 'break',
+		state: inBreakState ? 'running' : 'stopped',
+		isActive: inBreakState,
+		visible: inBreakState && !decisionEvent,  // Show break timer only during break (unless decision blocks it)
+		timeRemaining: computedBreakRemaining,    // 0 if no timing data
+		duration: breakRemainingReported || parseInt(fopUpdate?.breakTimeAllowed || fopUpdate?.timeAllowed || 600000),
+		startTime: breakStartMillisReported || null,
+		displayText: breakDisplayText  // "STOP"/"STOPP" for INTERRUPTION mode, null otherwise
+	};
+
+	// Update athlete timer visibility: hide during break, show when not in break
+	athleteTimer.visible = !inBreakState && athleteTimer.isActive;
+
+	return { timer: athleteTimer, breakTimer };
 }
 
 function extractDecisionState(fopUpdate) {
