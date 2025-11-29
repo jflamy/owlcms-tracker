@@ -58,8 +58,7 @@ export function resolveFlagPath(countryCode) {
 		}
 	}
 
-	// Not found
-	console.log(`[Flag] ✗ Not found: "${trimmedCode}" (tried exact case and uppercase)`);
+	// Not found - do not log to avoid noisy console output in production
 	return null;
 }
 
