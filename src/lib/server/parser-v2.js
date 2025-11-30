@@ -35,8 +35,13 @@ export function parseV2Database(params) {
   // Build team lookup map (V2 uses numeric team IDs)
   const teamMap = buildTeamMap(db.teams || []);
   
+  // Build category code → categoryName map from ageGroups
+  // Categories in ageGroups include categoryName (translated display name)
+  const categoryMap = buildCategoryMap(db.ageGroups || []);
+  console.log(`[V2 Parser] Built category map with ${categoryMap.size} entries`);
+  
   // Parse athletes from V2 format
-  const athletes = db.athletes.map(athlete => normalizeV2Athlete(athlete, teamMap));
+  const athletes = db.athletes.map(athlete => normalizeV2Athlete(athlete, teamMap, categoryMap));
   
   // Parse age groups and categories
   const categories = extractV2Categories(db.ageGroups || []);
@@ -93,16 +98,43 @@ function buildTeamMap(teams) {
 }
 
 /**
+ * Build category code → categoryName map from ageGroups
+ * Categories inside ageGroups include categoryName (translated display name from OWLCMS)
+ * @param {Array} ageGroups - V2 age groups array
+ * @returns {Map} Map of category code to categoryName
+ */
+function buildCategoryMap(ageGroups) {
+  const map = new Map();
+  for (const ageGroup of ageGroups) {
+    if (ageGroup.categories && Array.isArray(ageGroup.categories)) {
+      for (const category of ageGroup.categories) {
+        // categoryName is the translated display name (e.g., "M89 Senior")
+        // code is the internal code (e.g., "SR_M89")
+        if (category.code && category.categoryName) {
+          map.set(category.code, category.categoryName);
+        }
+      }
+    }
+  }
+  return map;
+}
+
+/**
  * Normalize V2 athlete to internal format
  * Preserves raw V2 data and adds derived fields clearly marked
  * 
  * @param {Object} athlete - V2 athlete object (raw from OWLCMS)
  * @param {Map} teamMap - Map of team ID to team name
+ * @param {Map} categoryMap - Map of category code to categoryName (translated display name)
  * @returns {Object} Normalized athlete with raw + derived data
  */
-function normalizeV2Athlete(athlete, teamMap) {
+function normalizeV2Athlete(athlete, teamMap, categoryMap) {
   // Derived: Team name resolved from numeric ID
   const teamName = athlete.team ? teamMap.get(athlete.team) : null;
+  
+  // Derived: Category name resolved from category code
+  // Use categoryMap lookup, fallback to categoryCode if not found
+  const categoryName = athlete.categoryCode ? (categoryMap.get(athlete.categoryCode) || athlete.categoryCode) : null;
   
   // Use precomputed key from OWLCMS (V2 format includes this)
   const athleteKey = athlete.key;
@@ -131,6 +163,7 @@ function normalizeV2Athlete(athlete, teamMap) {
     
     // Session - raw V2 field
     groupName: athlete.groupName,
+    sessionName: athlete.sessionName,
     
     // Administrative - raw V2 fields
     membership: athlete.membership,
@@ -220,9 +253,11 @@ function normalizeV2Athlete(athlete, teamMap) {
     // Derived: Team name resolved from numeric ID
     teamName: teamName,
     
+    // Derived: Category name resolved from categoryCode via ageGroups lookup
+    categoryName: categoryName, // Translated display name (e.g., "M89 Senior")
+    category: categoryName, // Alias for categoryName (display purposes)
+    
     // Derived: Aliases for backward compatibility
-    categoryName: athlete.categoryCode, // Alias for categoryCode
-    category: athlete.categoryCode, // Alias for categoryCode
     group: athlete.groupName, // Alias for groupName
     name: `${athlete.firstName || ''} ${athlete.lastName || ''}`.trim() // Alias for fullName
   };

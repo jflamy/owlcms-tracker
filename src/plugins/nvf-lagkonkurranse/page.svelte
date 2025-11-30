@@ -42,7 +42,9 @@
 	}
 
 	function displayAttempt(attempt) {
-		if (!attempt || !attempt.stringValue || attempt.stringValue === '') return '-';
+		if (!attempt) return '\u00A0';
+		if (!attempt.stringValue || attempt.stringValue === '' || attempt.stringValue === '-') return '\u00A0';
+		if (attempt.liftStatus === 'empty') return '\u00A0';
 		return attempt.stringValue.replace(/[()]/g, '');
 	}
 
@@ -362,33 +364,32 @@ export function shouldRenderFlag(url) {
 	.cell.next-score { font-weight: bold; color: #fff; }
 
 	.grid-row.current > .start-num,
-	.grid-row.current > .name { background: #1a1a1a !important; color: #fbbf24 !important; font-weight: bold; }
+	.grid-row.current > .name { color: #4ade80 !important; font-weight: bold; }
 
 	.grid-row.next > .start-num,
-	.grid-row.next > .name { background: #1a1a1a !important; color: #f97316 !important; font-weight: bold; }
+	.grid-row.next > .name { color: #f97316 !important; font-weight: bold; }
 
 	.attempt { font-weight: bold; white-space: nowrap; padding: 0 0.35rem; }
 	.header-secondary .col-attempt { white-space: nowrap; padding: 0 0.35rem; }
 	/* liftStatus values from hub: 'good', 'bad', 'current', 'next', 'request', 'empty' */
-	.attempt.empty { background: #4a4a4a !important; color: #aaa; }
-	.attempt.request { background: #4a4a4a; color: #ddd; }
+	.attempt.empty { background: transparent; color: #aaa !important; }
+	.attempt.request { background: transparent; color: #aaa !important; }
 	.attempt.good { background: #fff !important; color: #000; }
 	.attempt.bad { background: #dc2626 !important; color: #fff; }
-	.attempt.next { background: #f97316; color: #000; font-weight: bold; }
+	.attempt.next { background: transparent; color: #f97316 !important; }
 
-	/* Current attempt - highlighted and blinking */
+	/* Current attempt - highlighted and blinking (text only) */
 	.attempt.current {
-		background: #ffd700;
-		color: #000000 !important;
+		background: transparent;
+		color: #4ade80 !important;
 		font-weight: bold !important;
-		font-size: 1.3rem !important;
-	}
-	.attempt.current .attempt-value {
-		display: inline-block;
-		animation: scoreboardRequestedBlink 1.5s steps(1, end) infinite;
 	}
 
-	@keyframes scoreboardRequestedBlink {
+	.attempt.current .attempt-value {
+		animation: blink-text 2s ease-in-out infinite;
+	}
+
+	@keyframes blink-text {
 		0%, 49% { opacity: 1; }
 		50%, 100% { opacity: 0; }
 	}

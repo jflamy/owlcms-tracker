@@ -393,15 +393,15 @@
 
 	.grid-row.current > .start-num,
 	.grid-row.current > .name {
-		background: #22c55e !important;
-		color: #000 !important;
+		background: transparent !important;
+		color: #4ade80 !important;
 		font-weight: bold;
 	}
 
 	.grid-row.next > .start-num,
 	.grid-row.next > .name {
-		background: #f97316 !important;
-		color: #000 !important;
+		background: transparent !important;
+		color: #f97316 !important;
 		font-weight: bold;
 	}
 
@@ -417,8 +417,8 @@
 	}
 
 	.attempt.empty {
-		background: #4a4a4a !important;
-		color: #aaa;
+		background: transparent;
+		color: #aaa !important;
 	}
 
 	.attempt.success {
@@ -433,21 +433,21 @@
 
 	/* Current athlete's pending attempt - should blink */
 	.attempt.current-attempt {
-		background: #1e3a5f !important;
-		color: #fff;
+		background: transparent;
+		color: #4ade80 !important;
 		animation: blink 1s ease-in-out infinite;
 	}
 
 	/* Next athlete's pending attempt */
 	.attempt.next-attempt {
-		background: #374151 !important;
-		color: #fff;
+		background: transparent;
+		color: #f97316 !important;
 	}
 
 	/* Other athletes' pending requests */
 	.attempt.request {
 		background: transparent;
-		color: #9ca3af;
+		color: #aaa !important;
 	}
 
 	@keyframes blink {

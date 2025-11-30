@@ -289,6 +289,40 @@ function calculatePredictedIfNext(athlete) {
 }
 
 /**
+ * Calculate predicted total while optionally ignoring the first clean & jerk declaration.
+ * When includeCjDeclaration=true: Include C&J declaration in the prediction (during snatch phase, shows snatch + C&J decl)
+ * When includeCjDeclaration=false: Only snatch total until first C&J attempt is recorded (during snatch phase, shows snatch only)
+ * @param {Object} athlete - Athlete data
+ * @param {boolean} includeCjDeclaration - Whether to include the first CJ declaration in the prediction
+ * @returns {number}
+ */
+function calculatePredictedTotal(athlete, includeCjDeclaration = true) {
+	if (!athlete) return 0;
+
+	const snatchesDone = countCompletedSnatches(athlete);
+	const cjsDone = countCompletedCleanJerks(athlete);
+	
+	// During snatch phase (< 3 snatches done), special handling for includeCjDeclaration
+	if (snatchesDone < 3) {
+		const nextSnatch = getNextRequest(athlete.sattempts);
+		const bestSnatch = nextSnatch > 0 ? nextSnatch : (parseFormattedNumber(athlete.bestSnatch) || 0);
+		
+		// If includeCjDeclaration is true, add the first C&J request
+		if (includeCjDeclaration) {
+			const firstCJ = getNextRequest(athlete.cattempts);
+			if (firstCJ > 0) {
+				return bestSnatch + firstCJ;
+			}
+		}
+		// If includeCjDeclaration is false, return snatch-only total
+		return bestSnatch;
+	}
+
+	// If snatch phase is complete (>= 3 snatches done), use standard prediction logic
+	return calculatePredictedIfNext(athlete);
+}
+
+/**
  * Check if athlete's total is definitively zero (all attempts completed with no successful lifts)
  * @param {Object} athlete - Athlete object
  * @returns {boolean}
@@ -324,7 +358,7 @@ function isDefinitiveTotalZero(athlete) {
  * @returns {Object} TeamAthlete with uniform structure for team scoring
  */
 function teamAthleteFromSession(sessionAthlete, context = {}) {
-	const { liftingOrder = null, bodyWeight = null } = context;
+	const { liftingOrder = null, bodyWeight = null, includeCjDeclaration = true } = context;
 	
 	// Use body weight from context (merged from database) or from session athlete
 	const athleteBodyWeight = bodyWeight ?? sessionAthlete.bodyWeight ?? 0;
@@ -342,9 +376,9 @@ function teamAthleteFromSession(sessionAthlete, context = {}) {
 		: 0;
 	
 	// Calculate predicted total if next lift succeeds
-	const predictedIfNext = calculatePredictedIfNext(sessionAthlete);
-	const predictedScore = (predictedIfNext > 0 && normalizedGender && athleteBodyWeight > 0)
-		? CalculateSinclair2024(predictedIfNext, athleteBodyWeight, normalizedGender)
+	const predictedTotal = calculatePredictedTotal(sessionAthlete, includeCjDeclaration);
+	const predictedScore = (predictedTotal > 0 && normalizedGender && athleteBodyWeight > 0)
+		? CalculateSinclair2024(predictedTotal, athleteBodyWeight, normalizedGender)
 		: 0;
 	
 	// Determine if total is definitively zero
@@ -376,7 +410,7 @@ function teamAthleteFromSession(sessionAthlete, context = {}) {
 		actualScore,
 		
 		// Enrichment: predicted values (if next lift succeeds)
-		nextTotal: predictedIfNext,
+		nextTotal: predictedTotal,
 		nextScore: predictedScore,
 		
 		// Enrichment: display values
@@ -411,7 +445,7 @@ function computeBestLift(attempts) {
 
 /**
  * Format a single attempt from database raw fields into display format
- * Priority: actualLift > change2 > change1 > declaration
+ * Priority: change2 > change1 > declaration > automaticProgression (last available wins)
  * 
  * @param {string|number} declaration - Initial declared weight
  * @param {string|number} change1 - First change
@@ -419,32 +453,138 @@ function computeBestLift(attempts) {
  * @param {string|number} actualLift - Actual lift result (negative = fail)
  * @returns {Object} { stringValue, liftStatus } matching hub normalized format
  */
-function formatAttemptFromDatabase(declaration, change1, change2, actualLift) {
-	// If actual lift exists, it's been attempted
-	if (actualLift !== null && actualLift !== undefined && actualLift !== '' && actualLift !== 0) {
+function formatAttemptFromDatabase(declaration, change1, change2, actualLift, automaticProgression = null) {
+	// If actual lift exists (not null), it's been attempted
+	// null means not yet attempted; 0 or negative means failed lift
+	if (actualLift !== null && actualLift !== undefined) {
 		const val = parseInt(actualLift, 10);
 		if (!isNaN(val)) {
 			if (val > 0) {
 				return { stringValue: String(val), liftStatus: 'good' };
 			} else {
-				// Negative = failed lift
-				return { stringValue: String(Math.abs(val)), liftStatus: 'bad' };
+				// Zero or negative = failed lift (display absolute value)
+				return { stringValue: String(Math.abs(val) || declaration || '-'), liftStatus: 'bad' };
 			}
 		}
 	}
 	
-	// Not yet attempted - find the current request weight
-	const requestWeight = change2 || change1 || declaration;
-	if (requestWeight !== null && requestWeight !== undefined && requestWeight !== '' && requestWeight !== 0) {
-		const val = parseInt(requestWeight, 10);
-		if (!isNaN(val) && val > 0) {
-			return { stringValue: String(val), liftStatus: 'request' };
-		}
+	// Not yet attempted - find the current request weight (last available wins)
+	const requestWeight = getLastRequestWeight({ declaration, change1, change2, automaticProgression });
+	if (requestWeight !== null) {
+		return { stringValue: String(requestWeight), liftStatus: 'request' };
 	}
 	
 	// No data
-	return { stringValue: '', liftStatus: 'empty' };
+	return { stringValue: '-', liftStatus: 'empty' };
 }
+
+/**
+ * Get the last valid value in the request sequence for an attempt
+ * Priority: change2 > change1 > declaration > automaticProgression
+ * (last available wins, but "0" or empty values are skipped)
+ */
+function getLastRequestWeight(attempt) {
+	if (!attempt) return null;
+	
+	// Check in reverse priority order - last available wins
+	const candidates = [
+		attempt.change2,
+		attempt.change1,
+		attempt.declaration,
+		attempt.automaticProgression
+	];
+	
+	for (const candidate of candidates) {
+		if (candidate === null || candidate === undefined || candidate === '') continue;
+		const val = parseInt(candidate, 10);
+		if (!isNaN(val) && val > 0) {
+			return val;
+		}
+	}
+	return null;
+}
+
+/**
+ * Determine the current requested weight for a lift (snatch or C&J)
+ * Finds the first attempt with a request weight that hasn't been attempted
+ * @param {Array} attempts - Array of attempt data [{declaration, change1, change2, actualLift, automaticProgression}, ...]
+ * @returns {number|null} The requested weight for the current attempt, or null if all attempts are filled or have no requests
+ */
+function getCurrentRequestedWeight(attempts) {
+	if (!Array.isArray(attempts)) return null;
+	
+	for (const attempt of attempts) {
+		if (!attempt) continue;
+		
+		// If this attempt has no actual lift (not yet attempted), check for request weight
+		if (attempt.actualLift === null || attempt.actualLift === undefined) {
+			const requestWeight = getLastRequestWeight(attempt);
+			if (requestWeight !== null) {
+				// Found the first incomplete attempt with a valid request - return it
+				return requestWeight;
+			}
+			// This attempt has no request weight, continue looking at next attempts
+		}
+	}
+	
+	// No more incomplete attempts with requests found
+	return null;
+}
+
+/**
+ * Build formatted attempts array for a lift (snatch or C&J), marking the current request
+ * @param {Array} attemptDtos - Array of attempt data
+ * @returns {Array} Formatted attempts with correct 'current' vs 'request' status
+ */
+function buildFormattedAttempts(attemptDtos) {
+	if (!Array.isArray(attemptDtos)) return [];
+
+	// Find the current requested weight (first attempt without actual lift)
+	const currentRequest = getCurrentRequestedWeight(attemptDtos);
+
+	// Format each attempt
+	return attemptDtos.map((dto) => {
+		if (!dto) return { stringValue: '-', liftStatus: 'empty' };
+
+		// If actual lift exists, return result status
+		if (dto.actualLift !== null && dto.actualLift !== undefined) {
+			const val = parseInt(dto.actualLift, 10);
+			if (!isNaN(val)) {
+				if (val > 0) {
+					return { stringValue: String(val), liftStatus: 'good' };
+				} else {
+					return { stringValue: String(Math.abs(val) || dto.declaration || '-'), liftStatus: 'bad' };
+				}
+			}
+		}
+
+		// Not yet attempted - find the request weight (last available in sequence)
+		const requestWeight = getLastRequestWeight(dto);
+		if (requestWeight !== null) {
+			// Mark as 'current' if this is the current requested weight, otherwise 'request'
+			const status = requestWeight === currentRequest ? 'current' : 'request';
+			return { stringValue: String(requestWeight), liftStatus: status };
+		}
+
+		// No data - use '-' to match hub format
+		return { stringValue: '-', liftStatus: 'empty' };
+	});
+}
+
+function mapAttemptsToDisplayInfo(formattedAttempts) {
+	return (formattedAttempts || []).map((attempt) => {
+		if (!attempt || !attempt.stringValue || attempt.stringValue === '-') {
+			return { value: null, status: null };
+		}
+
+		const status = attempt.liftStatus === 'empty' ? null : attempt.liftStatus;
+		return {
+			value: attempt.stringValue,
+			status
+		};
+	});
+}
+
 
 /**
  * Create a TeamAthlete from a database athlete (from OWLCMS DATABASE message)
@@ -457,7 +597,7 @@ function formatAttemptFromDatabase(declaration, change1, change2, actualLift) {
  * @returns {Object} TeamAthlete with uniform structure for team scoring (same as teamAthleteFromSession)
  */
 function teamAthleteFromDatabase(dbAthlete, context = {}) {
-	const { liftingOrder = null } = context;
+	const { liftingOrder = null, includeCjDeclaration = true } = context;
 	
 	if (!dbAthlete) return null;
 	
@@ -473,18 +613,22 @@ function teamAthleteFromDatabase(dbAthlete, context = {}) {
 	const teamName = dbAthlete.teamName || competitionHub.getTeamNameById(dbAthlete.team) || '';
 	
 	// Build sattempts array from raw database fields
-	const sattempts = [
-		formatAttemptFromDatabase(dbAthlete.snatch1Declaration, dbAthlete.snatch1Change1, dbAthlete.snatch1Change2, dbAthlete.snatch1ActualLift),
-		formatAttemptFromDatabase(dbAthlete.snatch2Declaration, dbAthlete.snatch2Change1, dbAthlete.snatch2Change2, dbAthlete.snatch2ActualLift),
-		formatAttemptFromDatabase(dbAthlete.snatch3Declaration, dbAthlete.snatch3Change1, dbAthlete.snatch3Change2, dbAthlete.snatch3ActualLift)
+	// Mark the current requested weight as 'current', others as 'request' or 'empty'
+	const snatchAttempts = [
+		{ declaration: dbAthlete.snatch1Declaration, change1: dbAthlete.snatch1Change1, change2: dbAthlete.snatch1Change2, actualLift: dbAthlete.snatch1ActualLift, automaticProgression: dbAthlete.snatch1AutomaticProgression },
+		{ declaration: dbAthlete.snatch2Declaration, change1: dbAthlete.snatch2Change1, change2: dbAthlete.snatch2Change2, actualLift: dbAthlete.snatch2ActualLift, automaticProgression: dbAthlete.snatch2AutomaticProgression },
+		{ declaration: dbAthlete.snatch3Declaration, change1: dbAthlete.snatch3Change1, change2: dbAthlete.snatch3Change2, actualLift: dbAthlete.snatch3ActualLift, automaticProgression: dbAthlete.snatch3AutomaticProgression }
 	];
+	const sattempts = buildFormattedAttempts(snatchAttempts);
 	
 	// Build cattempts array from raw database fields
-	const cattempts = [
-		formatAttemptFromDatabase(dbAthlete.cleanJerk1Declaration, dbAthlete.cleanJerk1Change1, dbAthlete.cleanJerk1Change2, dbAthlete.cleanJerk1ActualLift),
-		formatAttemptFromDatabase(dbAthlete.cleanJerk2Declaration, dbAthlete.cleanJerk2Change1, dbAthlete.cleanJerk2Change2, dbAthlete.cleanJerk2ActualLift),
-		formatAttemptFromDatabase(dbAthlete.cleanJerk3Declaration, dbAthlete.cleanJerk3Change1, dbAthlete.cleanJerk3Change2, dbAthlete.cleanJerk3ActualLift)
+	// Mark the current requested weight as 'current', others as 'request' or 'empty'
+	const cjAttempts = [
+		{ declaration: dbAthlete.cleanJerk1Declaration, change1: dbAthlete.cleanJerk1Change1, change2: dbAthlete.cleanJerk1Change2, actualLift: dbAthlete.cleanJerk1ActualLift, automaticProgression: dbAthlete.cleanJerk1AutomaticProgression },
+		{ declaration: dbAthlete.cleanJerk2Declaration, change1: dbAthlete.cleanJerk2Change1, change2: dbAthlete.cleanJerk2Change2, actualLift: dbAthlete.cleanJerk2ActualLift, automaticProgression: dbAthlete.cleanJerk2AutomaticProgression },
+		{ declaration: dbAthlete.cleanJerk3Declaration, change1: dbAthlete.cleanJerk3Change1, change2: dbAthlete.cleanJerk3Change2, actualLift: dbAthlete.cleanJerk3ActualLift, automaticProgression: dbAthlete.cleanJerk3AutomaticProgression }
 	];
+	const cattempts = buildFormattedAttempts(cjAttempts);
 	
 	// Compute best lifts from actual lift results
 	const bestSnatch = computeBestLift([
@@ -517,9 +661,9 @@ function teamAthleteFromDatabase(dbAthlete, context = {}) {
 		: 0;
 	
 	// Calculate predicted total if next lift succeeds
-	const predictedIfNext = calculatePredictedIfNext(normalizedAthlete);
-	const predictedScore = (predictedIfNext > 0 && normalizedGender && athleteBodyWeight > 0)
-		? CalculateSinclair2024(predictedIfNext, athleteBodyWeight, normalizedGender)
+	const predictedTotal = calculatePredictedTotal(normalizedAthlete, includeCjDeclaration);
+	const predictedScore = (predictedTotal > 0 && normalizedGender && athleteBodyWeight > 0)
+		? CalculateSinclair2024(predictedTotal, athleteBodyWeight, normalizedGender)
 		: 0;
 	
 	// Determine if total is definitively zero
@@ -536,10 +680,41 @@ function teamAthleteFromDatabase(dbAthlete, context = {}) {
 	// Format category for display - replace underscores with spaces
 	const categoryDisplay = (dbAthlete.categoryCode || '').replace(/_/g, ' ');
 	
+	const displayInfoSattempts = mapAttemptsToDisplayInfo(sattempts);
+	const displayInfoCattempts = mapAttemptsToDisplayInfo(cattempts);
+	
+	const displayInfo = {
+		fullName,
+		teamName,
+		yearOfBirth: extractYearOfBirth(dbAthlete.fullBirthDate),
+		gender: dbAthlete.gender,
+		startNumber: String(dbAthlete.startNumber || ''),
+		lotNumber: String(dbAthlete.lotNumber || ''),
+		category: categoryDisplay,
+		sattempts: displayInfoSattempts,
+		cattempts: displayInfoCattempts,
+		bestSnatch: bestSnatch > 0 ? String(bestSnatch) : '-',
+		bestCleanJerk: bestCleanJerk > 0 ? String(bestCleanJerk) : '-',
+		total: displayTotal,
+		sinclairRank: '-',
+		classname: '',
+		group: dbAthlete.sessionName || '',
+		subCategory: '',
+		flagURL: '',
+		flagClass: '',
+		teamLength: teamName.length,
+		custom1: '',
+		custom2: '',
+		membership: ''
+	};
+	
 	return {
 		// Key for lookups (OWLCMS unique identifier)
 		key: dbAthlete.key,
 		athleteKey,
+		
+		// displayInfo (computed equivalent for database athlete)
+		displayInfo,
 		
 		// Computed display fields (matching session athlete format)
 		fullName,
@@ -575,7 +750,7 @@ function teamAthleteFromDatabase(dbAthlete, context = {}) {
 		actualScore,
 		
 		// Enrichment: predicted values (if next lift succeeds)
-		nextTotal: predictedIfNext,
+		nextTotal: predictedTotal,
 		nextScore: predictedScore,
 		
 		// Enrichment: display values
@@ -593,7 +768,7 @@ function teamAthleteFromDatabase(dbAthlete, context = {}) {
 }
 
 // Export for testing
-export { calculatePredictedIfNext, teamAthleteFromSession, teamAthleteFromDatabase };
+export { calculatePredictedIfNext, calculatePredictedTotal, teamAthleteFromSession, teamAthleteFromDatabase };
 
 // =============================================================================
 // LAYER 3: TEAM GROUPING AND SCORING
@@ -812,8 +987,13 @@ function groupByTeams(teamAthletes, gender, headers) {
 		};
 	});
 	
-	// Sort teams by actual score (highest first)
-	teams.sort((a, b) => b.teamScore - a.teamScore);
+	// Sort teams by actual score (highest first), then by predicted score as tiebreaker
+	teams.sort((a, b) => {
+		const scoreDiff = b.teamScore - a.teamScore;
+		if (scoreDiff !== 0) return scoreDiff;
+		// Tiebreaker: team with better predicted score first
+		return b.teamNextScore - a.teamNextScore;
+	});
 	
 	return teams;
 }
@@ -892,6 +1072,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	const sortBy = 'score';
 	const currentAttemptInfo = options.currentAttemptInfo ?? false;
 	const topN = options.topN ?? 0;
+	const includeCjDeclaration = Boolean(options.cjDecl ?? true);
 	const language = options.lang || options.language || 'no';
 	const translations = competitionHub.getTranslations(language);
 	const learningMode = process.env.LEARNING_MODE === 'true' ? 'enabled' : 'disabled';
@@ -1054,13 +1235,15 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 				const wrapped = teamAthleteFromSession(sessionAthlete, {
 					liftType,
 					liftingOrder: liftingOrderMap.get(athleteKey) ?? null,
-					bodyWeight: dbAthlete.bodyWeight || sessionAthlete.bodyWeight || 0
+					bodyWeight: dbAthlete.bodyWeight || sessionAthlete.bodyWeight || 0,
+					includeCjDeclaration
 				});
 				allTeamAthletes.push(wrapped);
 			} else {
 				// Athlete is NOT in current session - use database data
 				const wrapped = teamAthleteFromDatabase(dbAthlete, {
-					liftingOrder: null // Not in current lifting order
+					liftingOrder: null, // Not in current lifting order
+					includeCjDeclaration
 				});
 				if (wrapped) {
 					allTeamAthletes.push(wrapped);
@@ -1132,6 +1315,15 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	const maxTeamNameLength = Math.max(0, ...teams.map(t => (t.teamName || '').length));
 	const compactTeamColumn = maxTeamNameLength < 7;
 
+	const responseOptions = {
+		showRecords,
+		sortBy,
+		gender: requestedGender !== undefined ? requestedGender : undefined,
+		currentAttemptInfo,
+		topN,
+		cjDecl: includeCjDeclaration
+	};
+
 	const result = {
 		competition,
 		currentAttempt,
@@ -1157,7 +1349,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		compactTeamColumn,
 		status: (fopUpdate || databaseState) ? 'ready' : 'waiting',
 		lastUpdate: fopUpdate?.lastUpdate || Date.now(),
-		options: { showRecords, sortBy, gender: requestedGender !== undefined ? requestedGender : undefined, currentAttemptInfo, topN }
+		options: responseOptions
 	};
 	
 	// Cache result (excluding frequently changing fields)
@@ -1174,7 +1366,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		breakType: result.breakType,
 		status: result.status,
 		lastUpdate: result.lastUpdate,
-		options: result.options
+		options: responseOptions
 	});
 	
 	console.log(`[NVF] Cache now has ${nvfScoreboardCache.size} entries`);

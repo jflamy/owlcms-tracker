@@ -45,6 +45,13 @@ export default {
 			default: 'no',
 			description: 'Choose scoreboard text language (English or Norwegian)'
 		},
+		{
+			key: 'cjDecl',
+			label: 'Include CJ Declaration',
+			type: 'boolean',
+			default: true,
+			description: 'Include first C&J attempt in predicted total / Inkluder første støt i anslått sammenlagt'
+		},
 	],
 	
 	// Required FOP data fields

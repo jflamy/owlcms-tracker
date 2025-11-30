@@ -330,14 +330,12 @@ export function shouldRenderFlag(url) {
 	.attempt { font-weight: bold; white-space: nowrap; padding: 0 0.35rem; }
 	.header-secondary .col-attempt { white-space: nowrap; padding: 0 0.35rem; }
 	/* liftStatus values from hub: 'good', 'bad', 'current', 'next', 'request', 'empty' */
-	.attempt.empty { background: #4a4a4a !important; color: #aaa; }
-	.attempt.request { background: #4a4a4a !important; color: #ddd; }
+	.attempt.empty { background: transparent; color: #aaa !important; }
+	.attempt.request { background: transparent; color: #aaa !important; }
 	.attempt.good { background: #fff !important; color: #000; }
 	.attempt.bad { background: #dc2626 !important; color: #fff; }
-	.attempt.next { background: #f97316; color: #000; font-weight: bold; }
-
-	/* Current attempt - highlighted */
-	.attempt.current { color: #fbbf24 !important; font-weight: bold !important; font-size: 1.3rem !important; }
+	.attempt.next { background: transparent; color: #f97316 !important; }
+	.attempt.current { background: transparent; color: #4ade80 !important; animation: blink 1s ease-in-out infinite; }
 
 	.grid-row.team-header > .cell {
 		background: #4a5568 !important;
