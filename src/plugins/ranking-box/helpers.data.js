@@ -8,6 +8,10 @@
 import { competitionHub } from '$lib/server/competition-hub.js';
 import { getFlagUrl } from '$lib/server/flag-resolver.js';
 
+import { buildCacheKey } from '$lib/server/cache-utils.js';
+// Cache for ranking-box
+const rankingBoxCache = new Map();
+
 /**
  * Extract attempt value with status styling
  * Priority: actualLift > change2 > change1 > declaration
@@ -35,6 +39,16 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// Extract options
 	const pageInterval = parseInt(options.pageInterval || 5);
 	const modality = options.modality || 'total'; // snatch | cj | total
+
+	// Cache key: hub version + options affecting layout
+	const cacheKey = buildCacheKey({ fopName, includeFop: true, opts: { modality, pageInterval } });
+	if (rankingBoxCache.has(cacheKey)) {
+		const cached = rankingBoxCache.get(cacheKey);
+		return {
+			...cached,
+			learningMode: process.env.LEARNING_MODE === 'true' ? 'enabled' : 'disabled'
+		};
+	}
 	
 	// Parse session athletes from OWLCMS precomputed data
 	let athletes = [];
@@ -158,4 +172,19 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		pageInterval,
 		status: athletes.length > 0 ? 'ready' : 'waiting'
 	};
+
+    // Cache a simplified stable payload (exclude any volatile fields)
+    const toCache = {
+        competition: { name: fopUpdate?.competitionName || 'Competition', fop: fopName },
+        session: { name: fopUpdate?.sessionName || 'Session', fopState: fopUpdate?.fopState || 'UNKNOWN' },
+        athletes,
+        modality,
+        pageInterval,
+        status: athletes.length > 0 ? 'ready' : 'waiting'
+    };
+    rankingBoxCache.set(cacheKey, toCache);
+    if (rankingBoxCache.size > 3) {
+        const firstKey = rankingBoxCache.keys().next().value;
+        rankingBoxCache.delete(firstKey);
+    }
 }

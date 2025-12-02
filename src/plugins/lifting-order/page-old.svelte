@@ -20,7 +20,7 @@
 			competition: {
 				name: $competition.competition?.name || $competition.competitionName || 'Competition',
 				fop: $competition.competition?.fop || $competition.fop || 'A',
-				groupInfo: $competition.groupInfo || ''
+					sessionInfo: $competition.sessionInfo || ''
 			},
 			currentAthlete: $competition.fullName ? {
 				name: $competition.fullName,
@@ -119,7 +119,7 @@
 		<h1>{competition_data.name || 'Competition Scoreboard'}</h1>
 		<div class="header-info">
 			<span>FOP {competition_data.fop || 'A'}</span>
-			<span>{competition_data.groupInfo || competition_data.session || ''}</span>
+			<span>{competition_data.sessionInfo || competition_data.session || ''}</span>
 		</div>
 	</header>
 

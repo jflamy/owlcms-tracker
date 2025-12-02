@@ -1,6 +1,10 @@
 import { competitionHub } from '$lib/server/competition-hub.js';
 import { getFlagUrl } from '$lib/server/flag-resolver.js';
 
+import { buildCacheKey } from '$lib/server/cache-utils.js';
+// Plugin cache for lower-third
+const lowerThirdCache = new Map();
+
 /**
  * Lower Third Minimal Status Scoreboard - Server-side data processing
  * 
@@ -119,6 +123,23 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	const position = options.position || 'bottom-right';
 	const fontSize = options.fontSize || 'medium';
 
+	// Build cache key (includes fop) based on hub version + relevant options
+	const cacheKey = buildCacheKey({ fopName, includeFop: true, opts: { position, fontSize } });
+
+	if (lowerThirdCache.has(cacheKey)) {
+		const cached = lowerThirdCache.get(cacheKey);
+		// Always compute volatile fields fresh
+		const timer = extractTimerState(fopUpdate);
+		const decision = extractDecisionState(fopUpdate);
+		return {
+			...cached,
+			timer,
+			decision,
+			sessionStatus,
+			learningMode
+		};
+	}
+
 	// If no data yet, return waiting state
 	if (!fopUpdate && !databaseState) {
 		return {
@@ -126,7 +147,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			currentAthleteInfo: null,
 			timer: { state: 'stopped', timeRemaining: 0 },
 			decision: { visible: false },
-			sessionStatus: { isDone: false, groupName: '', lastActivity: 0 },
+			sessionStatus: { isDone: false, sessionName: '', lastActivity: 0 },
 			status: 'waiting',
 			options: { position, fontSize }
 		};
@@ -168,4 +189,16 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		status: 'ready',
 		options: { position, fontSize }
 	};
+}
+
+// Cache result (exclude volatile fields like timer/decision/sessionStatus)
+// We set the cache after construction above, but also add a defensive caching
+// pass here in case callers want the cached variant in subsequent calls.
+// Note: keep small cache to limit memory use.
+function cacheLowerThird(cacheKey, payload) {
+	lowerThirdCache.set(cacheKey, payload);
+	if (lowerThirdCache.size > 3) {
+		const firstKey = lowerThirdCache.keys().next().value;
+		lowerThirdCache.delete(firstKey);
+	}
 }

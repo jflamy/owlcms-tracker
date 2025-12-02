@@ -13,6 +13,7 @@ const timerStateMap = new Map();
  * Plugin-specific cache to avoid recomputing attempt board on every browser request
  */
 const attemptBoardCache = new Map();
+import { buildCacheKey } from '$lib/server/cache-utils.js';
 
 /**
  * Get the full database state (raw athlete data) - SERVER-SIDE ONLY
@@ -61,11 +62,9 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// Get session status early (before cache check, so it's always fresh)
 	const sessionStatus = competitionHub.getSessionStatus(fopName);
 
-	// Check cache first - cache key based on the last update timestamp from the Hub.
-	// This ensures all clients see the same data for a given update, 
-	// and invalidation is instant when a new update arrives.
-	const lastUpdate = fopUpdate?.lastDataUpdate || 0;
-	const cacheKey = `${fopName}-${lastUpdate}-${JSON.stringify(options)}`;
+	// Check cache first - cache key based on hub FOP version + options.
+	// Volatile fields (timer/decision/sessionStatus) are excluded from the cache.
+	const cacheKey = buildCacheKey({ fopName, includeFop: true, opts: options });
 	
 	if (attemptBoardCache.has(cacheKey)) {
 		const cached = attemptBoardCache.get(cacheKey);
@@ -116,7 +115,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		fop: fopName,
 		state: fopUpdate?.fopState || 'INACTIVE',
 		session: fopUpdate?.sessionName || 'A',
-		groupInfo: (fopUpdate?.groupInfo || '').replace(/&ndash;/g, '–').replace(/&mdash;/g, '—'),
+		sessionInfo: (fopUpdate?.sessionInfo || '').replace(/&ndash;/g, '–').replace(/&mdash;/g, '—'),
 		liftsDone: fopUpdate?.liftsDone || ''
 	};
 
@@ -263,7 +262,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		options: { showRecords }
 	};
 	
-	// Cache the result
+	// Cache the result (exclude volatile fields like timer/decision/sessionStatus)
 	attemptBoardCache.set(cacheKey, {
 		scoreboardName: result.scoreboardName,
 		competition: result.competition,
@@ -286,9 +285,9 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		lastUpdate: result.lastUpdate,
 		options: result.options
 	});
-	
-	// Cleanup old cache entries
-	if (attemptBoardCache.size > 20) {
+    
+	// Cleanup old cache entries - keep small number of cached variants
+	if (attemptBoardCache.size > 3) {
 		const firstKey = attemptBoardCache.keys().next().value;
 		attemptBoardCache.delete(firstKey);
 	}

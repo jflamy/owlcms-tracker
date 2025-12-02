@@ -87,7 +87,7 @@ export function formatScoreboardData(competitionState) {
 		timer,
 		rankings,
 		displaySettings: competitionState.displaySettings || {},
-		groupInfo: competitionState.groupInfo || {},
+		sessionInfo: competitionState.sessionInfo || {},
 		groups: competitionState.groups || [],
 		categories: competitionState.categories || [],
 		records: competitionState.records || null,

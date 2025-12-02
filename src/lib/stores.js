@@ -170,7 +170,7 @@ export const liftingOrder = derived(competition, $c => $c.liftingOrder ?? []);
 
 export const competitionInfo = derived(competition, $c => $c.competition ?? {});
 
-export const groupInfo = derived(competition, $c => $c.groupInfo ?? {});
+export const sessionInfo = derived(competition, $c => $c.sessionInfo ?? {});
 
 export const leaders = derived(competition, $c => $c.leaders ?? []);
 

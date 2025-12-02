@@ -39,7 +39,7 @@ export function formatScoreboardData(competitionState) {
 		name: competitionState.competition?.name || 'Competition',
 		fop: competitionState.competition?.fop || 'A',
 		state: competitionState.competition?.state || 'INACTIVE',
-		session: competitionState.competition?.currentSession || competitionState.competition?.groupName || 'A',
+		session: competitionState.competition?.currentSession || 'A',
 		date: competitionState.competition?.date || new Date().toISOString().split('T')[0]
 	};
 
@@ -87,7 +87,7 @@ export function formatScoreboardData(competitionState) {
 		timer,
 		rankings,
 		displaySettings: competitionState.displaySettings || {},
-		groupInfo: competitionState.groupInfo || {},
+		sessionInfo: competitionState.sessionInfo || {},
 		groups: competitionState.groups || [],
 		categories: competitionState.categories || [],
 		records: competitionState.records || null,

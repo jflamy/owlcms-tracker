@@ -89,7 +89,9 @@ export function shouldRenderFlag(url) {
 		<div class="session-header-wrapper" role="button" aria-label="Open gender menu" tabindex="0">
 			<CurrentAttemptBar 
 				currentAttempt={data.currentAttempt}
-				timerState={timerState}
+				timerData={data.timer}
+				breakTimerData={data.breakTimer}
+				displayMode={data.displayMode || 'none'}
 				decisionState={data.decision}
 				scoreboardName={data.scoreboardName}
 				sessionStatus={data.sessionStatus}
@@ -100,7 +102,8 @@ export function shouldRenderFlag(url) {
 				showLifterInfo={data.options?.currentAttemptInfo ?? true}
 				translations={{
 					session: data.headers?.session || 'Session',
-					snatch: data.headers?.snatch || 'Snatch'
+					snatch: data.headers?.snatch || 'Snatch',
+					noAthleteLifting: data.headers?.noAthleteLifting || 'No athlete currently lifting'
 				}}
 			/>
 		</div>
@@ -110,7 +113,7 @@ export function shouldRenderFlag(url) {
 
 	<main class="main">
 		{#if data.status === 'waiting'}
-			<div class="waiting"><p>{data.message || 'Waiting for competition data...'}</p></div>
+			<div class="waiting"><p>{data.headers?.waitingForData || data.message || 'Waiting for competition data...'}</p></div>
 		{:else}
 			<div class="scoreboard-grid" class:compact-team-column={data.compactTeamColumn} role="grid" tabindex="0">
 				<div class="grid-row header header-primary" role="row" tabindex="0" on:contextmenu={openGenderMenu} on:click|preventDefault|stopPropagation={openGenderMenu} on:keydown={handleSessionKeydown}>
@@ -165,7 +168,7 @@ export function shouldRenderFlag(url) {
 						{/if}
 						<span class="team-name-text">{team.teamName}</span>
 					</div>
-					<div class="cell team-stats" role="gridcell">{team.athleteCount}</div>
+					<div class="cell team-stats" role="gridcell">{team.totalLabel}</div>
 					<div class="cell team-score" role="gridcell">{formatScore(team.teamScore)}</div>
 					<div class="cell team-gap" aria-hidden="true"></div>
 					<div class="cell team-next-total" role="gridcell">&nbsp;</div>

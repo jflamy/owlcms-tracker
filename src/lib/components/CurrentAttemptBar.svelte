@@ -1,24 +1,44 @@
 <script>
 	// Current attempt information bar component - shared across all scoreboards
 	// Displays: start number, athlete name, team, attempt label, weight, timer, and decision lights
-	
+	// Display mode is computed server-side and passed in via displayMode prop:
+	//   'decision' - show referee decision lights
+	//   'break' - show break timer
+	//   'athlete' - show athlete countdown timer
+	//   'none' - show neither timer nor decision
+    
+	import CountdownTimer from './CountdownTimer.svelte';
+
 	export let currentAttempt = {};
-	export let timerState = { seconds: 0, isRunning: false, isWarning: false, display: '0:00' };
 	export let decisionState = {};
+	export let timerData = null;      // Athlete timer data from parent
+	export let breakTimerData = null; // Break timer data from parent
+	export let displayMode = 'none';  // Server-computed: 'decision' | 'break' | 'athlete' | 'none'
 	export let scoreboardName = 'Scoreboard';
 	export let sessionStatus = {};
 	export let competition = {};
-	export let showDecisionLights = true;  // For grid scoreboards, false for simpler scoreboards
-	export let showTimer = true;  // Control whether to show timer slot
-	export let compactMode = false;  // Simpler layout for team scoreboard
-	export let showLifterInfo = true;  // Toggle athlete/attempt info display
-	export let translations = {};  // Translated strings (session, snatch, etc.)
-	
+	export let showDecisionLights = true;
+	export let showTimer = true;
+	export let compactMode = false;
+	export let showLifterInfo = true;
+	export let translations = {};
+    
+	// Timer colors (no state, just constants)
+	const ATHLETE_TIMER_COLOR = '#4ade80';    // Green
+	const ATHLETE_TIMER_WARNING = '#fbbf24';  // Yellow
+	const BREAK_TIMER_COLOR = '#00d4d4';      // Turquoise
+	const BREAK_TIMER_WARNING = '#00d4d4';    // Keep turquoise
+
 	function getRefereeClass(value) {
 		if (value === 'good') return 'good';
 		if (value === 'bad') return 'bad';
 		return 'pending';
 	}
+	
+	// Computed visibility based on server-side displayMode
+	$: showAthleteTimer = displayMode === 'athlete' && showTimer && competition?.showTimer;
+	$: showBreakTimer = displayMode === 'break' && showTimer && competition?.showTimer;
+	$: showDecisions = displayMode === 'decision' && showDecisionLights;
 </script>
 
 {#if compactMode}
@@ -28,28 +48,41 @@
 			{#if showLifterInfo}
 				<div class="lifter-info">
 					<div class="name-and-team">
-						<span class="lifter-name">{currentAttempt?.fullName || 'No athlete currently lifting'}</span>
+						<span class="lifter-name">{currentAttempt?.fullName || translations?.noAthleteLifting || 'No athlete currently lifting'}</span>
 						{#if currentAttempt?.teamName}
 							<span class="team">{currentAttempt.teamName}</span>
 						{/if}
 					</div>
 					<span class="attempt-label">{@html currentAttempt?.attempt || ''}</span>
-					<span class="weight">{currentAttempt?.weight || '-'} kg</span>
+					{#if competition?.showWeight && currentAttempt?.weight}
+						<span class="weight">{currentAttempt.weight} kg</span>
+					{/if}
 
-					{#if showTimer || showDecisionLights}
+					{#if (showTimer && competition?.showTimer) || showDecisionLights}
 						<div class="timer-decision-container compact-container">
-							{#if showTimer}
-								<div 
-									class="timer-slot"
-									class:visible={!decisionState?.visible}
-									class:running={timerState.isRunning}
-									class:warning={timerState.isWarning}
-								>
-									<span class="timer-display">{timerState.display}</span>
+							<!-- Athlete timer shown when displayMode is 'athlete' -->
+							{#if showAthleteTimer}
+								<div class="timer-slot">
+									<CountdownTimer 
+										{timerData}
+										color={ATHLETE_TIMER_COLOR} 
+										warningColor={ATHLETE_TIMER_WARNING}
+									/>
 								</div>
 							{/if}
-							{#if showDecisionLights}
-								<div class="decision-slot" class:visible={decisionState?.visible}>
+							<!-- Break timer shown when displayMode is 'break' -->
+							{#if showBreakTimer}
+								<div class="break-slot">
+									<CountdownTimer 
+										timerData={breakTimerData} 
+										color={BREAK_TIMER_COLOR} 
+										warningColor={BREAK_TIMER_WARNING}
+									/>
+								</div>
+							{/if}
+							<!-- Decision lights shown when displayMode is 'decision' -->
+							{#if showDecisions}
+								<div class="decision-slot">
 									<div class="decision-lights" aria-label="Referee decisions">
 										{#if !decisionState?.isSingleReferee}
 											<div class="referee-light {getRefereeClass(decisionState?.ref1)}"></div>
@@ -67,7 +100,7 @@
 			{/if}
 		{/if}
 		<div class="session-info">
-			{@html competition?.groupInfo || (translations.session || 'Session')}
+			{@html competition?.sessionInfo || (translations.session || 'Session')}
 		</div>
 	</header>
 {:else}
@@ -79,27 +112,40 @@
 					<span class="lifter-name">{sessionStatus.statusMessage || 'Session Done.'}</span>
 				{:else}
 					<div class="name-and-team">
-						<span class="lifter-name">{currentAttempt?.fullName || 'No athlete currently lifting'}</span>
+						<span class="lifter-name">{currentAttempt?.fullName || translations?.noAthleteLifting || 'No athlete currently lifting'}</span>
 						{#if currentAttempt?.teamName}
 							<span class="team">{currentAttempt.teamName}</span>
 						{/if}
 					</div>
 					<span class="attempt-label">{@html currentAttempt?.attempt || ''}</span>
-					<span class="weight">{currentAttempt?.weight || '-'} kg</span>
-					{#if showTimer || showDecisionLights}
+					{#if competition?.showWeight && currentAttempt?.weight}
+						<span class="weight">{currentAttempt.weight} kg</span>
+					{/if}
+					{#if (showTimer && competition?.showTimer) || showDecisionLights}
 						<div class="timer-decision-container">
-							{#if showTimer}
-								<div 
-									class="timer-slot"
-									class:visible={!decisionState?.visible}
-									class:running={timerState.isRunning}
-									class:warning={timerState.isWarning}
-								>
-									<span class="timer-display">{timerState.display}</span>
+							<!-- Athlete timer shown when displayMode is 'athlete' -->
+							{#if showAthleteTimer}
+								<div class="timer-slot">
+									<CountdownTimer 
+										{timerData}
+										color={ATHLETE_TIMER_COLOR} 
+										warningColor={ATHLETE_TIMER_WARNING}
+									/>
 								</div>
 							{/if}
-							{#if showDecisionLights}
-								<div class="decision-slot" class:visible={decisionState?.visible}>
+							<!-- Break timer shown when displayMode is 'break' -->
+							{#if showBreakTimer}
+								<div class="break-slot">
+									<CountdownTimer 
+										timerData={breakTimerData} 
+										color={BREAK_TIMER_COLOR} 
+										warningColor={BREAK_TIMER_WARNING}
+									/>
+								</div>
+							{/if}
+							<!-- Decision lights shown when displayMode is 'decision' -->
+							{#if showDecisions}
+								<div class="decision-slot">
 									<div class="decision-lights" aria-label="Referee decisions">
 										{#if !decisionState?.isSingleReferee}
 											<div class="referee-light {getRefereeClass(decisionState?.ref1)}"></div>
@@ -120,7 +166,7 @@
 			{#if sessionStatus?.isDone}
 				{@html '&nbsp;'}
 			{:else}
-				{@html competition?.groupInfo || (translations.session || 'Session')}
+				{@html competition?.sessionInfo || (translations.session || 'Session')}
 			{/if}
 		</div>
 	</header>
@@ -207,7 +253,6 @@
 		display: flex;
 		align-items: center;
 		justify-content: flex-end;
-		width: 9rem;
 		min-width: 9rem;
 		height: 2.5rem;
 		gap: 0.5rem;
@@ -215,33 +260,20 @@
 	}
 
 	.timer-slot,
+	.break-slot,
 	.decision-slot {
-		display: none;
+		display: flex;
 		align-items: center;
 		justify-content: center;
-		width: 100%;
 		height: 100%;
 		border-radius: 0.25rem;
 		padding: 0.35rem 0.75rem;
 	}
 
-	.timer-slot {
+	.timer-slot,
+	.break-slot {
 		background: #1a1a1a;
-		color: #fbbf24;
 		font-weight: bold;
-	}
-
-	.timer-slot.visible {
-		display: flex;
-	}
-
-	.timer-slot.running {
-		color: #4ade80;
-	}
-
-	.timer-slot.warning {
-		color: #fbbf24;
-		background: rgba(239, 68, 68, 0.2);
 	}
 
 	.timer-display {
@@ -252,10 +284,6 @@
 
 	.decision-slot {
 		background: rgba(26, 26, 26, 0.95);
-	}
-
-	.decision-slot.visible {
-		display: flex;
 	}
 
 	.decision-lights {

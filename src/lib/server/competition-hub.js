@@ -25,7 +25,7 @@ class CompetitionHub {
     this.fopUpdates = {};
     
     // Per-FOP session status tracking
-    // Structure: { 'A': { isDone: true/false, groupName: 'M1', lastActivity: timestamp }, ... }
+    // Structure: { 'A': { isDone: true/false, sessionName: 'M1', lastActivity: timestamp }, ... }
     this.fopSessionStatus = {};
     
     // Legacy state property (deprecated, will migrate to fopUpdates)
@@ -68,8 +68,10 @@ class CompetitionHub {
 
   /**
    * Main handler for OWLCMS WebSocket messages
+   * @param {Object} params - The message payload
+   * @param {string} messageType - The WebSocket message type: 'update', 'timer', 'decision'
    */
-  handleOwlcmsMessage(params) {
+  handleOwlcmsMessage(params, messageType = 'update') {
     this.metrics.messagesReceived++;
     
     try {
@@ -95,9 +97,10 @@ class CompetitionHub {
 
       // Store/merge the update data regardless of database state
       // This ensures we have current athlete, timer, etc. even while waiting for database
-      const isTimerOrDecision = normalizedParams.athleteTimerEventType || 
-                                normalizedParams.breakTimerEventType || 
-                                normalizedParams.decisionEventType;
+      // Use the actual messageType to determine if this is timer/decision (not the field contents!)
+      // UPDATE messages can have timer/decision fields like athleteTimerEventType="SetTime", decisionEventType="RESET"
+      // but those should NOT prevent lastDataUpdate from being updated.
+      const isTimerOrDecision = messageType === 'timer' || messageType === 'decision';
       const now = Date.now();
       const prevDataUpdate = this.fopUpdates[fopName]?.lastDataUpdate || now;
 
@@ -350,12 +353,12 @@ class CompetitionHub {
       mode: params.mode
     };
 
-    // Group/session info (V2 uses sessionName)
+    // Session info
     if (params.sessionName) {
-      result.groupInfo = {
+      result.sessionInfo = {
         name: params.sessionName,
-        description: params.groupDescription,
-        info: params.groupInfo,
+        description: params.sessionDescription,
+        info: params.sessionInfo,
         liftsDone: params.liftsDone
       };
     }
@@ -623,14 +626,14 @@ class CompetitionHub {
    */
   updateSessionStatus(fopName, params) {
     const uiEvent = params.uiEvent;
-    const groupName = params.groupName || '';
+    const sessionName = params.sessionName || '';
     const breakType = params.breakType || '';
     
     // Initialize status if not exists
     if (!this.fopSessionStatus[fopName]) {
       this.fopSessionStatus[fopName] = {
         isDone: false,
-        groupName: '',
+        sessionName: '',
         lastActivity: Date.now()
       };
     }
@@ -641,26 +644,26 @@ class CompetitionHub {
     // Check if session is done
     if (uiEvent === 'GroupDone' || breakType === 'GROUP_DONE') {
       status.isDone = true;
-      status.groupName = groupName;
+      status.sessionName = sessionName;
       status.lastActivity = Date.now();
       
       if (!wasSessionDone) {
-        console.log(`[Hub] 🏁 Session completed for FOP ${fopName} (group: ${groupName || 'none'})`);
+        console.log(`[Hub] 🏁 Session completed for FOP ${fopName} (session: ${sessionName || 'none'})`);
       }
     }
     // Check if session was reopened (any activity other than GroupDone while marked as done)
     else if (status.isDone && (uiEvent || params.athleteTimerEventType || params.decisionEventType)) {
       // Session is active again - could be timer, decision, or any other update
-      const previousGroupName = status.groupName;
+      const previousSessionName = status.sessionName;
       status.isDone = false;
-      status.groupName = groupName;
+      status.sessionName = sessionName;
       status.lastActivity = Date.now();
       
-      console.log(`[Hub] 🔄 Session reopened for FOP ${fopName} (was: ${previousGroupName}, now: ${groupName || 'active'})`);
+      console.log(`[Hub] 🔄 Session reopened for FOP ${fopName} (was: ${previousSessionName}, now: ${sessionName || 'active'})`);
     }
     // Normal activity update
     else if (!status.isDone) {
-      status.groupName = groupName;
+      status.sessionName = sessionName;
       status.lastActivity = Date.now();
     }
   }
@@ -668,12 +671,12 @@ class CompetitionHub {
   /**
    * Get session status for a specific FOP
    * @param {string} fopName - Name of the FOP
-   * @returns {Object} Session status { isDone, groupName, lastActivity }
+   * @returns {Object} Session status { isDone, sessionName, lastActivity }
    */
   getSessionStatus(fopName = 'A') {
     return this.fopSessionStatus[fopName] || { 
       isDone: false, 
-      groupName: '', 
+      sessionName: '', 
       lastActivity: 0 
     };
   }
@@ -1929,7 +1932,7 @@ class CompetitionHub {
       name: params.competitionName || 'Competition',
       fop: params.fop || 'A',
       state: params.fopState || 'INACTIVE',
-      currentSession: params.groupName || 'A',
+      currentSession: params.sessionName || 'A',
       date: new Date().toISOString().split('T')[0] // Default to today
     };
 

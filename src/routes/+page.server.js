@@ -27,6 +27,17 @@ export async function load() {
 	const databaseState = competitionHub.getDatabaseState();
 	const competitionName = databaseState?.competition?.name || 'OWLCMS Competition';
 	
+	// Get available locales from loaded translations
+	const availableLocales = competitionHub.getAvailableLocales();
+	
+	// Build language display names from Tracker.LocaleName translations
+	const languageNames = {};
+	for (const locale of availableLocales) {
+		const translations = competitionHub.getTranslations(locale);
+		// Use the locale's own name for itself (e.g., "Norsk" for 'no', "Français" for 'fr')
+		languageNames[locale] = translations?.['Tracker.LocaleName'] || locale;
+	}
+	
 	const confirmedFopsAvailable = typeof competitionHub.hasConfirmedFops === 'function'
 		? competitionHub.hasConfirmedFops()
 		: false;
@@ -35,6 +46,8 @@ export async function load() {
 		fops: availableFOPs,
 		competitionName,
 		hasData: availableFOPs.length > 0,
-		hasConfirmedFops: confirmedFopsAvailable
+		hasConfirmedFops: confirmedFopsAvailable,
+		availableLocales,
+		languageNames
 	};
 }

@@ -4,7 +4,6 @@
 	
 	// Props passed from parent route
 	export let data = {};
-	export let config = {};
 	export let options = {};
 	
 	// Timer state for countdown
@@ -51,8 +50,8 @@
 		<h1>{data.competition?.name || 'Competition Scoreboard'}</h1>
 		<div class="header-info">
 			<span>FOP {data.competition?.fop || 'A'}</span>
-			{#if data.competition?.groupInfo}
-				<span>{data.competition.groupInfo}</span>
+			{#if data.competition?.sessionInfo}
+				<span>{data.competition.sessionInfo}</span>
 			{/if}
 		</div>
 	</header>

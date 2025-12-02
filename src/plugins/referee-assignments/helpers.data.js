@@ -6,6 +6,12 @@
  */
 
 import { competitionHub } from '$lib/server/competition-hub.js';
+import { buildCacheKey } from '$lib/server/cache-utils.js';
+
+// Cache for referee-assignments
+const refereeAssignmentsCache = new Map();
+
+// Hub FOP version lookup is centralized in `buildCacheKey` from cache-utils.
 
 /**
  * Main function to get referee assignment data
@@ -15,6 +21,10 @@ import { competitionHub } from '$lib/server/competition-hub.js';
  */
 export function getScoreboardData(fopName = 'A', options = {}) {
 	const databaseState = competitionHub.getDatabaseState();
+		const cacheKey = buildCacheKey({ includeFop: false, opts: options });
+		if (refereeAssignmentsCache.has(cacheKey)) {
+			return refereeAssignmentsCache.get(cacheKey);
+		}
 	
 	if (!databaseState || !databaseState.competition) {
 		return {
@@ -132,4 +142,19 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		totalSessions: sortedGroups.length,
 		totalOfficialTypes: officialTypes.length
 	};
+
+	// Cache the stable assignment result
+	const toCache = {
+		status: 'ready',
+		competition: { name: databaseState.competition?.name || 'Competition' },
+		sessions: sortedGroups.map(group => ({ id: group.id, name: group.name, description: group.description, displayName: `${group.name}: ${group.description}` })),
+		assignmentRows,
+		totalSessions: sortedGroups.length,
+		totalOfficialTypes: officialTypes.length
+	};
+	refereeAssignmentsCache.set(cacheKey, toCache);
+	if (refereeAssignmentsCache.size > 3) {
+		const firstKey = refereeAssignmentsCache.keys().next().value;
+		refereeAssignmentsCache.delete(firstKey);
+	}
 }

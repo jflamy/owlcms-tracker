@@ -6,6 +6,7 @@ import { competitionHub } from '$lib/server/competition-hub.js';
 import { extractRecordsFromUpdate } from '$lib/server/records-extractor.js';
 import { getFlagUrl } from '$lib/server/flag-resolver.js';
 import { getCompetitionState } from './helpers.js';
+import { buildCacheKey } from '$lib/server/cache-utils.js';
 
 // Track timer visibility state per FOP so StopTime events behave like SetTime when clock is idle
 const timerStateMap = new Map();
@@ -53,7 +54,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		fop: fopName,
 		state: fopUpdate?.fopState || 'INACTIVE',
 		session: fopUpdate?.sessionName || 'A',
-		groupInfo: (fopUpdate?.groupInfo || '').replace(/&ndash;/g, '\u2013').replace(/&mdash;/g, '\u2014'),
+		sessionInfo: (fopUpdate?.sessionInfo || '').replace(/&ndash;/g, '\u2013').replace(/&mdash;/g, '\u2014'),
 		liftsDone: fopUpdate?.liftsDone || ''
 	};
 	
@@ -86,11 +87,8 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	const records = extractRecordsFromUpdate(fopUpdate);
 	const decision = extractDecisionState(fopUpdate);
 	
-	// Check cache first - cache key based on the last update timestamp from the Hub.
-	// This ensures all clients see the same data for a given update, 
-	// and invalidation is instant when a new update arrives.
-	const lastUpdate = fopUpdate?.lastDataUpdate || 0;
-	const cacheKey = `${fopName}-${lastUpdate}-${JSON.stringify(options)}`;
+	// Check cache first - use hub FOP version + options for cache key
+	const cacheKey = buildCacheKey({ fopName, includeFop: true, opts: options });
 	
 	// Extract current athlete from liftingOrderAthletes (has classname="current" or "current blink")
 	let currentAttempt = null;
@@ -350,8 +348,8 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		options: result.options
 	});
 	
-	// Cleanup old cache entries (keep last 20)
-	if (liftingOrderCache.size > 20) {
+	// Cleanup old cache entries (keep last 3)
+	if (liftingOrderCache.size > 3) {
 		const firstKey = liftingOrderCache.keys().next().value;
 		liftingOrderCache.delete(firstKey);
 	}

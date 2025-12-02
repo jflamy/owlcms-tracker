@@ -11,6 +11,11 @@ import { getFlagUrl } from '$lib/server/flag-resolver.js';
 const timerStateMap = new Map();
 
 /**
+ * Defensive helper to get the hub-provided FOP version used for cache invalidation
+ */
+import { buildCacheKey } from '$lib/server/cache-utils.js';
+
+/**
  * Plugin-specific cache to avoid recomputing rankings on every browser request
  * Structure: { 'cacheKey': { competition, rankedAthletes, ... } }
  */
@@ -52,7 +57,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		fop: fopName,
 		state: fopUpdate?.fopState || 'INACTIVE',
 		session: fopUpdate?.sessionName || 'A',
-		groupInfo: (fopUpdate?.groupInfo || '').replace(/&ndash;/g, '\u2013').replace(/&mdash;/g, '\u2014'),
+		sessionInfo: (fopUpdate?.sessionInfo || '').replace(/&ndash;/g, '\u2013').replace(/&mdash;/g, '\u2014'),
 		liftsDone: fopUpdate?.liftsDone || ''
 	};
 	
@@ -85,9 +90,8 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	const records = extractRecordsFromUpdate(fopUpdate);
 	const decision = extractDecisionState(fopUpdate);
 	
-	// Check cache first - cache key based on the last update timestamp from the Hub.
-	const lastUpdate = fopUpdate?.lastDataUpdate || 0;
-	const cacheKey = `${fopName}-${lastUpdate}-${JSON.stringify(options)}`;
+	// Check cache first - cache key based on hub FOP version + options
+	const cacheKey = buildCacheKey({ fopName, includeFop: true, opts: options });
 	
 	// Extract current athlete from session entries (has classname="current" or "current blink")
 	let currentAttempt = null;
@@ -359,7 +363,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		options: { showRecords }
 	};
 	
-	// Cache the result
+	// Cache the result (exclude volatile fields like timer/decision/sessionStatus)
 	rankingsCache.set(cacheKey, {
 		scoreboardName: result.scoreboardName,
 		competition: result.competition,
@@ -380,9 +384,9 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		lastUpdate: result.lastUpdate,
 		options: result.options
 	});
-	
-	// Cleanup old cache entries (keep last 20)
-	if (rankingsCache.size > 20) {
+    
+	// Cleanup old cache entries - keep a small number to limit memory
+	if (rankingsCache.size > 3) {
 		const firstKey = rankingsCache.keys().next().value;
 		rankingsCache.delete(firstKey);
 	}

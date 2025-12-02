@@ -100,18 +100,36 @@ function buildTeamMap(teams) {
 /**
  * Build category code → categoryName map from ageGroups
  * Categories inside ageGroups include categoryName (translated display name from OWLCMS)
+ * 
+ * The category code is computed the same way as in OWLCMS Category.getComputedCode():
+ *   code = ageGroup.code + "_" + gender + maximumWeight
+ * 
+ * Example: SR_M110 = SR (ageGroup code) + _ + M (gender) + 110 (maximumWeight)
+ * 
  * @param {Array} ageGroups - V2 age groups array
  * @returns {Map} Map of category code to categoryName
  */
 function buildCategoryMap(ageGroups) {
   const map = new Map();
   for (const ageGroup of ageGroups) {
+    const ageGroupCode = ageGroup.code || '';
     if (ageGroup.categories && Array.isArray(ageGroup.categories)) {
       for (const category of ageGroup.categories) {
-        // categoryName is the translated display name (e.g., "M89 Senior")
-        // code is the internal code (e.g., "SR_M89")
-        if (category.code && category.categoryName) {
-          map.set(category.code, category.categoryName);
+        // Compute the code the same way OWLCMS does:
+        // code = ageGroupCode + "_" + gender + weightLimit
+        const gender = category.gender || '';
+        const maxWeight = category.maximumWeight;
+        // Format weight: >130 becomes "999", otherwise integer
+        const weightStr = maxWeight > 130 ? '999' : String(Math.round(maxWeight));
+        
+        // Build the code: either "ageGroupCode_GenderWeight" or just "GenderWeight" if no ageGroup
+        const computedCode = ageGroupCode 
+          ? `${ageGroupCode}_${gender}${weightStr}`
+          : `${gender}${weightStr}`;
+        
+        // categoryName is the translated display name (e.g., "M89 Senior", "K 36")
+        if (category.categoryName) {
+          map.set(computedCode, category.categoryName);
         }
       }
     }
@@ -162,7 +180,6 @@ function normalizeV2Athlete(athlete, teamMap, categoryMap) {
     team: athlete.team, // Keep original numeric ID
     
     // Session - raw V2 field
-    groupName: athlete.groupName,
     sessionName: athlete.sessionName,
     
     // Administrative - raw V2 fields
@@ -257,8 +274,8 @@ function normalizeV2Athlete(athlete, teamMap, categoryMap) {
     categoryName: categoryName, // Translated display name (e.g., "M89 Senior")
     category: categoryName, // Alias for categoryName (display purposes)
     
-    // Derived: Aliases for backward compatibility
-    group: athlete.groupName, // Alias for groupName
+    // Derived: Aliases
+    group: athlete.sessionName, // Alias for sessionName
     name: `${athlete.firstName || ''} ${athlete.lastName || ''}`.trim() // Alias for fullName
   };
 }

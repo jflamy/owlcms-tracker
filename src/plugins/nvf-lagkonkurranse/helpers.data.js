@@ -19,6 +19,7 @@
 import { competitionHub } from '$lib/server/competition-hub.js';
 import { getFlagUrl } from '$lib/server/flag-resolver.js';
 import { CalculateSinclair2024 } from '$lib/sinclair-coefficients.js';
+import { buildCacheKey } from '$lib/server/cache-utils.js';
 
 // =============================================================================
 // CACHE
@@ -28,6 +29,15 @@ import { CalculateSinclair2024 } from '$lib/sinclair-coefficients.js';
  * Plugin-specific cache to avoid recomputing team data on every browser request
  */
 const nvfScoreboardCache = new Map();
+
+/**
+ * Track last known session gender per FOP
+ * When no session is active, we use the previous session's gender (default: 'M')
+ */
+const lastKnownGenderByFop = new Map();
+
+// NOTE: cache key construction uses the shared `buildCacheKey` helper
+// to centralize hub/fop version lookup and consistent key formatting.
 
 // =============================================================================
 // UTILITY FUNCTIONS
@@ -532,17 +542,18 @@ function getCurrentRequestedWeight(attempts) {
 }
 
 /**
- * Build formatted attempts array for a lift (snatch or C&J), marking the current request
+ * Build formatted attempts array for a lift (snatch or C&J)
+ * NOTE: Database-only reconstruction should use 'request' status, NOT 'current'.
+ * The 'current' and 'next' statuses are session-specific and only come from
+ * OWLCMS's displayInfo for session athletes.
  * @param {Array} attemptDtos - Array of attempt data
- * @returns {Array} Formatted attempts with correct 'current' vs 'request' status
+ * @returns {Array} Formatted attempts with liftStatus: 'good', 'bad', 'request', or 'empty'
  */
 function buildFormattedAttempts(attemptDtos) {
 	if (!Array.isArray(attemptDtos)) return [];
 
-	// Find the current requested weight (first attempt without actual lift)
-	const currentRequest = getCurrentRequestedWeight(attemptDtos);
-
-	// Format each attempt
+	// Format each attempt - use 'request' for pending weights (not 'current')
+	// 'current' and 'next' are session-specific and only set by OWLCMS displayInfo
 	return attemptDtos.map((dto) => {
 		if (!dto) return { stringValue: '-', liftStatus: 'empty' };
 
@@ -561,9 +572,9 @@ function buildFormattedAttempts(attemptDtos) {
 		// Not yet attempted - find the request weight (last available in sequence)
 		const requestWeight = getLastRequestWeight(dto);
 		if (requestWeight !== null) {
-			// Mark as 'current' if this is the current requested weight, otherwise 'request'
-			const status = requestWeight === currentRequest ? 'current' : 'request';
-			return { stringValue: String(requestWeight), liftStatus: status };
+			// Always use 'request' for database reconstruction
+			// 'current' and 'next' only come from OWLCMS session data
+			return { stringValue: String(requestWeight), liftStatus: 'request' };
 		}
 
 		// No data - use '-' to match hub format
@@ -613,7 +624,7 @@ function teamAthleteFromDatabase(dbAthlete, context = {}) {
 	const teamName = dbAthlete.teamName || competitionHub.getTeamNameById(dbAthlete.team) || '';
 	
 	// Build sattempts array from raw database fields
-	// Mark the current requested weight as 'current', others as 'request' or 'empty'
+	// Uses 'request' for pending weights (not 'current' - that's session-specific)
 	const snatchAttempts = [
 		{ declaration: dbAthlete.snatch1Declaration, change1: dbAthlete.snatch1Change1, change2: dbAthlete.snatch1Change2, actualLift: dbAthlete.snatch1ActualLift, automaticProgression: dbAthlete.snatch1AutomaticProgression },
 		{ declaration: dbAthlete.snatch2Declaration, change1: dbAthlete.snatch2Change1, change2: dbAthlete.snatch2Change2, actualLift: dbAthlete.snatch2ActualLift, automaticProgression: dbAthlete.snatch2AutomaticProgression },
@@ -622,7 +633,7 @@ function teamAthleteFromDatabase(dbAthlete, context = {}) {
 	const sattempts = buildFormattedAttempts(snatchAttempts);
 	
 	// Build cattempts array from raw database fields
-	// Mark the current requested weight as 'current', others as 'request' or 'empty'
+	// Uses 'request' for pending weights (not 'current' - that's session-specific)
 	const cjAttempts = [
 		{ declaration: dbAthlete.cleanJerk1Declaration, change1: dbAthlete.cleanJerk1Change1, change2: dbAthlete.cleanJerk1Change2, actualLift: dbAthlete.cleanJerk1ActualLift, automaticProgression: dbAthlete.cleanJerk1AutomaticProgression },
 		{ declaration: dbAthlete.cleanJerk2Declaration, change1: dbAthlete.cleanJerk2Change1, change2: dbAthlete.cleanJerk2Change2, actualLift: dbAthlete.cleanJerk2ActualLift, automaticProgression: dbAthlete.cleanJerk2AutomaticProgression },
@@ -830,30 +841,64 @@ function getAthletePredictedScore(athlete) {
 }
 
 /**
+ * Compare athletes by score with session as tiebreaker
+ * Primary: higher score first
+ * Tiebreaker: smaller session number first (earlier session = higher priority)
+ * 
+ * @param {Object} a - First athlete
+ * @param {Object} b - Second athlete
+ * @param {Function} scoreFn - Function to get score from athlete
+ * @returns {number} Comparison result
+ */
+function compareByScoreWithSessionTiebreaker(a, b, scoreFn) {
+	const scoreA = scoreFn(a);
+	const scoreB = scoreFn(b);
+	
+	// Primary sort: higher score first
+	if (scoreB !== scoreA) {
+		return scoreB - scoreA;
+	}
+	
+	// Tiebreaker: smaller session number first (earlier session = higher priority)
+	const sessionA = (a.group || a.sessionName || '').toString();
+	const sessionB = (b.group || b.sessionName || '').toString();
+	return sessionA.localeCompare(sessionB, undefined, { numeric: true });
+}
+
+/**
  * Determine top contributors for a team (for actual or predicted scores)
+ * 
+ * When scores are equal, athletes from earlier sessions have priority
+ * (smaller session number = higher priority)
  * 
  * @param {Array} athletes - Array of TeamAthlete objects for this team
  * @param {string} gender - Gender filter ('M', 'F', or 'MF')
  * @param {Function} scoreFn - Function to get score from athlete
+ * @param {Object} topCounts - Top score counts { topM, topF, topMFm, topMFf }
  * @returns {Set} Set of athlete keys for top contributors
  */
-function findTopContributors(athletes, gender, scoreFn) {
+function findTopContributors(athletes, gender, scoreFn, topCounts = {}) {
+	const { topM = 4, topF = 4, topMFm = 2, topMFf = 2 } = topCounts;
 	let topContributors = [];
 	
 	if (gender === 'MF') {
-		// Mixed: top 2 men + top 2 women
+		// Mixed: top N men + top N women (configurable)
 		const males = athletes.filter(a => normalizeGender(a.gender) === 'M');
 		const females = athletes.filter(a => normalizeGender(a.gender) === 'F');
 		
-		// Sort each gender by score (highest first)
-		males.sort((a, b) => scoreFn(b) - scoreFn(a));
-		females.sort((a, b) => scoreFn(b) - scoreFn(a));
+		// Sort each gender by score (highest first), with session as tiebreaker
+		males.sort((a, b) => compareByScoreWithSessionTiebreaker(a, b, scoreFn));
+		females.sort((a, b) => compareByScoreWithSessionTiebreaker(a, b, scoreFn));
 		
-		topContributors = [...males.slice(0, 2), ...females.slice(0, 2)];
+		topContributors = [...males.slice(0, topMFm), ...females.slice(0, topMFf)];
+	} else if (gender === 'F') {
+		// Female only: top N by score (configurable)
+		const byScore = [...athletes].sort((a, b) => compareByScoreWithSessionTiebreaker(a, b, scoreFn));
+		topContributors = byScore.slice(0, topF);
 	} else {
-		// Single gender: top 4 by score
-		const byScore = [...athletes].sort((a, b) => scoreFn(b) - scoreFn(a));
-		topContributors = byScore.slice(0, 4);
+		// Male only (default): top N by score (configurable)
+		const byScore = [...athletes].sort((a, b) => compareByScoreWithSessionTiebreaker(a, b, scoreFn));
+		topContributors = byScore.slice(0, topM);
 	}
 	
 	// Use athleteKey for identification (OWLCMS unique key)
@@ -865,9 +910,10 @@ function findTopContributors(athletes, gender, scoreFn) {
 /**
  * Group TeamAthletes by team and compute team scores
  * 
- * Team score = sum of top 4 contributors' actualScore (Sinclair)
- *   - Single gender: top 4 by actualScore
- *   - Mixed (MF): top 2 men + top 2 women by actualScore
+ * Team score = sum of top N contributors' actualScore (Sinclair)
+ *   - Single gender M: top topM by actualScore
+ *   - Single gender F: top topF by actualScore  
+ *   - Mixed (MF): top topMFm men + top topMFf women by actualScore
  * 
  * All highlighting is precomputed as CSS class names on each athlete:
  *   - scoreHighlightClass: CSS class for actual score cell (e.g., 'top-contributor-m', 'top-contributor-f', 'top-contributor')
@@ -879,10 +925,12 @@ function findTopContributors(athletes, gender, scoreFn) {
  * @param {Array} teamAthletes - Array of TeamAthlete objects
  * @param {string} gender - Gender filter ('M', 'F', or 'MF')
  * @param {Object} headers - Translated headers
+ * @param {Object} topCounts - Top score counts { topM, topF, topMFm, topMFf }
  * @returns {Array} Array of team objects ready for frontend display
  */
-function groupByTeams(teamAthletes, gender, headers) {
-	console.log(`[NVF groupByTeams] Input: ${teamAthletes.length} athletes, gender filter: ${gender}`);
+function groupByTeams(teamAthletes, gender, headers, topCounts = {}) {
+	const { topM = 4, topF = 4, topMFm = 2, topMFf = 2 } = topCounts;
+	console.log(`[NVF groupByTeams] Input: ${teamAthletes.length} athletes, gender filter: ${gender}, topCounts: M=${topM}, F=${topF}, MFm=${topMFm}, MFf=${topMFf}`);
 	
 	// Filter athletes with no team
 	const athletesWithTeams = teamAthletes.filter(a => {
@@ -915,10 +963,10 @@ function groupByTeams(teamAthletes, gender, headers) {
 		const athletes = allTeamAthletes.filter(a => !a.isSpacer);
 		
 		// Find top contributors for ACTUAL score
-		const actualTopContributors = findTopContributors(athletes, gender, getAthleteScore);
+		const actualTopContributors = findTopContributors(athletes, gender, getAthleteScore, topCounts);
 		
 		// Find top contributors for PREDICTED score (may differ from actual!)
-		const predictedTopContributors = findTopContributors(athletes, gender, getAthletePredictedScore);
+		const predictedTopContributors = findTopContributors(athletes, gender, getAthletePredictedScore, topCounts);
 		
 		// Calculate team scores
 		let teamScore = 0;
@@ -975,15 +1023,32 @@ function groupByTeams(teamAthletes, gender, headers) {
 		// Count contributors (for display label)
 		const contributorCount = actualTopContributors.size;
 		
+		// Build totalLabel using translations with placeholders
+		// Tracker.TopMScores = "top {0} scores" for single gender
+		// Tracker.TopMFScores = "top {0}+{1} scores" for mixed
+		let totalLabel;
+		if (gender === 'MF') {
+			const template = headers?.topMFScores || 'top {0}+{1} scores';
+			totalLabel = template.replace('{0}', topMFm).replace('{1}', topMFf);
+		} else if (gender === 'F') {
+			const template = headers?.topMScores || 'top {0} scores';
+			totalLabel = template.replace('{0}', topF);
+		} else {
+			const template = headers?.topMScores || 'top {0} scores';
+			totalLabel = template.replace('{0}', topM);
+		}
+		
 		return {
 			teamName,
 			flagUrl: getFlagUrl(teamName, true),
 			athletes: athletesWithHighlighting,
 			athleteCount: athletes.length,
+			// Label describing which athletes contribute to the team total
+			totalLabel,
 			teamScore,
 			teamNextScore,
 			contributorCount,
-			contributorLabel: headers?.top4scores || (gender === 'MF' ? 'top 2+2 scores' : 'top 4 scores')
+			contributorLabel: totalLabel
 		};
 	});
 	
@@ -1002,16 +1067,136 @@ function groupByTeams(teamAthletes, gender, headers) {
 // TIMER AND DECISION EXTRACTION
 // =============================================================================
 
-function extractTimerState(fopUpdate) {
-	return {
-		state: fopUpdate?.athleteTimerEventType === 'StartTime' ? 'running' : 
-		       fopUpdate?.athleteTimerEventType === 'StopTime' ? 'stopped' : 
-		       fopUpdate?.athleteTimerEventType === 'SetTime' ? 'set' :
-		       fopUpdate?.athleteTimerEventType ? fopUpdate.athleteTimerEventType.toLowerCase() : 'stopped',
-		timeRemaining: fopUpdate?.athleteMillisRemaining ? parseInt(fopUpdate.athleteMillisRemaining) : 0,
+/**
+ * Extract both athlete and break timers from a FOP update.
+ * Returns { timer, breakTimer } where each object contains:
+ * { type: 'athlete'|'break', state: 'running'|'set'|'stopped', isActive, visible, timeRemaining, duration, startTime, displayText }
+ * 
+ * @param {Object} fopUpdate - The FOP update object from competition hub
+ * @param {string} language - Language code for break text (e.g., 'no' for Norwegian)
+ * @returns {Object} { timer, breakTimer }
+ */
+function extractTimers(fopUpdate, language = 'en') {
+	const athleteEvent = fopUpdate?.athleteTimerEventType;
+	const athleteTimeRemaining = parseInt(fopUpdate?.athleteMillisRemaining || 0);
+
+	// Athlete timer state - simple mapping
+	const athleteState = athleteEvent === 'StartTime' ? 'running' : 
+	                     athleteEvent === 'StopTime' ? 'stopped' : 
+	                     athleteEvent === 'SetTime' ? 'set' : 
+	                     (athleteEvent ? String(athleteEvent).toLowerCase() : 'stopped');
+	
+	const athleteTimer = {
+		type: 'athlete',
+		state: athleteState,
+		isActive: Boolean(athleteEvent || athleteTimeRemaining > 0),
+		visible: Boolean(athleteEvent || athleteTimeRemaining > 0),
+		timeRemaining: athleteTimeRemaining,
 		duration: fopUpdate?.timeAllowed ? parseInt(fopUpdate.timeAllowed) : 60000,
 		startTime: null
 	};
+
+	// Break timer state
+	const breakEvent = fopUpdate?.breakTimerEventType;
+	const breakRemainingReported = parseInt(fopUpdate?.breakMillisRemaining || 0);
+	const breakStartMillisReported = parseInt(fopUpdate?.breakStartTimeMillis || fopUpdate?.breakStartTime || 0);
+	const decisionEvent = Boolean(fopUpdate?.decisionEventType || fopUpdate?.decisionsVisible === 'true' || fopUpdate?.down === 'true');
+	const fopState = String(fopUpdate?.fopState || '').toUpperCase();
+	const mode = String(fopUpdate?.mode || '').toUpperCase();
+
+	const normBreakEvent = (breakEvent || '').toString().toLowerCase();
+	const breakPaused = normBreakEvent.includes('pause') || normBreakEvent === 'breakpaused';
+
+	// If athlete timer starts, we exit break state
+	const athleteTimerStarting = athleteEvent === 'StartTime';
+
+	// Determine if we're in a break state:
+	// - fopState === 'BREAK' means we're in a break
+	// - breakTimerEventType with 'start' or 'breakstarted' means break started
+	// - If explicitly paused, we're NOT in break state
+	// - If athlete timer starts, we're NOT in break state anymore
+	const inBreakState = !breakPaused && !athleteTimerStarting && (fopState === 'BREAK' || normBreakEvent.includes('start') || normBreakEvent === 'breakstarted');
+
+	// Compute remaining milliseconds using reported timing data
+	let computedBreakRemaining = 0;
+	let breakDisplayText = null;  // Text to display instead of time (e.g., "STOP" / "STOPP")
+
+	// Check if this is an INTERRUPTION mode break
+	if (mode === 'INTERRUPTION' && inBreakState) {
+		// Compute display text based on language
+		breakDisplayText = language === 'no' ? 'STOPP' : 'STOP';
+	} else if (inBreakState) {
+		// Normal break with countdown
+		if (breakRemainingReported > 0 && breakStartMillisReported > 0) {
+			// We have current timing: compute remaining based on start + duration
+			const expectedEnd = breakStartMillisReported + breakRemainingReported;
+			const now = Date.now();
+			computedBreakRemaining = Math.max(0, expectedEnd - now);
+		} else if (!breakRemainingReported && breakStartMillisReported > 0) {
+			// We have persisted start time but no remaining duration reported
+			// Estimate: assume 600000ms (10 minutes) duration
+			const now = Date.now();
+			const elapsed = now - breakStartMillisReported;
+			const assumedDuration = 600000;
+			computedBreakRemaining = Math.max(0, assumedDuration - elapsed);
+		}
+		// Otherwise computedBreakRemaining stays 0 (no timing data available)
+	}
+
+	const breakTimer = {
+		type: 'break',
+		state: inBreakState ? 'running' : 'stopped',
+		isActive: inBreakState,
+		visible: inBreakState && !decisionEvent,  // Show break timer only during break (unless decision blocks it)
+		timeRemaining: computedBreakRemaining,    // 0 if no timing data
+		duration: breakRemainingReported || parseInt(fopUpdate?.breakTimeAllowed || fopUpdate?.timeAllowed || 600000),
+		startTime: breakStartMillisReported || null,
+		displayText: breakDisplayText  // "STOP"/"STOPP" for INTERRUPTION mode, null otherwise
+	};
+
+	// Update athlete timer visibility: hide during break, show when not in break
+	athleteTimer.visible = !inBreakState && athleteTimer.isActive;
+
+	return { timer: athleteTimer, breakTimer };
+}
+
+/**
+ * Compute what should be displayed: decision lights, break timer, athlete timer, or nothing.
+ * Returns { displayMode, displayClass, activeTimer } where:
+ * - displayMode: 'decision' | 'break' | 'athlete' | 'none'
+ * - displayClass: CSS class like 'show-decision', 'show-break', etc.
+ * - activeTimer: the timer object that should be displayed (either timer or breakTimer)
+ * 
+ * @param {Object} timer - Athlete timer from extractTimers()
+ * @param {Object} breakTimer - Break timer from extractTimers()
+ * @param {Object} decision - Decision state from extractDecisionState()
+ * @returns {Object} { displayMode, displayClass, activeTimer }
+ */
+function computeDisplayMode(timer, breakTimer, decision) {
+	const decisionPresent = Boolean(decision?.visible);
+	
+	// Priority: decision > break timer > athlete timer > nothing
+	let displayMode = decisionPresent ? 'decision' : 
+	                  (breakTimer?.visible ? 'break' : 
+	                  (timer?.visible ? 'athlete' : 'none'));
+	
+	// Defensive rule: if break timer is actively running and there's no visible decision,
+	// prefer the break display even if other flags are inconsistent (protect against stale flags)
+	if (!decisionPresent && breakTimer && breakTimer.state === 'running') {
+		displayMode = 'break';
+		// Ensure visibility flags align with forced display mode
+		try {
+			if (breakTimer) breakTimer.visible = true;
+			if (timer) timer.visible = false;
+		} catch (e) {
+			// ignore immaterial errors modifying timer objects
+		}
+	}
+	
+	const displayClass = `show-${displayMode}`;
+	const activeTimer = displayMode === 'break' ? breakTimer : timer;
+	
+	return { displayMode, displayClass, activeTimer };
 }
 
 function extractDecisionState(fopUpdate) {
@@ -1070,12 +1255,29 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// Options
 	const showRecords = options.showRecords ?? false;
 	const sortBy = 'score';
-	const currentAttemptInfo = options.currentAttemptInfo ?? false;
+	const currentAttemptInfo = options.currentAttemptInfo ?? true;
 	const topN = options.topN ?? 0;
 	const includeCjDeclaration = Boolean(options.cjDecl ?? true);
 	const language = options.lang || options.language || 'no';
 	const translations = competitionHub.getTranslations(language);
 	const learningMode = process.env.LEARNING_MODE === 'true' ? 'enabled' : 'disabled';
+	
+	// Check if "include all athletes" mode is enabled
+	const includeAllAthletes = options.allAthletes === true || options.allAthletes === 'true';
+	
+	// Top score counts for team scoring (configurable per federation)
+	// When includeAllAthletes is true, use 10 for all counts (effectively includes everyone)
+	const topCounts = includeAllAthletes ? {
+		topM: 10,
+		topF: 10,
+		topMFm: 10,
+		topMFf: 10
+	} : {
+		topM: parseInt(options.topM, 10) || 4,      // M mode: top N men
+		topF: parseInt(options.topF, 10) || 4,      // F mode: top N women
+		topMFm: parseInt(options.topMFm, 10) || 2,  // MF mode: top N men
+		topMFf: parseInt(options.topMFf, 10) || 2   // MF mode: top N women
+	};
 	const sessionStatus = competitionHub.getSessionStatus(fopName);
 
 	// Detect session gender from session athletes
@@ -1090,27 +1292,59 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		helperDetectedGender = normalizeGender(fopUpdate?.gender) || 'unknown';
 	}
 	
-	console.log(`[NVF helpers] Detected session athlete: "${helperDetectedAthlete?.fullName || 'none'}" gender: ${helperDetectedGender}`);
+	// Update last known gender if we detected one from the session
+	if (helperDetectedGender && helperDetectedGender !== 'unknown') {
+		lastKnownGenderByFop.set(fopName, helperDetectedGender);
+	}
+	
+	// Get the last known gender for this FOP, defaulting to 'M' if never set
+	const lastKnownGender = lastKnownGenderByFop.get(fopName) || 'M';
+	
+	console.log(`[NVF helpers] Detected session athlete: "${helperDetectedAthlete?.fullName || 'none'}" gender: ${helperDetectedGender}, lastKnown: ${lastKnownGender}`);
 
 	// Resolve gender option
-	const requestedGender = (typeof options.gender === 'string' || options.gender === true) ? options.gender : undefined;
-	let gender = 'MF';
+	// - Explicit URL parameter (M, F, MF) takes precedence
+	// - 'current' uses detected gender from session, or last known, or 'M'
+	// - No option: use detected gender from session, or last known, or 'M'
+	let gender = 'M';
 	
 	if (options.gender === true) {
+		// Legacy: gender=true means MF mode
 		gender = 'MF';
 	} else if (typeof options.gender === 'string') {
-		if (String(options.gender).trim().toLowerCase() === 'current') {
-			gender = (helperDetectedGender && helperDetectedGender !== 'unknown') ? helperDetectedGender : 'MF';
+		const genderOption = String(options.gender).trim().toUpperCase();
+		if (genderOption === 'CURRENT') {
+			// Use detected gender, fall back to last known, then 'M'
+			gender = (helperDetectedGender && helperDetectedGender !== 'unknown') 
+				? helperDetectedGender 
+				: lastKnownGender;
+		} else if (genderOption === 'MF' || genderOption === 'M' || genderOption === 'F') {
+			gender = genderOption === 'MF' ? 'MF' : normalizeGender(genderOption);
 		} else {
-			gender = normalizeGender(options.gender) || 'MF';
+			// Unknown option - treat as single gender or default
+			gender = normalizeGender(options.gender) || lastKnownGender;
 		}
 	} else {
-		gender = (helperDetectedGender && helperDetectedGender !== 'unknown') ? helperDetectedGender : 'MF';
+		// No explicit option: use detected gender, fall back to last known, then 'M'
+		gender = (helperDetectedGender && helperDetectedGender !== 'unknown') 
+			? helperDetectedGender 
+			: lastKnownGender;
 	}
 
-	// Build headers from translations
+	// Determine if we're actually in mixed-gender mode (explicit MF request)
+	// Only show "2+2" text when user explicitly requests MF mode via URL parameter
+	const isExplicitMixedMode = typeof options.gender === 'string' && 
+		String(options.gender).trim().toUpperCase() === 'MF';
+
+	// Helper to substitute {0}, {1}, etc. placeholders in translation strings
+	const formatTranslation = (template, ...args) => {
+		if (!template) return '';
+		return args.reduce((str, arg, i) => str.replace(`{${i}}`, arg), template);
+	};
+
+	// Build headers from translations (all from OWLCMS, using Tracker.* keys for new ones)
 	const headers = {
-		order: language === 'no' ? 'Rekke\u00ADfølge' : (translations.Start || translations.Order || 'Order'),
+		order: translations['Tracker.Order'] || translations.Start || translations.Order || 'Order',
 		name: translations.Name || 'Name',
 		category: translations.Category || 'Cat.',
 		birth: translations['Scoreboard.Birth'] || translations.Birth || 'Born',
@@ -1121,25 +1355,29 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		score: translations.Score || 'Score',
 		best: translations.Best || '✔',
 		rank: translations.Rank || 'Rank',
-		session: language === 'no' ? 'Pulje' : (translations.Session || 'Session'),
-		top4scores: (gender === 'MF') 
-			? (language === 'no' ? 'topp 2+2 poengsummer' : 'top 2+2 scores') 
-			: (language === 'no' ? 'topp 4 poengsummer' : 'top 4 scores'),
-		totalNextS: language === 'no' ? 'Total Neste F' : 'Total Next S',
-		scoreNextS: language === 'no' ? 'Poeng Neste F' : 'Score Next S'
+		session: translations['Tracker.Session'] || translations.Session || 'Session',
+		// Translation templates for top scores labels
+		topMScores: translations['Tracker.TopMScores'] || 'top {0} scores',
+		topMFScores: translations['Tracker.TopMFScores'] || 'top {0}+{1} scores',
+		totalNextS: translations['Tracker.TotalNextScore'] || 'Total Next S',
+		scoreNextS: translations['Tracker.ScoreNextScore'] || 'Score Next S',
+		waitingForData: translations['Tracker.WaitingForData'] || 'Waiting for competition data...',
+		noCompetitionData: translations['Tracker.WaitingForData'] || 'Waiting for competition data...',
+		noAthleteLifting: translations['Tracker.NoAthleteLifting'] || 'No athlete currently lifting'
 	};
 
 	// Early return for waiting states - but only if we have NO data at all
 	// If we have database data, show it even without an active session
 	if (!fopUpdate && !databaseState) {
 		return {
-			competition: { name: 'No Competition Data', fop: 'unknown' },
+			competition: { name: headers.noCompetitionData, fop: 'unknown' },
 			currentAthlete: null,
 			timer: { state: 'stopped', timeRemaining: 0 },
-			sessionStatus: { isDone: false, groupName: '', lastActivity: 0 },
+			sessionStatus: { isDone: false, sessionName: '', lastActivity: 0 },
 			teams: [],
 			headers,
 			status: 'waiting',
+			message: headers.waitingForData,
 			learningMode
 		};
 	}
@@ -1151,11 +1389,10 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		console.log(`[NVF helpers] No active session, defaulting to M (show men from database)`);
 	}
 
-	// Check cache - include resolved gender in cache key
-	const lastUpdate = fopUpdate?.lastDataUpdate || 0;
-	const cacheKey = `${fopName}-${lastUpdate}-${gender}-${JSON.stringify(options)}`;
-	
-	console.log(`[NVF helpers] Cache check: key=${cacheKey.substring(0, 60)}..., gender=${gender}`);
+	// Check cache - include hub FOP version and resolved gender in cache key
+	// Use shared buildCacheKey; include gender + options to differentiate views.
+	const cacheKey = buildCacheKey({ fopName, includeFop: true, opts: { gender, ...options } });
+	console.log(`[NVF helpers] Cache check: key=${String(cacheKey).substring(0, 120)}..., gender=${gender}`);
 	
 	if (nvfScoreboardCache.has(cacheKey)) {
 		const cached = nvfScoreboardCache.get(cacheKey);
@@ -1165,10 +1402,18 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			sessionStatusMessage = (fopUpdate.fullName || '').replace(/&ndash;/g, '–').replace(/&mdash;/g, '—');
 		}
 		
+		// Extract timers and compute display mode (what should be visible)
+		const { timer, breakTimer } = extractTimers(fopUpdate, language);
+		const decision = extractDecisionState(fopUpdate);
+		const { displayMode, displayClass, activeTimer } = computeDisplayMode(timer, breakTimer, decision);
+		
 		return {
 			...cached,
-			timer: extractTimerState(fopUpdate),
-			decision: extractDecisionState(fopUpdate),
+			timer: activeTimer,
+			breakTimer,
+			displayMode,
+			displayClass,
+			decision,
 			sessionStatus,
 			sessionStatusMessage,
 			learningMode
@@ -1265,28 +1510,58 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// =========================================================================
 	// LAYER 3: Group by teams
 	// =========================================================================
-	const teams = groupByTeams(athletesWithFlags, gender, headers);
+	const teams = groupByTeams(athletesWithFlags, gender, headers, topCounts);
 	
 	console.log(`[NVF helpers] Grouped ${allTeamAthletes.length} athletes into ${teams.length} teams (gender=${gender})`);
 	if (teams.length > 0) {
 		teams.forEach(t => console.log(`[NVF helpers]   Team "${t.teamName}": ${t.athleteCount} athletes, score=${t.teamScore?.toFixed(2)}`));
 	}
 	
+	// Determine platform state and visibility flags
+	// fopState values: INACTIVE, BREAK, CURRENT_ATHLETE, TIME_STARTED, TIME_STOPPED, DOWN_SIGNAL, DECISION_VISIBLE, etc.
+	// Any fopState other than INACTIVE means we have an active session
+	const platformState = fopUpdate?.fopState || 'INACTIVE';
+	const hasActiveSession = platformState !== 'INACTIVE';
+	const hasCurrentAthlete = Boolean(fopUpdate?.fullName && platformState !== 'INACTIVE' && !sessionStatus.isDone);
+	
+	// Use sessionInfo from OWLCMS if available, otherwise build fallback
+	// OWLCMS sends sessionInfo with format like "pulje P1.1 Rykk" (session name + lift type)
+	let sessionInfo;
+	if (fopUpdate?.sessionInfo) {
+		// Use OWLCMS-provided sessionInfo directly
+		sessionInfo = fopUpdate.sessionInfo;
+	} else if (hasActiveSession && fopUpdate?.sessionName) {
+		// Fallback: build from sessionName + lift type
+		sessionInfo = `${headers.session} ${fopUpdate?.sessionName || 'A'} - ${liftTypeLabel}`;
+	} else if (hasActiveSession) {
+		// Active but no sessionName in message (e.g., timer-only message) - just show lift type
+		sessionInfo = liftTypeLabel;
+	} else {
+		// No active session - show "Platform X"
+		const platformLabel = translations.Platform || 'Platform';
+		sessionInfo = `${platformLabel} ${fopName}`;
+	}
+	
 	// Extract competition info
 	const competition = {
 		name: fopUpdate?.competitionName || databaseState?.competition?.name || 'Competition',
 		fop: fopName,
-		state: fopUpdate?.fopState || 'INACTIVE',
-		session: fopUpdate?.sessionName || 'A',
-		liftType: liftType,
-		groupInfo: `${language === 'no' ? 'Pulje' : (translations.Session || 'Session')} ${fopUpdate?.sessionName || 'A'} - ${liftTypeLabel}`
+		state: platformState,
+		session: fopUpdate?.sessionName || '',
+		liftType: hasActiveSession ? liftType : null,
+		sessionInfo,
+		// Visibility flags - no logic in svelte, all controlled here
+		// showTimer: true if fopState indicates active competition (not INACTIVE)
+		showWeight: hasCurrentAthlete,
+		showTimer: hasActiveSession,
+		showLiftType: hasActiveSession
 	};
 
-	// Extract current attempt
+	// Extract current attempt - only if there's actually an athlete lifting
 	let currentAttempt = null;
 	let sessionStatusMessage = null;
 	
-	if (fopUpdate?.fullName) {
+	if (hasCurrentAthlete && fopUpdate?.fullName) {
 		const cleanFullName = (fopUpdate.fullName || '').replace(/&ndash;/g, '–').replace(/&mdash;/g, '—');
 		
 		currentAttempt = {
@@ -1303,13 +1578,17 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			timeAllowed: fopUpdate.timeAllowed,
 			startTime: null
 		};
-		
-		if (sessionStatus.isDone) {
-			sessionStatusMessage = cleanFullName;
-		}
+	}
+	
+	// Session done message (separate from currentAttempt)
+	if (sessionStatus.isDone && fopUpdate?.fullName) {
+		sessionStatusMessage = (fopUpdate.fullName || '').replace(/&ndash;/g, '–').replace(/&mdash;/g, '—');
 	}
 
-	const timer = extractTimerState(fopUpdate);
+	// Extract timers and compute display mode
+	const { timer, breakTimer } = extractTimers(fopUpdate, language);
+	const decision = extractDecisionState(fopUpdate);
+	const { displayMode, displayClass, activeTimer } = computeDisplayMode(timer, breakTimer, decision);
 	
 	// Compute max team name length for responsive layout
 	const maxTeamNameLength = Math.max(0, ...teams.map(t => (t.teamName || '').length));
@@ -1318,7 +1597,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	const responseOptions = {
 		showRecords,
 		sortBy,
-		gender: requestedGender !== undefined ? requestedGender : undefined,
+		gender: options.gender !== undefined ? options.gender : undefined,
 		currentAttemptInfo,
 		topN,
 		cjDecl: includeCjDeclaration
@@ -1331,7 +1610,10 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			fullName: helperDetectedAthlete?.fullName || helperDetectedAthlete?.startNumber || null,
 			gender: helperDetectedGender || null
 		},
-		timer,
+		timer: activeTimer,
+		breakTimer,
+		displayMode,
+		displayClass,
 		sessionStatusMessage,
 		teams,
 		allAthletes: athletesWithFlags,
@@ -1370,8 +1652,8 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	});
 	
 	console.log(`[NVF] Cache now has ${nvfScoreboardCache.size} entries`);
-	
-	// Cleanup old cache entries
+    
+	// Cleanup old cache entries (keep last 3)
 	if (nvfScoreboardCache.size > 3) {
 		const firstKey = nvfScoreboardCache.keys().next().value;
 		nvfScoreboardCache.delete(firstKey);
@@ -1380,7 +1662,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	return {
 		...result,
 		sessionStatus,
-		decision: extractDecisionState(fopUpdate),
+		decision,
 		learningMode
 	};
 }
@@ -1394,7 +1676,7 @@ function createWaitingResponse(fopName, fopUpdate, databaseState, headers, learn
 		currentAttempt: null,
 		detectedAthlete: { fullName: null, gender: null },
 		timer: { state: 'stopped', timeRemaining: 0 },
-		sessionStatus: { isDone: false, groupName: '', lastActivity: 0 },
+		sessionStatus: { isDone: false, sessionName: '', lastActivity: 0 },
 		teams: [],
 		headers,
 		status: 'waiting',

@@ -209,7 +209,7 @@ async function handleUpdateMessage(payload, hasBundledDatabase = false) {
 	const uiEvent = payload.uiEvent || '';
 	const isDatabaseComing = uiEvent === 'SwitchGroup' || uiEvent === 'GroupDone';
 
-	const result = competitionHub.handleOwlcmsMessage(payload);
+	const result = competitionHub.handleOwlcmsMessage(payload, 'update');
 	const missing = competitionHub.getMissingPreconditions();
 
 	if (isDatabaseComing) {
@@ -266,7 +266,7 @@ async function handleTimerMessage(payload, hasBundledDatabase = false) {
 	// If we still have no database, request it from OWLCMS
 	if (!competitionHub.getDatabaseState() && !hasBundledDatabase) {
 		console.log('[WebSocket] Timer received but no database - requesting database');
-		const interimResult = competitionHub.handleOwlcmsMessage(payload);
+		const interimResult = competitionHub.handleOwlcmsMessage(payload, 'timer');
 		const missing = competitionHub.getMissingPreconditions();
 		return {
 			status: 428,
@@ -276,7 +276,7 @@ async function handleTimerMessage(payload, hasBundledDatabase = false) {
 		};
 	}
 
-	const result = competitionHub.handleOwlcmsMessage(payload);
+	const result = competitionHub.handleOwlcmsMessage(payload, 'timer');
 	return mapHubResultToResponse(result, 'timer');
 }
 
@@ -286,7 +286,7 @@ async function handleTimerMessage(payload, hasBundledDatabase = false) {
 async function handleDecisionMessage(payload, hasBundledDatabase = false) {
 	if (!competitionHub.getDatabaseState() && !hasBundledDatabase) {
 		console.log('[WebSocket] Decision received but no database - requesting database');
-		const interimResult = competitionHub.handleOwlcmsMessage(payload);
+		const interimResult = competitionHub.handleOwlcmsMessage(payload, 'decision');
 		const missing = competitionHub.getMissingPreconditions();
 		return {
 			status: 428,
@@ -296,7 +296,7 @@ async function handleDecisionMessage(payload, hasBundledDatabase = false) {
 		};
 	}
 
-	const result = competitionHub.handleOwlcmsMessage(payload);
+	const result = competitionHub.handleOwlcmsMessage(payload, 'decision');
 	return mapHubResultToResponse(result, 'decision');
 }
 
@@ -358,7 +358,7 @@ function capitalize(value) {
 async function handleGenericMessage(payload, hasBundledDatabase, type) {
 	if (!competitionHub.getDatabaseState() && !hasBundledDatabase) {
 		console.log(`[WebSocket] ${type} message received but no database - requesting database`);
-		const interimResult = competitionHub.handleOwlcmsMessage(payload);
+		const interimResult = competitionHub.handleOwlcmsMessage(payload, type || 'generic');
 		const missing = competitionHub.getMissingPreconditions();
 		return {
 			status: 428,
@@ -368,7 +368,7 @@ async function handleGenericMessage(payload, hasBundledDatabase, type) {
 		};
 	}
 
-	const result = competitionHub.handleOwlcmsMessage(payload);
+	const result = competitionHub.handleOwlcmsMessage(payload, type || 'generic');
 	return mapHubResultToResponse(result, type || 'message');
 }
 

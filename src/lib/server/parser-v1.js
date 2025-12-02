@@ -44,7 +44,7 @@ export function parseV1Database(params) {
     name: params.competitionName || 'Competition',
     fop: params.fop || 'A',
     state: params.fopState || 'INACTIVE',
-    currentSession: params.groupName || 'A',
+    currentSession: params.sessionName || 'A',
     date: new Date().toISOString().split('T')[0]
   };
 

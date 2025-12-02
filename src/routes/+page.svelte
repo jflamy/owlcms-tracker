@@ -14,11 +14,29 @@
   // Collapse state for categories (accordion behavior - only one open at a time)
   let expandedCategory = null; // Start folded
 
-  // Language name translations (for displaying language options)
-  const languageNames = {
-    'en': 'English',
-    'no': 'Norsk'
-  };
+  // Language name translations (from OWLCMS via Tracker.LocaleName)
+  // These are dynamically loaded from the server
+  $: languageNames = data.languageNames || {};
+  $: availableLocales = data.availableLocales || [];
+
+  /**
+   * Get the effective options for a select field
+   * Handles dynamic options like 'dynamic:locales' which are resolved at runtime
+   */
+  function getEffectiveOptions(option) {
+    if (option.key === 'language' && option.options === 'dynamic:locales') {
+      // Sort with default language first, then alphabetically by display name
+      const defaultLang = option.default || 'en';
+      return [...availableLocales].sort((a, b) => {
+        if (a === defaultLang) return -1;
+        if (b === defaultLang) return 1;
+        const nameA = languageNames[a] || a;
+        const nameB = languageNames[b] || b;
+        return nameA.localeCompare(nameB);
+      });
+    }
+    return option.options || [];
+  }
 
   function getDisplayName(option, optionKey) {
     // If this is a language option, use the language name translations
@@ -513,54 +531,167 @@
       
       <div class="modal-body">
         {#if modalScoreboard.options && modalScoreboard.options.length > 0}
-          <div class="options-grid">
-            {#each modalScoreboard.options as option}
-              <div class="option-field">
-                <label for="{modalScoreboard.type}-{modalFop}-{option.key}">
-                  {option.label}
-                  {#if option.description}
-                    <span class="option-help" title={option.description}>ⓘ</span>
-                  {/if}
-                </label>
-                
-                {#if option.type === 'select'}
-                  <select 
-                    id="{modalScoreboard.type}-{modalFop}-{option.key}"
-                    bind:value={scoreboardOptions[modalScoreboard.type][modalFop][option.key]}
-                  >
-                    {#each option.options as opt}
-                      <option value={opt}>{getDisplayName(opt, option.key)}</option>
-                    {/each}
-                  </select>
-                {:else if option.type === 'boolean'}
-                  <div class="checkbox-wrapper">
-                    <input 
-                      type="checkbox" 
-                      id="{modalScoreboard.type}-{modalFop}-{option.key}"
-                      bind:checked={scoreboardOptions[modalScoreboard.type][modalFop][option.key]}
-                    />
-                    <label for="{modalScoreboard.type}-{modalFop}-{option.key}" class="checkbox-label">
-                      {scoreboardOptions[modalScoreboard.type][modalFop][option.key] ? 'Yes' : 'No'}
+          {@const hasGroups = modalScoreboard.options.some(opt => opt.group)}
+          {#if hasGroups}
+            {@const displayOptions = modalScoreboard.options.filter(opt => opt.group === 'display' || !opt.group)}
+            {@const scoringOptions = modalScoreboard.options.filter(opt => opt.group === 'scoring')}
+            <div class="options-columns">
+              <div class="options-column">
+                <h4 class="column-title">Display Options</h4>
+                {#each displayOptions as option}
+                  <div class="option-field">
+                    <label for="{modalScoreboard.type}-{modalFop}-{option.key}">
+                      {option.label}
+                      {#if option.description}
+                        <span class="option-help" title={option.description}>ⓘ</span>
+                      {/if}
                     </label>
+                    
+                    {#if option.type === 'select'}
+                      <select 
+                        id="{modalScoreboard.type}-{modalFop}-{option.key}"
+                        bind:value={scoreboardOptions[modalScoreboard.type][modalFop][option.key]}
+                      >
+                        {#each getEffectiveOptions(option) as opt}
+                          <option value={opt}>{getDisplayName(opt, option.key)}</option>
+                        {/each}
+                      </select>
+                    {:else if option.type === 'boolean'}
+                      <div class="checkbox-wrapper">
+                        <input 
+                          type="checkbox" 
+                          id="{modalScoreboard.type}-{modalFop}-{option.key}"
+                          bind:checked={scoreboardOptions[modalScoreboard.type][modalFop][option.key]}
+                        />
+                        <label for="{modalScoreboard.type}-{modalFop}-{option.key}" class="checkbox-label">
+                          {scoreboardOptions[modalScoreboard.type][modalFop][option.key] ? 'Yes' : 'No'}
+                        </label>
+                      </div>
+                    {:else if option.type === 'number'}
+                      <input 
+                        type="number" 
+                        id="{modalScoreboard.type}-{modalFop}-{option.key}"
+                        bind:value={scoreboardOptions[modalScoreboard.type][modalFop][option.key]}
+                        min={option.min}
+                        max={option.max}
+                      />
+                    {:else}
+                      <input 
+                        type="text" 
+                        id="{modalScoreboard.type}-{modalFop}-{option.key}"
+                        bind:value={scoreboardOptions[modalScoreboard.type][modalFop][option.key]}
+                      />
+                    {/if}
                   </div>
-                {:else if option.type === 'number'}
-                  <input 
-                    type="number" 
-                    id="{modalScoreboard.type}-{modalFop}-{option.key}"
-                    bind:value={scoreboardOptions[modalScoreboard.type][modalFop][option.key]}
-                    min={option.min}
-                    max={option.max}
-                  />
-                {:else}
-                  <input 
-                    type="text" 
-                    id="{modalScoreboard.type}-{modalFop}-{option.key}"
-                    bind:value={scoreboardOptions[modalScoreboard.type][modalFop][option.key]}
-                  />
-                {/if}
+                {/each}
               </div>
-            {/each}
-          </div>
+              {#if scoringOptions.length > 0}
+                <div class="options-column">
+                  <h4 class="column-title">Team Scoring</h4>
+                  {#each scoringOptions as option}
+                    {@const isDisabled = option.disabledBy && scoreboardOptions[modalScoreboard.type][modalFop][option.disabledBy]}
+                    <div class="option-field" class:disabled-option={isDisabled}>
+                      <label for="{modalScoreboard.type}-{modalFop}-{option.key}">
+                        {option.label}
+                        {#if option.description}
+                          <span class="option-help" title={option.description}>ⓘ</span>
+                        {/if}
+                      </label>
+                      
+                      {#if option.type === 'select'}
+                        <select 
+                          id="{modalScoreboard.type}-{modalFop}-{option.key}"
+                          bind:value={scoreboardOptions[modalScoreboard.type][modalFop][option.key]}
+                          disabled={isDisabled}
+                        >
+                          {#each getEffectiveOptions(option) as opt}
+                            <option value={opt}>{getDisplayName(opt, option.key)}</option>
+                          {/each}
+                        </select>
+                      {:else if option.type === 'boolean'}
+                        <div class="checkbox-wrapper">
+                          <input 
+                            type="checkbox" 
+                            id="{modalScoreboard.type}-{modalFop}-{option.key}"
+                            bind:checked={scoreboardOptions[modalScoreboard.type][modalFop][option.key]}
+                            disabled={isDisabled}
+                          />
+                          <label for="{modalScoreboard.type}-{modalFop}-{option.key}" class="checkbox-label">
+                            {scoreboardOptions[modalScoreboard.type][modalFop][option.key] ? 'Yes' : 'No'}
+                          </label>
+                        </div>
+                      {:else if option.type === 'number'}
+                        <input 
+                          type="number" 
+                          id="{modalScoreboard.type}-{modalFop}-{option.key}"
+                          bind:value={scoreboardOptions[modalScoreboard.type][modalFop][option.key]}
+                          min={option.min}
+                          max={option.max}
+                          disabled={isDisabled}
+                        />
+                      {:else}
+                        <input 
+                          type="text" 
+                          id="{modalScoreboard.type}-{modalFop}-{option.key}"
+                          bind:value={scoreboardOptions[modalScoreboard.type][modalFop][option.key]}
+                          disabled={isDisabled}
+                        />
+                      {/if}
+                    </div>
+                  {/each}
+                </div>
+              {/if}
+            </div>
+          {:else}
+            <div class="options-grid">
+              {#each modalScoreboard.options as option}
+                <div class="option-field">
+                  <label for="{modalScoreboard.type}-{modalFop}-{option.key}">
+                    {option.label}
+                    {#if option.description}
+                      <span class="option-help" title={option.description}>ⓘ</span>
+                    {/if}
+                  </label>
+                  
+                  {#if option.type === 'select'}
+                    <select 
+                      id="{modalScoreboard.type}-{modalFop}-{option.key}"
+                      bind:value={scoreboardOptions[modalScoreboard.type][modalFop][option.key]}
+                    >
+                      {#each getEffectiveOptions(option) as opt}
+                        <option value={opt}>{getDisplayName(opt, option.key)}</option>
+                      {/each}
+                    </select>
+                  {:else if option.type === 'boolean'}
+                    <div class="checkbox-wrapper">
+                      <input 
+                        type="checkbox" 
+                        id="{modalScoreboard.type}-{modalFop}-{option.key}"
+                        bind:checked={scoreboardOptions[modalScoreboard.type][modalFop][option.key]}
+                      />
+                      <label for="{modalScoreboard.type}-{modalFop}-{option.key}" class="checkbox-label">
+                        {scoreboardOptions[modalScoreboard.type][modalFop][option.key] ? 'Yes' : 'No'}
+                      </label>
+                    </div>
+                  {:else if option.type === 'number'}
+                    <input 
+                      type="number" 
+                      id="{modalScoreboard.type}-{modalFop}-{option.key}"
+                      bind:value={scoreboardOptions[modalScoreboard.type][modalFop][option.key]}
+                      min={option.min}
+                      max={option.max}
+                    />
+                  {:else}
+                    <input 
+                      type="text" 
+                      id="{modalScoreboard.type}-{modalFop}-{option.key}"
+                      bind:value={scoreboardOptions[modalScoreboard.type][modalFop][option.key]}
+                    />
+                  {/if}
+                </div>
+              {/each}
+            </div>
+          {/if}
         {/if}
       </div>
       
@@ -783,7 +914,7 @@
     background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
     border-radius: 12px;
     border: 1px solid rgba(255, 255, 255, 0.2);
-    max-width: 500px;
+    max-width: 700px;
     width: 90%;
     max-height: 80vh;
     display: flex;
@@ -880,6 +1011,45 @@
     gap: 1rem;
   }
   
+  .options-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+  }
+  
+  .options-column {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .column-title {
+    font-size: 0.95rem;
+    color: #667eea;
+    margin: 0 0 0.5rem 0;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid rgba(102, 126, 234, 0.3);
+    font-weight: 600;
+  }
+  
+  .disabled-option {
+    opacity: 0.5;
+    pointer-events: none;
+  }
+  
+  .disabled-option input,
+  .disabled-option select {
+    background: #2a2a3a;
+    cursor: not-allowed;
+  }
+  
+  @media (max-width: 600px) {
+    .options-columns {
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+    }
+  }
+  
   .option-field {
     display: flex;
     flex-direction: column;
@@ -970,11 +1140,13 @@
     padding: 3rem;
     border-radius: 12px;
     border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #e2e8f0;
   }
   
   .waiting-content h2 {
     font-size: 2rem;
     margin-bottom: 1rem;
+    color: #e2e8f0;
   }
   
   .waiting-note {

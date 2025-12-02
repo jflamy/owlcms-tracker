@@ -10,6 +10,9 @@ import { getCompetitionState } from './helpers.js';
 // Track timer visibility state per FOP so StopTime events behave like SetTime when clock is idle
 const timerStateMap = new Map();
 
+// Helper: get hub FOP version for cache keys
+import { buildCacheKey } from '$lib/server/cache-utils.js';
+
 /**
  * Plugin-specific cache to avoid recomputing session results on every browser request
  * Structure: { 'cacheKey': { competition, startOrderAthletes, rankings, ... } }
@@ -53,7 +56,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		fop: fopName,
 		state: fopUpdate?.fopState || 'INACTIVE',
 		session: fopUpdate?.sessionName || 'A',
-		groupInfo: (fopUpdate?.groupInfo || '').replace(/&ndash;/g, '\u2013').replace(/&mdash;/g, '\u2014'),
+		sessionInfo: (fopUpdate?.sessionInfo || '').replace(/&ndash;/g, '\u2013').replace(/&mdash;/g, '\u2014'),
 		liftsDone: fopUpdate?.liftsDone || ''
 	};
 	// Prefer hub-normalized start order entries (includes spacers and resolved athlete payloads)
@@ -85,11 +88,8 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	const records = extractRecordsFromUpdate(fopUpdate);
 	const decision = extractDecisionState(fopUpdate);
 	
-	// Check cache first - cache key based on the last update timestamp from the Hub.
-	// This ensures all clients see the same data for a given update, 
-	// and invalidation is instant when a new update arrives.
-	const lastUpdate = fopUpdate?.lastDataUpdate || 0;
-	const cacheKey = `${fopName}-${lastUpdate}-${JSON.stringify(options)}`;
+	// Check cache first - use shared buildCacheKey (hub/fop version + options)
+	const cacheKey = buildCacheKey({ fopName, includeFop: true, opts: options });
 	
 	// Extract current athlete from startOrderAthletes (has classname="current" or "current blink")
 	let currentAttempt = null;
@@ -349,8 +349,8 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		options: result.options
 	});
 	
-	// Cleanup old cache entries (keep last 20)
-	if (sessionResultsCache.size > 20) {
+	// Cleanup old cache entries (keep last 3)
+	if (sessionResultsCache.size > 3) {
 		const firstKey = sessionResultsCache.keys().next().value;
 		sessionResultsCache.delete(firstKey);
 	}

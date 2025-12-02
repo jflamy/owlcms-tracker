@@ -7,6 +7,12 @@ import { getFlagUrl } from '$lib/server/flag-resolver.js';
 import { calculateSinclair } from '$lib/sinclair-coefficients.js';
 
 /**
+ * Helper: get hub FOP version for cache keys.
+ * Falls back to global state version or 0 when not available.
+ */
+import { buildCacheKey } from '$lib/server/cache-utils.js';
+
+/**
  * Plugin-specific cache to avoid recomputing team data on every browser request
  * Structure: { 'fopName-lastUpdate-gender-topN-sortBy': { teams, allAthletes, ... } }
  */
@@ -100,11 +106,9 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// Get session status early (before cache check, so it's always fresh)
 	const sessionStatus = competitionHub.getSessionStatus(fopName);
 
-	// Check cache first - cache key based on the last update timestamp from the Hub.
-	// This ensures all clients see the same data for a given update, 
-	// and invalidation is instant when a new update arrives.
-	const lastUpdate = fopUpdate?.lastDataUpdate || 0;
-	const cacheKey = `${fopName}-${lastUpdate}-${JSON.stringify(options)}`;
+	// Check cache first - cache key based on hub FOP version + options.
+	// Timer/decision/sessionStatus are intentionally NOT included in the cache key.
+	const cacheKey = buildCacheKey({ fopName, includeFop: true, opts: options });
 	
 	if (teamScoreboardCache.has(cacheKey)) {
 		const cached = teamScoreboardCache.get(cacheKey);
@@ -125,21 +129,38 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		};
 	}
 
+	// Determine platform state and visibility flags
+	const platformState = fopUpdate?.fopState || 'INACTIVE';
+	const hasActiveSession = platformState !== 'INACTIVE' && fopUpdate?.sessionName;
+	const hasCurrentAthlete = Boolean(fopUpdate?.fullName && platformState !== 'INACTIVE' && !sessionStatus.isDone);
+	
+	// Build sessionInfo based on platform state
+	let sessionInfo;
+	if (hasActiveSession && fopUpdate?.sessionInfo) {
+		sessionInfo = (fopUpdate.sessionInfo || '').replace(/&ndash;/g, '–').replace(/&mdash;/g, '—');
+	} else {
+		// No active session - show "Platform X"
+		sessionInfo = `Platform ${fopName}`;
+	}
+
 	// Extract basic competition info
 	const competition = {
 		name: fopUpdate?.competitionName || databaseState?.competition?.name || 'Competition',
 		fop: fopName,
-		state: fopUpdate?.fopState || 'INACTIVE',
-		session: fopUpdate?.sessionName || 'A',
-		// Replace HTML entities with Unicode characters
-		groupInfo: (fopUpdate?.groupInfo || '').replace(/&ndash;/g, '–').replace(/&mdash;/g, '—')
+		state: platformState,
+		session: fopUpdate?.sessionName || '',
+		sessionInfo,
+		// Visibility flags - no logic in svelte, all controlled here
+		showWeight: hasCurrentAthlete,
+		showTimer: hasActiveSession && platformState !== 'INACTIVE',
+		showLiftType: hasActiveSession
 	};
 
-	// Extract current athlete info from UPDATE message
+	// Extract current athlete info from UPDATE message - only if there's actually an athlete lifting
 	let currentAttempt = null;
 	let sessionStatusMessage = null;  // For displaying when session is done
 	
-	if (fopUpdate?.fullName) {
+	if (hasCurrentAthlete && fopUpdate?.fullName) {
 		// Clean up HTML entities in fullName (OWLCMS sends session status here when done)
 		const cleanFullName = (fopUpdate.fullName || '').replace(/&ndash;/g, '–').replace(/&mdash;/g, '—');
 		
@@ -157,11 +178,11 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			timeAllowed: fopUpdate.timeAllowed,
 			startTime: fopUpdate.athleteTimerEventType === 'Start' ? Date.now() - (fopUpdate.timeAllowed - (fopUpdate.athleteMillisRemaining || 0)) : null
 		};
-		
-		// If session is done, save the cleaned message separately
-		if (sessionStatus.isDone) {
-			sessionStatusMessage = cleanFullName;
-		}
+	}
+	
+	// Session done message (separate from currentAttempt)
+	if (sessionStatus.isDone && fopUpdate?.fullName) {
+		sessionStatusMessage = (fopUpdate.fullName || '').replace(/&ndash;/g, '–').replace(/&mdash;/g, '—');
 	}
 
 	// Extract timer info from UPDATE message or keep previous timer state
@@ -381,7 +402,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		} : {},
 		isBreak: fopUpdate?.break === 'true' || false,
 		breakType: fopUpdate?.breakType,
-		sessionStatus,  // Include session status (isDone, groupName, lastActivity)
+		sessionStatus,  // Include session status (isDone, sessionName, lastActivity)
 		compactTeamColumn,  // Narrow team column if max team size < 7
 		status: (fopUpdate || databaseState) ? 'ready' : 'waiting',
 		lastUpdate: fopUpdate?.lastUpdate || Date.now(),
@@ -403,8 +424,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		options: result.options
 	});
 	
-	// Cleanup old cache entries (keep last 3 - with 6 FOPs max and 2-3 options = ~18 entries worst case)
-	// Reducing from 20 to 3 to avoid memory bloat when multiple scoreboards/FOPs loaded
+	// Cleanup old cache entries (keep last 3)
 	if (teamScoreboardCache.size > 3) {
 		const firstKey = teamScoreboardCache.keys().next().value;
 		teamScoreboardCache.delete(firstKey);
