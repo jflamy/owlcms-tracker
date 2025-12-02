@@ -235,11 +235,11 @@
                 <p class="description">{@html scoreboard.description}</p>
                 
                 <div class="fop-links">
-                  <h4>Select Platform:</h4>
-                  <div class="fop-list">
-                    {#each data.fops as fop}
-                      <div class="fop-row">
-                        {#if confirmedFops}
+                  {#if confirmedFops}
+                    <h4>Select Platform:</h4>
+                    <div class="fop-list">
+                      {#each data.fops as fop}
+                        <div class="fop-row">
                           <a 
                             href={getScoreboardUrl(scoreboard.type, fop)}
                             class="fop-link"
@@ -248,14 +248,7 @@
                           >
                             Platform {fop}
                           </a>
-                        {:else}
-                          <div class="fop-link disabled">
-                            Platform {fop}
-                            <span class="fop-wait">Awaiting OWLCMS connection</span>
-                          </div>
-                        {/if}
                           {#if scoreboard.options && scoreboard.options.length > 0}
-                            {#if confirmedFops}
                             <button
                               class="options-btn"
                               on:click={() => openOptionsModal(scoreboard, fop)}
@@ -263,15 +256,17 @@
                             >
                               ⚙️ Options
                             </button>
-                          {:else}
-                            <button class="options-btn disabled" disabled title="Waiting for OWLCMS connection">
-                              ⚙️ Options
-                            </button>
                           {/if}
-                        {/if}
+                        </div>
+                      {/each}
+                    </div>
+                  {:else}
+                    <div class="fop-list">
+                      <div class="fop-link disabled">
+                        <span class="fop-wait">Awaiting OWLCMS connection...</span>
                       </div>
-                    {/each}
-                  </div>
+                    </div>
+                  {/if}
                 </div>
               </div>
             {/each}
@@ -296,11 +291,11 @@
                   <p class="description">{@html scoreboard.description}</p>
                   
                   <div class="fop-links">
-                    <h4>Select Platform:</h4>
-                    <div class="fop-list">
-                      {#each data.fops as fop}
-                        <div class="fop-row">
-                          {#if confirmedFops}
+                    {#if confirmedFops}
+                      <h4>Select Platform:</h4>
+                      <div class="fop-list">
+                        {#each data.fops as fop}
+                          <div class="fop-row">
                             <a 
                               href={getScoreboardUrl(scoreboard.type, fop)}
                               class="fop-link"
@@ -309,14 +304,7 @@
                             >
                               Platform {fop}
                             </a>
-                          {:else}
-                            <div class="fop-link disabled">
-                              Platform {fop}
-                              <span class="fop-wait">Awaiting OWLCMS connection</span>
-                            </div>
-                          {/if}
-                          {#if scoreboard.options && scoreboard.options.length > 0}
-                            {#if confirmedFops}
+                            {#if scoreboard.options && scoreboard.options.length > 0}
                               <button
                                 class="options-btn"
                                 on:click={() => openOptionsModal(scoreboard, fop)}
@@ -324,15 +312,17 @@
                               >
                                 ⚙️ Options
                               </button>
-                            {:else}
-                              <button class="options-btn disabled" disabled title="Waiting for OWLCMS connection">
-                                ⚙️ Options
-                              </button>
                             {/if}
-                          {/if}
+                          </div>
+                        {/each}
+                      </div>
+                    {:else}
+                      <div class="fop-list">
+                        <div class="fop-link disabled">
+                          <span class="fop-wait">Awaiting OWLCMS connection...</span>
                         </div>
-                      {/each}
-                    </div>
+                      </div>
+                    {/if}
                   </div>
                 </div>
               {/each}
@@ -358,11 +348,11 @@
                   <p class="description">{@html scoreboard.description}</p>
                   
                   <div class="fop-links">
-                    <h4>Select Platform:</h4>
-                    <div class="fop-list">
-                      {#each data.fops as fop}
-                        <div class="fop-row">
-                          {#if confirmedFops}
+                    {#if confirmedFops}
+                      <h4>Select Platform:</h4>
+                      <div class="fop-list">
+                        {#each data.fops as fop}
+                          <div class="fop-row">
                             <a 
                               href={getScoreboardUrl(scoreboard.type, fop)}
                               class="fop-link"
@@ -371,14 +361,7 @@
                             >
                               Platform {fop}
                             </a>
-                          {:else}
-                            <div class="fop-link disabled">
-                              Platform {fop}
-                              <span class="fop-wait">Awaiting OWLCMS connection</span>
-                            </div>
-                          {/if}
-                          {#if scoreboard.options && scoreboard.options.length > 0}
-                            {#if confirmedFops}
+                            {#if scoreboard.options && scoreboard.options.length > 0}
                               <button
                                 class="options-btn"
                                 on:click={() => openOptionsModal(scoreboard, fop)}
@@ -386,15 +369,17 @@
                               >
                                 ⚙️ Options
                               </button>
-                            {:else}
-                              <button class="options-btn disabled" disabled title="Waiting for OWLCMS connection">
-                                ⚙️ Options
-                              </button>
                             {/if}
-                          {/if}
+                          </div>
+                        {/each}
+                      </div>
+                    {:else}
+                      <div class="fop-list">
+                        <div class="fop-link disabled">
+                          <span class="fop-wait">Awaiting OWLCMS connection...</span>
                         </div>
-                      {/each}
-                    </div>
+                      </div>
+                    {/if}
                   </div>
                 </div>
               {/each}
@@ -422,11 +407,11 @@
                     {@html scoreboard.description}
                   </p>
                   <div class="fop-links">
-                    <h4>Document Views:</h4>
-                    <div class="fop-list">
-                      {#each data.fops as fop}
-                        <div class="fop-row">
-                          {#if confirmedFops}
+                    {#if confirmedFops}
+                      <h4>Document Views:</h4>
+                      <div class="fop-list">
+                        {#each data.fops as fop}
+                          <div class="fop-row">
                             <a 
                               href={getScoreboardUrl(scoreboard.type, fop)}
                               class="fop-link"
@@ -442,18 +427,16 @@
                             >
                               ⚙️ Options
                             </button>
-                          {:else}
-                            <div class="fop-link disabled">
-                              Platform {fop}
-                              <span class="fop-wait">Awaiting OWLCMS connection</span>
-                            </div>
-                            <button class="options-btn disabled" disabled title="Waiting for OWLCMS connection">
-                              ⚙️ Options
-                            </button>
-                          {/if}
+                          </div>
+                        {/each}
+                      </div>
+                    {:else}
+                      <div class="fop-list">
+                        <div class="fop-link disabled">
+                          <span class="fop-wait">Awaiting OWLCMS connection...</span>
                         </div>
-                      {/each}
-                    </div>
+                      </div>
+                    {/if}
                   </div>
                 </div>
               {/each}
@@ -479,11 +462,11 @@
                   <p class="description">{@html scoreboard.description}</p>
                   
                   <div class="fop-links">
-                    <h4>Select Platform:</h4>
-                    <div class="fop-list">
-                      {#each data.fops as fop}
-                        <div class="fop-row">
-                          {#if confirmedFops}
+                    {#if confirmedFops}
+                      <h4>Select Platform:</h4>
+                      <div class="fop-list">
+                        {#each data.fops as fop}
+                          <div class="fop-row">
                             <a 
                               href={getScoreboardUrl(scoreboard.type, fop)}
                               class="fop-link"
@@ -492,14 +475,7 @@
                             >
                               Platform {fop}
                             </a>
-                          {:else}
-                            <div class="fop-link disabled">
-                              Platform {fop}
-                              <span class="fop-wait">Awaiting OWLCMS connection</span>
-                            </div>
-                          {/if}
-                          {#if scoreboard.options && scoreboard.options.length > 0}
-                            {#if confirmedFops}
+                            {#if scoreboard.options && scoreboard.options.length > 0}
                               <button
                                 class="options-btn"
                                 on:click={() => openOptionsModal(scoreboard, fop)}
@@ -507,15 +483,17 @@
                               >
                                 ⚙️
                               </button>
-                            {:else}
-                              <button class="options-btn disabled" disabled title="Waiting for OWLCMS connection">
-                                ⚙️
-                              </button>
                             {/if}
-                          {/if}
+                          </div>
+                        {/each}
+                      </div>
+                    {:else}
+                      <div class="fop-list">
+                        <div class="fop-link disabled">
+                          <span class="fop-wait">Awaiting OWLCMS connection...</span>
                         </div>
-                      {/each}
-                    </div>
+                      </div>
+                    {/if}
                   </div>
                 </div>
               {/each}

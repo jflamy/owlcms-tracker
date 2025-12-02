@@ -542,6 +542,9 @@ function getCurrentRequestedWeight(attempts) {
 	return null;
 }
 
+// Unicode non-breaking space for empty attempt cells (matches OWLCMS format)
+const NBSP = '\u00A0';
+
 /**
  * Build formatted attempts array for a lift (snatch or C&J)
  * NOTE: Database-only reconstruction should use 'request' status, NOT 'current'.
@@ -553,10 +556,12 @@ function getCurrentRequestedWeight(attempts) {
 function buildFormattedAttempts(attemptDtos) {
 	if (!Array.isArray(attemptDtos)) return [];
 
+	let foundFirstRequest = false;
+
 	// Format each attempt - use 'request' for pending weights (not 'current')
 	// 'current' and 'next' are session-specific and only set by OWLCMS displayInfo
 	return attemptDtos.map((dto) => {
-		if (!dto) return { stringValue: '-', liftStatus: 'empty' };
+		if (!dto) return { stringValue: NBSP, liftStatus: 'empty' };
 
 		// If actual lift exists, return result status
 		if (dto.actualLift !== null && dto.actualLift !== undefined) {
@@ -565,7 +570,11 @@ function buildFormattedAttempts(attemptDtos) {
 				if (val > 0) {
 					return { stringValue: String(val), liftStatus: 'good' };
 				} else {
-					return { stringValue: String(Math.abs(val) || dto.declaration || '-'), liftStatus: 'bad' };
+					// Zero or negative = failed lift (display absolute value)
+					// If value is 0, it's a "not taken" lift - show hyphen with bad status
+					const absVal = Math.abs(val);
+					const displayVal = absVal === 0 ? '-' : String(absVal || dto.declaration || '-');
+					return { stringValue: displayVal, liftStatus: 'bad' };
 				}
 			}
 		}
@@ -573,19 +582,28 @@ function buildFormattedAttempts(attemptDtos) {
 		// Not yet attempted - find the request weight (last available in sequence)
 		const requestWeight = getLastRequestWeight(dto);
 		if (requestWeight !== null) {
-			// Always use 'request' for database reconstruction
-			// 'current' and 'next' only come from OWLCMS session data
-			return { stringValue: String(requestWeight), liftStatus: 'request' };
+			// Only show the FIRST request in the sequence as 'request'
+			// Subsequent requests are forced empty (no value shown)
+			if (!foundFirstRequest) {
+				foundFirstRequest = true;
+				// Always use 'request' for database reconstruction
+				// 'current' and 'next' only come from OWLCMS session data
+				return { stringValue: String(requestWeight), liftStatus: 'request' };
+			} else {
+				// Found a subsequent request - force empty with no value
+				return { stringValue: NBSP, liftStatus: 'empty' };
+			}
 		}
 
-		// No data - use '-' to match hub format
-		return { stringValue: '-', liftStatus: 'empty' };
+		// No data - use nbsp for empty cell
+		return { stringValue: NBSP, liftStatus: 'empty' };
 	});
 }
 
 function mapAttemptsToDisplayInfo(formattedAttempts) {
 	return (formattedAttempts || []).map((attempt) => {
-		if (!attempt || !attempt.stringValue || attempt.stringValue === '-') {
+		// Check for empty: no attempt, no stringValue, hyphen, or nbsp
+		if (!attempt || !attempt.stringValue || attempt.stringValue === '-' || attempt.stringValue === NBSP) {
 			return { value: null, status: null };
 		}
 
@@ -1447,6 +1465,12 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		}
 	}
 	
+	// Determine platform state early (needed for session athlete processing)
+	// fopState values: INACTIVE, BREAK, CURRENT_ATHLETE, TIME_STARTED, TIME_STOPPED, DOWN_SIGNAL, DECISION_VISIBLE, etc.
+	// Any fopState other than INACTIVE means we have an active session
+	const platformState = fopUpdate?.fopState || 'INACTIVE';
+	const hasActiveSession = platformState !== 'INACTIVE';
+	
 	// =========================================================================
 	// LAYER 2: Build ALL team athletes (session + database)
 	// Session athletes have live data, database athletes have historical data
@@ -1454,14 +1478,18 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	
 	// Build session athletes map by key (for merging)
 	const sessionAthletesByKey = new Map();
-	sessionAthletes
-		.filter(athlete => !athlete.isSpacer)
-		.forEach(sessionAthlete => {
-			const athleteKey = normalizeKey(sessionAthlete.athleteKey ?? sessionAthlete.key);
-			if (athleteKey) {
-				sessionAthletesByKey.set(athleteKey, sessionAthlete);
-			}
-		});
+	
+	// Only use session athletes if we have an active session
+	if (hasActiveSession) {
+		sessionAthletes
+			.filter(athlete => !athlete.isSpacer)
+			.forEach(sessionAthlete => {
+				const athleteKey = normalizeKey(sessionAthlete.athleteKey ?? sessionAthlete.key);
+				if (athleteKey) {
+					sessionAthletesByKey.set(athleteKey, sessionAthlete);
+				}
+			});
+	}
 	
 	// Process ALL database athletes - use session data if available, else database data
 	const allTeamAthletes = [];
@@ -1521,11 +1549,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		teams.forEach(t => console.log(`[NVF helpers]   Team "${t.teamName}": ${t.athleteCount} athletes, score=${t.teamScore?.toFixed(2)}`));
 	}
 	
-	// Determine platform state and visibility flags
-	// fopState values: INACTIVE, BREAK, CURRENT_ATHLETE, TIME_STARTED, TIME_STOPPED, DOWN_SIGNAL, DECISION_VISIBLE, etc.
-	// Any fopState other than INACTIVE means we have an active session
-	const platformState = fopUpdate?.fopState || 'INACTIVE';
-	const hasActiveSession = platformState !== 'INACTIVE';
+	// Determine if there's a current athlete lifting
 	const hasCurrentAthlete = Boolean(fopUpdate?.fullName && platformState !== 'INACTIVE' && !sessionStatus.isDone);
 	
 	// Use sessionInfo from OWLCMS if available, otherwise build fallback
@@ -1560,6 +1584,15 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		showTimer: hasActiveSession,
 		showLiftType: hasActiveSession
 	};
+
+	// If no active session, clear start numbers for all athletes
+	if (!hasActiveSession) {
+		teams.forEach(team => {
+			team.athletes.forEach(athlete => {
+				athlete.startNumber = '';
+			});
+		});
+	}
 
 	// Extract current attempt - only if there's actually an athlete lifting
 	let currentAttempt = null;
