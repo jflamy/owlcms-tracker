@@ -14,31 +14,26 @@ const _ = competitionHub;
 
 // Show ready banner immediately on module load (server startup)
 console.log('');
-console.log('✅ ═══════════════════════════════════════════════════════');
-console.log('✅ SERVER READY TO RECEIVE OWLCMS MESSAGES');
-console.log('✅ ═══════════════════════════════════════════════════════');
+console.log('═══════════════════════════════════════════════════════');
+console.log('   OWLCMS Competition Tracker - Ready');
+console.log('═══════════════════════════════════════════════════════');
 console.log('');
-console.log('📡 OWLCMS WebSocket: ws://localhost:8096/ws');
+console.log('WebSocket: ws://localhost:8096/ws');
 
 // Get list of supported message types
 const jsonMessageTypes = ['database', 'update', 'timer', 'decision'];
 const binaryMessageTypes = ['flags_zip', 'pictures', 'styles', 'translations_zip'];
 const allMessageTypes = [...jsonMessageTypes, ...binaryMessageTypes];
 
-console.log(`   JSON Messages: ${jsonMessageTypes.join(', ')}`);
-console.log(`   Binary Frames: ${binaryMessageTypes.join(', ')}`);
+console.log(`  JSON Messages: ${jsonMessageTypes.join(', ')}`);
+console.log(`  Binary Frames: ${binaryMessageTypes.join(', ')}`);
 console.log('');
-console.log('🌐 Web interface: http://localhost:8096');
-console.log('');
+console.log('Web interface: http://localhost:8096');
 if (LEARNING_MODE) {
-  console.log('🔬 LEARNING MODE: Capturing all messages to samples/');
-  console.log('');
+  console.log('Learning Mode: Capturing messages to samples/');
 }
 console.log('═══════════════════════════════════════════════════════');
-console.log('');
-
-// Crash detection and monitoring
-console.log('[Monitor] Starting crash detection and health monitoring');
+// Crash detection and monitoring (silent - no startup log)
 
 // Detect unhandled exceptions (crashes)
 process.on('uncaughtException', (error) => {
@@ -101,7 +96,7 @@ let hasShownFirstRequest = false;
 export async function handle({ event, resolve }) {
   if (!hasShownFirstRequest) {
     hasShownFirstRequest = true;
-    console.log('🌐 Web server processing HTTP requests');
+    console.log('[Server] Ready to process HTTP requests');
     console.log('');
   }
 

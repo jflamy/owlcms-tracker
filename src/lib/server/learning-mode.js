@@ -8,7 +8,6 @@ const SAMPLES_DIR = 'samples';
 if (LEARNING_MODE) {
 	try {
 		mkdirSync(SAMPLES_DIR, { recursive: true });
-		console.log('🔬 LEARNING MODE ENABLED - Capturing messages to samples/ directory');
 	} catch (err) {
 		console.error('Failed to create samples directory:', err);
 	}
@@ -121,16 +120,10 @@ export function captureMessage(formData, rawBody, endpoint = '', overrideType = 
 }
 
 /**
- * Log learning mode status on startup
+ * Log learning mode status on startup (deprecated - status now logged in hooks.server.js)
  */
 export function logLearningModeStatus() {
-	if (LEARNING_MODE) {
-		console.log('');
-		console.log('🔬 Learning mode: capturing requests to samples/ (ISO8601 filenames)');
-	} else {
-		console.log('🚀 Production mode - No message capturing');
-		console.log('💡 To enable learning mode: LEARNING_MODE=true npm run dev');
-	}
+	// Logging moved to hooks.server.js to avoid duplicate messages
 }
 
 export { LEARNING_MODE };

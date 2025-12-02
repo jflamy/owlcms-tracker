@@ -7,15 +7,7 @@ import fs from 'fs';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const IS_VITEST = process.env.VITEST === 'true';
 
-// Show startup banner immediately (avoid duplicate learning-mode logs)
-if (!IS_VITEST) {
-	const LEARNING_MODE = process.env.LEARNING_MODE === 'true';
-	console.log('\n═══════════════════════════════════════════════════════');
-	console.log('   OWLCMS Competition Tracker - Starting Up');
-	console.log('═══════════════════════════════════════════════════════');
-	console.log(LEARNING_MODE ? '🔬 Learning mode active' : '🚀 Production mode');
-	console.log('⏳ Initializing server...\n');
-}
+// Startup banner is shown by hooks.server.js instead to avoid duplication
 
 export default defineConfig({
 	plugins: [

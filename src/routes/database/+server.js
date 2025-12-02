@@ -75,7 +75,7 @@ export async function POST({ request }) {
     const result = competitionHub.handleFullCompetitionData(payloadToProcess);
     
     if (result.accepted) {
-      console.log('✅ Full competition data accepted and loaded');
+      console.log('Full competition data accepted and loaded');
       return json({ 
         success: true,
         message: 'Full competition data loaded successfully',
@@ -84,7 +84,7 @@ export async function POST({ request }) {
         learningMode: LEARNING_MODE
       }, { status: 200 });
     } else {
-      console.log('❌ Failed to process full competition data');
+      console.log('Failed to process full competition data');
       return json({
         error: 'processing_error',
         message: result.reason || 'Unable to process full competition data',

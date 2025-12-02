@@ -9,7 +9,7 @@ export async function POST({ request }) {
     // In the future, this could handle styling/configuration files
     
     if (LEARNING_MODE) {
-      console.log('📁 Config upload received in learning mode');
+      console.log('Config upload received in learning mode');
     }
     
     return json({ 

@@ -22,7 +22,7 @@ export async function GET({ params }) {
 		
 		// Security: prevent directory traversal
 		if (filename.includes('..') || filename.includes('/')) {
-			console.log(`[Flag Route] ✗ Security check failed: ${filename}`);
+			console.log(`[Flag Route] Security check failed: ${filename}`);
 			return new Response('Not Found', { status: 404 });
 		}
 
@@ -33,13 +33,13 @@ export async function GET({ params }) {
 		const resolvedPath = path.resolve(filePath);
 		const resolvedDir = path.resolve(flagsDir);
 		if (!resolvedPath.startsWith(resolvedDir)) {
-			console.log(`[Flag Route] ✗ Path traversal blocked: ${resolvedPath}`);
+			console.log(`[Flag Route] Path traversal blocked: ${resolvedPath}`);
 			return new Response('Not Found', { status: 404 });
 		}
 
 		// Check if file exists
 		if (!fs.existsSync(filePath)) {
-			console.log(`[Flag Route] ✗ File not found: ${filePath}`);
+			console.log(`[Flag Route] File not found: ${filePath}`);
 			return new Response('Not Found', { status: 404 });
 		}
 
@@ -50,7 +50,7 @@ export async function GET({ params }) {
 		const ext = path.extname(filename).toLowerCase();
 		const mimeType = MIME_TYPES[ext] || 'application/octet-stream';
 
-		console.log(`[Flag Route] ✓ Serving ${filename} (${fileBuffer.length} bytes, ${mimeType})`);
+		console.log(`[Flag Route] Serving ${filename} (${fileBuffer.length} bytes, ${mimeType})`);
 
 		// Return file with proper headers
 		return new Response(fileBuffer, {

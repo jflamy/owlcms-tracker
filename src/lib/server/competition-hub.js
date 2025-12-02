@@ -57,13 +57,11 @@ class CompetitionHub {
     this.translations = {};
     this.lastTranslationsChecksum = null;  // Track checksum to avoid reprocessing identical translations
     
-    // Log learning mode status on startup
+    // Log learning mode status on startup (logging moved to hooks.server.js)
     logLearningModeStatus();
     
     // Indicate system is ready
-    console.log('🎯 [Hub] Competition Hub initialized and ready to receive OWLCMS messages');
-    console.log('📡 [Hub] Listening for WebSocket connections at /ws');
-    console.log('🌐 [Hub] Browser clients can connect to SSE /api/client-stream');
+    console.log('[Hub] Competition Hub initialized');
   }
 
   /**
@@ -2080,10 +2078,19 @@ class CompetitionHub {
 // Use globalThis to persist across HMR (Vite hot reload)
 if (!globalThis.__competitionHub) {
   globalThis.__competitionHub = new CompetitionHub();
-  console.log('[Hub] Creating new CompetitionHub instance');
+  // Only log on actual HMR reloads (when Vite is already running)
+  if (globalThis.__viteReady) {
+    console.log('[Hub] Reusing existing CompetitionHub instance (HMR)');
+  }
 } else {
-  console.log('[Hub] Reusing existing CompetitionHub instance (HMR)');
+  // On first startup, don't log reuse since it's a fresh instance
+  if (globalThis.__viteReady) {
+    console.log('[Hub] Reusing existing CompetitionHub instance (HMR)');
+  }
 }
+
+// Mark Vite as ready after first startup
+globalThis.__viteReady = true;
 
 export const competitionHub = globalThis.__competitionHub;
 if (!competitionHub.hasConfirmedFops) {

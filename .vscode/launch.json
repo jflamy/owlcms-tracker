@@ -8,8 +8,7 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "env": {
-        "NODE_ENV": "development",
-        "NODE_OPTIONS": "--max-old-space-size=1024"
+        "NODE_ENV": "development"
       },
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
@@ -25,8 +24,7 @@
       "runtimeArgs": ["run", "dev:learning"],
       "env": {
         "NODE_ENV": "development",
-        "LEARNING_MODE": "true",
-        "NODE_OPTIONS": "--max-old-space-size=1024"
+        "LEARNING_MODE": "true"
       },
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
