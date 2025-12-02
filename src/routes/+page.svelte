@@ -881,12 +881,6 @@
     border-color: #667eea;
     transform: scale(1.05);
   }
-
-  .options-btn.disabled {
-    pointer-events: none;
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
   
   /* Modal Styles */
   .modal-overlay {

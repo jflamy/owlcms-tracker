@@ -94,7 +94,7 @@ export function shouldRenderFlag(url) {
 </script>
 
 <svelte:head>
-	<title>{data.scoreboardName || 'NVF Lagkonkurranse'} - {data.competition?.name || 'OWLCMS'}</title>
+	<title>{data.scoreboardName || 'Team Competition'} - {data.competition?.name || 'OWLCMS'}</title>
 </svelte:head>
 
 <div class="scoreboard">
@@ -127,6 +127,9 @@ export function shouldRenderFlag(url) {
 	<main class="main">
 		{#if data.status === 'waiting'}
 			<div class="waiting"><p>{data.headers?.waitingForData || data.message || 'Waiting for competition data...'}</p></div>
+		{:else if data.hideHeaders}
+			<!-- Minimal UI: show only the attempt bar (rendered above main), hide table headers -->
+			<div class="waiting-for-session"></div>
 		{:else}
 			<div class="scoreboard-grid" class:compact-team-column={data.compactTeamColumn} class:hide-predicted={!showPredicted} role="grid" tabindex="0">
 				<div class="grid-row header header-primary" role="row" tabindex="0" on:contextmenu={openGenderMenu} on:click|preventDefault|stopPropagation={openGenderMenu} on:keydown={handleSessionKeydown}>
@@ -643,7 +646,7 @@ export function shouldRenderFlag(url) {
 	}
 
 	/* Context menu for gender selection (right-click on header) */
-	.nvf-context-menu {
+	.team-context-menu {
 		background: #111;
 		border: 1px solid #444;
 		padding: 0.25rem;

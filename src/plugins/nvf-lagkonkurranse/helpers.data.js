@@ -1,5 +1,5 @@
 /**
- * Server-side scoreboard helpers for NVF Lagkonkurranse
+ * Server-side scoreboard helpers for team-based scoreboards
  * 
  * ARCHITECTURE: Layered data processing
  * 
@@ -28,7 +28,7 @@ import { buildCacheKey } from '$lib/server/cache-utils.js';
 /**
  * Plugin-specific cache to avoid recomputing team data on every browser request
  */
-const nvfScoreboardCache = new Map();
+const teamScoreboardCache = new Map();
 
 /**
  * Track last known session gender per FOP
@@ -949,7 +949,7 @@ function findTopContributors(athletes, gender, scoreFn, topCounts = {}) {
  */
 function groupByTeams(teamAthletes, gender, headers, topCounts = {}, includeAllAthletes = false) {
 	const { topM = 4, topF = 4, topMFm = 2, topMFf = 2 } = topCounts;
-	console.log(`[NVF groupByTeams] Input: ${teamAthletes.length} athletes, gender filter: ${gender}, topCounts: M=${topM}, F=${topF}, MFm=${topMFm}, MFf=${topMFf}, includeAll=${includeAllAthletes}`);
+	console.log(`[Team groupByTeams] Input: ${teamAthletes.length} athletes, gender filter: ${gender}, topCounts: M=${topM}, F=${topF}, MFm=${topMFm}, MFf=${topMFf}, includeAll=${includeAllAthletes}`);
 	
 	// Filter athletes with no team
 	const athletesWithTeams = teamAthletes.filter(a => {
@@ -957,14 +957,14 @@ function groupByTeams(teamAthletes, gender, headers, topCounts = {}, includeAllA
 		return teamName.length > 0;
 	});
 	
-	console.log(`[NVF groupByTeams] After team filter: ${athletesWithTeams.length} athletes with teams`);
+	console.log(`[Team groupByTeams] After team filter: ${athletesWithTeams.length} athletes with teams`);
 	
 	// Filter by gender if not mixed
 	const filteredAthletes = gender !== 'MF' 
 		? athletesWithTeams.filter(a => normalizeGender(a.gender) === gender)
 		: athletesWithTeams;
 	
-	console.log(`[NVF groupByTeams] After gender filter: ${filteredAthletes.length} athletes`);
+	console.log(`[Team groupByTeams] After gender filter: ${filteredAthletes.length} athletes`);
 	
 	// Group by team
 	const teamMap = new Map();
@@ -1094,7 +1094,7 @@ function groupByTeams(teamAthletes, gender, headers, topCounts = {}, includeAllA
  * { type: 'athlete'|'break', state: 'running'|'set'|'stopped', isActive, visible, timeRemaining, duration, startTime, displayText }
  * 
  * @param {Object} fopUpdate - The FOP update object from competition hub
- * @param {string} language - Language code for break text (e.g., 'no' for Norwegian)
+ * @param {string} language - Language code for break text (e.g., 'nb' for Norwegian Bokmål)
  * @returns {Object} { timer, breakTimer }
  */
 function extractTimers(fopUpdate, language = 'en') {
@@ -1260,7 +1260,7 @@ function extractDecisionState(fopUpdate) {
 /**
  * Get formatted scoreboard data for SSR/API (SERVER-SIDE ONLY)
  * 
- * For NVF team scoreboard:
+ * For team-based scoreboards:
  * - Uses session athletes from hub (already flattened, OWLCMS-computed values)
  * - Wraps each athlete with enrichment (sinclair, predictions)
  * - Groups by team and computes team scores
@@ -1319,15 +1319,19 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		lastKnownGenderByFop.set(fopName, helperDetectedGender);
 	}
 	
-	// Get the last known gender for this FOP, defaulting to 'M' if never set
-	const lastKnownGender = lastKnownGenderByFop.get(fopName) || 'M';
+	// Get the last known gender for this FOP (may be undefined if never set)
+	const lastKnownGender = lastKnownGenderByFop.get(fopName);
 	
-	console.log(`[NVF helpers] Detected session athlete: "${helperDetectedAthlete?.fullName || 'none'}" gender: ${helperDetectedGender}, lastKnown: ${lastKnownGender}`);
+	console.log(`[Team helpers] Detected session athlete: "${helperDetectedAthlete?.fullName || 'none'}" gender: ${helperDetectedGender}, lastKnown: ${lastKnownGender || 'none'}`);
+
+	// Track if we're in "current" mode with no gender history
+	// This is used to show just the attempt bar when no session has run yet
+	let noGenderHistory = false;
 
 	// Resolve gender option
 	// - Explicit URL parameter (M, F, MF) takes precedence
-	// - 'current' uses detected gender from session, or last known, or 'M'
-	// - No option: use detected gender from session, or last known, or 'M'
+	// - 'current' uses detected gender from session, or last known, or shows minimal UI
+	// - No option: use detected gender from session, or last known, or shows minimal UI
 	let gender = 'M';
 	
 	if (options.gender === true) {
@@ -1336,21 +1340,33 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	} else if (typeof options.gender === 'string') {
 		const genderOption = String(options.gender).trim().toUpperCase();
 		if (genderOption === 'CURRENT') {
-			// Use detected gender, fall back to last known, then 'M'
-			gender = (helperDetectedGender && helperDetectedGender !== 'unknown') 
-				? helperDetectedGender 
-				: lastKnownGender;
+			// Use detected gender, fall back to last known
+			if (helperDetectedGender && helperDetectedGender !== 'unknown') {
+				gender = helperDetectedGender;
+			} else if (lastKnownGender) {
+				gender = lastKnownGender;
+			} else {
+				// No session active and no previous session - show minimal UI
+				noGenderHistory = true;
+				gender = 'M'; // Default for any data we might show
+			}
 		} else if (genderOption === 'MF' || genderOption === 'M' || genderOption === 'F') {
 			gender = genderOption === 'MF' ? 'MF' : normalizeGender(genderOption);
 		} else {
 			// Unknown option - treat as single gender or default
-			gender = normalizeGender(options.gender) || lastKnownGender;
+			gender = normalizeGender(options.gender) || lastKnownGender || 'M';
 		}
 	} else {
-		// No explicit option: use detected gender, fall back to last known, then 'M'
-		gender = (helperDetectedGender && helperDetectedGender !== 'unknown') 
-			? helperDetectedGender 
-			: lastKnownGender;
+		// No explicit option: use detected gender, fall back to last known
+		if (helperDetectedGender && helperDetectedGender !== 'unknown') {
+			gender = helperDetectedGender;
+		} else if (lastKnownGender) {
+			gender = lastKnownGender;
+		} else {
+			// No session active and no previous session - show minimal UI
+			noGenderHistory = true;
+			gender = 'M'; // Default for any data we might show
+		}
 	}
 
 	// Determine if we're actually in mixed-gender mode (explicit MF request)
@@ -1404,21 +1420,61 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		};
 	}
 	
-	// If gender='current' but no session is active, default to 'M' (show all)
-	// This allows displaying teams from database even before a session starts
-	if (gender === 'MF' && helperDetectedGender === 'unknown' && databaseState?.athletes?.length > 0) {
+	// If gender=Current (or no explicit gender) and no session history exists,
+	// return minimal UI showing just the attempt bar without team data
+	// This avoids showing arbitrary gender data before any session has started
+	if (noGenderHistory && helperDetectedGender === 'unknown') {
+		console.log(`[Team helpers] No gender history and no active session - showing minimal UI`);
+		const { timer, breakTimer } = extractTimers(fopUpdate, language);
+		const decision = extractDecisionState(fopUpdate);
+		const { displayMode, displayClass, activeTimer } = computeDisplayMode(timer, breakTimer, decision);
+		
+		// Build platform label for session info
+		const platformLabel = translations.Platform || 'Platform';
+		const platformSessionInfo = `${platformLabel} ${fopName}`;
+		
+		return {
+			competition: { 
+				name: databaseState?.competition?.competitionName || fopUpdate?.competitionName || 'Competition', 
+				fop: fopName,
+				sessionInfo: platformSessionInfo,
+				showWeight: false,
+				showTimer: true,
+				showLiftType: false
+			},
+			currentAthlete: null,
+			timer: activeTimer,
+			breakTimer,
+			decision,
+			displayMode,
+			displayClass,
+			sessionStatus: { isDone: false, sessionName: platformSessionInfo, lastActivity: 0 },
+			teams: [],
+			headers,
+			hideHeaders: true,  // Signal to hide table headers when no data
+			status: 'waiting_for_session',
+			message: headers.noAthleteLifting || 'No athlete currently lifting',
+			gender,
+			learningMode
+		};
+	}
+	
+	// If gender was auto-detected (not explicitly set via URL) and no session is active,
+	// default to 'M' to show men from database. Do NOT override explicit MF request.
+	// isExplicitMixedMode is true when user explicitly set gender=MF in URL
+	if (gender === 'MF' && !isExplicitMixedMode && helperDetectedGender === 'unknown' && databaseState?.athletes?.length > 0) {
 		gender = 'M';
-		console.log(`[NVF helpers] No active session, defaulting to M (show men from database)`);
+		console.log(`[Team helpers] No active session, defaulting to M (show men from database)`);
 	}
 
 	// Check cache - include hub FOP version and resolved gender in cache key
 	// Use shared buildCacheKey; include gender + options to differentiate views.
 	const cacheKey = buildCacheKey({ fopName, includeFop: true, opts: { gender, ...options } });
-	console.log(`[NVF helpers] Cache check: key=${String(cacheKey).substring(0, 120)}..., gender=${gender}`);
+	console.log(`[Team helpers] Cache check: key=${String(cacheKey).substring(0, 120)}..., gender=${gender}`);
 	
-	if (nvfScoreboardCache.has(cacheKey)) {
-		const cached = nvfScoreboardCache.get(cacheKey);
-		console.log(`[NVF helpers] Cache HIT - returning cached data with ${cached.teams?.length || 0} teams`);
+	if (teamScoreboardCache.has(cacheKey)) {
+		const cached = teamScoreboardCache.get(cacheKey);
+		console.log(`[Team helpers] Cache HIT - returning cached data with ${cached.teams?.length || 0} teams`);
 		let sessionStatusMessage = null;
 		if (sessionStatus.isDone && fopUpdate?.fullName) {
 			sessionStatusMessage = (fopUpdate.fullName || '').replace(/&ndash;/g, '–').replace(/&mdash;/g, '—');
@@ -1442,7 +1498,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		};
 	}
 	
-	console.log(`[NVF helpers] Cache MISS - computing data for gender=${gender}`);
+	console.log(`[Team helpers] Cache MISS - computing data for gender=${gender}`);
 
 	// Determine current lift type
 	const liftTypeKey = fopUpdate?.liftTypeKey || 'Snatch';
@@ -1494,13 +1550,13 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// Process ALL database athletes - use session data if available, else database data
 	const allTeamAthletes = [];
 	
-	console.log(`[NVF helpers] Database has ${databaseState?.athletes?.length || 0} athletes, session has ${sessionAthletesByKey.size} athletes`);
+	console.log(`[Team helpers] Database has ${databaseState?.athletes?.length || 0} athletes, session has ${sessionAthletesByKey.size} athletes`);
 	
 	if (databaseState?.athletes && Array.isArray(databaseState.athletes)) {
 		for (const dbAthlete of databaseState.athletes) {
 			const athleteKey = normalizeKey(dbAthlete.key);
 			if (!athleteKey) {
-				console.log(`[NVF helpers] Skipping athlete with no key:`, dbAthlete?.lastName);
+				console.log(`[Team helpers] Skipping athlete with no key:`, dbAthlete?.lastName);
 				continue;
 			}
 			
@@ -1525,13 +1581,13 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 				if (wrapped) {
 					allTeamAthletes.push(wrapped);
 				} else {
-					console.log(`[NVF helpers] teamAthleteFromDatabase returned null for:`, dbAthlete?.lastName);
+					console.log(`[Team helpers] teamAthleteFromDatabase returned null for:`, dbAthlete?.lastName);
 				}
 			}
 		}
 	}
 	
-	console.log(`[NVF helpers] Built ${allTeamAthletes.length} team athletes from database`);
+	console.log(`[Team helpers] Built ${allTeamAthletes.length} team athletes from database`);
 	
 	// Add flag URLs
 	const athletesWithFlags = allTeamAthletes.map(athlete => ({
@@ -1544,9 +1600,9 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// =========================================================================
 	const teams = groupByTeams(athletesWithFlags, gender, headers, topCounts, includeAllAthletes);
 	
-	console.log(`[NVF helpers] Grouped ${allTeamAthletes.length} athletes into ${teams.length} teams (gender=${gender})`);
+	console.log(`[Team helpers] Grouped ${allTeamAthletes.length} athletes into ${teams.length} teams (gender=${gender})`);
 	if (teams.length > 0) {
-		teams.forEach(t => console.log(`[NVF helpers]   Team "${t.teamName}": ${t.athleteCount} athletes, score=${t.teamScore?.toFixed(2)}`));
+		teams.forEach(t => console.log(`[Team helpers]   Team "${t.teamName}": ${t.athleteCount} athletes, score=${t.teamScore?.toFixed(2)}`));
 	}
 	
 	// Determine if there's a current athlete lifting
@@ -1673,7 +1729,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	};
 	
 	// Cache result (excluding frequently changing fields)
-	nvfScoreboardCache.set(cacheKey, {
+	teamScoreboardCache.set(cacheKey, {
 		competition: result.competition,
 		currentAttempt: result.currentAttempt,
 		detectedAthlete: result.detectedAthlete,
@@ -1689,12 +1745,12 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		options: responseOptions
 	});
 	
-	console.log(`[NVF] Cache now has ${nvfScoreboardCache.size} entries`);
+	console.log(`[Team] Cache now has ${teamScoreboardCache.size} entries`);
     
 	// Cleanup old cache entries (keep last 3)
-	if (nvfScoreboardCache.size > 3) {
-		const firstKey = nvfScoreboardCache.keys().next().value;
-		nvfScoreboardCache.delete(firstKey);
+	if (teamScoreboardCache.size > 3) {
+		const firstKey = teamScoreboardCache.keys().next().value;
+		teamScoreboardCache.delete(firstKey);
 	}
 
 	return {

@@ -1,6 +1,5 @@
 <script>
 	import { createTimer } from '$lib/timer-logic.js';
-	import { translations } from '$lib/stores.js';
 	import { onMount, onDestroy } from 'svelte';
 	import CurrentAttemptBar from '$lib/components/CurrentAttemptBar.svelte';
 
@@ -16,11 +15,8 @@
 		timerState = state;
 	});
 
-	// Current translations object (populated from store)
-	let t = {};
-	const unsubscribeTranslations = translations.subscribe(trans => {
-		t = trans.en || {};
-	});
+	// Language is handled server-side via data.headers
+	// No client-side translation needed
 
 	onMount(() => {
 		timer.start(data.timer);
@@ -29,11 +25,11 @@
 	onDestroy(() => {
 		timer.stop();
 		unsubscribe();
-		unsubscribeTranslations();
 	});
 
 	$: currentAttempt = data.currentAttempt;
 	$: teams = data.teams || [];
+	$: showPredicted = data.options?.showPredicted ?? true;
 
 	// Sync timer with server when data changes
 	$: if (data.timer) {
@@ -47,8 +43,22 @@
 	}
 
 	function displayAttempt(attempt) {
-		if (!attempt || !attempt.stringValue || attempt.stringValue === '') return '-';
-		return attempt.stringValue.replace(/[()]/g, '');
+		if (!attempt) return '\u00A0';
+		
+		let val = attempt.stringValue;
+		// Treat '0' as '-'
+		if (val === '0') val = '-';
+		
+		if (!val || val === '') return '\u00A0';
+		
+		// If value is '-', only show it if it's a failed lift (bad)
+		if (val === '-') {
+			if (attempt.liftStatus === 'bad') return '-';
+			return '\u00A0';
+		}
+
+		if (attempt.liftStatus === 'empty') return '\u00A0';
+		return val.replace(/[()]/g, '');
 	}
 
 	function parseFormattedNumber(value) {
@@ -63,6 +73,15 @@
 		const num = parseFormattedNumber(value);
 		return num > 0 ? num.toFixed(2) : '-';
 	}
+
+	// Format score for display - uses precomputed isDefinitiveZero flag from backend
+	function formatScoreDisplay(value, isDefinitiveZero = false) {
+		const num = parseFormattedNumber(value);
+		if (num > 0) return num.toFixed(2);
+		if (isDefinitiveZero && num === 0) return '0.00';
+		return '-';
+	}
+
 </script>
 
 <script context="module">
@@ -75,58 +94,79 @@ export function shouldRenderFlag(url) {
 </script>
 
 <svelte:head>
-	<title>{data.scoreboardName || 'Team Scoreboard'} - {data.competition?.name || 'OWLCMS'}</title>
+	<title>{data.scoreboardName || 'Team Competition'} - {data.competition?.name || 'OWLCMS'}</title>
 </svelte:head>
 
 <div class="scoreboard">
-	{#if data.status !== 'waiting'}
-		<CurrentAttemptBar 
-			currentAttempt={data.currentAttempt}
-			timerState={timerState}
-			decisionState={{}}
-			scoreboardName={data.scoreboardName}
-			sessionStatus={data.sessionStatus}
-			competition={data.competition}
-			showDecisionLights={false}
-			showTimer={true}
-			compactMode={true}
-		/>
+	{#if data.status !== 'waiting' && !data.sessionStatus?.isDone}
+		<div class="session-header-wrapper" role="button" aria-label="Open gender menu" tabindex="0">
+			<CurrentAttemptBar 
+				currentAttempt={data.currentAttempt}
+				timerData={data.timer}
+				breakTimerData={data.breakTimer}
+				displayMode={data.displayMode || 'none'}
+				decisionState={data.decision}
+				scoreboardName={data.scoreboardName}
+				sessionStatus={data.sessionStatus}
+				competition={data.competition}
+				showDecisionLights={true}
+				showTimer={true}
+				compactMode={true}
+				showLifterInfo={data.options?.currentAttemptInfo ?? true}
+				translations={{
+					session: data.headers?.session || 'Session',
+					snatch: data.headers?.snatch || 'Snatch',
+					noAthleteLifting: data.headers?.noAthleteLifting || 'No athlete currently lifting'
+				}}
+			/>
+		</div>
 	{/if}
+
+	<!-- Context menu disabled for DOM inspection -->
 
 	<main class="main">
 		{#if data.status === 'waiting'}
-			<div class="waiting"><p>{data.message || 'Waiting for competition data...'}</p></div>
+			<div class="waiting"><p>{data.headers?.waitingForData || data.message || 'Waiting for competition data...'}</p></div>
+		{:else if data.hideHeaders}
+			<!-- Minimal UI: show only the attempt bar (rendered above main), hide table headers -->
+			<div class="waiting-for-session"></div>
 		{:else}
-			<div class="scoreboard-grid" class:compact-team-column={data.compactTeamColumn} role="grid">
-				<div class="grid-row header header-primary" role="row">
-					<div class="cell header col-start span-two" role="columnheader">{t.Start || 'Start'}</div>
-					<div class="cell header col-name span-two" role="columnheader">{t.Name || 'Name'}</div>
-					<div class="cell header col-cat span-two" role="columnheader">{t.Category || 'Cat.'}</div>
-					<div class="cell header col-born span-two" role="columnheader">{t.Birth || 'Born'}</div>
-					<div class="cell header col-team span-two" role="columnheader">{t.Team || 'Team'}</div>
+			<div class="scoreboard-grid" class:compact-team-column={data.compactTeamColumn} class:hide-predicted={!showPredicted} role="grid" tabindex="0">
+				<div class="grid-row header header-primary" role="row" tabindex="0" on:contextmenu={openGenderMenu} on:click|preventDefault|stopPropagation={openGenderMenu} on:keydown={handleSessionKeydown}>
+					<div class="cell header col-start span-two" role="columnheader">{data.headers?.order || 'Order'}</div>
+					<div class="cell header col-name span-two" role="columnheader">{data.headers?.name || 'Name'}</div>
+					<div class="cell header col-cat span-two" role="columnheader">{data.headers?.category || 'Cat.'}</div>
+					<div class="cell header col-born span-two" role="columnheader">{data.headers?.birth || 'Born'}</div>
+					<div class="cell header col-team span-two" role="columnheader">{data.headers?.team || 'Team'}</div>
 					<div class="cell header v-spacer v-spacer-snatch span-two" aria-hidden="true"></div>
-					<div class="cell header col-group col-group-snatch" role="columnheader">{t.Snatch || 'Snatch'}</div>
+					<div class="cell header col-group col-group-snatch" role="columnheader">{data.headers?.snatch || 'Snatch'}</div>
 					<div class="cell header v-spacer v-spacer-middle span-two" aria-hidden="true"></div>
-					<div class="cell header col-group col-group-cj" role="columnheader">{t.Clean_and_Jerk || 'Clean &amp; Jerk'}</div>
+					<div class="cell header col-group col-group-cj" role="columnheader">{data.headers?.cleanJerk || 'Clean & Jerk'}</div>
 					<div class="cell header v-spacer v-spacer-total span-two" aria-hidden="true"></div>
-					<div class="cell header col-total span-two" role="columnheader">{t.TOTAL || 'Total'}</div>
-					<div class="cell header col-score span-two" role="columnheader">{t.Score || 'Score'}</div>
+					<div class="cell header col-total span-two" role="columnheader">{data.headers?.total || 'Total'}</div>
+					<div class="cell header col-score span-two" role="columnheader">{data.headers?.score || 'Score'}</div>
+					<div class="cell header v-spacer v-spacer-next span-two" aria-hidden="true"></div>
+					<div class="cell header col-next-total span-two" role="columnheader">{data.headers?.totalNextS || 'Total Next S'}</div>
+					<div class="cell header col-next-score span-two" role="columnheader">{data.headers?.scoreNextS || 'Score Next S'}</div>
 				</div>
-				<div class="grid-row header header-secondary" role="row">
-					<div class="cell header col-name-portrait" role="columnheader">{t.Name || 'Name'}</div>
+				<div class="grid-row header header-secondary" role="row" tabindex="0" on:contextmenu={openGenderMenu} on:click|preventDefault|stopPropagation={openGenderMenu} on:keydown={handleSessionKeydown}>
+					<div class="cell header col-name-portrait" role="columnheader">{data.headers?.name || 'Name'}</div>
 					<div class="cell header v-spacer v-spacer-snatch" aria-hidden="true"></div>
 					<div class="cell header col-attempt snatch-1" role="columnheader">1</div>
 					<div class="cell header col-attempt snatch-2" role="columnheader">2</div>
 					<div class="cell header col-attempt snatch-3" role="columnheader">3</div>
-					<div class="cell header col-best snatch-best" role="columnheader">{t.Best || '✔'}</div>
+					<div class="cell header col-best snatch-best" role="columnheader">{data.headers?.best || '✔'}</div>
 					<div class="cell header v-spacer v-spacer-middle" aria-hidden="true"></div>
 					<div class="cell header col-attempt cj-1" role="columnheader">1</div>
 					<div class="cell header col-attempt cj-2" role="columnheader">2</div>
 					<div class="cell header col-attempt cj-3" role="columnheader">3</div>
-					<div class="cell header col-best cj-best" role="columnheader">{t.Best || '✔'}</div>
+					<div class="cell header col-best cj-best" role="columnheader">{data.headers?.best || '✔'}</div>
 					<div class="cell header v-spacer v-spacer-total" aria-hidden="true"></div>
-					<div class="cell header col-total-portrait" role="columnheader">{t.TOTAL || 'Total'}</div>
-					<div class="cell header col-score-portrait" role="columnheader">{t.Score || 'Score'}</div>
+					<div class="cell header col-total-portrait" role="columnheader">{data.headers?.total || 'Total'}</div>
+					<div class="cell header col-score-portrait" role="columnheader">{data.headers?.score || 'Score'}</div>
+					<div class="cell header v-spacer v-spacer-next" aria-hidden="true"></div>
+					<div class="cell header col-next-total-portrait" role="columnheader">{data.headers?.totalNextS || 'NEXT S'}</div>
+					<div class="cell header col-next-score-portrait" role="columnheader">{data.headers?.scoreNextS || 'NEXT S'}</div>
 				</div>
 
 				{#if teams.length > 0}
@@ -135,44 +175,50 @@ export function shouldRenderFlag(url) {
 					</div>
 				{/if}
 
-				{#each teams as team}
-					<div class="grid-row team-header" role="row">
-						<div class="cell team-name-header" role="gridcell">
-							{#if shouldRenderFlag(team.flagUrl)}
-								<img src={team.flagUrl} alt={team.teamName} class="team-flag" />
-							{/if}
-							{team.teamName}
-						</div>
-						<div class="cell team-stats" role="gridcell">{team.athleteCount} athletes</div>
-						<div class="cell team-score" role="gridcell">{formatScore(team.teamScore)}</div>
-					</div>
 
-					{#each team.athletes as athlete}
-						<div
+			{#each teams as team}
+				<div class="grid-row team-header" role="row">
+					<div class="cell team-name-header" role="gridcell">
+						{#if shouldRenderFlag(team.flagUrl)}
+							<img src={team.flagUrl} alt={team.teamName} class="team-flag" />
+						{/if}
+						<span class="team-name-text">{team.teamName}</span>
+					</div>
+					<div class="cell team-stats" role="gridcell">{team.totalLabel}</div>
+					<div class="cell team-score" role="gridcell">{formatScore(team.teamScore)}</div>
+					<div class="cell team-gap" aria-hidden="true"></div>
+					<div class="cell team-next-total" role="gridcell">&nbsp;</div>
+					<div class="cell team-next-score" role="gridcell">{formatScore(team.teamNextScore)}</div>
+				</div>
+				{#each team.athletes as athlete}
+							<div
 							class="grid-row data-row team-athlete"
 							class:current={athlete.classname && athlete.classname.includes('current')}
 							class:next={athlete.classname && athlete.classname.includes('next')}
 							role="row"
 						>
-							<div class="cell start-num" role="gridcell">{athlete.startNumber}</div>
+							<div class="cell start-num" role="gridcell">{athlete.inCurrentSession ? (athlete.liftingOrder ?? '') : ''}</div>
 							<div class="cell name" role="gridcell">{athlete.fullName}</div>
 							<div class="cell cat" role="gridcell">{athlete.category || ''}</div>
 							<div class="cell born" role="gridcell">{athlete.yearOfBirth || ''}</div>
 							<div class="cell team-name" role="gridcell">{athlete.teamName || ''}</div>
 							<div class="cell v-spacer" aria-hidden="true"></div>
-							<div class="cell attempt {getAttemptClass(athlete.sattempts?.[0])}" role="gridcell">{displayAttempt(athlete.sattempts?.[0])}</div>
-							<div class="cell attempt {getAttemptClass(athlete.sattempts?.[1])}" role="gridcell">{displayAttempt(athlete.sattempts?.[1])}</div>
-							<div class="cell attempt {getAttemptClass(athlete.sattempts?.[2])}" role="gridcell">{displayAttempt(athlete.sattempts?.[2])}</div>
+							<div class="cell attempt {getAttemptClass(athlete.sattempts?.[0])}" role="gridcell"><span class="attempt-value">{displayAttempt(athlete.sattempts?.[0])}</span></div>
+							<div class="cell attempt {getAttemptClass(athlete.sattempts?.[1])}" role="gridcell"><span class="attempt-value">{displayAttempt(athlete.sattempts?.[1])}</span></div>
+							<div class="cell attempt {getAttemptClass(athlete.sattempts?.[2])}" role="gridcell"><span class="attempt-value">{displayAttempt(athlete.sattempts?.[2])}</span></div>
 							<div class="cell best" role="gridcell">{athlete.bestSnatch || '-'}</div>
 							<div class="cell v-spacer" aria-hidden="true"></div>
-							<div class="cell attempt {getAttemptClass(athlete.cattempts?.[0])}" role="gridcell">{displayAttempt(athlete.cattempts?.[0])}</div>
-							<div class="cell attempt {getAttemptClass(athlete.cattempts?.[1])}" role="gridcell">{displayAttempt(athlete.cattempts?.[1])}</div>
-							<div class="cell attempt {getAttemptClass(athlete.cattempts?.[2])}" role="gridcell">{displayAttempt(athlete.cattempts?.[2])}</div>
+							<div class="cell attempt {getAttemptClass(athlete.cattempts?.[0])}" role="gridcell"><span class="attempt-value">{displayAttempt(athlete.cattempts?.[0])}</span></div>
+							<div class="cell attempt {getAttemptClass(athlete.cattempts?.[1])}" role="gridcell"><span class="attempt-value">{displayAttempt(athlete.cattempts?.[1])}</span></div>
+							<div class="cell attempt {getAttemptClass(athlete.cattempts?.[2])}" role="gridcell"><span class="attempt-value">{displayAttempt(athlete.cattempts?.[2])}</span></div>
 							<div class="cell best" role="gridcell">{athlete.bestCleanJerk || '-'}</div>
-							<div class="cell v-spacer" aria-hidden="true"></div>
-							<div class="cell total" role="gridcell">{athlete.total || '-'}</div>
-							<div class="cell score" role="gridcell">{formatScore(athlete.globalScore || athlete.sinclair)}</div>
-						</div>
+						<div class="cell v-spacer" aria-hidden="true"></div>
+						<div class="cell total" role="gridcell">{athlete.displayTotal ?? '-'}</div>
+						<div class="cell score {athlete.scoreHighlightClass || ''}" role="gridcell">{athlete.displayScore}</div>
+					<div class="cell v-spacer" aria-hidden="true"></div>
+					<div class="cell next-total" role="gridcell">{athlete.nextTotal ? athlete.nextTotal : '-'}</div>
+					<div class="cell next-score {athlete.nextScoreHighlightClass || ''}" role="gridcell">{athlete.displayNextScore}</div>
+					</div>
 					{/each}
 
 					<div class="grid-row team-spacer" aria-hidden="true">
@@ -221,14 +267,16 @@ export function shouldRenderFlag(url) {
 		--col-name: minmax(14rem, 2.5fr);
 		--col-cat: 14ch;
 		--col-born: 14ch;
-		--col-team-min: 8rem;
-		--col-team-max: 1.8fr;
-		--col-team: minmax(var(--col-team-min), var(--col-team-max));
+		--col-team-min: 0;
+		--col-team-max: 0;
+		--col-team: 0;
 		--col-gap: var(--grid-gap-size);
 		--col-attempt: 4.4rem;
 		--col-best: 4.4rem;
 		--col-total: 4.9rem;
 		--col-score: 12ch;
+		--col-next-total: 5.9rem;
+		--col-next-score: 12ch;
 		/* Header row heights: calculated to match session-results */
 		--header-primary-vpad: 0.2rem; /* vertical padding for primary header cells */
 		--header-primary-height: calc(1rem + (var(--header-primary-vpad) * 2));
@@ -251,17 +299,43 @@ export function shouldRenderFlag(url) {
 			var(--col-best)
 			var(--col-gap)
 			var(--col-total)
-			var(--col-score);
+			var(--col-score)
+			var(--col-gap)
+			var(--col-next-total)
+			var(--col-next-score);
 		grid-template-rows: var(--header-primary-height) var(--header-secondary-height) var(--template-rows);
 		row-gap: 0;
-		font-size: 1.1rem;
+		font-size: 1.2rem;
 		line-height: 1;
 	}
 
 	.scoreboard-grid.compact-team-column {
-		--col-team-min: 5rem;
-		--col-team-max: 5rem;
-		--col-team: 5rem;
+		--col-team-min: 0;
+		--col-team-max: 0;
+		--col-team: 0;
+	}
+
+	/* Hide predicted total columns when showPredicted is false */
+	.scoreboard-grid.hide-predicted {
+		--col-next-total: 0;
+		--col-next-score: 0;
+	}
+
+	.scoreboard-grid.hide-predicted .v-spacer-next,
+	.scoreboard-grid.hide-predicted .col-next-total,
+	.scoreboard-grid.hide-predicted .col-next-score,
+	.scoreboard-grid.hide-predicted .col-next-total-portrait,
+	.scoreboard-grid.hide-predicted .col-next-score-portrait,
+	.scoreboard-grid.hide-predicted .next-total,
+	.scoreboard-grid.hide-predicted .next-score,
+	.scoreboard-grid.hide-predicted .team-gap,
+	.scoreboard-grid.hide-predicted .team-next-total,
+	.scoreboard-grid.hide-predicted .team-next-score {
+		visibility: hidden;
+		width: 0;
+		padding: 0;
+		border: none;
+		overflow: hidden;
 	}
 
 	.grid-row { display: contents; }
@@ -304,6 +378,13 @@ export function shouldRenderFlag(url) {
 	.col-group { justify-content: center; font-size: 1.1rem; }
 	.span-two { align-self: stretch; }
 
+	/* Center Next S column headers */
+	.header-primary .col-next-total,
+	.header-primary .col-next-score {
+		justify-content: center;
+		text-align: center;
+	}
+
 	.cell.v-spacer { background: #000; border: none; padding: 0; }
 	.cell.span-all { grid-column: 1 / -1; }
 
@@ -316,16 +397,19 @@ export function shouldRenderFlag(url) {
 
 	.cell.cat { justify-content: center; padding: 0; text-align: center; white-space: nowrap; }
 	.cell.start-num { font-weight: bold; color: #fbbf24; }
+	.cell.col-team { visibility: hidden; width: 0; padding: 0; border: none; }
 
 	.cell.best,
 	.cell.total,
-	.cell.score { background: #2a2a2a; font-weight: bold; color: #fff; }
+	.cell.score,
+	.cell.next-total,
+	.cell.next-score { font-weight: bold; color: #fff; }
 
 	.grid-row.current > .start-num,
-	.grid-row.current > .name { background: #1a1a1a !important; color: #fbbf24 !important; font-weight: bold; }
+	.grid-row.current > .name { color: #4ade80 !important; font-weight: bold; }
 
 	.grid-row.next > .start-num,
-	.grid-row.next > .name { background: #1a1a1a !important; color: #f97316 !important; font-weight: bold; }
+	.grid-row.next > .name { color: #f97316 !important; font-weight: bold; }
 
 	.attempt { font-weight: bold; white-space: nowrap; padding: 0 0.35rem; }
 	.header-secondary .col-attempt { white-space: nowrap; padding: 0 0.35rem; }
@@ -335,7 +419,45 @@ export function shouldRenderFlag(url) {
 	.attempt.good { background: #fff !important; color: #000; }
 	.attempt.bad { background: #dc2626 !important; color: #fff; }
 	.attempt.next { background: transparent; color: #f97316 !important; }
-	.attempt.current { background: transparent; color: #4ade80 !important; animation: blink 1s ease-in-out infinite; }
+
+	/* Current attempt - highlighted and blinking (text only) */
+	.attempt.current {
+		background: transparent;
+		color: #4ade80 !important;
+		font-weight: bold !important;
+	}
+
+	.attempt.current .attempt-value {
+		animation: blink-text 2s ease-in-out infinite;
+	}
+
+	@keyframes blink-text {
+		0%, 49% { opacity: 1; }
+		50%, 100% { opacity: 0; }
+	}
+
+	/* Data row grid column positioning */
+	.grid-row.data-row > .start-num { grid-column: 1; }
+	.grid-row.data-row > .name { grid-column: 2; }
+	.grid-row.data-row > .cat { grid-column: 3; }
+	.grid-row.data-row > .born { grid-column: 4; }
+	.grid-row.data-row > .team-name { grid-column: 5; visibility: hidden; width: 0; padding: 0; border: none; }
+	.grid-row.data-row > .v-spacer:nth-of-type(1) { grid-column: 6; }
+	.grid-row.data-row > .attempt:nth-of-type(1) { grid-column: 7; }
+	.grid-row.data-row > .attempt:nth-of-type(2) { grid-column: 8; }
+	.grid-row.data-row > .attempt:nth-of-type(3) { grid-column: 9; }
+	.grid-row.data-row > .best:nth-of-type(1) { grid-column: 10; }
+	.grid-row.data-row > .v-spacer:nth-of-type(2) { grid-column: 11; }
+	.grid-row.data-row > .attempt:nth-of-type(4) { grid-column: 12; }
+	.grid-row.data-row > .attempt:nth-of-type(5) { grid-column: 13; }
+	.grid-row.data-row > .attempt:nth-of-type(6) { grid-column: 14; }
+	.grid-row.data-row > .best:nth-of-type(2) { grid-column: 15; }
+	.grid-row.data-row > .v-spacer:nth-of-type(3) { grid-column: 16; }
+	.grid-row.data-row > .total { grid-column: 17; }
+	.grid-row.data-row > .score { grid-column: 18; }
+	.grid-row.data-row > .v-spacer:nth-of-type(4) { grid-column: 19; }
+	.grid-row.data-row > .next-total { grid-column: 20; }
+	.grid-row.data-row > .next-score { grid-column: 21; }
 
 	.grid-row.team-header > .cell {
 		background: #4a5568 !important;
@@ -347,17 +469,32 @@ export function shouldRenderFlag(url) {
 		border-top: 4px solid #4a5568;
 		border-bottom: 4px solid #4a5568;
 	}
-	.grid-row.team-header > .team-name-header { grid-column: 1 / span 5; justify-content: flex-start; font-size: 1.6rem; text-shadow: 1px 1px 2px rgba(0,0,0,0.7); border-left: 8px solid #4a5568; display: flex; align-items: center; gap: 0.75rem; }
-	.grid-row.team-header > .team-name-header .team-flag { height: 1.5rem; max-width: 2rem; object-fit: contain; }
+	.grid-row.team-header > .team-name-header { grid-column: 1 / span 5; justify-content: flex-start; font-size: 1.6rem; text-shadow: 1px 1px 2px rgba(0,0,0,0.7); border-left: 8px solid #4a5568; display: flex; align-items: center; gap: 0.75rem; overflow: visible; white-space: nowrap; }
+	.grid-row.team-header > .team-name-header .team-flag { height: 1.5rem; max-width: 2rem; object-fit: contain; border: 1px solid white; }
+	.grid-row.team-header > .team-name-header .team-name-text { flex: 1; min-width: 0; white-space: nowrap; overflow: visible; }
 
 	/* Hide any data: URI flags (legacy placeholders) */
 	.team-flag[src^="data:image/"] { display: none; }
-	.grid-row.team-header > .team-stats { grid-column: 6 / 18; justify-content: flex-start; font-size: 0.95rem; color: #cbd5e0; }
-	.grid-row.team-header > .team-score { grid-column: 18; justify-content: center; font-size: 1.6rem; border-right: 8px solid #4a5568; }
+	.grid-row.team-header > .team-stats { grid-column: 6 / 18; justify-content: flex-end; font-size: 0.95rem; color: #cbd5e0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+	.grid-row.team-header > .team-score { grid-column: 18; justify-content: center; font-size: 1.4rem; font-weight: bold; background: #1b5e20 !important; color: #fff; border: none !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	.grid-row.team-header > .team-gap { grid-column: 19; background: #000; border: none; padding: 0; }
+	.grid-row.team-header > .team-next-total { grid-column: 20; justify-content: center; font-size: 1.4rem; font-weight: bold; background: #4a5568 !important; color: #fff; border: none !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	.grid-row.team-header > .team-next-score { grid-column: 21; justify-content: center; font-size: 1.4rem; font-weight: bold; border-right: 8px solid #4a5568; background: #831843 !important; color: #fff; border: none !important; border-right: 8px solid #4a5568 !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+	/* Highlight athlete scores that contribute to team score */
+	/* Single gender mode or MF mode male contributors */
+	.grid-row.data-row > .score.top-contributor,
+	.grid-row.data-row > .score.top-contributor-m { background: #1b5e20 !important; color: #fff !important; font-weight: bold; }
+	.grid-row.data-row > .next-score.top-contributor,
+	.grid-row.data-row > .next-score.top-contributor-m { background: #831843 !important; color: #fff !important; font-weight: bold; }
+
+	/* MF mode: lighter highlight colors for female contributors */
+	.grid-row.data-row > .score.top-contributor-f { background: #57a05a !important; color: #fff !important; font-weight: bold; }
+	.grid-row.data-row > .next-score.top-contributor-f { background: #c06da0 !important; color: #fff !important; font-weight: bold; }
 
 	.grid-row.team-athlete > .cell:first-of-type { border-left: 8px solid #4a5568 !important; }
 	.grid-row.team-athlete > .cell:last-of-type { border-right: 8px solid #4a5568 !important; }
-	.grid-row.team-athlete > .cell { border-top: 1px solid #444; border-bottom: 1px solid #444; }
+	.grid-row.team-athlete > .cell { border-top: none; border-bottom: none; }
 
 	.grid-row.team-spacer > .cell { grid-column: 1 / -1; background: #000; border: none; height: calc(var(--grid-gap-size) * 2.4); padding: 0; border-top: 8px solid #4a5568; }
 	.grid-row.team-spacer.top-spacer > .cell { height: var(--grid-gap-size); border-top: none; }
@@ -382,6 +519,9 @@ export function shouldRenderFlag(url) {
 	.header-primary .v-spacer-total { grid-column: 16; }
 	.header-primary .col-total { grid-column: 17; }
 	.header-primary .col-score { grid-column: 18; }
+	.header-primary .v-spacer-next { grid-column: 19; }
+	.header-primary .col-next-total { grid-column: 20; }
+	.header-primary .col-next-score { grid-column: 21; }
 
 	.header-secondary .col-name-portrait { grid-column: 2; }
 	.header-secondary .v-spacer-snatch { grid-column: 6; }
@@ -397,10 +537,15 @@ export function shouldRenderFlag(url) {
 	.header-secondary .v-spacer-total { grid-column: 16; }
 	.header-secondary .col-total-portrait { grid-column: 17; }
 	.header-secondary .col-score-portrait { grid-column: 18; }
+	.header-secondary .v-spacer-next { grid-column: 19; }
+	.header-secondary .col-next-total-portrait { grid-column: 20; }
+	.header-secondary .col-next-score-portrait { grid-column: 21; }
 
 	.header-secondary .col-name-portrait,
 	.header-secondary .col-total-portrait,
-	.header-secondary .col-score-portrait { visibility: hidden; pointer-events: none; padding: 0; height: 0; border: none; }
+	.header-secondary .col-score-portrait,
+	.header-secondary .col-next-total-portrait,
+	.header-secondary .col-next-score-portrait { visibility: hidden; pointer-events: none; padding: 0; height: 0; border: none; }
 	.header-secondary .v-spacer { background: #000; border: none; height: 0; padding: 0; }
 
 	@media (max-width: 1160px) {
@@ -415,10 +560,13 @@ export function shouldRenderFlag(url) {
 			--col-best: 3.8rem;
 			--col-total: 4.5rem;
 			--col-score: 12ch;
+			--col-next-total: 5.5rem;
+			--col-next-score: 12ch;
 		}
 		.scoreboard-grid.compact-team-column {
-			--col-team-min: 5rem;
-			--col-team-max: 5rem;
+			--col-team-min: 0;
+			--col-team-max: 0;
+			--col-team: 0;
 		}
 	}
 
@@ -437,6 +585,8 @@ export function shouldRenderFlag(url) {
 			--col-best: 3.4rem;
 			--col-born: 0;
 			--col-score: 12ch;
+			--col-next-total: 5.2rem;
+			--col-next-score: 11ch;
 			--header-primary-height: 2.5rem;
 		}
 		.scoreboard-grid.compact-team-column {
@@ -456,7 +606,7 @@ export function shouldRenderFlag(url) {
 		.start-number { font-size: 0.75rem; padding: 0.2rem 0.3rem; }
 		.main { --grid-gap-size: 0.3rem; }
 		.scoreboard-grid { --col-start: 0; --col-cat: 0; --col-team: 0; --col-best: 0; --col-attempt: 2.75rem; --header-primary-height: 2.3rem; }
-		.scoreboard-grid.compact-team-column { --col-team: 5rem; }
+		.scoreboard-grid.compact-team-column { --col-team: 0; }
 		.header-primary .col-start,
 		.grid-row.data-row > .start-num,
 		.header-primary .col-cat,
@@ -466,23 +616,26 @@ export function shouldRenderFlag(url) {
 		.grid-row.data-row > .best { display: none; }
 		.header-secondary .col-name-portrait,
 		.header-secondary .col-total-portrait,
-		.header-secondary .col-score-portrait { visibility: visible; pointer-events: auto; height: auto; padding: 0.12rem 0.2rem; border: 1px solid #555; }
+		.header-secondary .col-score-portrait,
+		.header-secondary .col-next-total-portrait,
+		.header-secondary .col-next-score-portrait { visibility: visible; pointer-events: auto; height: auto; padding: 0.12rem 0.2rem; border: 1px solid #555; }
 		.header-secondary .col-name-portrait { text-align: left; }
 		.grid-row.team-header > .team-name-header { grid-column: 2 / 12; border-left-width: 0; font-size: 1.2rem; }
-		.grid-row.team-header > .team-stats { grid-column: 12 / 18; font-size: 0.8rem; }
-		.grid-row.team-header > .team-score { grid-column: 18; font-size: 1.2rem; border-right-width: 0; }
+		.grid-row.team-header > .team-stats { grid-column: 12 / 17; font-size: 0.8rem; }
+		.grid-row.team-header > .team-score { grid-column: 17 / 19; font-size: 1.2rem; font-weight: bold; }
+		.grid-row.team-header > .team-next-score { grid-column: 19 / 22; font-size: 1.2rem; font-weight: normal; border-right-width: 0; }
 		.grid-row.team-athlete > .cell:first-of-type { border-left-width: 4px !important; }
 		.grid-row.team-athlete > .cell:last-of-type { border-right-width: 4px !important; }
 	}
 	
 	/* Compact team column for small team sizes (< 7 athletes) */
 	.scoreboard-grid.compact-team-column .grid-row.team-header > .team-name-header {
-		grid-column: 1 / span 3;
+		grid-column: 1 / span 5;
 		font-size: 1.4rem;
 	}
 	
 	.scoreboard-grid.compact-team-column .grid-row.team-header > .team-stats {
-		grid-column: 4 / 18;
+		grid-column: 6 / 18;
 	}
 	
 	.scoreboard-grid.compact-team-column .grid-row.team-athlete > .team-name {
@@ -491,5 +644,18 @@ export function shouldRenderFlag(url) {
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
+
+	/* Context menu for gender selection (right-click on header) */
+	.team-context-menu {
+		background: #111;
+		border: 1px solid #444;
+		padding: 0.25rem;
+		border-radius: 6px;
+		box-shadow: 0 6px 18px rgba(0,0,0,0.6);
+		min-width: 6rem;
+		display: flex;
+		flex-direction: column;
+	}
+
+	/* Context menu disabled for DOM inspection */
 </style>
- 
