@@ -473,7 +473,8 @@ function formatAttemptFromDatabase(declaration, change1, change2, actualLift, au
 				return { stringValue: String(val), liftStatus: 'good' };
 			} else {
 				// Zero or negative = failed lift (display absolute value)
-				return { stringValue: String(Math.abs(val) || declaration || '-'), liftStatus: 'bad' };
+				const decl = parseInt(declaration, 10) || 0;
+				return { stringValue: String(Math.abs(val) || decl || '-'), liftStatus: 'bad' };
 			}
 		}
 	}
@@ -928,9 +929,9 @@ function findTopContributors(athletes, gender, scoreFn, topCounts = {}) {
  * @param {Object} topCounts - Top score counts { topM, topF, topMFm, topMFf }
  * @returns {Array} Array of team objects ready for frontend display
  */
-function groupByTeams(teamAthletes, gender, headers, topCounts = {}) {
+function groupByTeams(teamAthletes, gender, headers, topCounts = {}, includeAllAthletes = false) {
 	const { topM = 4, topF = 4, topMFm = 2, topMFf = 2 } = topCounts;
-	console.log(`[NVF groupByTeams] Input: ${teamAthletes.length} athletes, gender filter: ${gender}, topCounts: M=${topM}, F=${topF}, MFm=${topMFm}, MFf=${topMFf}`);
+	console.log(`[NVF groupByTeams] Input: ${teamAthletes.length} athletes, gender filter: ${gender}, topCounts: M=${topM}, F=${topF}, MFm=${topMFm}, MFf=${topMFf}, includeAll=${includeAllAthletes}`);
 	
 	// Filter athletes with no team
 	const athletesWithTeams = teamAthletes.filter(a => {
@@ -991,7 +992,7 @@ function groupByTeams(teamAthletes, gender, headers, topCounts = {}) {
 			
 			// Determine CSS class for actual score highlight
 			let scoreHighlightClass = '';
-			if (isActualContributor) {
+			if (!includeAllAthletes && isActualContributor) {
 				if (gender === 'MF') {
 					// In MF mode, differentiate by gender
 					scoreHighlightClass = athleteGender === 'F' ? 'top-contributor-f' : 'top-contributor-m';
@@ -1002,7 +1003,7 @@ function groupByTeams(teamAthletes, gender, headers, topCounts = {}) {
 			
 			// Determine CSS class for predicted score highlight
 			let nextScoreHighlightClass = '';
-			if (isPredictedContributor) {
+			if (!includeAllAthletes && isPredictedContributor) {
 				if (gender === 'MF') {
 					nextScoreHighlightClass = athleteGender === 'F' ? 'top-contributor-f' : 'top-contributor-m';
 				} else {
@@ -1027,7 +1028,9 @@ function groupByTeams(teamAthletes, gender, headers, topCounts = {}) {
 		// Tracker.TopMScores = "top {0} scores" for single gender
 		// Tracker.TopMFScores = "top {0}+{1} scores" for mixed
 		let totalLabel;
-		if (gender === 'MF') {
+		if (includeAllAthletes) {
+			totalLabel = '';
+		} else if (gender === 'MF') {
 			const template = headers?.topMFScores || 'top {0}+{1} scores';
 			totalLabel = template.replace('{0}', topMFm).replace('{1}', topMFf);
 		} else if (gender === 'F') {
@@ -1256,6 +1259,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	const showRecords = options.showRecords ?? false;
 	const sortBy = 'score';
 	const currentAttemptInfo = options.currentAttemptInfo ?? true;
+	const showPredicted = options.showPredicted !== 'false' && options.showPredicted !== false;
 	const topN = options.topN ?? 0;
 	const includeCjDeclaration = Boolean(options.cjDecl ?? true);
 	const language = options.lang || options.language || 'no';
@@ -1357,8 +1361,8 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		rank: translations.Rank || 'Rank',
 		session: translations['Tracker.Session'] || translations.Session || 'Session',
 		// Translation templates for top scores labels
-		topMScores: translations['Tracker.TopMScores'] || 'top {0} scores',
-		topMFScores: translations['Tracker.TopMFScores'] || 'top {0}+{1} scores',
+		topMScores: translations['Tracker.TopNScores'] || 'top {0} scores',
+		topMFScores: translations['Tracker.TopNPlusNScores'] || 'top {0}+{1} scores',
 		totalNextS: translations['Tracker.TotalNextScore'] || 'Total Next S',
 		scoreNextS: translations['Tracker.ScoreNextScore'] || 'Score Next S',
 		waitingForData: translations['Tracker.WaitingForData'] || 'Waiting for competition data...',
@@ -1510,7 +1514,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// =========================================================================
 	// LAYER 3: Group by teams
 	// =========================================================================
-	const teams = groupByTeams(athletesWithFlags, gender, headers, topCounts);
+	const teams = groupByTeams(athletesWithFlags, gender, headers, topCounts, includeAllAthletes);
 	
 	console.log(`[NVF helpers] Grouped ${allTeamAthletes.length} athletes into ${teams.length} teams (gender=${gender})`);
 	if (teams.length > 0) {
@@ -1599,6 +1603,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		sortBy,
 		gender: options.gender !== undefined ? options.gender : undefined,
 		currentAttemptInfo,
+		showPredicted,
 		topN,
 		cjDecl: includeCjDeclaration
 	};

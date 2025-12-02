@@ -49,6 +49,14 @@ export default {
 			description: 'Choose scoreboard text language / Velg språk for resultattavle'
 		},
 		{
+			key: 'showPredicted',
+			label: 'Show Predicted Totals',
+			type: 'boolean',
+			default: true,
+			group: 'display',
+			description: 'Show predicted total and score columns / Vis anslått total og poeng kolonner'
+		},
+		{
 			key: 'cjDecl',
 			label: 'Include CJ Declaration',
 			type: 'boolean',

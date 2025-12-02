@@ -29,6 +29,7 @@
 
 	$: currentAttempt = data.currentAttempt;
 	$: teams = data.teams || [];
+	$: showPredicted = data.options?.showPredicted ?? true;
 
 	// Sync timer with server when data changes
 	$: if (data.timer) {
@@ -43,9 +44,21 @@
 
 	function displayAttempt(attempt) {
 		if (!attempt) return '\u00A0';
-		if (!attempt.stringValue || attempt.stringValue === '' || attempt.stringValue === '-') return '\u00A0';
+		
+		let val = attempt.stringValue;
+		// Treat '0' as '-'
+		if (val === '0') val = '-';
+		
+		if (!val || val === '') return '\u00A0';
+		
+		// If value is '-', only show it if it's a failed lift (bad)
+		if (val === '-') {
+			if (attempt.liftStatus === 'bad') return '-';
+			return '\u00A0';
+		}
+
 		if (attempt.liftStatus === 'empty') return '\u00A0';
-		return attempt.stringValue.replace(/[()]/g, '');
+		return val.replace(/[()]/g, '');
 	}
 
 	function parseFormattedNumber(value) {
@@ -115,7 +128,7 @@ export function shouldRenderFlag(url) {
 		{#if data.status === 'waiting'}
 			<div class="waiting"><p>{data.headers?.waitingForData || data.message || 'Waiting for competition data...'}</p></div>
 		{:else}
-			<div class="scoreboard-grid" class:compact-team-column={data.compactTeamColumn} role="grid" tabindex="0">
+			<div class="scoreboard-grid" class:compact-team-column={data.compactTeamColumn} class:hide-predicted={!showPredicted} role="grid" tabindex="0">
 				<div class="grid-row header header-primary" role="row" tabindex="0" on:contextmenu={openGenderMenu} on:click|preventDefault|stopPropagation={openGenderMenu} on:keydown={handleSessionKeydown}>
 					<div class="cell header col-start span-two" role="columnheader">{data.headers?.order || 'Order'}</div>
 					<div class="cell header col-name span-two" role="columnheader">{data.headers?.name || 'Name'}</div>
@@ -297,6 +310,29 @@ export function shouldRenderFlag(url) {
 		--col-team-min: 0;
 		--col-team-max: 0;
 		--col-team: 0;
+	}
+
+	/* Hide predicted total columns when showPredicted is false */
+	.scoreboard-grid.hide-predicted {
+		--col-next-total: 0;
+		--col-next-score: 0;
+	}
+
+	.scoreboard-grid.hide-predicted .v-spacer-next,
+	.scoreboard-grid.hide-predicted .col-next-total,
+	.scoreboard-grid.hide-predicted .col-next-score,
+	.scoreboard-grid.hide-predicted .col-next-total-portrait,
+	.scoreboard-grid.hide-predicted .col-next-score-portrait,
+	.scoreboard-grid.hide-predicted .next-total,
+	.scoreboard-grid.hide-predicted .next-score,
+	.scoreboard-grid.hide-predicted .team-gap,
+	.scoreboard-grid.hide-predicted .team-next-total,
+	.scoreboard-grid.hide-predicted .team-next-score {
+		visibility: hidden;
+		width: 0;
+		padding: 0;
+		border: none;
+		overflow: hidden;
 	}
 
 	.grid-row { display: contents; }

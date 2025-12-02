@@ -66,22 +66,24 @@
     expandedCategory = expandedCategory === category ? null : category;
   }
   
-  // Initialize default options for each scoreboard
-  $: {
-    data.scoreboards.forEach(scoreboard => {
-      if (!scoreboardOptions[scoreboard.type]) {
-        scoreboardOptions[scoreboard.type] = {};
-      }
-      // Initialize defaults for each FOP
-      data.fops.forEach(fop => {
-        if (!scoreboardOptions[scoreboard.type][fop]) {
-          scoreboardOptions[scoreboard.type][fop] = {};
-          scoreboard.options.forEach(opt => {
-            scoreboardOptions[scoreboard.type][fop][opt.key] = opt.default;
-          });
-        }
+  // Initialize default options for each scoreboard once the data is available
+  let defaultsInitialized = false;
+  $: if (!defaultsInitialized && data.scoreboards?.length && data.fops?.length) {
+    const initialOptions = {};
+
+    data.scoreboards.forEach((scoreboard) => {
+      initialOptions[scoreboard.type] = {};
+      data.fops.forEach((fop) => {
+        const optionDefaults = {};
+        scoreboard.options?.forEach((opt) => {
+          optionDefaults[opt.key] = opt.default;
+        });
+        initialOptions[scoreboard.type][fop] = optionDefaults;
       });
     });
+
+    scoreboardOptions = initialOptions;
+    defaultsInitialized = true;
   }
   
   function openOptionsModal(scoreboard, fop) {
@@ -187,6 +189,14 @@
     });
     
     return `/${type}?${params.toString()}`;
+  }
+
+  function isOptionDisabled(option, type, fop) {
+    // Only 'allAthletes' can disable other fields
+    if (option.disabledBy === 'allAthletes') {
+       return !!scoreboardOptions[type]?.[fop]?.['allAthletes'];
+    }
+    return false;
   }
 </script>
 
@@ -539,7 +549,8 @@
               <div class="options-column">
                 <h4 class="column-title">Display Options</h4>
                 {#each displayOptions as option}
-                  <div class="option-field">
+                  {@const isDisabled = isOptionDisabled(option, modalScoreboard.type, modalFop)}
+                  <div class="option-field" class:disabled-option={isDisabled}>
                     <label for="{modalScoreboard.type}-{modalFop}-{option.key}">
                       {option.label}
                       {#if option.description}
@@ -551,6 +562,7 @@
                       <select 
                         id="{modalScoreboard.type}-{modalFop}-{option.key}"
                         bind:value={scoreboardOptions[modalScoreboard.type][modalFop][option.key]}
+                        disabled={isDisabled}
                       >
                         {#each getEffectiveOptions(option) as opt}
                           <option value={opt}>{getDisplayName(opt, option.key)}</option>
@@ -562,6 +574,7 @@
                           type="checkbox" 
                           id="{modalScoreboard.type}-{modalFop}-{option.key}"
                           bind:checked={scoreboardOptions[modalScoreboard.type][modalFop][option.key]}
+                          disabled={isDisabled}
                         />
                         <label for="{modalScoreboard.type}-{modalFop}-{option.key}" class="checkbox-label">
                           {scoreboardOptions[modalScoreboard.type][modalFop][option.key] ? 'Yes' : 'No'}
@@ -574,12 +587,14 @@
                         bind:value={scoreboardOptions[modalScoreboard.type][modalFop][option.key]}
                         min={option.min}
                         max={option.max}
+                        disabled={isDisabled}
                       />
                     {:else}
                       <input 
                         type="text" 
                         id="{modalScoreboard.type}-{modalFop}-{option.key}"
                         bind:value={scoreboardOptions[modalScoreboard.type][modalFop][option.key]}
+                        disabled={isDisabled}
                       />
                     {/if}
                   </div>
@@ -589,7 +604,7 @@
                 <div class="options-column">
                   <h4 class="column-title">Team Scoring</h4>
                   {#each scoringOptions as option}
-                    {@const isDisabled = option.disabledBy && scoreboardOptions[modalScoreboard.type][modalFop][option.disabledBy]}
+                    {@const isDisabled = isOptionDisabled(option, modalScoreboard.type, modalFop)}
                     <div class="option-field" class:disabled-option={isDisabled}>
                       <label for="{modalScoreboard.type}-{modalFop}-{option.key}">
                         {option.label}
@@ -726,7 +741,7 @@
   
   .header {
     text-align: center;
-    margin-bottom: 3rem;
+    margin-bottom: 1rem;
     padding: 2rem 0;
   }
   
@@ -1129,7 +1144,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 2rem 0;
+    padding: 0 0 2rem 0;
     width: 100%;
   }
   
