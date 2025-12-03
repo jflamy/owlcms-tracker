@@ -61,7 +61,17 @@
 			return '?';
 		}
 		
+		// 0 lifts (not taken in session) should display as "-"
+		if (val === 0 || val === '0') return '-';
+		
 		if (val === null || val === undefined || val === '' || val === '-') return '-';
+		
+		// Handle negative values (failed lifts) - show absolute value
+		const numVal = parseInt(val, 10);
+		if (!isNaN(numVal) && numVal < 0) {
+			return String(Math.abs(numVal));
+		}
+		
 		return String(val);
 	}
 </script>
@@ -122,24 +132,24 @@
 				</div>
 				<div class="cell v-spacer" aria-hidden="true"></div>
 				<div class="cell attempt {getAttemptClass(athlete.sattempts?.[0])}" role="gridcell">
-					{displayAttempt(athlete.sattempts?.[0])}
+					<span class="attempt-value">{displayAttempt(athlete.sattempts?.[0])}</span>
 				</div>
 				<div class="cell attempt {getAttemptClass(athlete.sattempts?.[1])}" role="gridcell">
-					{displayAttempt(athlete.sattempts?.[1])}
+					<span class="attempt-value">{displayAttempt(athlete.sattempts?.[1])}</span>
 				</div>
 				<div class="cell attempt {getAttemptClass(athlete.sattempts?.[2])}" role="gridcell">
-					{displayAttempt(athlete.sattempts?.[2])}
+					<span class="attempt-value">{displayAttempt(athlete.sattempts?.[2])}</span>
 				</div>
 				<div class="cell best" role="gridcell">{athlete.bestSnatch || '-'}</div>
 				<div class="cell v-spacer" aria-hidden="true"></div>
 				<div class="cell attempt {getAttemptClass(athlete.cattempts?.[0])}" role="gridcell">
-					{displayAttempt(athlete.cattempts?.[0])}
+					<span class="attempt-value">{displayAttempt(athlete.cattempts?.[0])}</span>
 				</div>
 				<div class="cell attempt {getAttemptClass(athlete.cattempts?.[1])}" role="gridcell">
-					{displayAttempt(athlete.cattempts?.[1])}
+					<span class="attempt-value">{displayAttempt(athlete.cattempts?.[1])}</span>
 				</div>
 				<div class="cell attempt {getAttemptClass(athlete.cattempts?.[2])}" role="gridcell">
-					{displayAttempt(athlete.cattempts?.[2])}
+					<span class="attempt-value">{displayAttempt(athlete.cattempts?.[2])}</span>
 				</div>
 				<div class="cell best" role="gridcell">{athlete.bestCleanJerk || '-'}</div>
 				<div class="cell v-spacer" aria-hidden="true"></div>
@@ -182,24 +192,24 @@
 					</div>
 					<div class="cell v-spacer" aria-hidden="true"></div>
 					<div class="cell attempt {getAttemptClass(leader.sattempts?.[0])}" role="gridcell">
-						{displayAttempt(leader.sattempts?.[0])}
+						<span class="attempt-value">{displayAttempt(leader.sattempts?.[0])}</span>
 					</div>
 					<div class="cell attempt {getAttemptClass(leader.sattempts?.[1])}" role="gridcell">
-						{displayAttempt(leader.sattempts?.[1])}
+						<span class="attempt-value">{displayAttempt(leader.sattempts?.[1])}</span>
 					</div>
 					<div class="cell attempt {getAttemptClass(leader.sattempts?.[2])}" role="gridcell">
-						{displayAttempt(leader.sattempts?.[2])}
+						<span class="attempt-value">{displayAttempt(leader.sattempts?.[2])}</span>
 					</div>
 					<div class="cell best" role="gridcell">{leader.bestSnatch || '-'}</div>
 					<div class="cell v-spacer" aria-hidden="true"></div>
 					<div class="cell attempt {getAttemptClass(leader.cattempts?.[0])}" role="gridcell">
-						{displayAttempt(leader.cattempts?.[0])}
+						<span class="attempt-value">{displayAttempt(leader.cattempts?.[0])}</span>
 					</div>
 					<div class="cell attempt {getAttemptClass(leader.cattempts?.[1])}" role="gridcell">
-						{displayAttempt(leader.cattempts?.[1])}
+						<span class="attempt-value">{displayAttempt(leader.cattempts?.[1])}</span>
 					</div>
 					<div class="cell attempt {getAttemptClass(leader.cattempts?.[2])}" role="gridcell">
-						{displayAttempt(leader.cattempts?.[2])}
+						<span class="attempt-value">{displayAttempt(leader.cattempts?.[2])}</span>
 					</div>
 					<div class="cell best" role="gridcell">{leader.bestCleanJerk || '-'}</div>
 					<div class="cell v-spacer" aria-hidden="true"></div>
@@ -393,14 +403,12 @@
 
 	.grid-row.current > .start-num,
 	.grid-row.current > .name {
-		background: transparent !important;
 		color: #4ade80 !important;
 		font-weight: bold;
 	}
 
 	.grid-row.next > .start-num,
 	.grid-row.next > .name {
-		background: transparent !important;
 		color: #f97316 !important;
 		font-weight: bold;
 	}
@@ -435,7 +443,10 @@
 	.attempt.current-attempt {
 		background: transparent;
 		color: #4ade80 !important;
-		animation: blink 1s ease-in-out infinite;
+	}
+
+	.attempt.current-attempt .attempt-value {
+		animation: blink-text 2s ease-in-out infinite;
 	}
 
 	/* Next athlete's pending attempt */
@@ -450,9 +461,9 @@
 		color: #aaa !important;
 	}
 
-	@keyframes blink {
-		0%, 100% { opacity: 1; }
-		50% { opacity: 0.5; }
+	@keyframes blink-text {
+		0%, 49% { opacity: 1; }
+		50%, 100% { opacity: 0; }
 	}
 
 	.grid-row.spacer > .cell {

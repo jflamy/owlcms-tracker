@@ -1,117 +1,10 @@
 import { competitionHub } from '$lib/server/competition-hub.js';
 import { getFlagUrl } from '$lib/server/flag-resolver.js';
-
+import { extractTimerAndDecisionState, computeDisplayMode } from '$lib/server/timer-decision-helpers.js';
 import { buildCacheKey } from '$lib/server/cache-utils.js';
+
 // Plugin cache for lower-third
 const lowerThirdCache = new Map();
-
-/**
- * Lower Third Minimal Status Scoreboard - Server-side data processing
- * 
- * Provides minimal overlay data for live video streaming:
- * - Current athlete name and requested weight
- * - Timer countdown (only when running)
- * - Decision lights (when visible)
- * 
- * @param {string} fopName - Field of Play name (e.g., 'A', 'Platform_A')
- * @param {Object} options - Display options from URL query parameters
- * @returns {Object} Processed scoreboard data
- */
-
-/**
- * Extract timer state from FOP update
- * Timer visibility rules:
- * - Show when SetTime or StartTime is received
- * - Hide ONLY when StopTime is received while timer is running
- * - SetTime after StopTime makes timer visible again
- * - On page load, initialize from current timer event type
- */
-let isTimerActive = null; // null = uninitialized, true = visible, false = hidden
-let isTimerRunning = false; // Track if timer is counting down
-
-function extractTimerState(fopUpdate) {
-	const eventType = fopUpdate?.athleteTimerEventType;
-	const timeRemaining = parseInt(fopUpdate?.athleteMillisRemaining || 0);
-	
-	// Initialize state on first call from current fopUpdate data
-	if (isTimerActive === null) {
-		if (eventType === 'StartTime') {
-			isTimerActive = true;
-			isTimerRunning = true;
-		} else if (eventType === 'SetTime') {
-			isTimerActive = true;
-			isTimerRunning = false;
-		} else if (eventType === 'StopTime') {
-			isTimerActive = false;
-			isTimerRunning = false;
-		} else if (timeRemaining > 0) {
-			// Has time but no event - assume timer is set
-			isTimerActive = true;
-			isTimerRunning = false;
-		} else {
-			// No timer data at all
-			isTimerActive = false;
-			isTimerRunning = false;
-		}
-	}
-	
-	// State machine for timer visibility and running state
-	if (eventType === 'SetTime') {
-		// Timer loaded - make it active (even after being stopped)
-		isTimerActive = true;
-		isTimerRunning = false;
-	} else if (eventType === 'StartTime') {
-		// Timer started - active and running
-		isTimerActive = true;
-		isTimerRunning = true;
-	} else if (eventType === 'StopTime' && isTimerRunning) {
-		// StopTime while running - hide timer (lift completed)
-		isTimerActive = false;
-		isTimerRunning = false;
-	} else if (eventType === 'StopTime' && !isTimerRunning) {
-		// StopTime while not running - acts like SetTime (OWLCMS uses this to set timer)
-		isTimerActive = true;
-		isTimerRunning = false;
-	}
-	// If no event, preserve state
-	
-	// Determine display state
-	let state = 'stopped';
-	if (isTimerActive && isTimerRunning) {
-		state = 'running';
-	} else if (isTimerActive) {
-		state = 'set';
-	}
-	
-	return {
-		state,
-		timeRemaining,
-		duration: parseInt(fopUpdate?.timeAllowed || 60000)
-	};
-}
-
-/**
- * Extract decision state from FOP update
- */
-function extractDecisionState(fopUpdate) {
-	// Decision is visible when decisionsVisible is true or decisionEventType indicates display
-	const isVisible = fopUpdate?.decisionsVisible === 'true' || 
-	                  fopUpdate?.decisionEventType === 'FULL_DECISION';
-	
-	// Check for explicit single-referee flag from OWLCMS
-	const isSingleReferee = fopUpdate?.singleReferee === 'true' || 
-	                        fopUpdate?.singleReferee === true;
-	
-	return {
-		visible: isVisible,
-		type: fopUpdate?.decisionEventType || null,
-		isSingleReferee,
-		ref1: fopUpdate?.d1 === 'true' ? 'good' : fopUpdate?.d1 === 'false' ? 'bad' : null,
-		ref2: fopUpdate?.d2 === 'true' ? 'good' : fopUpdate?.d2 === 'false' ? 'bad' : null,
-		ref3: fopUpdate?.d3 === 'true' ? 'good' : fopUpdate?.d3 === 'false' ? 'bad' : null,
-		down: fopUpdate?.down === 'true'
-	};
-}
 
 export function getScoreboardData(fopName = 'A', options = {}) {
 	const fopUpdate = competitionHub.getFopUpdate(fopName);
@@ -123,18 +16,19 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	const position = options.position || 'bottom-right';
 	const fontSize = options.fontSize || 'medium';
 
-	// Build cache key (includes fop) based on hub version + relevant options
+	// Build cache key based on competition data
 	const cacheKey = buildCacheKey({ fopName, includeFop: true, opts: { position, fontSize } });
 
 	if (lowerThirdCache.has(cacheKey)) {
 		const cached = lowerThirdCache.get(cacheKey);
-		// Always compute volatile fields fresh
-		const timer = extractTimerState(fopUpdate);
-		const decision = extractDecisionState(fopUpdate);
+		// Always compute volatile fields (timer/decision/displayMode) fresh
+		const { timer, breakTimer, decision, displayMode } = extractTimerAndDecisionState(fopUpdate, fopName);
 		return {
 			...cached,
 			timer,
+			breakTimer,
 			decision,
+			displayMode,
 			sessionStatus,
 			learningMode
 		};
@@ -143,14 +37,16 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// If no data yet, return waiting state
 	if (!fopUpdate && !databaseState) {
 		return {
-			competition: { name: 'Waiting for data...', fop: fopName },
-			currentAthleteInfo: null,
-			timer: { state: 'stopped', timeRemaining: 0 },
-			decision: { visible: false },
-			sessionStatus: { isDone: false, sessionName: '', lastActivity: 0 },
-			status: 'waiting',
-			options: { position, fontSize }
-		};
+		competition: { name: 'Waiting for data...', fop: fopName },
+		currentAthleteInfo: null,
+		timer: { state: 'stopped', timeRemaining: 0, duration: 60000 },
+		breakTimer: { state: 'stopped', timeRemaining: 0, duration: 300000 },
+		decision: { visible: false, isSingleReferee: false, ref1: null, ref2: null, ref3: null },
+		displayMode: 'none',
+		sessionStatus: { isDone: false, sessionName: '', lastActivity: 0 },
+		status: 'waiting',
+		options: { position, fontSize }
+	};
 	}
 
 	// Extract competition info
@@ -161,12 +57,31 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 
 	// Extract current athlete info
 	let currentAthleteInfo = null;
-	if (fopUpdate?.fullName && !sessionStatus.isDone) {
-		// Clean HTML entities
-		const cleanFullName = (fopUpdate.fullName || '').replace(/&ndash;/g, '–').replace(/&mdash;/g, '—');
-		
+	
+	// During interruption: use the break message from fullName
+	if (fopUpdate?.mode === 'INTERRUPTION' && fopUpdate?.fullName) {
+		let displayName = fopUpdate.fullName || '';
+		// Extract just the message after the ndash (handles both &ndash; and – unicode)
+		// First decode HTML entities
+		displayName = displayName.replace(/&ndash;/g, '–').replace(/&mdash;/g, '—');
+		// Then split on ndash or mdash and take the last part
+		const parts = displayName.split(/\s*[–—]\s*/);
+		if (parts.length > 1) {
+			displayName = parts[parts.length - 1];
+		}
 		currentAthleteInfo = {
-			fullName: cleanFullName,
+			fullName: displayName,
+			teamName: '',
+			flagUrl: null,
+			weight: '',
+			attemptNumber: '',
+			liftType: ''
+		};
+	} else if (fopUpdate?.fullName && !sessionStatus.isDone && fopUpdate?.mode !== 'INTERRUPTION') {
+		// Normal mode: use fullName from fopUpdate (athlete info)
+		// Only use fullName if mode is NOT interruption (avoid stale jury deliberation text)
+		currentAthleteInfo = {
+			fullName: fopUpdate.fullName || '',
 			teamName: fopUpdate.teamName || '',
 			flagUrl: getFlagUrl(fopUpdate.teamName),
 			weight: fopUpdate.weight || '',
@@ -176,29 +91,34 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		};
 	}
 
-	// Extract timer and decision states
-	const timer = extractTimerState(fopUpdate);
-	const decision = extractDecisionState(fopUpdate);
+	// Extract timer, break timer, decision, and display mode using shared helper
+	const { timer, breakTimer, decision, displayMode } = extractTimerAndDecisionState(fopUpdate, fopName);
 
-	return {
+	const result = {
 		competition,
 		currentAthleteInfo,
 		timer,
+		breakTimer,
 		decision,
+		displayMode,
 		sessionStatus,
 		status: 'ready',
 		options: { position, fontSize }
 	};
-}
 
-// Cache result (exclude volatile fields like timer/decision/sessionStatus)
-// We set the cache after construction above, but also add a defensive caching
-// pass here in case callers want the cached variant in subsequent calls.
-// Note: keep small cache to limit memory use.
-function cacheLowerThird(cacheKey, payload) {
-	lowerThirdCache.set(cacheKey, payload);
+	// Cache result (exclude volatile fields)
+	lowerThirdCache.set(cacheKey, {
+		competition,
+		currentAthleteInfo,
+		sessionStatus,
+		status: 'ready',
+		options: { position, fontSize }
+	});
+
 	if (lowerThirdCache.size > 3) {
 		const firstKey = lowerThirdCache.keys().next().value;
 		lowerThirdCache.delete(firstKey);
 	}
+
+	return result;
 }

@@ -37,7 +37,7 @@
 	<div class="records-section">
 		<div class="records-table-grid" style="--num-categories: {categories.length}">
 			<!-- Row 1: Category headers with title in top-left, spanning 2 rows for spacers and main headers -->
-			<div class="records-title-cell span-two">{translations.RECORDS || 'RECORDS'}</div>
+			<div class="records-title-cell span-two">{translations.Records || 'Records'}</div>
 			{#each categories as category}
 				<div class="records-v-spacer records-v-spacer-header span-two" aria-hidden="true"></div>
 				<div class="records-category-header">{getCategoryDisplayName(records, category)}</div>
@@ -74,7 +74,7 @@
 
 <style>
 	.records-section {
-		padding: 2rem;
+		padding: 2em 0 0 0;
 		background: #000;
 		overflow-x: auto;
 	}
@@ -92,8 +92,6 @@
 		grid-template-rows: var(--header-primary-height) var(--header-secondary-height);
 		grid-auto-rows: var(--data-row-height);
 		width: fit-content;
-		border: 1px solid #333;
-		border-radius: 4px;
 		overflow: hidden;
 	}
 
@@ -102,15 +100,14 @@
 		grid-column: 1;
 		grid-row: 1 / span 2;
 		display: flex;
-		align-items: center;
-		justify-content: center;
-		padding: var(--header-primary-vpad) 0.15rem;
-		background: #3a3a3a;
+		align-items: flex-start;
+		justify-content: flex-start;
+		padding: 0 0.15rem;
+		background: transparent;
 		font-weight: bold;
 		font-size: 1.2rem;
-		color: #e0e0e0;
-		border: 1px solid #555;
-		text-transform: uppercase;
+		color: #ccc;
+		border: none;
 	}
 
 	.span-two {
@@ -184,7 +181,7 @@
 		background: #1a1a1a;
 		font-weight: bold;
 		font-size: 1.1rem;
-		color: #fbbf24;
+		color: #fff;
 		border-right: 1px solid #333;
 		border-bottom: 1px solid #333;
 		height: var(--data-row-height);

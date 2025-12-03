@@ -27,6 +27,9 @@
 	$: currentAttempt = data.currentAttempt;
 	$: decisionState = data.decision || {};
 	
+	// Use displayMode from server (computed by shared timer-decision-helpers)
+	$: displayMode = data.displayMode || 'none';
+	
 	// Sync timer with server when data changes
 	$: if (data.timer) {
 		timer.syncWithServer(data.timer);
@@ -34,22 +37,30 @@
 </script>
 
 <svelte:head>
-	<title>{data.scoreboardName || 'Scoreboard'} - {data.competition?.name || 'OWLCMS'}</title>
+	<title>{data.scoreboardName || 'Attempt Bar'} - {data.competition?.name || 'OWLCMS'}</title>
 </svelte:head>
 
 <div class="scoreboard">
-	<!-- Current Attempt Header (top line only) -->
-	<CurrentAttemptBar 
-		currentAttempt={data.currentAttempt}
-		timerState={timerState}
-		decisionState={data.decision}
-		scoreboardName={data.scoreboardName}
-		sessionStatus={data.sessionStatus}
-		competition={data.competition}
-		showDecisionLights={true}
-		showTimer={true}
-		compactMode={false}
-	/>
+	<!-- Current Attempt Bar (same as StandardScoreboard) -->
+	{#if data.status !== 'waiting'}
+		<CurrentAttemptBar 
+			currentAttempt={data.currentAttempt}
+			timerData={data.timer}
+			breakTimerData={data.breakTimer}
+			displayMode={displayMode}
+			decisionState={data.decision}
+			scoreboardName={data.scoreboardName}
+			sessionStatus={data.sessionStatus}
+			competition={data.competition}
+			showDecisionLights={true}
+			showTimer={true}
+			compactMode={false}
+		/>
+	{:else}
+		<div class="waiting">
+			<p>{data.message || 'Waiting for competition data...'}</p>
+		</div>
+	{/if}
 </div>
 
 <style>
@@ -70,5 +81,14 @@
 		display: flex;
 		flex-direction: column;
 		overflow: hidden;
+	}
+
+	.waiting {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		height: 100%;
+		font-size: 1.5rem;
+		color: #888;
 	}
 </style>

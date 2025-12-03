@@ -1,15 +1,15 @@
 /**
  * Scoreboard Configuration
  * 
- * Metadata for the "Attempt Board" scoreboard
+ * Metadata for the "Attempt Bar" scoreboard
  */
 
 export default {
 	// Display name
-	name: 'Attempt Board',
+	name: 'Attempt Bar',
 	
 	// Description for AI assistants
-	description: 'Displays individual attempts with focus on lift attempts and decisions. Useful for judges and coaches to track attempt progression.',
+	description: 'Displays just the current attempt bar with athlete info, timer, and decision lights. Useful for overlay graphics.',
 	
 	// Category for grouping in the UI
 	category: 'attempt-board',

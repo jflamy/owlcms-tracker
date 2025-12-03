@@ -14,7 +14,9 @@
 	});
 
 	onMount(() => {
-		timer.start(data.timer);
+		if (data.timer && data.timer.visible) {
+			timer.start(data.timer);
+		}
 	});
 
 	onDestroy(() => {
@@ -23,11 +25,50 @@
 	});
 
 	// Reactive sync on server updates
-	$: if (data.timer) timer.syncWithServer(data.timer);
+	// Only sync and start timer if it should be visible
+	$: if (data.timer) {
+		if (data.timer.visible) {
+			timer.syncWithServer(data.timer);
+		} else {
+			// Stop timer if it becomes invisible (e.g., during break)
+			timer.stop();
+		}
+	}
 
 	// Get position classes
 	$: positionClass = data.options?.position || 'bottom-right';
 	$: fontSizeClass = `font-${data.options?.fontSize || 'medium'}`;
+
+	// Display mode determines what shows on the right side
+	// 'decision' > 'break' > 'athlete' > 'none' (priority order)
+	$: displayMode = data.displayMode || 'none';
+	$: showAthleteTimer = displayMode === 'athlete';
+	$: showBreakTimer = displayMode === 'break';
+	$: showDecisions = displayMode === 'decision';
+	
+	// Check if displaying interruption message (STOP/STOPP text)
+	$: isInterruption = Boolean(data.breakTimer?.displayText);
+
+	// For break timer, we need to start countdown from break timer data
+	let breakTimerState = { seconds: 0, isRunning: false, isWarning: false, display: '0:00' };
+	const breakTimer = createTimer();
+	
+	const breakUnsubscribe = breakTimer.subscribe((state) => {
+		breakTimerState = state;
+	});
+
+	$: if (data.breakTimer && showBreakTimer && !data.breakTimer?.displayText) {
+		breakTimer.start(data.breakTimer);
+	} else if (!showBreakTimer || data.breakTimer?.displayText) {
+		breakTimer.stop();
+	}
+
+	$: if (data.breakTimer) breakTimer.syncWithServer(data.breakTimer);
+
+	onDestroy(() => {
+		breakTimer.stop();
+		breakUnsubscribe();
+	});
 </script>
 
 <script context="module">
@@ -38,42 +79,55 @@ export function shouldRenderFlag(url) {
 }
 </script>
 
-<div class="lower-third-overlay {positionClass} {fontSizeClass}">
-	<!-- Left: Athlete Name Card (always shown when athlete is present) -->
+<div class="lower-third-overlay {positionClass} {fontSizeClass}" class:interruption={isInterruption}>
+	<!-- Left: Athlete Name Card -->
 	{#if data.currentAthleteInfo}
-		<div class="info-card name-card">
+		<div class="info-card name-card" class:during-break={showBreakTimer}>
 			<div class="name-content">
 				<span class="athlete-name">{data.currentAthleteInfo.fullName}</span>
-				<span class="separator">•</span>
-				{#if data.currentAthleteInfo.flagUrl}
-					{#if shouldRenderFlag(data.currentAthleteInfo.flagUrl)}
-						<img src={data.currentAthleteInfo.flagUrl} alt={data.currentAthleteInfo.teamName} class="team-flag" />
+				<!-- During break/interruption: no separators, team, or weight -->
+				{#if !showBreakTimer}
+					<span class="separator">•</span>
+					{#if data.currentAthleteInfo.flagUrl}
+						{#if shouldRenderFlag(data.currentAthleteInfo.flagUrl)}
+							<img src={data.currentAthleteInfo.flagUrl} alt={data.currentAthleteInfo.teamName} class="team-flag" />
+						{/if}
 					{/if}
+					<span class="team">{data.currentAthleteInfo.teamName}</span>
+					<span class="separator">•</span>
+					<span class="weight">{data.currentAthleteInfo.weight}kg</span>
 				{/if}
-				<span class="team">{data.currentAthleteInfo.teamName}</span>
-				<span class="separator">•</span>
-				<span class="weight">{data.currentAthleteInfo.weight}kg</span>
 			</div>
 		</div>
 	{/if}
 
 	<!-- Right: Timer OR Decision (never both) -->
 	<!-- Decision has priority when visible -->
-	{#if data.decision?.visible}
+	{#if showDecisions}
 		<div class="info-card decision-card">
 			<div class="decision-lights">
-				{#if !data.decision.isSingleReferee}
-					<div class="referee-light {getDecisionClass(data.decision.ref1)}"></div>
+				{#if !data.decision?.isSingleReferee}
+					<div class="referee-light {getDecisionClass(data.decision?.ref1)}"></div>
 				{/if}
-				<div class="referee-light {getDecisionClass(data.decision.ref2)}"></div>
-				{#if !data.decision.isSingleReferee}
-					<div class="referee-light {getDecisionClass(data.decision.ref3)}"></div>
+				<div class="referee-light {getDecisionClass(data.decision?.ref2)}"></div>
+				{#if !data.decision?.isSingleReferee}
+					<div class="referee-light {getDecisionClass(data.decision?.ref3)}"></div>
 				{/if}
 			</div>
 		</div>
-	{:else if data.currentAthleteInfo && data.timer?.state !== 'stopped'}
-		<!-- Show timer when athlete is announced and timer is not in final stopped state -->
-		<!-- Timer shows for 'running' and 'set' states (includes intermediate stops during adjustment) -->
+	{:else if showBreakTimer}
+		<!-- Break timer or interruption status -->
+		<div class="info-card timer-card" class:warning={breakTimerState.isWarning && !data.breakTimer?.displayText}>
+			{#if data.breakTimer?.displayText}
+				<!-- Show "STOP"/"STOPP" text during interruption instead of countdown -->
+				<div class="timer-display">{data.breakTimer.displayText}</div>
+			{:else}
+				<!-- Show countdown for regular break -->
+				<div class="timer-display">{breakTimerState.display}</div>
+			{/if}
+		</div>
+	{:else if showAthleteTimer && data.timer?.visible && data.currentAthleteInfo}
+		<!-- Athlete timer -->
 		<div class="info-card timer-card" class:warning={timerState.isWarning}>
 			<div class="timer-display">{timerState.display}</div>
 		</div>
@@ -91,6 +145,16 @@ export function shouldRenderFlag(url) {
 		padding: 5rem;
 		z-index: 9999;
 		pointer-events: none; /* Allow click-through */
+	}
+
+	/* Red background during interruption */
+	.lower-third-overlay.interruption .info-card {
+		background: rgba(220, 38, 38, 0.95);
+		border: 1px solid rgba(255, 255, 255, 0.2);
+	}
+
+	.lower-third-overlay.interruption .info-card.decision-card {
+		background: rgba(220, 38, 38, 0.95);
 	}
 
 	/* Position classes */
@@ -139,6 +203,11 @@ export function shouldRenderFlag(url) {
 		flex: 0 0 auto;
 		min-width: auto;
 		max-width: none;
+	}
+
+	.name-card.during-break {
+		/* During break: just show athlete name, no team info */
+		background: rgba(0, 0, 0, 0.85);
 	}
 
 	.name-content {
