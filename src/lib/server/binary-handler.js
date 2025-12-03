@@ -2,7 +2,15 @@
  * Binary WebSocket frame handler for OWLCMS flags and pictures
  * 
  * Handles binary frames from OWLCMS containing ZIP archives with flags/pictures
- * Frame format: [type_length:4 bytes] [type_string] [ZIP payload]
+ * 
+ * Frame format (Version 2.0.0+):
+ *   [version_length:4 bytes BE] [version_string:UTF-8] [type_length:4 bytes BE] [type_string:UTF-8] [ZIP payload]
+ * 
+ * Example: 6-byte "2.0.0" + 5-byte "flags" frame:
+ *   [0x00,0x00,0x00,0x05] [2,.,0,.,0] [0x00,0x00,0x00,0x05] [f,l,a,g,s] [ZIP...]
+ * 
+ * Legacy format (before Version 2.0.0):
+ *   [type_length:4 bytes BE] [type_string:UTF-8] [ZIP payload]
  */
 
 import AdmZip from 'adm-zip';
@@ -10,6 +18,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
+import { isVersionAcceptable, parseVersion } from './protocol-config.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -94,42 +103,105 @@ export function handleBinaryMessage(buffer) {
 			return;
 		}
 
-		// Read type length as big-endian 32-bit integer (network byte order)
-		// OWLCMS prefixes binary frames with a 4-byte big-endian length for the type string
-		const typeLength = buffer.readUInt32BE(0);
+		// Read first 4-byte integer
+		const firstLength = buffer.readUInt32BE(0);
 
 		// Log first 20 bytes for debugging
 		const preview = buffer.slice(0, Math.min(20, buffer.length)).toString('hex');
 		console.log(`[BINARY] Frame start (hex): ${preview}`);
-		console.log(`[BINARY] Parsed typeLength: ${typeLength} (0x${typeLength.toString(16)}), total frame: ${buffer.length} bytes`);
+		console.log(`[BINARY] First 4-byte value: ${firstLength} (0x${firstLength.toString(16)}), total frame: ${buffer.length} bytes`);
 
-		// Sanity check: if typeLength is unreasonably large (> 10MB), it's probably malformed
-		if (typeLength > 10 * 1024 * 1024) {
-			// Try to detect if this is a ZIP file (starts with 504B0304)
-			if (buffer[0] === 0x50 && buffer[1] === 0x4b && buffer[2] === 0x03 && buffer[3] === 0x04) {
-				console.log('[BINARY] ℹ️  Detected ZIP file without type prefix - treating as flags_zip');
-				handleFlagsMessage(buffer);
+		let offset = 0;
+		let protocolVersion = null;
+		let messageType = null;
+		let payload = null;
+
+		// Detect frame format by checking if first value looks like a version length (typically 5-7)
+		// vs a type length (typically 5-17 for "translations_zip", "flags", etc)
+		// 
+		// If firstLength is 5-7 and buffer contains valid UTF-8 that looks like a version (e.g., "2.0.0"),
+		// treat it as version 2.0.0+ format. Otherwise, treat as legacy format.
+
+		if (firstLength <= 20 && firstLength > 0 && buffer.length >= 4 + firstLength + 4) {
+			// Try to parse as version string
+			try {
+				const potentialVersion = buffer.slice(4, 4 + firstLength).toString('utf8');
+				const parsedVer = parseVersion(potentialVersion);
+				
+				if (parsedVer) {
+					// Looks like a valid version string (e.g., "2.0.0")
+					console.log(`[BINARY] ✅ Detected version 2.0.0+ format with protocol version: ${potentialVersion}`);
+					
+					// Validate protocol version
+					const versionCheck = isVersionAcceptable(potentialVersion);
+					if (!versionCheck.valid) {
+						console.error(`[BINARY] ❌ Protocol version validation failed: ${versionCheck.error}`);
+						return;
+					}
+					
+					protocolVersion = potentialVersion;
+					offset = 4 + firstLength;
+					
+					// Now read the message type
+					if (buffer.length < offset + 4) {
+						console.error(`[BINARY] ERROR: Frame too short for type length at offset ${offset}`);
+						return;
+					}
+					
+					const typeLength = buffer.readUInt32BE(offset);
+					offset += 4;
+					
+					if (buffer.length < offset + typeLength) {
+						console.error(
+							`[BINARY] ERROR: Frame too short for type (need ${offset + typeLength}, got ${buffer.length})`
+						);
+						return;
+					}
+					
+					messageType = buffer.slice(offset, offset + typeLength).toString('utf8');
+					offset += typeLength;
+					payload = buffer.slice(offset);
+					
+				} else {
+					// Not a version string, treat as legacy format
+					console.log(`[BINARY] Detected legacy format (no version header)`);
+					messageType = buffer.slice(4, 4 + firstLength).toString('utf8');
+					payload = buffer.slice(4 + firstLength);
+				}
+			} catch (e) {
+				// Failed to parse as version, treat as legacy format
+				console.log(`[BINARY] Treating as legacy format: ${e.message}`);
+				messageType = buffer.slice(4, 4 + firstLength).toString('utf8');
+				payload = buffer.slice(4 + firstLength);
+			}
+		} else {
+			// Sanity check: if firstLength is unreasonably large (> 10MB), it's probably malformed
+			if (firstLength > 10 * 1024 * 1024) {
+				// Try to detect if this is a ZIP file (starts with 504B0304)
+				if (buffer[0] === 0x50 && buffer[1] === 0x4b && buffer[2] === 0x03 && buffer[3] === 0x04) {
+					console.log('[BINARY] ℹ️  Detected ZIP file without type prefix - treating as flags_zip');
+					handleFlagsMessage(buffer);
+					return;
+				}
+				console.error(
+					`[BINARY] ERROR: firstLength appears malformed (${firstLength} bytes, 0x${firstLength.toString(16)}), but buffer is only ${buffer.length} bytes total`
+				);
 				return;
 			}
-			console.error(
-				`[BINARY] ERROR: typeLength appears malformed (${typeLength} bytes, 0x${typeLength.toString(16)}), but buffer is only ${buffer.length} bytes total`
-			);
-			return;
+
+			// Legacy format: firstLength is the type length
+			console.log(`[BINARY] Treating as legacy format: firstLength=${firstLength} appears to be type length`);
+			
+			if (buffer.length < 4 + firstLength) {
+				console.error(
+					`[BINARY] ERROR: Frame too short for type (need ${4 + firstLength}, got ${buffer.length})`
+				);
+				return;
+			}
+
+			messageType = buffer.slice(4, 4 + firstLength).toString('utf8');
+			payload = buffer.slice(4 + firstLength);
 		}
-
-		// Validate frame contains complete type string
-		if (buffer.length < 4 + typeLength) {
-			console.error(
-				`[BINARY] ERROR: Frame too short for type (need ${4 + typeLength}, got ${buffer.length})`
-			);
-			return;
-		}
-
-		// Extract message type (UTF-8 string)
-		const messageType = buffer.slice(4, 4 + typeLength).toString('utf8');
-
-		// Extract binary payload (everything after type)
-		const payload = buffer.slice(4 + typeLength);
 
 		// Route to handler based on message type
 		if (messageType === 'flags_zip') {

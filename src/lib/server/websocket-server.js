@@ -1,6 +1,6 @@
 /**
  * WebSocket server for receiving OWLCMS events
- * Handles wrapped messages with {type, payload} structure
+ * Handles wrapped messages with {type, payload, version} structure
  */
 
 import { WebSocketServer } from 'ws';
@@ -8,6 +8,7 @@ import { competitionHub } from './competition-hub.js';
 import { captureMessage, LEARNING_MODE } from './learning-mode.js';
 import { extractEmbeddedDatabase } from './embedded-database.js';
 import { handleBinaryMessage } from './binary-handler.js';
+import { extractAndValidateVersion } from './protocol-config.js';
 
 let wss = null;
 
@@ -42,11 +43,28 @@ export function initWebSocketServer(httpServer) {
 				}
 			}
 
-			// Text frame: JSON with {"type":"...","payload":{...}}
+			// Text frame: JSON with {"version":"2.0.0","type":"...","payload":{...}}
 			try {
 				const message = JSON.parse(data.toString());
 				const messageType = message.type ? message.type.toUpperCase() : 'OTHER';
 				console.log(`[WebSocket] Text frame received, message type: ${messageType}`);
+				
+				// Validate protocol version
+				const versionCheck = extractAndValidateVersion(message);
+				if (!versionCheck.valid) {
+					console.error(`[WebSocket] ❌ Version validation failed: ${versionCheck.error}`);
+					ws.send(JSON.stringify({
+						status: 400,
+						error: 'Protocol version check failed',
+						reason: versionCheck.error,
+						details: {
+							received: versionCheck.version,
+							info: 'Please ensure OWLCMS is configured with the correct tracker WebSocket URL and is up to date'
+						}
+					}));
+					return;
+				}
+				console.log(`[WebSocket] ✅ Protocol version validated: ${versionCheck.version}`);
 				
 				// Capture message in learning mode using explicit WebSocket type
 				if (LEARNING_MODE) {
@@ -56,7 +74,7 @@ export function initWebSocketServer(httpServer) {
 				}
 				
 				if (!message.type || !message.payload) {
-					ws.send(JSON.stringify({ error: 'Invalid message format. Expected {type, payload}' }));
+					ws.send(JSON.stringify({ error: 'Invalid message format. Expected {version, type, payload}' }));
 					return;
 				}
 				
