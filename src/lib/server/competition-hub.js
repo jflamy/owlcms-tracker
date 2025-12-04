@@ -44,6 +44,7 @@ class CompetitionHub {
     this.lastDatabaseChecksum = null;
     this._hasConfirmedFops = false;
     this.flagsLoaded = false;
+    // Always start with translationsReady = false so tracker requests fresh translations on startup
     this.translationsReady = false;
     this.databaseAthleteIndex = new Map();
     this.databaseTeamMap = new Map();
@@ -2076,17 +2077,9 @@ class CompetitionHub {
 
 // Export singleton instance
 // Use globalThis to persist across HMR (Vite hot reload)
+// Translations and other state persist - OWLCMS pushes fresh data when needed
 if (!globalThis.__competitionHub) {
   globalThis.__competitionHub = new CompetitionHub();
-  // Only log on actual HMR reloads (when Vite is already running)
-  if (globalThis.__viteReady) {
-    console.log('[Hub] Reusing existing CompetitionHub instance (HMR)');
-  }
-} else {
-  // On first startup, don't log reuse since it's a fresh instance
-  if (globalThis.__viteReady) {
-    console.log('[Hub] Reusing existing CompetitionHub instance (HMR)');
-  }
 }
 
 // Mark Vite as ready after first startup

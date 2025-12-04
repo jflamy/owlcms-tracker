@@ -10,8 +10,8 @@
 	let scoreboardData = null;
 	let unsubscribeSSE = null;
 	
-	// Get language preference from URL parameter or options (default: 'no')
-	$: language = $page.url.searchParams.get('lang') || $page.url.searchParams.get('language') || 'no';
+	// Get language preference from URL parameter or config default or fallback to 'en'
+	$: language = $page.url.searchParams.get('lang') || $page.url.searchParams.get('language') || data.config?.options?.find(o => o.key === 'language')?.default || 'en';
 	
 	// Build API URL with all parameters (including lang)
 	$: apiUrl = `/api/scoreboard?type=${data.scoreboardType}&fop=${data.fopName}&lang=${language}` +

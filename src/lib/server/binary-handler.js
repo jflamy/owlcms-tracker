@@ -404,12 +404,11 @@ function handleTranslationsZipMessage(zipBuffer) {
 		// This will be called at runtime when message arrives
 		const competitionHub = require('./competition-hub.js').competitionHub;
 		
-		// Check checksum first (skip if matches)
+		// Check checksum to determine if content changed
 		const checksum = payload.translationsChecksum;
-		if (checksum && checksum === competitionHub.lastTranslationsChecksum) {
-			const elapsed = Date.now() - startTime;
-			console.log(`[TRANSLATIONS_ZIP] ⏭️  Checksum ${checksum.substring(0, 8)}... matches, skipping reprocessing (${elapsed}ms)`);
-			return;
+		const checksumMatches = checksum && checksum === competitionHub.lastTranslationsChecksum;
+		if (checksumMatches) {
+			console.log(`[TRANSLATIONS_ZIP] 🔄 Checksum ${checksum.substring(0, 8)}... matches previous, but processing anyway (forced refresh)`);
 		}
 		
 		// Handle wrapper structure: { "locales": { "en": {...}, "fr": {...} }, "translationsChecksum": "..." }

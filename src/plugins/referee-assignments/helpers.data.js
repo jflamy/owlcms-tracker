@@ -1,8 +1,8 @@
 /**
  * Referee Assignments Scoreboard - Server-side helpers
  * 
- * This scoreboard displays referee and official assignments across all sessions/groups.
- * Structure: Top row shows session names, subsequent rows show different official types.
+ * This scoreboard displays referee and official assignments across all sessions/groups
+ * in a professional IWF protocol format.
  */
 
 import { competitionHub } from '$lib/server/competition-hub.js';
@@ -11,150 +11,231 @@ import { buildCacheKey } from '$lib/server/cache-utils.js';
 // Cache for referee-assignments
 const refereeAssignmentsCache = new Map();
 
-// Hub FOP version lookup is centralized in `buildCacheKey` from cache-utils.
-
 /**
  * Main function to get referee assignment data
  * @param {string} fopName - Field of play name (not used for this scoreboard, but required by system)
- * @param {object} options - User options
+ * @param {object} options - User options (including lang/language for translation locale)
  * @returns {object} Referee assignment data structured for display
  */
 export function getScoreboardData(fopName = 'A', options = {}) {
 	const databaseState = competitionHub.getDatabaseState();
-		const cacheKey = buildCacheKey({ includeFop: false, opts: options });
-		if (refereeAssignmentsCache.has(cacheKey)) {
-			return refereeAssignmentsCache.get(cacheKey);
-		}
+	
+	// Get language from options (same pattern as team-scoreboard)
+	const language = options.lang || options.language || 'en';
+	const translations = competitionHub.getTranslations(language);
+	
+	// Include translations checksum in cache key so cache invalidates when translations change
+	const translationsChecksum = competitionHub.lastTranslationsChecksum || 'none';
+	const cacheKey = buildCacheKey({ includeFop: false, opts: options }) + `-txcs:${translationsChecksum.substring(0, 8)}`;
+	
+	if (refereeAssignmentsCache.has(cacheKey)) {
+		return refereeAssignmentsCache.get(cacheKey);
+	}
 	
 	if (!databaseState || !databaseState.competition) {
 		return {
 			status: 'no_data',
 			message: 'No competition data available',
 			sessions: [],
-			assignmentRows: []
+			header: {}
 		};
 	}
 
-	const groups = databaseState.groups || [];
+	// Use sessions if available, otherwise extract from athletes' group assignments
+	let sessions = databaseState.sessions || [];
 	
-	if (groups.length === 0) {
-		return {
-			status: 'no_groups',
-			message: 'No sessions/groups found in competition',
+	if (sessions.length === 0 && databaseState.athletes) {
+		// Extract unique groups from athletes
+		const groupMap = new Map();
+		databaseState.athletes.forEach(athlete => {
+			if (athlete.group && !groupMap.has(athlete.group)) {
+				groupMap.set(athlete.group, { name: athlete.group, description: athlete.group });
+			}
+		});
+		sessions = Array.from(groupMap.values());
+	}
+	
+	if (sessions.length === 0) {
+		// If still no sessions, at least show the competition header with placeholder
+		const competition = databaseState.competition;
+		const result = {
+			status: 'ready',
+			header: {
+				competitionName: competition.competitionName || 'Competition',
+				site: competition.competitionSite || '',
+				competitionDate: competition.competitionDate ? formatDate(competition.competitionDate, language) : '',
+				city: competition.competitionCity || '',
+				title: translations['OfficialAssignments'] || `!${language}:OfficialAssignments`
+			},
 			sessions: [],
-			assignmentRows: []
+			totalSessions: 0,
+			labels: buildLabels(translations, language)
 		};
+		refereeAssignmentsCache.set(cacheKey, result);
+		return result;
 	}
 
-	// Sort groups by name (which is typically "1", "2", etc.)
-	const sortedGroups = [...groups].sort((a, b) => {
+	// Sort sessions by name
+	const sortedSessions = [...sessions].sort((a, b) => {
 		const aNum = parseInt(a.name, 10);
 		const bNum = parseInt(b.name, 10);
-		return aNum - bNum;
+		return !isNaN(aNum) && !isNaN(bNum) ? aNum - bNum : a.name.localeCompare(b.name);
 	});
 
-	// Define official types and their corresponding field names
-	const officialTypes = [
-		{
-			label: 'Referee 1',
-			field: 'referee1',
-			type: 'referee1'
-		},
-		{
-			label: 'Referee 2',
-			field: 'referee2',
-			type: 'referee2'
-		},
-		{
-			label: 'Referee 3',
-			field: 'referee3',
-			type: 'referee3'
-		},
-		{
-			label: 'Jury 1',
-			field: 'jury1',
-			type: 'jury1'
-		},
-		{
-			label: 'Jury 2',
-			field: 'jury2',
-			type: 'jury2'
-		},
-		{
-			label: 'Jury 3',
-			field: 'jury3',
-			type: 'jury3'
-		},
-		{
-			label: 'Jury 4',
-			field: 'jury4',
-			type: 'jury4'
-		},
-		{
-			label: 'Jury 5',
-			field: 'jury5',
-			type: 'jury5'
-		},
-		{
-			label: 'Technical Controller',
-			field: 'technicalController',
-			type: 'technicalController'
-		},
-		{
-			label: 'Time Keeper',
-			field: 'timeKeeper',
-			type: 'timeKeeper'
-		},
-		{
-			label: 'Marshal',
-			field: 'marshall',
-			type: 'marshall'
+	// Get competition info for header
+	const competition = databaseState.competition;
+	
+	// Helper function to split names on " et " or " and "
+	function formatNames(value) {
+		if (!value || value.trim() === '') {
+			return null;
 		}
-	];
+		
+		const trimmed = value.trim();
+		const names = trimmed.split(/\s+(?:et|and)\s+/i).map(n => n.trim()).filter(n => n.length > 0);
+		
+		return {
+			raw: trimmed,
+			split: names.length > 1 ? names : []
+		};
+	}
 
-	// Build the assignment table
-	// Each row represents an official type, each column represents a session
-	const assignmentRows = officialTypes.map(officialType => ({
-		label: officialType.label,
-		type: officialType.type,
-		assignments: sortedGroups.map(group => {
-			const value = group[officialType.field];
-			// Handle null, undefined, or empty string
-			return {
-				name: (value && value.trim()) || '—',
-				isEmpty: !value || value.trim() === ''
-			};
-		})
-	}));
+	// Build session columns data
+	const sessionColumns = sortedSessions.map((session, idx) => {
+		// Get category info if available - find athletes in this session
+		const sessionAthletes = (databaseState.athletes || []).filter(a => a.group === session.name);
+		
+		return {
+			id: `session-${idx}`,
+			name: session.name,
+			displayName: session.description || session.name,
+			platformName: session.platformName || '',
+			weighInTime: session.weighInTime ? formatTime(session.weighInTime) : '',
+			competitionTime: session.competitionTime ? formatTime(session.competitionTime) : '',
+			athleteCount: sessionAthletes.length,
+			officials: {
+				weighIn1: formatNames(session.weighIn1),
+				weighIn2: formatNames(session.weighIn2),
+				announcer: formatNames(session.announcer),
+				marshall: formatNames(session.marshall),
+				marshal2: formatNames(session.marshal2),
+				technicalController: formatNames(session.technicalController),
+				technicalController2: formatNames(session.technicalController2),
+				technicalController3: formatNames(session.technicalController3),
+				timeKeeper: formatNames(session.timeKeeper),
+				referee1: formatNames(session.referee1),
+				referee2: formatNames(session.referee2),
+				referee3: formatNames(session.referee3),
+				reserve: formatNames(session.reserve),
+				jury1: formatNames(session.jury1),
+				jury2: formatNames(session.jury2),
+				jury3: formatNames(session.jury3),
+				jury4: formatNames(session.jury4),
+				jury5: formatNames(session.jury5),
+				reserveJury: formatNames(session.reserveJury),
+				competitionDirector: formatNames(session.competitionDirector),
+				competitionSecretary: formatNames(session.competitionSecretary),
+				competitionSecretary2: formatNames(session.competitionSecretary2),
+				doctor: formatNames(session.doctor),
+				doctor2: formatNames(session.doctor2),
+				doctor3: formatNames(session.doctor3)
+			}
+		};
+	});
 
-	return {
+	// Build result with translations
+	const sideRefereeBase = translations['SideReferee'] || `!${language}:SideReferee`;
+	
+	const result = {
 		status: 'ready',
-		competition: {
-			name: databaseState.competition?.name || 'Competition'
+		header: {
+			competitionName: competition.competitionName || 'Competition',
+			site: competition.competitionSite || '',
+			competitionDate: competition.competitionDate ? formatDate(competition.competitionDate, language) : '',
+			city: competition.competitionCity || '',
+			title: translations['OfficialAssignments'] || `!${language}:OfficialAssignments`
 		},
-		sessions: sortedGroups.map(group => ({
-			id: group.id,
-			name: group.name,
-			description: group.description,
-			displayName: `${group.name}: ${group.description}`
-		})),
-		assignmentRows,
-		totalSessions: sortedGroups.length,
-		totalOfficialTypes: officialTypes.length
+		sessions: sessionColumns,
+		totalSessions: sortedSessions.length,
+		// Pass translations and labels for use in component
+		labels: buildLabels(translations, language)
 	};
 
-	// Cache the stable assignment result
-	const toCache = {
-		status: 'ready',
-		competition: { name: databaseState.competition?.name || 'Competition' },
-		sessions: sortedGroups.map(group => ({ id: group.id, name: group.name, description: group.description, displayName: `${group.name}: ${group.description}` })),
-		assignmentRows,
-		totalSessions: sortedGroups.length,
-		totalOfficialTypes: officialTypes.length
-	};
-	refereeAssignmentsCache.set(cacheKey, toCache);
+	// Cache the result
+	refereeAssignmentsCache.set(cacheKey, result);
 	if (refereeAssignmentsCache.size > 3) {
 		const firstKey = refereeAssignmentsCache.keys().next().value;
 		refereeAssignmentsCache.delete(firstKey);
 	}
+
+	return result;
+}
+
+/**
+ * Format time array [year, month, day, hour, minute] to readable string
+ */
+function formatTime(timeArray) {
+	if (!timeArray || timeArray.length < 5) return '';
+	const [, , , hour, minute] = timeArray;
+	return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
+
+/**
+ * Format date array [year, month, day] to locale-appropriate string
+ * @param {Array} dateArray - [year, month, day]
+ * @param {string} language - Language code (e.g., 'en', 'fr', 'fr_CA')
+ */
+function formatDate(dateArray, language = 'en') {
+	if (!dateArray || dateArray.length < 3) return '';
+	const [year, month, day] = dateArray;
+	
+	// Use ISO format (yyyy-mm-dd) for French Canadian and other locales that prefer it
+	// Use international format (dd/mm/yyyy) for most European locales
+	// Use US format (mm/dd/yyyy) for US English
+	const lang = language.toLowerCase();
+	
+	if (lang === 'fr_ca' || lang === 'fr-ca' || lang === 'en_ca' || lang === 'en-ca') {
+		// Canadian format: yyyy-mm-dd (ISO)
+		return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+	} else if (lang === 'en_us' || lang === 'en-us') {
+		// US format: mm/dd/yyyy
+		return `${String(month).padStart(2, '0')}/${String(day).padStart(2, '0')}/${year}`;
+	} else {
+		// International/European format: dd/mm/yyyy
+		return `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`;
+	}
+}
+
+/**
+ * Build labels object from translations
+ */
+function buildLabels(translations, language) {
+	const sideRefereeBase = translations['SideReferee'] || `!${language}:SideReferee`;
+	
+	return {
+		group: translations['Group'] || `!${language}:Group`,
+		official_at_weighin: translations['WeighInOfficials'] || `!${language}:WeighInOfficials`,
+		weighin_time: translations['WeighInTime_StartList'] || `!${language}:WeighInTime_StartList`,
+		competition_time: translations['StartTime'] || `!${language}:StartTime`,
+		announcer: translations['Announcer'] || `!${language}:Announcer`,
+		referees: translations['Referees'] || `!${language}:Referees`,
+		center_referee: translations['CenterReferee'] || `!${language}:CenterReferee`,
+		side_referee_1: (sideRefereeBase + ' 1'),
+		side_referee_2: (sideRefereeBase + ' 3'),
+		reserve_referee: translations['ReserveReferee'] || `!${language}:ReserveReferee`,
+		marshals: translations['Marshals'] || `!${language}:Marshals`,
+		marshall: translations['Marshall'] || `!${language}:Marshall`,
+		timekeeper: translations['Timekeeper'] || `!${language}:Timekeeper`,
+		technical_controller: translations['TechnicalController'] || `!${language}:TechnicalController`,
+		secretaries: translations['Secretaries'] || `!${language}:Secretaries`,
+		secretary: translations['Secretary'] || `!${language}:Secretary`,
+		doctor: translations['Doctor'] || `!${language}:Doctor`,
+		jury: translations['Jury'] || `!${language}:Jury`,
+		jury_president: translations['JuryPresident'] || `!${language}:JuryPresident`,
+		jury_members: translations['JuryMembers'] || `!${language}:JuryMembers`,
+		reserve: translations['Reserve'] || `!${language}:Reserve`,
+		support_it: translations['TechnologySupport'] || `!${language}:TechnologySupport`,
+		tis1: translations['TIS1'] || `!${language}:TIS1`,
+		tis2: translations['TIS2'] || `!${language}:TIS2`
+	};
 }

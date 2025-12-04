@@ -26,9 +26,9 @@ export default {
 			key: 'language',
 			label: 'Language',
 			type: 'select',
-			options: ['en', 'no'],
+			options: 'dynamic:locales',
 			default: 'en',
-			description: 'Choose scoreboard text language (English or Norwegian)'
+			description: 'Choose scoreboard text language'
 		}
 	],
 	
