@@ -1,5 +1,6 @@
 <script>
   import { browser } from '$app/environment';
+  import { invalidateAll } from '$app/navigation';
   import { onMount } from 'svelte';
   export let data;
   
@@ -15,7 +16,7 @@
   let expandedCategory = null; // Start folded
 
   // Language name translations (from OWLCMS via Tracker.LocaleName)
-  // These are dynamically loaded from the server
+  // These are dynamically loaded from the server and refreshed when data arrives
   $: languageNames = data.languageNames || {};
   $: availableLocales = data.availableLocales || [];
 
@@ -25,11 +26,14 @@
    */
   function getEffectiveOptions(option) {
     if (option.key === 'language' && option.options === 'dynamic:locales') {
-      // Sort with default language first, then alphabetically by display name
+      // Sort with default language first, then alphabetically by display name, Interlingua (ia) last
       const defaultLang = option.default || 'en';
       return [...availableLocales].sort((a, b) => {
         if (a === defaultLang) return -1;
         if (b === defaultLang) return 1;
+        // Interlingua (ia) always last
+        if (a === 'ia') return 1;
+        if (b === 'ia') return -1;
         const nameA = languageNames[a] || a;
         const nameB = languageNames[b] || b;
         return nameA.localeCompare(nameB);
@@ -132,6 +136,8 @@
     const eventSource = new EventSource('/api/client-stream');
     const markConfirmed = () => {
       confirmedFops = true;
+      // Invalidate page data to refresh locales from server
+      invalidateAll();
     };
 
     const handleMessage = (event) => {

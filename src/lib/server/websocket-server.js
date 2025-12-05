@@ -230,38 +230,13 @@ async function handleUpdateMessage(payload, hasBundledDatabase = false) {
 	const result = competitionHub.handleOwlcmsMessage(payload, 'update');
 	const missing = competitionHub.getMissingPreconditions();
 
-	if (isDatabaseComing) {
-		console.log(`[WebSocket] ${uiEvent} update received${hasBundledDatabase ? ' with embedded database' : ' without embedded database'}`);
-
-		if (missing.includes('translations')) {
-			console.log(`[WebSocket] ${uiEvent} processed but translations missing - requesting translations`);
-			return {
-				status: 428,
-				message: 'Precondition Required: Missing required data',
-				reason: 'missing_translations',
-				missing: missing
-			};
-		}
-
-		if (!hasBundledDatabase && !competitionHub.getDatabaseState()) {
-			console.log(`[WebSocket] ${uiEvent} processed but database missing - requesting database`);
-			return {
-				status: 428,
-				message: 'Precondition Required: Missing required data',
-				reason: 'no_database_state',
-				missing: missing
-			};
-		}
-
-		return mapHubResultToResponse(result, 'update');
-	}
-
-	if (!competitionHub.getDatabaseState() && !isDatabaseComing && !hasBundledDatabase) {
-		console.log(`[WebSocket] Update received (${uiEvent}) but no database - requesting database`);
+	// Always check for missing preconditions and request them
+	if (missing.length > 0) {
+		console.log(`[WebSocket] Update processed but missing preconditions: ${missing.join(', ')}`);
 		return {
 			status: 428,
 			message: 'Precondition Required: Missing required data',
-			reason: result?.reason || 'no_database_state',
+			reason: 'missing_preconditions',
 			missing: missing
 		};
 	}
@@ -281,20 +256,20 @@ async function handleUpdateMessage(payload, hasBundledDatabase = false) {
  * Handle timer message - same payload as POST /timer
  */
 async function handleTimerMessage(payload, hasBundledDatabase = false) {
-	// If we still have no database, request it from OWLCMS
-	if (!competitionHub.getDatabaseState() && !hasBundledDatabase) {
-		console.log('[WebSocket] Timer received but no database - requesting database');
-		const interimResult = competitionHub.handleOwlcmsMessage(payload, 'timer');
-		const missing = competitionHub.getMissingPreconditions();
+	const result = competitionHub.handleOwlcmsMessage(payload, 'timer');
+	const missing = competitionHub.getMissingPreconditions();
+
+	// Request missing preconditions (database and/or translations)
+	if (missing.length > 0) {
+		console.log(`[WebSocket] Timer received but missing: ${missing.join(', ')}`);
 		return {
 			status: 428,
 			message: 'Precondition Required: Missing required data',
-			reason: interimResult?.reason || 'no_database_state',
+			reason: 'missing_preconditions',
 			missing: missing
 		};
 	}
 
-	const result = competitionHub.handleOwlcmsMessage(payload, 'timer');
 	return mapHubResultToResponse(result, 'timer');
 }
 
@@ -302,19 +277,20 @@ async function handleTimerMessage(payload, hasBundledDatabase = false) {
  * Handle decision message - same payload as POST /decision
  */
 async function handleDecisionMessage(payload, hasBundledDatabase = false) {
-	if (!competitionHub.getDatabaseState() && !hasBundledDatabase) {
-		console.log('[WebSocket] Decision received but no database - requesting database');
-		const interimResult = competitionHub.handleOwlcmsMessage(payload, 'decision');
-		const missing = competitionHub.getMissingPreconditions();
+	const result = competitionHub.handleOwlcmsMessage(payload, 'decision');
+	const missing = competitionHub.getMissingPreconditions();
+
+	// Request missing preconditions (database and/or translations)
+	if (missing.length > 0) {
+		console.log(`[WebSocket] Decision received but missing: ${missing.join(', ')}`);
 		return {
 			status: 428,
 			message: 'Precondition Required: Missing required data',
-			reason: interimResult?.reason || 'no_database_state',
+			reason: 'missing_preconditions',
 			missing: missing
 		};
 	}
 
-	const result = competitionHub.handleOwlcmsMessage(payload, 'decision');
 	return mapHubResultToResponse(result, 'decision');
 }
 

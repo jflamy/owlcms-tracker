@@ -424,15 +424,31 @@ function handleTranslationsZipMessage(zipBuffer) {
 		// Cache each locale
 		let localesCount = 0;
 		let totalKeys = 0;
+		let skippedLocales = [];
 		console.log(`[TRANSLATIONS_ZIP] 🔄 Caching locales...`);
+		
+		// Pattern for valid locale codes: must start with letter, can contain letters, numbers, underscores, hyphens
+		// Rejects: empty, numeric-only, contains spaces, starts with number
+		const validLocalePattern = /^[A-Za-z][A-Za-z0-9_-]*$/;
 		
 		for (const [locale, translationMap] of Object.entries(translationsData)) {
 			// Skip metadata fields and only process translation maps
+			// Also skip invalid locale codes (empty, numeric, containing spaces, etc.)
 			if (translationMap && typeof translationMap === 'object' && locale !== 'translationsChecksum') {
-				competitionHub.setTranslations(locale, translationMap);
+				// Extra validation: skip empty strings, whitespace-only, or anything not matching pattern
+				const trimmedLocale = (locale || '').trim();
+				if (!trimmedLocale || !validLocalePattern.test(trimmedLocale)) {
+					skippedLocales.push(locale || '(empty)');
+					continue;
+				}
+				competitionHub.setTranslations(trimmedLocale, translationMap);
 				localesCount++;
 				totalKeys += Object.keys(translationMap).length;
 			}
+		}
+		
+		if (skippedLocales.length > 0) {
+			console.log(`[TRANSLATIONS_ZIP] ⚠️  Skipped ${skippedLocales.length} invalid locale keys: ${skippedLocales.slice(0, 5).map(l => JSON.stringify(l)).join(', ')}${skippedLocales.length > 5 ? '...' : ''}`);
 		}
 		
 		// Store checksum after successful processing

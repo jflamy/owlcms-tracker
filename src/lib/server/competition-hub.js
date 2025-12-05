@@ -1822,6 +1822,9 @@ class CompetitionHub {
     this.lastDatabaseChecksum = null;
     this.lastDatabaseLoad = 0;
     this.flagsLoaded = false;
+    // Clear translations completely so a reconnect forces a fresh translations_zip
+    this.translations = {};
+    this.lastTranslationsChecksum = null;
     this.translationsReady = false;
     this._hasConfirmedFops = false;
     this.broadcast({

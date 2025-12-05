@@ -28,14 +28,38 @@ export async function load() {
 	const competitionName = databaseState?.competition?.name || 'OWLCMS Competition';
 	
 	// Get available locales from loaded translations
-	const availableLocales = competitionHub.getAvailableLocales();
-	
-	// Build language display names from Tracker.LocaleName translations
+	// Prefer hub locales; fall back to English so dropdown is never empty even if translations arrive late
+	const hubLocales = competitionHub.getAvailableLocales();
+	const availableLocales = hubLocales.length > 0 ? hubLocales : ['en'];
+
+	// Filter locales to BCP-47-ish strings to avoid RangeError in Intl.DisplayNames (allow _ as OWLCMS uses en_US style)
+	const sanitizedLocales = availableLocales.filter((loc) => typeof loc === 'string' && /^[A-Za-z0-9_-]+$/.test(loc));
+	const displayLocales = sanitizedLocales.length > 0 ? sanitizedLocales : ['en'];
+
+	// Build language display names, falling back to Intl.DisplayNames when Tracker.LocaleName is absent
 	const languageNames = {};
+	let displayNames = null;
+	if (typeof Intl !== 'undefined' && Intl.DisplayNames) {
+		try {
+			displayNames = new Intl.DisplayNames(displayLocales, { type: 'language' });
+		} catch (err) {
+			// If Intl.DisplayNames rejects locales, skip and rely on translation/fallbacks
+			displayNames = null;
+		}
+	}
+	const localePattern = /^[A-Za-z0-9_-]+$/;
 	for (const locale of availableLocales) {
 		const translations = competitionHub.getTranslations(locale);
-		// Use the locale's own name for itself (e.g., "Norsk" for 'no', "Français" for 'fr')
-		languageNames[locale] = translations?.['Tracker.LocaleName'] || locale;
+		const translated = translations?.['Tracker.LocaleName'];
+		let intlName = null;
+		if (displayNames && localePattern.test(locale)) {
+			try {
+				intlName = displayNames.of(locale);
+			} catch {
+				// Invalid locale code for Intl, skip
+			}
+		}
+		languageNames[locale] = translated || intlName || locale;
 	}
 	
 	const confirmedFopsAvailable = typeof competitionHub.hasConfirmedFops === 'function'
