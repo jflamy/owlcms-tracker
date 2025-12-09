@@ -297,9 +297,9 @@ export function computeGamxM(gender, bodyMass, total, age)  // MASTERS (age requ
 
 ## Testing
 
-Test file: `src/lib/gamx.test.js`
+Test file: `src/lib/gamx2.test.js`
 
-Run with: `node src/lib/gamx.test.js`
+Run with: `node src/lib/gamx2.test.js`
 
 ### Test Suites
 
