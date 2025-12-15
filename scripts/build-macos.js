@@ -5,11 +5,12 @@ import https from 'https';
 import AdmZip from 'adm-zip';
 
 const NODE_VERSION = '22.12.0';
-const DIST_DIR = 'dist/macos';
-const NODE_URL = `https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-darwin-arm64.tar.gz`;
-const NODE_FILENAME = `node-v${NODE_VERSION}-darwin-arm64.tar.gz`;
+const ARCH = process.env.MACOS_ARCH || 'arm64'; // 'arm64' for M-series, 'x64' for Intel
+const DIST_DIR = ARCH === 'x64' ? 'dist/macos-x64' : 'dist/macos';
+const NODE_URL = `https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-darwin-${ARCH}.tar.gz`;
+const NODE_FILENAME = `node-v${NODE_VERSION}-darwin-${ARCH}.tar.gz`;
 
-console.log('📦 Building macOS portable package...\n');
+console.log(`📦 Building macOS ${ARCH === 'x64' ? 'Intel (x64)' : 'M-series (ARM64)'} portable package...\n`);
 
 // Helper to download file
 function downloadFile(url, dest) {
@@ -81,7 +82,7 @@ function downloadFile(url, dest) {
 
     // 6. Extract Node.js binary
     console.log('\n📦 Extracting Node.js...');
-    execSync(`cd ${DIST_DIR} && tar xzf ${NODE_FILENAME} && mv node-v${NODE_VERSION}-darwin-arm64/bin/node . && rm -rf node-v${NODE_VERSION}-darwin-arm64 ${NODE_FILENAME}`, { stdio: 'inherit' });
+    execSync(`cd ${DIST_DIR} && tar xzf ${NODE_FILENAME} && mv node-v${NODE_VERSION}-darwin-${ARCH}/bin/node . && rm -rf node-v${NODE_VERSION}-darwin-${ARCH} ${NODE_FILENAME}`, { stdio: 'inherit' });
     console.log('✓ Extracted Node.js binary');
 
     // 7. Make tracker.sh executable
@@ -128,7 +129,8 @@ For more information: https://github.com/owlcms/owlcms-tracker
     console.log('\n📦 Creating ZIP file...');
     
     // Use native zip command (faster than adm-zip for large directories)
-    const zipPath = 'dist/owlcms-tracker-macos.zip';
+    const zipFilename = ARCH === 'x64' ? 'owlcms-tracker-macos-x64.zip' : 'owlcms-tracker-macos.zip';
+    const zipPath = `dist/${zipFilename}`;
     
     // Use native zip command on macOS/Linux
     const createZip = () => {
@@ -151,34 +153,13 @@ For more information: https://github.com/owlcms/owlcms-tracker
       await createZip();
       console.log(`✓ Created ${zipPath}`);
     } catch (zipErr) {
-      console.warn('⚠️  Native zip failed, falling back to adm-zip...');
-      // Fallback to adm-zip if native zip fails
-      const zip2 = new AdmZip();
-      const zipDir2 = (dirPath, zipPath = '') => {
-        const files = fs.readdirSync(dirPath);
-        files.forEach(file => {
-          const filePath = path.join(dirPath, file);
-          const zPath = zipPath ? path.join(zipPath, file) : file;
-          const stats = fs.statSync(filePath);
-          if (stats.isDirectory()) {
-            zipDir2(filePath, zPath);
-          } else {
-            const entry = zip2.addFile(zPath, fs.readFileSync(filePath));
-            // Preserve executable bit for .sh files
-            if (file.endsWith('.sh') || file === 'node') {
-              entry.attr = 0o755 << 16; // Unix file permissions
-            }
-          }
-        });
-      };
-      zipDir2(DIST_DIR, 'owlcms-tracker');
-      zip2.writeZip(zipPath);
-      console.log(`✓ Created ${zipPath} (fallback)`);
+      console.error('❌ Failed to create ZIP with native zip command:', zipErr.message);
+      process.exit(1);
     }
 
     const sizeInMB = (fs.statSync(zipPath).size / 1024 / 1024).toFixed(1);
     console.log(`
-✅ macOS package complete!
+✅ macOS ${ARCH === 'x64' ? 'Intel (x64)' : 'M-series (ARM64)'} package complete!
 
 File: ${zipPath} (${sizeInMB}MB)
 

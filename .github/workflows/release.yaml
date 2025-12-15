@@ -1,0 +1,122 @@
+name: Build Release Packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      revision:
+        description: 'semver number for the release'
+        required: true
+        default: '1.0.0'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      REVISION: ${{ github.event.inputs.revision }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build base application
+        run: npm run build
+      
+      - name: Build Windows package
+        run: node scripts/build-windows.js
+      
+      - name: Build macOS ARM64 (M-series) package
+        run: node scripts/build-macos.js
+      
+      - name: Build macOS x64 (Intel) package
+        run: MACOS_ARCH=x64 node scripts/build-macos.js
+      
+      - name: Setup Docker buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Log in to Docker Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.DOCKER_REG }}
+          username: ${{ secrets.ORG_DOCKER_USER }}
+          password: ${{ secrets.ORG_DOCKER_TOKEN }}
+      
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_REG }}/owlcms/tracker:${{ env.REVISION }}
+            ${{ secrets.DOCKER_REG }}/owlcms/tracker:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: List generated packages
+        run: |
+          echo "Generated packages:"
+          ls -lh dist/*.zip
+          # Rename packages to include version
+          mv dist/owlcms-tracker-windows.zip dist/owlcms-tracker-windows_${{ env.REVISION }}.zip
+          mv dist/owlcms-tracker-macos.zip dist/owlcms-tracker-macos-arm64_${{ env.REVISION }}.zip
+          mv dist/owlcms-tracker-macos-x64.zip dist/owlcms-tracker-macos-x64_${{ env.REVISION }}.zip
+          mv dist/owlcms-tracker-rpi.zip dist/owlcms-tracker-rpi_${{ env.REVISION }}.zip
+          echo "Renamed packages:"
+          ls -lh dist/*.zip
+      
+      - name: Upload Windows package
+        uses: actions/upload-artifact@v4
+        with:
+          name: owlcms-tracker-windows
+          path: dist/owlcms-tracker-windows_${{ env.REVISION }}.zip
+          retention-days: 90
+      
+      - name: Upload macOS ARM64 package
+        uses: actions/upload-artifact@v4
+        with:
+          name: owlcms-tracker-macos-arm64
+          path: dist/owlcms-tracker-macos-arm64_${{ env.REVISION }}.zip
+          retention-days: 90
+      
+      - name: Upload macOS x64 package
+        uses: actions/upload-artifact@v4
+        with:
+          name: owlcms-tracker-macos-x64
+          path: dist/owlcms-tracker-macos-x64_${{ env.REVISION }}.zip
+          retention-days: 90
+      
+      - name: Upload Raspberry Pi package
+        uses: actions/upload-artifact@v4
+        with:
+          name: owlcms-tracker-rpi
+          path: dist/owlcms-tracker-rpi_${{ env.REVISION }}.zip
+          retention-days: 90
+      
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -x
+          # Tag the current commit
+          git config user.email "${{ github.actor }}@users.noreply.github.com"
+          git config user.name "${{ github.actor }}"
+          git tag ${{ env.REVISION }}
+          git push origin ${{ env.REVISION }}
+          
+          # Create release with all packages and release notes
+          gh release create ${{ env.REVISION }} \
+            --title "${{ env.REVISION }}" \
+            --notes-file ReleaseNotes.md \
+            dist/owlcms-tracker-windows_${{ env.REVISION }}.zip \
+            dist/owlcms-tracker-macos-arm64_${{ env.REVISION }}.zip \
+            dist/owlcms-tracker-macos-x64_${{ env.REVISION }}.zip \
+            dist/owlcms-tracker-rpi_${{ env.REVISION }}.zip
+          set +x

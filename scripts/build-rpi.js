@@ -191,31 +191,9 @@ For more information: https://github.com/owlcms/owlcms-tracker
       await createZip();
       console.log(`✓ Created ${zipPath}`);
     } catch (zipErr) {
-      console.warn('⚠️  Native zip failed, falling back to adm-zip...');
-      // Fallback to adm-zip if native zip fails
-      const zip2 = new AdmZip();
-      const zipDir2 = (dirPath, zipPath = '') => {
-        const files = fs.readdirSync(dirPath);
-        files.forEach(file => {
-          const filePath = path.join(dirPath, file);
-          const zPath = zipPath ? path.join(zipPath, file) : file;
-          const stats = fs.statSync(filePath);
-          if (stats.isDirectory()) {
-            zipDir2(filePath, zPath);
-          } else {
-            const entry = zip2.addFile(zPath, fs.readFileSync(filePath));
-            // Preserve executable bit for .sh files
-            if (file.endsWith('.sh') || file === 'node') {
-              entry.attr = 0o755 << 16; // Unix file permissions
-            }
-          }
-        });
-      };
-      zipDir2(DIST_DIR, 'owlcms-tracker-rpi');
-      zip2.writeZip(zipPath);
-      console.log(`✓ Created ${zipPath} (fallback)`);
+      console.error('❌ Failed to create ZIP with native zip command:', zipErr.message);
+      process.exit(1);
     }
-    console.log(`✓ Created ${zipPath}`);
 
     const sizeInMB = (fs.statSync(zipPath).size / 1024 / 1024).toFixed(1);
     console.log(`

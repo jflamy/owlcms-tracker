@@ -81,8 +81,28 @@ function downloadFile(url, dest) {
 
     // 6. Extract Node.js binary
     console.log('\n📦 Extracting Node.js...');
-    const zip = new AdmZip(nodeZipPath);
-    zip.extractAllTo(DIST_DIR, true);
+    // Use PowerShell to extract ZIP (native Windows)
+    const extractNodeZip = () => {
+      return new Promise((resolve, reject) => {
+        const psCommand = `
+          $ErrorActionPreference = 'Stop'
+          $ProgressPreference = 'SilentlyContinue'
+          $zipPath = '${path.resolve(nodeZipPath).replace(/\\/g, '/')}'
+          $destPath = '${path.resolve(DIST_DIR).replace(/\\/g, '/')}'
+          Expand-Archive -LiteralPath $zipPath -DestinationPath $destPath -Force
+        `;
+        const ps = spawn('powershell.exe', ['-NoProfile', '-Command', psCommand], {
+          stdio: 'inherit',
+          windowsHide: false
+        });
+        ps.on('close', (code) => {
+          if (code !== 0) reject(new Error(`PowerShell extract returned ${code}`));
+          else resolve();
+        });
+        ps.on('error', reject);
+      });
+    };
+    await extractNodeZip();
     fs.renameSync(path.join(DIST_DIR, `node-v${NODE_VERSION}-win-x64`, 'node.exe'), path.join(DIST_DIR, 'node.exe'));
     fs.rmSync(path.join(DIST_DIR, `node-v${NODE_VERSION}-win-x64`), { recursive: true });
     fs.unlinkSync(nodeZipPath);
