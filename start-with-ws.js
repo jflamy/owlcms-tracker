@@ -5,6 +5,26 @@
  * so the /ws endpoint accepts OWLCMS WebSocket connections in production.
  */
 
+// Add global uncaught exception handler to prevent crashes from abrupt connection resets
+process.on('uncaughtException', (err) => {
+  // ECONNRESET is normal when OWLCMS disconnects abruptly - log but don't crash
+  if (err.code === 'ECONNRESET' || err.message.includes('ECONNRESET')) {
+    console.warn('[Error] Connection reset by OWLCMS (normal during disconnection)');
+    return; // Don't crash
+  }
+  
+  // Log other unexpected errors but try to continue
+  console.error('❌ Uncaught Exception:', err.message);
+  console.error('Stack:', err.stack);
+  // For critical errors, you could still exit: process.exit(1);
+});
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+  console.warn('[Warning] Unhandled Rejection:', reason);
+  // Don't exit - let the app continue running
+});
+
 (async () => {
   try {
     // Set port for adapter-node (default 5173, but we want 8096)

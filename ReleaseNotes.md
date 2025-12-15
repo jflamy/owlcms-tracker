@@ -5,6 +5,7 @@
 - Initial release
 
 ### Bug Fixes
+- alpha02: When running the build version, don't abort when owlcms disconnects
 - alpha01: flatten the zip structure so the script is at top level
 
 ### Breaking Changes
