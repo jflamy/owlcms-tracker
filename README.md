@@ -23,15 +23,7 @@ Since the tracker has the full database available and the current session, it ca
 
 ### Getting Started
 - **[CREATE_YOUR_OWN.md](./CREATE_YOUR_OWN.md)** - Create custom scoreboards (step-by-step guide)
-
-### Core Reference
-- **[docs/SCOREBOARD_ARCHITECTURE.md](./docs/SCOREBOARD_ARCHITECTURE.md)** - Complete system architecture
-- **[docs/WEBSOCKET_MESSAGE_SPEC.md](./docs/WEBSOCKET_MESSAGE_SPEC.md)** - OWLCMS message formats
-
-### Examples
-- **[Plugin README](./src/plugins/lifting-order/README.md)** - Example scoreboard with AI prompts
-
-
+- **[docs/README.md](./docs/README.md)** - Documentation index and navigation
 
 ## OWLCMS Configuration Required
 
@@ -43,27 +35,6 @@ Set to: `ws://localhost:8096/ws` (or `wss://your-tracker-host:8096/ws` for secur
 
 **That's it!** No code changes to OWLCMS needed - just this URL setting.
 
-### WebSocket Message Format
-
-OWLCMS sends messages in this format:
-
-```json
-{
-  "type": "update|timer|decision|database",
-  "payload": {
-    // Nested JSON objects with competition data
-  }
-}
-```
-
-**Message Types:**
-- **`database`** - Full competition data synchronization (athletes, FOPs, categories, databaseChecksum)
-- **`update`** - Lifting order changes, athlete switches, UI events (includes session athletes in `startOrderAthletes` field, formerly `groupAthletes`)
-- **`timer`** - Timer start/stop/set events
-- **`decision`** - Referee decisions and down signals
-
-**See [docs/WEBSOCKET_MESSAGE_SPEC.md](./docs/WEBSOCKET_MESSAGE_SPEC.md) for complete message format details.**
-
 ## Features
 
 - **Multiple Scoreboard Types** - Lifting order, results, team rankings, and more  
@@ -74,17 +45,7 @@ OWLCMS sends messages in this format:
 - **Real-Time SSE Updates** - Instant display of decisions and timer events  
 - **Server-Side Processing** - Process once, serve hundreds of browsers
 
-## Architecture
-
-**Real-time SSE push architecture** - Competition data flows from OWLCMS through the Competition Hub to browsers via Server-Sent Events, triggering instant updates on decisions and timer events.
-
-```
-OWLCMS → Competition Hub → SSE Broadcast → Browsers
-```
-
-**For complete architecture details**, see **[docs/SCOREBOARD_ARCHITECTURE.md](./docs/SCOREBOARD_ARCHITECTURE.md)**
-
-## Running the Tracker
+## Quick Start
 
 ### Prerequisites
 

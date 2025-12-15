@@ -31,7 +31,7 @@ All messages follow this JSON structure:
 - `uiEvent` - Event class name that triggered the update (e.g., "LiftingOrderUpdated", "SwitchGroup", "GroupDone")
 - `updateKey` - Validation key
 - `competitionName` - Name of the competition
-- `fop` - Field of play name
+- `fop` - Field of play name (or `fopName` - both field names are accepted)
 - `fopState` - Current FOP state (e.g., "BREAK", "CURRENT_ATHLETE", etc.)
 - `break` - Boolean string indicating if in break ("true"/"false")
 - `breakType` - Type of break if applicable (e.g., "GROUP_DONE", "BEFORE_INTRODUCTION", etc.)
@@ -188,16 +188,30 @@ UPDATE messages also include ordering arrays that reference athletes by key:
 **Key Payload Fields:**
 
 - `updateKey` - Validation key
-- `fopName` - Field of play name
+- `fopName` - Field of play name (or `fop` - both field names are accepted)
 - `mode` - Board display mode
 - `fullName` - Current athlete's full name
 - `attemptNumber` - Current attempt number
-- `athleteTimerEventType` - Timer event type for athlete clock
-- `breakTimerEventType` - Timer event type for break clock
+
+**Athlete Timer Fields:**
+- `athleteTimerEventType` - Timer event type for athlete clock:
+  - `StartTime` - Athlete timer starts counting down
+  - `StopTime` - Athlete timer stops (display time but don't count)
+  - `SetTime` - Athlete timer is set but not running
 - `athleteMillisRemaining` - Milliseconds remaining on athlete clock
-- `breakMillisRemaining` - Milliseconds remaining on break clock
 - `athleteStartTimeMillis` - Absolute start time for athlete timer
+- `timeAllowed` - Total time allowed for athlete (usually 60000ms)
+
+**Break Timer Fields:**
+- `breakTimerEventType` - Timer event type for break clock:
+  - `StartTime` - Break timer starts
+  - `StopTime` - Break timer stops
+  - `SetTime` - Break timer is set but not running
+  - `Pause` - Break timer paused (clears all break timer fields)
+- `breakMillisRemaining` - Milliseconds remaining on break clock
 - `breakStartTimeMillis` - Absolute start time for break timer
+
+**Other Fields:**
 - `serverLocalTime` - Current server time for synchronization
 
 **Frequency:** Sent on timer start/stop/set events
@@ -219,7 +233,7 @@ UPDATE messages also include ordering arrays that reference athletes by key:
 - `updateKey` - Validation key
 - `mode` - Board display mode
 - `competitionName` - Name of the competition
-- `fop` - Field of play name
+- `fop` - Field of play name (or `fopName` - both field names are accepted)
 - `fullName` - Current athlete's full name
 - `attemptNumber` - Current attempt number
 - `liftTypeKey` - Lift type (SNATCH/CLEANJERK)
@@ -247,43 +261,166 @@ UPDATE messages also include ordering arrays that reference athletes by key:
 
 In addition to the JSON text frames documented above, OWLCMS can send large binary payloads over the same WebSocket connection. These are used to transfer ZIP archives for flags, pictures, styles, and translations. The tracker recognizes a small set of binary message types and routes each ZIP to an appropriate handler.
 
-Frame layout (preferred format):
+### Frame Structure
 
-- 4 bytes: `typeLength` (unsigned 32-bit big-endian / network byte order)
-- `typeLength` bytes: UTF-8 `type` string (examples: `flags_zip`, `pictures`, `styles`, `translations_zip`)
-- Remaining bytes: binary payload (typically a ZIP archive)
+Binary frames are sent as **binary WebSocket frames** (not text) and use a length-prefixed type header:
 
-Notes:
+```
+[4 bytes: typeLength (big-endian)] [typeLength bytes: UTF-8 type] [remaining bytes: ZIP payload]
+```
 
-- The `typeLength` is read using big-endian (network) byte order. The receiver must use `readUInt32BE(0)` to parse it correctly.
-- The payload is usually a ZIP archive; handlers will parse ZIP entries and extract files to `./local/{flags,pictures,styles}` or will parse `translations.json` inside a translations ZIP.
-- For robustness, the tracker also supports a fallback: when `typeLength` appears malformed but the buffer begins with the ZIP magic bytes (`50 4B 03 04`), the frame is treated as a `flags_zip` (legacy behavior seen in some integrations).
+**Parsing Algorithm:**
 
-Supported binary message types:
+1. Read first 4 bytes as unsigned 32-bit big-endian (network byte order): `typeLength`
+2. Read next `typeLength` bytes as UTF-8 string: `type`
+3. Remaining bytes: ZIP archive binary payload
+4. **Fallback:** If typeLength parsing fails but buffer begins with ZIP magic bytes (`50 4B 03 04`), treat as `flags_zip` (legacy behavior)
 
-- `flags_zip` (preferred) / `flags` (legacy): ZIP archive containing flag image files. The tracker extracts files into `./local/flags` and marks flags as loaded.
-- `pictures`: ZIP archive of athlete/team pictures; extracted into `./local/pictures`.
-- `styles`: ZIP archive containing CSS/asset files; extracted into `./local/styles`.
-- `translations_zip`: ZIP archive expected to contain a single file named `translations.json`.
+**Example Byte Layout (flags_zip):**
 
-Translations ZIP details:
+```
+[00 00 00 09] [66 6C 61 67 73 5F 7A 69 70] [50 4B 03 04 ... ZIP data ...]
+     ↓              ↓                          ↓
+  typeLength    "flags_zip" (9 bytes)      ZIP archive
+   (big-endian)    (UTF-8)                (binary payload)
+```
 
-- `translations.json` may have one of two wrapper formats:
-  - Wrapper form: `{ "locales": { "en": {...}, "fr": {...} }, "translationsChecksum": "..." }`
-  - Direct form: `{ "en": {...}, "fr": {...} }`
-- The tracker extracts each locale map and caches it in the Competition Hub.
-- If `translationsChecksum` is provided and matches the hub's `lastTranslationsChecksum`, the tracker will skip reprocessing to save CPU/time.
+### Supported Binary Message Types
 
-Server behavior and sanity checks:
+| Type | Purpose | Handler Behavior |
+|------|---------|------------------|
+| `flags_zip` or `flags` | Country/team flag images | Extracts ZIP to `./local/flags/`, updates hub state, runs sanity checks |
+| `pictures` | Athlete/team photos | Extracts ZIP to `./local/pictures/`, updates hub state |
+| `styles` | Custom CSS/asset files | Extracts ZIP to `./local/styles/`, updates hub state |
+| `translations_zip` | Localized text for UI | Parses `translations.json`, merges by locale, updates hub, checks checksum |
 
-- After extracting flags or translations, the tracker runs lightweight sanity checks (file counts, locale/key counts) and logs the result.
-- When translations are loaded for the first time the hub logs `TRANSLATIONS INITIALIZED` and caches the checksum.
-- When the tracker cannot find `translations.json` inside a `translations_zip`, it logs an error and ignores the payload.
+### Type-Specific Handling
 
-Security and size considerations:
+#### `flags_zip` (or `flags`)
 
-- The tracker validates `typeLength` against an upper bound (to avoid attempting to allocate huge buffers). If the reported length is unreasonably large, the tracker attempts ZIP-detection before rejecting the frame.
-- ZIP entries are written to disk under `./local/*` using their entry names; ensure OWLCMS produces safe file names.
+**Source:** ZIP archive containing flag image files
+
+**Handler Processing:**
+1. Extract all ZIP entries to `./local/flags/` directory
+2. Files can have any image format (PNG, JPG, SVG, etc.)
+3. Typical naming: `<country-code>.png` (e.g., `US.png`, `FR.png`)
+4. After extraction, hub state is updated and marked as ready
+5. Sanity check: Logs number of flags extracted
+
+**Usage:** Scoreboards access flags via path: `/local/flags/<country-code>.png`
+
+#### `pictures`
+
+**Source:** ZIP archive containing athlete/team picture files
+
+**Handler Processing:**
+1. Extract all ZIP entries to `./local/pictures/` directory
+2. Files can have any image format
+3. Typical naming: `<athlete-id>.png` or `<team-name>.png`
+4. After extraction, hub state is updated
+5. Sanity check: Logs number of pictures extracted
+
+**Usage:** Scoreboards access pictures via path: `/local/pictures/<athlete-id>.png`
+
+#### `styles`
+
+**Source:** ZIP archive containing CSS and asset files
+
+**Handler Processing:**
+1. Extract all ZIP entries to `./local/styles/` directory
+2. May contain CSS files, fonts, images, or other assets
+3. After extraction, hub state is updated
+4. Sanity check: Logs number of files extracted
+
+**Usage:** Scoreboards include CSS via: `<link rel="stylesheet" href="/local/styles/custom.css">`
+
+#### `translations_zip`
+
+**Source:** ZIP archive containing exactly one file: `translations.json`
+
+**File Format:**
+
+`translations.json` uses one of two wrapper formats:
+
+```json
+// Wrapper form (with checksum):
+{
+  "locales": {
+    "en": { "Start": "Start", "Stop": "Stop", ... },
+    "fr": { "Start": "Commencer", ... },
+    "fr-CA": { "Start": "Démarrer" }  // Regional variant
+  },
+  "translationsChecksum": "abc123def456"
+}
+
+// Direct form (legacy):
+{
+  "en": { "Start": "Start", "Stop": "Stop", ... },
+  "fr": { "Start": "Commencer", ... },
+  "fr-CA": { "Start": "Démarrer" }
+}
+```
+
+**Handler Processing:**
+
+1. Extract `translations.json` from ZIP
+2. Parse JSON to get locale maps
+3. For each locale:
+   - **If base locale (e.g., "en", "fr"):** Store complete map in hub
+   - **If regional variant (e.g., "fr-CA"):** Merge with base locale, keeping both base and variant keys
+4. Cache `translationsChecksum` in hub (if provided)
+5. On next `translations_zip` with same checksum: Skip processing (cached result)
+6. Sanity checks:
+   - Verify `translations.json` exists in ZIP
+   - Count locale maps
+   - Count translation keys per locale
+   - Log results
+
+**Hub Integration:**
+
+After translations are loaded, plugins access them via:
+
+```javascript
+const translations = competitionHub.getTranslations('fr-CA');
+// Returns: { "Start": "Démarrer", "Stop": "Stop", ... }
+// (fr-CA keys override base locale "fr" where defined)
+```
+
+**Regional Variant Merging:**
+
+When `fr-CA` is requested but `fr` is the base:
+- Start with `fr` locale map
+- Override with any keys provided in `fr-CA`
+- Result: French Canadian with fallback to French
+
+### Checksum Optimization
+
+**Purpose:** Avoid reprocessing identical translations
+
+**Flow:**
+1. OWLCMS sends `translations_zip` with `translationsChecksum: "abc123"`
+2. Handler checks hub's `lastTranslationsChecksum`
+3. If match: Skip JSON parsing, use cached result (fast path)
+4. If mismatch: Parse, merge, cache new checksum (slow path)
+5. Log: `[Hub] Translations checksum match - skipping reprocessing`
+
+### Security Considerations
+
+**File Name Safety:**
+- ZIP entries are extracted using their names as-is
+- Ensure OWLCMS produces safe file names (no path traversal like `../`)
+- Tracker validates `typeLength` against upper bound (default 1MB)
+
+**Buffer Validation:**
+1. Read `typeLength` (first 4 bytes)
+2. If `typeLength > 1MB`: Attempt ZIP magic byte detection
+3. If no ZIP magic bytes found: Reject frame as malformed
+4. This prevents memory exhaustion from huge `typeLength` values
+
+**ZIP Archive Validation:**
+- Verifies ZIP format before extraction
+- Logs error if ZIP is corrupted or unreadable
+- Skips malformed entries silently
 
 ---
 
@@ -318,7 +455,7 @@ Security and size considerations:
 }
 ```
 
-**Timer Message:**
+**Timer Message (Athlete Clock):**
 
 ```json
 {
@@ -328,6 +465,22 @@ Security and size considerations:
     "fopName": "Platform A",
     "athleteTimerEventType": "StartTime",
     "athleteMillisRemaining": "60000",
+    "timeAllowed": "60000",
+    "serverLocalTime": "14:23:45.123"
+  }
+}
+```
+
+**Timer Message (Break Clock):**
+```json
+{
+  "type": "timer",
+  "payload": {
+    "updateKey": "secret123",
+    "fopName": "Platform A",
+    "breakTimerEventType": "StartTime",
+    "breakMillisRemaining": "300000",
+    "breakStartTimeMillis": "1702598625123",
     "serverLocalTime": "14:23:45.123"
   }
 }

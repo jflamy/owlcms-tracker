@@ -410,9 +410,11 @@ export function getScoreboardData(fopName = 'A', options = {}, locale = 'en') {
   const sortBy = options.sortBy || 'total';
   const topN = options.topN || 10;
   
-  // 3. BUILD CACHE KEY (based on athlete data, NOT timer state)
-  const dataHash = fopUpdate?.groupAthletes?.substring(0, 100) || '';
-  const cacheKey = `${fopName}-${dataHash}-${sortBy}-${topN}`;
+  // 3. BUILD CACHE KEY (based on hub FOP version, which increments on data changes)
+  // The hub version is incremented whenever relevant messages arrive (update/timer/decision/database)
+  // This avoids content-based hashing - simpler and more efficient
+  const hubFopVersion = competitionHub.getFopStateVersion(fopName);
+  const cacheKey = `${fopName}-v${hubFopVersion}-${sortBy}-${topN}`;
   
   // 4. CHECK PLUGIN-SPECIFIC CACHE
   if (teamScoreboardCache.has(cacheKey)) {
@@ -431,15 +433,56 @@ export function getScoreboardData(fopName = 'A', options = {}, locale = 'en') {
   
   // 5. FETCH DATA FROM HUB
   // Session athletes (primary source - from WebSocket type="update")
-  let athletes = [];
+  // These have displayInfo ALREADY computed by OWLCMS
+  let sessionAthletes = [];
   if (fopUpdate?.groupAthletes) {
-    athletes = JSON.parse(fopUpdate.groupAthletes); // Parse JSON string
+    sessionAthletes = JSON.parse(fopUpdate.groupAthletes); // Parse JSON string
+    // Each sessionAthletes[i] already has displayInfo with:
+    // - fullName, teamName, weight, total, sinclair, rank
+    // - classname: "current-athlete", "waiting", "good-lift", "no-lift", "finished"
+    // - displayWeight, displayAttempt (formatted strings)
+    // All precomputed by OWLCMS - use directly!
+  }
+  
+  // If you need athletes NOT in current session (e.g., from other teams/sessions),
+  // merge them from databaseState and compute displayInfo yourself
+  let allTeamAthletes = [...sessionAthletes];
+  const sessionIds = new Set(sessionAthletes.map(a => a.id));
+  
+  // Example: Add athletes from specific team(s) not in current session
+  const databaseState = competitionHub.getDatabaseState();
+  if (databaseState?.athletes && options.includeAllTeamMembers) {
+    databaseState.athletes.forEach(dbAthlete => {
+      if (!sessionIds.has(dbAthlete.id) && dbAthlete.teamName === options.filterTeam) {
+        // Compute displayInfo from database fields
+        const displayInfo = {
+          fullName: dbAthlete.fullName,
+          teamName: dbAthlete.teamName,
+          weight: dbAthlete.weight || 0,
+          total: dbAthlete.total || 0,
+          sinclair: dbAthlete.sinclair || 0,
+          rank: dbAthlete.rank || 0,
+          // Format display values
+          displayWeight: String(dbAthlete.weight || 0),
+          displayAttempt: '0/3',  // Not lifting in this session
+          classname: '', // Not currently lifting
+          bestSnatch: dbAthlete.snatch || 0,
+          bestCleanJerk: dbAthlete.cleanAndJerk || 0
+        };
+        
+        allTeamAthletes.push({
+          id: dbAthlete.id,
+          startNumber: dbAthlete.startNumber,
+          ...displayInfo
+        });
+      }
+    });
   }
   
   // 6. APPLY PLUGIN BUSINESS LOGIC
-  // Group athletes by team
+  // Group athletes by team (now includes both session + database athletes)
   const teamMap = new Map();
-  athletes.forEach(athlete => {
+  allTeamAthletes.forEach(athlete => {
     const team = athlete.teamName || 'No Team';
     if (!teamMap.has(team)) {
       teamMap.set(team, []);
@@ -632,18 +675,202 @@ fopUpdate.fopName                                 // FOP name (for reference)
 **Data Source Priority:**
 
 1. **Session athletes (Primary):** `fopUpdate.groupAthletes` from WebSocket `type="update"`
-   - Contains current session athletes with precomputed fields
+   - Contains current session athletes with **display-ready fields**
    - Includes `classname` flags (e.g., "current", "finished", "good-lift")
-   - JSON string - must parse
+   - **Display fields ALREADY COMPUTED BY OWLCMS** - use directly, don't transform
+   - Parsed as nested JSON object
 
 2. **Lifting order (Secondary):** `fopUpdate.liftingOrderAthletes` from WebSocket `type="update"`
-   - Contains upcoming lifters
-   - JSON string - must parse
+   - Contains upcoming lifters with **display-ready fields**
+   - **Display fields ALREADY COMPUTED BY OWLCMS** - use directly
+   - Parsed as nested JSON object
 
 3. **Database athletes (Fallback):** `databaseState.athletes` from WebSocket `type="database"`
    - ONLY use for athletes NOT in current session
-   - Examples: Previous sessions, different teams
+   - Examples: Athletes from other teams, previous sessions, not competing today
+   - **RAW DATA - YOU MUST COMPUTE display fields** from database fields
    - Direct objects - no parsing needed
+
+### Display Fields: OWLCMS-Computed vs Plugin-Computed
+
+**Key Concept:** OWLCMS sends **display-ready data** for session athletes. This includes:
+- Formatted attempt values with success/fail indicators
+- Pre-computed rankings and totals
+- Visual state flags (`classname`) for highlighting current athlete, good/no-lift results
+- Team names, weight categories, and formatted strings ready for display
+
+When showing athletes NOT in the current session (from database), the plugin must **compute equivalent display fields** to ensure consistent rendering.
+
+#### What OWLCMS Computes (Session Athletes)
+
+Session athletes in `groupAthletes` include these **pre-computed display fields**:
+
+| Field | Description | Example |
+|-------|-------------|---------|
+| `fullName` | Formatted as "LASTNAME, Firstname" | `"DOE, John"` |
+| `teamName` | Team/club name | `"USA Weightlifting"` |
+| `classname` | CSS class for visual state | `"current"`, `"good-lift"`, `"no-lift"` |
+| `sattempts` | Array of 3 snatch attempt objects | See below |
+| `cattempts` | Array of 3 C&J attempt objects | See below |
+| `bestSnatch` | Best successful snatch | `120` |
+| `bestCleanJerk` | Best successful C&J | `150` |
+| `total` | Sum of best lifts (0 if bombed) | `270` |
+| `sinclair` | Sinclair score | `345.67` |
+| `totalRank` | Rank within category | `1` |
+
+**Attempt object structure** (computed by OWLCMS):
+```javascript
+{
+  "liftStatus": "good",    // "empty" | "request" | "good" | "fail"
+  "stringValue": "120"     // Display value (with parentheses for fails)
+}
+```
+
+#### What Plugins Compute (Database Athletes)
+
+When displaying athletes from the database (not in current session), plugins compute equivalent fields using a **formatAttempt** function:
+
+```javascript
+/**
+ * Format a single attempt from raw database fields to display format
+ * Uses OWLCMS priority order: actualLift > change2 > change1 > declaration > automaticProgression
+ * 
+ * @param {string} declaration - Original declared weight
+ * @param {string} change1 - First weight change
+ * @param {string} change2 - Second weight change
+ * @param {string} actualLift - Result (positive=good, negative=fail, e.g., "-120")
+ * @param {string} automaticProgression - Calculated progression weight
+ * @returns {Object} { liftStatus: 'empty'|'request'|'good'|'fail', stringValue: '120' }
+ */
+function formatAttempt(declaration, change1, change2, actualLift, automaticProgression) {
+  // Priority 1: actualLift (if lift has been attempted)
+  if (actualLift && actualLift !== '' && actualLift !== '0') {
+    if (actualLift.startsWith('-')) {
+      // Failed lift - OWLCMS uses negative values for fails
+      const weight = actualLift.substring(1);
+      return { liftStatus: 'fail', stringValue: `(${weight})` };
+    } else {
+      // Good lift
+      return { liftStatus: 'good', stringValue: actualLift };
+    }
+  }
+  
+  // Priority 2-5: Find the current requested weight
+  const displayWeight = change2 || change1 || declaration || automaticProgression || null;
+  
+  if (displayWeight && displayWeight !== '0' && displayWeight !== '-') {
+    return { liftStatus: 'request', stringValue: displayWeight };
+  }
+  
+  // No weight declared or attempted
+  return { liftStatus: 'empty', stringValue: '' };
+}
+```
+
+#### Complete Database-to-Display Transformation
+
+The actual code (from `team-scoreboard/helpers.data.js`) shows the full pattern:
+
+```javascript
+// Athletes from database that are NOT in the current session
+const databaseOnlyAthletes = databaseState.athletes
+  .filter(dbAthlete => !currentSessionLotNumbers.has(String(dbAthlete.lotNumber)))
+  .map(dbAthlete => {
+    // Format name as "LASTNAME, Firstname" to match OWLCMS format
+    const lastName = (dbAthlete.lastName || '').toUpperCase();
+    const firstName = dbAthlete.firstName || '';
+    const fullName = lastName && firstName ? `${lastName}, ${firstName}` : 
+                     lastName || firstName || '';
+    
+    return {
+      // Identity fields
+      fullName,
+      firstName: dbAthlete.firstName,
+      lastName: dbAthlete.lastName,
+      startNumber: dbAthlete.startNumber,
+      lotNumber: dbAthlete.lotNumber,
+      
+      // Team and category
+      teamName: dbAthlete.team || dbAthlete.club,
+      categoryName: dbAthlete.categoryName,
+      gender: dbAthlete.gender,
+      bodyWeight: dbAthlete.bodyWeight,
+      
+      // Format all 6 attempts using OWLCMS priority order
+      sattempts: [
+        formatAttempt(dbAthlete.snatch1Declaration, dbAthlete.snatch1Change1, 
+                      dbAthlete.snatch1Change2, dbAthlete.snatch1ActualLift, 
+                      dbAthlete.snatch1AutomaticProgression),
+        formatAttempt(dbAthlete.snatch2Declaration, dbAthlete.snatch2Change1,
+                      dbAthlete.snatch2Change2, dbAthlete.snatch2ActualLift,
+                      dbAthlete.snatch2AutomaticProgression),
+        formatAttempt(dbAthlete.snatch3Declaration, dbAthlete.snatch3Change1,
+                      dbAthlete.snatch3Change2, dbAthlete.snatch3ActualLift,
+                      dbAthlete.snatch3AutomaticProgression)
+      ],
+      cattempts: [
+        formatAttempt(dbAthlete.cleanJerk1Declaration, dbAthlete.cleanJerk1Change1,
+                      dbAthlete.cleanJerk1Change2, dbAthlete.cleanJerk1ActualLift,
+                      dbAthlete.cleanJerk1AutomaticProgression),
+        formatAttempt(dbAthlete.cleanJerk2Declaration, dbAthlete.cleanJerk2Change1,
+                      dbAthlete.cleanJerk2Change2, dbAthlete.cleanJerk2ActualLift,
+                      dbAthlete.cleanJerk2AutomaticProgression),
+        formatAttempt(dbAthlete.cleanJerk3Declaration, dbAthlete.cleanJerk3Change1,
+                      dbAthlete.cleanJerk3Change2, dbAthlete.cleanJerk3ActualLift,
+                      dbAthlete.cleanJerk3AutomaticProgression)
+      ],
+      
+      // Computed totals
+      total: dbAthlete.total || 0,
+      bestSnatch: computeBestLift([
+        dbAthlete.snatch1ActualLift,
+        dbAthlete.snatch2ActualLift,
+        dbAthlete.snatch3ActualLift
+      ]),
+      bestCleanJerk: computeBestLift([
+        dbAthlete.cleanJerk1ActualLift,
+        dbAthlete.cleanJerk2ActualLift,
+        dbAthlete.cleanJerk3ActualLift
+      ]),
+      
+      // Scoring fields
+      sinclair: dbAthlete.sinclair || 0,
+      totalRank: 0,  // Not ranked in this session
+      
+      // Visual state - NOT in current session
+      classname: '',  // Empty = no special highlighting
+      inCurrentSession: false
+    };
+  });
+```
+
+**Why this matters:**
+- **Svelte components render uniformly** - they don't need to know if data came from OWLCMS or was computed
+- **Same field structure** - `sattempts`, `cattempts`, `liftStatus`, `stringValue` work identically
+- **Visual consistency** - good lifts show as-is, failed lifts show in parentheses `(120)`
+
+### Pattern: Combining Session + Database Athletes
+
+```javascript
+// 1. Start with session athletes (OWLCMS display fields - use as-is)
+const sessionAthletes = fopUpdate.groupAthletes || [];
+const currentSessionLotNumbers = new Set(
+  sessionAthletes.map(a => String(a.lotNumber)).filter(Boolean)
+);
+
+// 2. Transform database athletes NOT in session (compute display fields)
+const databaseOnlyAthletes = databaseState.athletes
+  .filter(dbAthlete => !currentSessionLotNumbers.has(String(dbAthlete.lotNumber)))
+  .map(dbAthlete => transformDatabaseAthlete(dbAthlete));  // Applies formatAttempt, etc.
+
+// 3. Combine both - all athletes now have equivalent display fields
+const allAthletes = [...sessionAthletes, ...databaseOnlyAthletes];
+
+// 4. Svelte component renders uniformly
+{#each allAthletes as athlete}
+  <AthleteRow {athlete} />  <!-- Works the same for both sources -->
+{/each}
+```
 
 ### API Endpoint Integration
 
@@ -1218,7 +1445,7 @@ The architecture separates responsibilities:
 
 ### Cache Implementation Pattern
 
-Each plugin implements a **Map-based cache** with intelligent invalidation:
+Each plugin implements a **Map-based cache** with hub version-based invalidation:
 
 ```javascript
 /**
@@ -1230,43 +1457,48 @@ const scoreboardCache = new Map();
 export function getScoreboardData(fopName = 'A', options = {}) {
 	const fopUpdate = getFopUpdate(fopName);
 	
-	// Cache key based on athlete data, NOT timer events
-	// Use first 100 chars of groupAthletes as quick hash
-	const dataHash = fopUpdate?.groupAthletes?.substring(0, 100) || '';
-	const cacheKey = `${fopName}-${dataHash}-${option1}-${option2}`;
+	// Cache key based on hub FOP version, NOT content hashing
+	// Hub version increments when relevant messages arrive (update/timer/decision/database)
+	const hubFopVersion = competitionHub.getFopStateVersion(fopName);
+	const cacheKey = `${fopName}-v${hubFopVersion}-${option1}-${option2}`;
 	
 	// Check cache first
 	if (scoreboardCache.has(cacheKey)) {
 		const cached = scoreboardCache.get(cacheKey);
 		console.log(`[Plugin] ✓ Cache hit (${scoreboardCache.size} entries)`);
 		
-		// Return cached data with current timer state
+		// Return cached data with fresh timer/decision state
 		return {
 			...cached,
 			timer: extractTimerState(fopUpdate),
-			learningMode
+			decision: extractDecisionState(fopUpdate)
 		};
 	}
 	
-	console.log(`[Plugin] Cache miss, computing data...`);
+	console.log(`[Plugin] Cache miss, computing...`);
 	
 	// Heavy processing here (grouping, sorting, filtering)
 	// ...
 	
-	// Cache the result (exclude timer and learningMode)
+	// Cache the result (exclude timer and decision - they change frequently)
 	scoreboardCache.set(cacheKey, processedData);
 	
-	// Cleanup old entries (keep last 20)
+	// Cleanup: Keep last 20 cache entries
 	if (scoreboardCache.size > 20) {
 		const firstKey = scoreboardCache.keys().next().value;
 		scoreboardCache.delete(firstKey);
 	}
 	
-	return processedData;
+	// Return with fresh timer/decision state
+	return {
+		...processedData,
+		timer: extractTimerState(fopUpdate),
+		decision: extractDecisionState(fopUpdate)
+	};
 }
 
 /**
- * Extract timer separately (changes frequently)
+ * Extract timer state separately (changes frequently)
  */
 function extractTimerState(fopUpdate) {
 	return {
@@ -1275,19 +1507,54 @@ function extractTimerState(fopUpdate) {
 		duration: parseInt(fopUpdate?.timeAllowed || 60000)
 	};
 }
+
+/**
+ * Extract decision state separately (changes frequently)
+ */
+function extractDecisionState(fopUpdate) {
+	return {
+		type: fopUpdate?.decisionEventType || null,
+		visible: fopUpdate?.decisionsVisible === 'true'
+	};
+}
 ```
+
+**Key points:**
+- **Hub version is the single source of truth** for invalidation
+- **Timer/decision state extracted separately** (outside cache) so frequent updates don't cause misses
+- **No content hashing** - simpler and faster
+- **Auto-cleanup** prevents memory bloat from old cache entries
 
 ### Cache Key Strategy
 
 **Cache keys include:**
 - **FOP name** - Separate cache per platform
-- **Data hash** - First 100 chars of `groupAthletes` or `liftingOrderAthletes` JSON
+- **Hub FOP version** - Incremented when relevant data changes (update/timer/decision/database messages)
 - **User options** - Gender filter, topN, sortBy, etc.
 
-**Why hash athlete data instead of timestamp?**
-- Timer events update `lastUpdate` timestamp but don't change athlete data
-- Using timestamp would invalidate cache on every timer event
-- Using data hash only invalidates when athletes/weights actually change
+**How it works:**
+- Hub tracks a **version number per FOP** that increments on every relevant message
+- Cache key includes `v{hubFopVersion}` instead of content hashing
+- **Timer events:** Hub version increments → All browsers fetch fresh data → Plugin gets cache hit because the "heavy lifting" (parsing, grouping, sorting) was cached
+- **Athlete data changes:** New message with different athlete data → Hub version increments → Cache miss → Recompute once
+- **Benefits:** No substring hashing, no formatting variations, simpler and faster cache invalidation
+
+**Example versions:**
+```javascript
+// Initial state: hubFopVersion = 1
+const cacheKey = 'Platform_A-v1-total-10';
+
+// OWLCMS sends UPDATE (athlete changes):
+// → hubFopVersion becomes 2
+// → New cache key: 'Platform_A-v2-total-10'
+// → Cache miss! (First browser recomputes, rest hit new cached result)
+
+// OWLCMS sends TIMER (StartTime):
+// → hubFopVersion becomes 3
+// → New cache key: 'Platform_A-v3-total-10'
+// → Cache miss! (But timer state is extracted separately, so same processing logic)
+// → Cache hit for remaining browsers
+```
 
 ### Cache Hit/Miss Scenarios
 
@@ -1327,7 +1594,8 @@ function extractTimerState(fopUpdate) {
 #### Team Scoreboard Cache
 ```javascript
 const teamScoreboardCache = new Map();
-const cacheKey = `${fopName}-${groupAthletesHash}-${gender}-${topN}-${sortBy}`;
+const hubFopVersion = competitionHub.getFopStateVersion(fopName);
+const cacheKey = `${fopName}-v${hubFopVersion}-${gender}-${topN}-${sortBy}`;
 ```
 **Heavy operations cached:**
 - Merging database athletes with group athletes
@@ -1339,7 +1607,8 @@ const cacheKey = `${fopName}-${groupAthletesHash}-${gender}-${topN}-${sortBy}`;
 #### Lifting Order Cache
 ```javascript
 const liftingOrderCache = new Map();
-const cacheKey = `${fopName}-${liftingOrderHash}-${showRecords}-${maxLifters}`;
+const hubFopVersion = competitionHub.getFopStateVersion(fopName);
+const cacheKey = `${fopName}-v${hubFopVersion}-${showRecords}-${maxLifters}`;
 ```
 **Heavy operations cached:**
 - Parsing `liftingOrderAthletes` JSON
@@ -1349,7 +1618,8 @@ const cacheKey = `${fopName}-${liftingOrderHash}-${showRecords}-${maxLifters}`;
 #### Session Results Cache
 ```javascript
 const sessionResultsCache = new Map();
-const cacheKey = `${fopName}-${groupAthletesHash}-${showRecords}`;
+const hubFopVersion = competitionHub.getFopStateVersion(fopName);
+const cacheKey = `${fopName}-v${hubFopVersion}-${showRecords}`;
 ```
 **Heavy operations cached:**
 - Parsing `groupAthletes` JSON (already sorted by OWLCMS)
