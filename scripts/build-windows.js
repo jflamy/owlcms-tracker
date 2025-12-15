@@ -159,38 +159,50 @@ For more information: https://github.com/owlcms/owlcms-tracker
     // 8. Create ZIP file
     console.log('\n📦 Creating ZIP file...');
     
-    // Use native zip command (faster than adm-zip for large directories)
-    // For Windows, we use PowerShell's Compress-Archive
     const zipPath = 'dist/owlcms-tracker-windows.zip';
-    const distFullPath = path.resolve(DIST_DIR).replace(/\\/g, '/');
-    const zipFullPath = path.resolve(zipPath).replace(/\\/g, '/');
 
-    // Use PowerShell to create the ZIP on Windows
+    // Use native zip command (cross-platform: works on Linux/macOS/Windows with Git Bash)
     const createZip = () => {
       return new Promise((resolve, reject) => {
-        const psCommand = `
-          $ErrorActionPreference = 'Stop'
-          $ProgressPreference = 'SilentlyContinue'
-          $src = "${distFullPath}/*"
-          $dst = "${zipFullPath}"
-          if (Test-Path -LiteralPath $dst) { Remove-Item -LiteralPath $dst -Force }
-          Compress-Archive -Path $src -DestinationPath $dst -Force
-        `;
-
-        const ps = spawn('powershell.exe', ['-NoProfile', '-Command', psCommand], {
-          stdio: 'inherit',
-          windowsHide: false
-        });
-
-        ps.on('close', (code) => {
+        const zip = spawn('zip', ['-r', '-q', zipPath, DIST_DIR]);
+        
+        zip.on('close', (code) => {
           if (code !== 0) {
-            reject(new Error(`PowerShell returned exit code ${code}`));
+            reject(new Error(`zip command returned exit code ${code}`));
           } else {
             resolve();
           }
         });
-
-        ps.on('error', reject);
+        
+        zip.on('error', (err) => {
+          // If zip command not found, try PowerShell (Windows-only)
+          console.log('zip command not found, trying PowerShell...');
+          const distFullPath = path.resolve(DIST_DIR).replace(/\\/g, '/');
+          const zipFullPath = path.resolve(zipPath).replace(/\\/g, '/');
+          const psCommand = `
+            $ErrorActionPreference = 'Stop'
+            $ProgressPreference = 'SilentlyContinue'
+            $src = "${distFullPath}/*"
+            $dst = "${zipFullPath}"
+            if (Test-Path -LiteralPath $dst) { Remove-Item -LiteralPath $dst -Force }
+            Compress-Archive -Path $src -DestinationPath $dst -Force
+          `;
+          
+          const ps = spawn('powershell.exe', ['-NoProfile', '-Command', psCommand], {
+            stdio: 'inherit',
+            windowsHide: false
+          });
+          
+          ps.on('close', (psCode) => {
+            if (psCode !== 0) {
+              reject(new Error(`PowerShell returned exit code ${psCode}`));
+            } else {
+              resolve();
+            }
+          });
+          
+          ps.on('error', reject);
+        });
       });
     };
     
