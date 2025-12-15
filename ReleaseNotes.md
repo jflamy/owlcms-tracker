@@ -5,7 +5,7 @@
 - Initial release
 
 ### Bug Fixes
-- none
+- alpha01: flatten the zip structure so the script is at top level
 
 ### Breaking Changes
 - List any breaking changes (if applicable)
@@ -20,6 +20,21 @@ Extract the ZIP file appropriate for your operating system:
 - **Raspberry Pi**: `owlcms-tracker-rpi_*.zip` - Run `./tracker-rpi.sh`
 
 All distributions include Node.js, so no additional installation is needed.
+
+### Docker Installation
+
+Alternatively, run the tracker in Docker (you may use a version number instead of `latest`)
+
+```bash
+docker run -d \
+  --name owlcms-tracker \
+  -p 8096:8096 \
+  docker.io/owlcms/tracker:latest
+```
+
+Then access the tracker at: `http://localhost:8096`
+
+**Note:** Replace `2.0.0-alpha00` with the appropriate version tag. Use `latest` for the newest release.
 
 ## OWLCMS Configuration
 

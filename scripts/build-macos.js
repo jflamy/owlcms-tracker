@@ -133,9 +133,10 @@ For more information: https://github.com/owlcms/owlcms-tracker
     const zipPath = `dist/${zipFilename}`;
     
     // Use native zip command on macOS/Linux
+    // Use -C to change directory so files are at top level when unzipped
     const createZip = () => {
       return new Promise((resolve, reject) => {
-        const zip = spawn('zip', ['-r', '-q', zipPath, DIST_DIR]);
+        const zip = spawn('zip', ['-r', '-q', zipPath, '.', '-C', DIST_DIR]);
         
         zip.on('close', (code) => {
           if (code !== 0) {
