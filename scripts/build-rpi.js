@@ -2,7 +2,6 @@ import fs from 'fs';
 import path from 'path';
 import { execSync, spawn } from 'child_process';
 import https from 'https';
-import AdmZip from 'adm-zip';
 import { createReadStream, createWriteStream } from 'fs';
 
 const NODE_VERSION = '22.12.0';

@@ -54,6 +54,9 @@ jobs:
       - name: Build macOS x64 (Intel) package
         run: MACOS_ARCH=x64 node scripts/build-macos.js
       
+      - name: Build Raspberry Pi package
+        run: node scripts/build-rpi.js
+      
       - name: Setup Docker buildx
         uses: docker/setup-buildx-action@v3
       
@@ -83,7 +86,11 @@ jobs:
           mv dist/owlcms-tracker-windows.zip dist/owlcms-tracker-windows_${{ env.REVISION }}.zip
           mv dist/owlcms-tracker-macos.zip dist/owlcms-tracker-macos-arm64_${{ env.REVISION }}.zip
           mv dist/owlcms-tracker-macos-x64.zip dist/owlcms-tracker-macos-x64_${{ env.REVISION }}.zip
-          mv dist/owlcms-tracker-rpi.zip dist/owlcms-tracker-rpi_${{ env.REVISION }}.zip
+          if [ -f dist/owlcms-tracker-rpi.zip ]; then
+            mv dist/owlcms-tracker-rpi.zip dist/owlcms-tracker-rpi_${{ env.REVISION }}.zip
+          else
+            echo "⚠️  RPi package not found - build may have failed"
+          fi
           echo "Renamed packages:"
           ls -lh dist/*.zip
       
@@ -109,6 +116,7 @@ jobs:
           retention-days: 90
       
       - name: Upload Raspberry Pi package
+        if: hashFiles('dist/owlcms-tracker-rpi_*.zip') != ''
         uses: actions/upload-artifact@v4
         with:
           name: owlcms-tracker-rpi
