@@ -1,4 +1,5 @@
 name: Build Release Packages
+run-name: Build Release - ${{ github.event.inputs.revision }} - ${{ github.event.head_commit.message || 'Manual dispatch' }}
 
 on:
   workflow_dispatch:

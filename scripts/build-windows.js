@@ -81,25 +81,34 @@ function downloadFile(url, dest) {
 
     // 6. Extract Node.js binary
     console.log('\n📦 Extracting Node.js...');
-    // Use PowerShell to extract ZIP (native Windows)
+    // Use unzip command (cross-platform: works on Linux/macOS/Windows with Git Bash)
     const extractNodeZip = () => {
       return new Promise((resolve, reject) => {
-        const psCommand = `
-          $ErrorActionPreference = 'Stop'
-          $ProgressPreference = 'SilentlyContinue'
-          $zipPath = '${path.resolve(nodeZipPath).replace(/\\/g, '/')}'
-          $destPath = '${path.resolve(DIST_DIR).replace(/\\/g, '/')}'
-          Expand-Archive -LiteralPath $zipPath -DestinationPath $destPath -Force
-        `;
-        const ps = spawn('powershell.exe', ['-NoProfile', '-Command', psCommand], {
-          stdio: 'inherit',
-          windowsHide: false
-        });
-        ps.on('close', (code) => {
-          if (code !== 0) reject(new Error(`PowerShell extract returned ${code}`));
+        const unzip = spawn('unzip', ['-q', nodeZipPath, '-d', DIST_DIR]);
+        unzip.on('close', (code) => {
+          if (code !== 0) reject(new Error(`unzip returned exit code ${code}`));
           else resolve();
         });
-        ps.on('error', reject);
+        unzip.on('error', (err) => {
+          console.log('unzip not available, trying PowerShell...');
+          // Fallback to PowerShell on Windows
+          const psCommand = `
+            $ErrorActionPreference = 'Stop'
+            $ProgressPreference = 'SilentlyContinue'
+            $zipPath = '${path.resolve(nodeZipPath).replace(/\\/g, '/')}'
+            $destPath = '${path.resolve(DIST_DIR).replace(/\\/g, '/')}'
+            Expand-Archive -LiteralPath $zipPath -DestinationPath $destPath -Force
+          `;
+          const ps = spawn('powershell.exe', ['-NoProfile', '-Command', psCommand], {
+            stdio: 'inherit',
+            windowsHide: false
+          });
+          ps.on('close', (psCode) => {
+            if (psCode !== 0) reject(new Error(`PowerShell extract returned ${psCode}`));
+            else resolve();
+          });
+          ps.on('error', reject);
+        });
       });
     };
     await extractNodeZip();
