@@ -174,7 +174,7 @@ For more information: https://github.com/owlcms/owlcms-tracker
     const createZip = () => {
       return new Promise((resolve, reject) => {
         const zipFilename = path.basename(zipPath);
-        const zip = spawn('zip', ['-r', '-q', `../../${zipFilename}`, '.'], {
+        const zip = spawn('zip', ['-r', '-q', `../${zipFilename}`, '.'], {
           cwd: DIST_DIR
         });
         
