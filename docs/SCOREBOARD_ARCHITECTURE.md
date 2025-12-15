@@ -22,17 +22,11 @@ This system targts **15+ different scoreboard types** with **up to 6 simultaneou
 6. **No OWLCMS changes required** - Works with existing data flow
 7. **Session Athletes First, Always** - Use `groupAthletes` from WebSocket type="update" as primary data source; only access `databaseState` for athletes NOT in current session
 
-## Data Source Documentation
-
-**For detailed field mapping and data transformation:**
-
-📖 **[FIELD_MAPPING_OVERVIEW.md](./FIELD_MAPPING_OVERVIEW.md)** - Quick reference and navigation guide
+## Data Source Priority
 
 **Key principle:** Always use session athletes data first (from WebSocket type="update", stored in the `groupAthletes` key). Only access Database Athletes (from WebSocket type="database") for athletes NOT in the current session (e.g., athletes from previous sessions, different teams).
 
-**See also:**
-- [FIELD_MAPPING.md](./FIELD_MAPPING.md) - Complete field-by-field mapping reference
-- [FIELD_MAPPING_SAMPLES.md](./FIELD_MAPPING_SAMPLES.md) - Real-world sample data with transformations
+For detailed implementation and data flow information, see **[OWLCMS_TRANSLATIONS_SPEC.md](./OWLCMS_TRANSLATIONS_SPEC.md)**.
 
 ## Architecture
 
@@ -317,6 +311,452 @@ src/
     │   └── ...
     └── team-rankings/   # Scoreboard type 3
         └── ...
+```
+
+## Plugin-Hub Interaction Pattern
+
+This section explains how **plugin-specific helpers** (the "plugin layer") interact with the **shared competition hub** (the "central data layer") to deliver scoreboard data to browsers.
+
+### Data Flow: Browser → Route → Helper → Hub → Browser
+
+```
+Browser Request
+  ↓
+GET /api/scoreboard?type=team-scoreboard&fop=Platform_A&sortBy=sinclair&topN=15
+  ↓
+routes/api/scoreboard/+server.js (unified API endpoint)
+  ↓ (reads request parameters)
+  ↓
+Loads plugin: src/plugins/team-scoreboard/helpers.data.js
+  ↓
+getScoreboardData(fopName='Platform_A', options={sortBy:'sinclair', topN:15})
+  ↓
+Helper function executes:
+  ├─ Import shared hub: `import { competitionHub } from '$lib/server/competition-hub.js'`
+  ├─ Fetch per-FOP data: `const fopUpdate = competitionHub.getFopUpdate(fopName)`
+  ├─ Parse JSON strings: `const athletes = JSON.parse(fopUpdate.groupAthletes)`
+  ├─ Apply plugin logic: Group by team, sort, compute totals
+  ├─ Check/update cache: Store processed result with data hash
+  └─ Return processed object: { athletes, teams, totals, ... }
+  ↓
+API endpoint returns JSON response
+  ↓
+Browser receives data
+  ↓
+Svelte component (page.svelte) displays data (pure rendering, no logic)
+```
+
+### Plugin Module Structure
+
+Each scoreboard plugin is a **self-contained folder** with **three key files**:
+
+#### 1. **config.js** - Metadata and Options
+
+Defines the scoreboard's identity and user-configurable options.
+
+```javascript
+// src/plugins/team-scoreboard/config.js
+
+export default {
+  name: 'Team Scoreboard',
+  description: 'Shows team rankings with athlete grouping',
+  options: [
+    {
+      key: 'sortBy',
+      label: 'Sort By',
+      type: 'select',
+      options: ['total', 'sinclair'],
+      default: 'total'
+    },
+    {
+      key: 'topN',
+      label: 'Show Top Teams',
+      type: 'number',
+      default: 10,
+      min: 3,
+      max: 50
+    }
+  ]
+};
+```
+
+**The API uses this to:**
+- Validate user-provided options
+- Show available options in discovery endpoints (`POST /api/scoreboard` with `action: "list_scoreboards"`)
+- Pass options to helpers.data.js
+
+#### 2. **helpers.data.js** - Plugin-Specific Data Processing
+
+The **plugin-specific business logic** that accesses the shared hub and transforms data.
+
+```javascript
+// src/plugins/team-scoreboard/helpers.data.js
+
+import { competitionHub } from '$lib/server/competition-hub.js';
+
+/**
+ * Plugin-specific cache stores processed results
+ * Key: "fopName-dataHash-option1-option2"
+ */
+const teamScoreboardCache = new Map();
+
+export function getScoreboardData(fopName = 'A', options = {}, locale = 'en') {
+  // 1. ACCESS SHARED HUB
+  const fopUpdate = competitionHub.getFopUpdate(fopName);
+  const databaseState = competitionHub.getDatabaseState();
+  const translations = competitionHub.getTranslations(locale);
+  
+  // 2. EXTRACT OPTIONS
+  const sortBy = options.sortBy || 'total';
+  const topN = options.topN || 10;
+  
+  // 3. BUILD CACHE KEY (based on athlete data, NOT timer state)
+  const dataHash = fopUpdate?.groupAthletes?.substring(0, 100) || '';
+  const cacheKey = `${fopName}-${dataHash}-${sortBy}-${topN}`;
+  
+  // 4. CHECK PLUGIN-SPECIFIC CACHE
+  if (teamScoreboardCache.has(cacheKey)) {
+    const cached = teamScoreboardCache.get(cacheKey);
+    console.log(`[Team Scoreboard] ✓ Cache hit`);
+    
+    // Return cached processed data + fresh timer/decision state
+    return {
+      ...cached,
+      timer: extractTimerState(fopUpdate),
+      decision: extractDecisionState(fopUpdate)
+    };
+  }
+  
+  console.log(`[Team Scoreboard] Cache miss, computing...`);
+  
+  // 5. FETCH DATA FROM HUB
+  // Session athletes (primary source - from WebSocket type="update")
+  let athletes = [];
+  if (fopUpdate?.groupAthletes) {
+    athletes = JSON.parse(fopUpdate.groupAthletes); // Parse JSON string
+  }
+  
+  // 6. APPLY PLUGIN BUSINESS LOGIC
+  // Group athletes by team
+  const teamMap = new Map();
+  athletes.forEach(athlete => {
+    const team = athlete.teamName || 'No Team';
+    if (!teamMap.has(team)) {
+      teamMap.set(team, []);
+    }
+    teamMap.get(team).push(athlete);
+  });
+  
+  // Convert to array and compute team totals
+  const teams = Array.from(teamMap, ([teamName, members]) => ({
+    teamName,
+    members,
+    totalScore: members.reduce((sum, a) => sum + (a.total || 0), 0)
+  }));
+  
+  // Sort teams
+  teams.sort((a, b) => b.totalScore - a.totalScore);
+  
+  // Limit to top N
+  const topTeams = teams.slice(0, topN);
+  
+  // 7. BUILD PROCESSED RESULT
+  const processedData = {
+    competition: {
+      name: fopUpdate?.competitionName || 'Competition',
+      fop: fopName
+    },
+    teams: topTeams,
+    totalTeams: teams.length,
+    status: teams.length > 0 ? 'ready' : 'waiting',
+    // Pass translated labels to component
+    labels: {
+      title: translations['Team Scoreboard'] || 'Team Scoreboard',
+      fop: translations['FOP'] || 'FOP',
+      rank: translations['Rank'] || 'Rank',
+      team: translations['Team'] || 'Team',
+      athletes: translations['Athletes'] || 'Athletes',
+      score: translations['Score'] || 'Score',
+      total: translations['Total'] || 'Total'
+    }
+  };
+  
+  // 8. CACHE THE RESULT (exclude timer/decision - they change frequently)
+  teamScoreboardCache.set(cacheKey, processedData);
+  
+  // Cleanup: Keep last 20 cache entries
+  if (teamScoreboardCache.size > 20) {
+    const firstKey = teamScoreboardCache.keys().next().value;
+    teamScoreboardCache.delete(firstKey);
+  }
+  
+  // 9. RETURN WITH FRESH TIMER/DECISION STATE
+  return {
+    ...processedData,
+    timer: extractTimerState(fopUpdate),
+    decision: extractDecisionState(fopUpdate)
+  };
+}
+
+// Extract timer state separately (changes frequently, not cached)
+function extractTimerState(fopUpdate) {
+  return {
+    state: fopUpdate?.athleteTimerEventType === 'StartTime' ? 'running' : 'stopped',
+    timeRemaining: parseInt(fopUpdate?.athleteMillisRemaining || 0),
+    duration: parseInt(fopUpdate?.timeAllowed || 60000)
+  };
+}
+
+// Extract decision state separately (changes frequently, not cached)
+function extractDecisionState(fopUpdate) {
+  return {
+    type: fopUpdate?.decisionEventType || null,
+    visible: fopUpdate?.decisionsVisible === 'true'
+  };
+}
+```
+
+**Key Pattern:**
+- **Import hub once at top** - `import { competitionHub } from '$lib/server/competition-hub.js'`
+- **Call hub methods** - `getFopUpdate()`, `getDatabaseState()`, etc.
+- **Parse JSON strings** - OWLCMS sends `groupAthletes` and `liftingOrderAthletes` as JSON strings
+- **Implement plugin-specific cache** - Based on data hash, not timestamp
+- **Extract frequently-changing state separately** - Timer and decision state updated at call time, not cached
+- **Return complete object** - Merge cached data with fresh state
+
+#### 3. **page.svelte** - Display-Only Component
+
+The Svelte component receives **pre-processed data** and displays it (no data transformation).
+
+```svelte
+<!-- src/plugins/team-scoreboard/page.svelte -->
+
+<script>
+  export let data = {};
+</script>
+
+<div class="team-scoreboard">
+  <h1>{data.labels?.title}</h1>
+  <p>{data.labels?.fop}: {data.competition?.fop}</p>
+  
+  {#each data.teams || [] as team, index}
+    <div class="team-card">
+      <h2 class="rank-{index + 1}">
+        #{index + 1} {team.teamName}
+      </h2>
+      <div class="team-total">
+        {data.labels?.total}: {team.totalScore}
+      </div>
+      
+      <div class="athletes-list">
+        <div class="list-header">
+          <span>{data.labels?.athletes}</span>
+          <span>{data.labels?.score}</span>
+        </div>
+        {#each team.members as athlete}
+          <div class="athlete-row">
+            <span>{athlete.fullName}</span>
+            <span>{athlete.total || '--'}</span>
+          </div>
+        {/each}
+      </div>
+    </div>
+  {/each}
+  
+  {#if data.status === 'waiting'}
+    <p class="waiting">Waiting for competition data...</p>
+  {/if}
+</div>
+
+<style>
+  /* Pure styling - no conditional logic, no calculations */
+  .team-scoreboard { padding: 2rem; background: #1a1a1a; color: white; }
+  .team-card { margin: 1rem; padding: 1rem; border: 1px solid #444; }
+  .rank-1 { color: gold; }
+  .rank-2 { color: silver; }
+  .rank-3 { color: #cd7f32; }
+  .athletes-list { margin-top: 1rem; }
+  .list-header { display: flex; gap: 1rem; font-weight: bold; padding: 0.5rem 0; border-bottom: 1px solid #666; }
+  .athlete-row { display: flex; gap: 1rem; padding: 0.5rem 0; }
+</style>
+```
+
+**CRITICAL RULE:**
+- ✅ Display pre-computed data (`data.teams`, `data.totalScore`)
+- ✅ Apply CSS styles
+- ❌ NO data transformations (`sort()`, `filter()`, `map()` for computation)
+- ❌ NO calculations or business logic
+- ❌ NO conditional JSON parsing
+
+### Hub Access Pattern
+
+All plugins follow the same **hub access pattern**:
+
+```javascript
+// Step 1: Import the shared hub
+import { competitionHub } from '$lib/server/competition-hub.js';
+
+// Step 2: Get per-FOP data
+const fopUpdate = competitionHub.getFopUpdate(fopName);
+
+// Step 3: Get database state (only if needed for non-session athletes)
+const databaseState = competitionHub.getDatabaseState();
+
+// Step 4: Access specific fields
+const athletes = JSON.parse(fopUpdate.groupAthletes);        // Session athletes
+const liftingOrder = JSON.parse(fopUpdate.liftingOrderAthletes); // Lifting order
+const timerState = fopUpdate.athleteTimerEventType;          // Timer
+const decisionState = fopUpdate.decisionEventType;           // Decision
+const competitionName = fopUpdate.competitionName;           // Meta
+```
+
+**Available Hub Methods:**
+
+```javascript
+// Get data
+competitionHub.getFopUpdate(fopName)              // Per-FOP current state
+competitionHub.getDatabaseState()                 // Full athlete/category data
+competitionHub.getAvailableFOPs()                 // List of FOP names
+
+// Hub stores data
+fopUpdate.groupAthletes                           // JSON string: athletes in current session
+fopUpdate.liftingOrderAthletes                    // JSON string: lifting order
+fopUpdate.athleteTimerEventType                   // Timer state: 'StartTime', 'StopTime', 'SetTime'
+fopUpdate.athleteMillisRemaining                  // Timer remaining (ms)
+fopUpdate.decisionEventType                       // Decision: 'FULL_DECISION', 'DOWN_SIGNAL', etc.
+fopUpdate.decisionsVisible                        // Show decision lights: 'true'/'false'
+fopUpdate.competitionName                         // Competition name
+fopUpdate.fopName                                 // FOP name (for reference)
+```
+
+**Data Source Priority:**
+
+1. **Session athletes (Primary):** `fopUpdate.groupAthletes` from WebSocket `type="update"`
+   - Contains current session athletes with precomputed fields
+   - Includes `classname` flags (e.g., "current", "finished", "good-lift")
+   - JSON string - must parse
+
+2. **Lifting order (Secondary):** `fopUpdate.liftingOrderAthletes` from WebSocket `type="update"`
+   - Contains upcoming lifters
+   - JSON string - must parse
+
+3. **Database athletes (Fallback):** `databaseState.athletes` from WebSocket `type="database"`
+   - ONLY use for athletes NOT in current session
+   - Examples: Previous sessions, different teams
+   - Direct objects - no parsing needed
+
+### API Endpoint Integration
+
+The **unified API endpoint** (`routes/api/scoreboard/+server.js`) handles:
+
+```javascript
+// GET /api/scoreboard?type=team-scoreboard&fop=Platform_A&sortBy=sinclair&topN=15
+
+import { scoreBoardRegistry } from '$lib/server/scoreboard-registry.js';
+
+export async function GET({ url }) {
+  const type = url.searchParams.get('type');           // e.g., 'team-scoreboard'
+  const fopName = url.searchParams.get('fop') || 'A';  // e.g., 'Platform_A'
+  
+  // Extract all options from query string
+  const options = {};
+  url.searchParams.forEach((value, key) => {
+    if (key !== 'type' && key !== 'fop') {
+      options[key] = value;
+    }
+  });
+  
+  // Load plugin's helpers module
+  const plugin = scoreBoardRegistry.getPlugin(type);
+  
+  // Call plugin's data function
+  const data = plugin.getScoreboardData(fopName, options);
+  
+  // Return as JSON
+  return Response.json({
+    success: true,
+    type,
+    fop: fopName,
+    options,
+    data,
+    timestamp: Date.now()
+  });
+}
+```
+
+**Request Flow:**
+1. Browser: `GET /api/scoreboard?type=team-scoreboard&fop=Platform_A`
+2. Route handler extracts `type` and `fop` from query string
+3. Route handler loads `src/plugins/team-scoreboard/helpers.data.js`
+4. Route handler calls `getScoreboardData('Platform_A', {})`
+5. Helper imports hub, calls `getFopUpdate('Platform_A')`
+6. Helper processes data, checks cache, returns JSON
+7. Route handler wraps in response envelope
+8. Browser receives processed data
+
+### Performance: Cache Behavior Example
+
+**Scenario:** 200 browsers display team scoreboard on FOP Platform_A
+
+```
+T=0s:   OWLCMS sends UPDATE (new lifting order)
+        → Hub broadcasts SSE to 200 browsers
+        
+        Browser 1 → GET /api/scoreboard?type=team-scoreboard&fop=Platform_A
+        → Helper: Check cache with dataHash=NEW
+        → Cache miss! New athletes data
+        → Compute team groupings (50ms)
+        → Store in cache
+        → Return to browser
+        
+        Browsers 2-200 → GET /api/scoreboard?type=team-scoreboard&fop=Platform_A
+        → Helper: Check cache with dataHash=NEW
+        → Cache hit! Same hash, same options
+        → Return cached data (1ms each)
+
+Total time: 50ms (first browser) + 199ms (remaining 199 × 1ms) = ~250ms for 200 browsers
+
+Without plugin cache: 200 browsers × 50ms = 10 seconds (40× slower)
+```
+
+**Timer Event (Different Cache Behavior):**
+
+```
+T=1s:   OWLCMS sends TIMER StartTime
+        → Hub broadcasts SSE to 200 browsers
+        
+        Browsers 1-200 → GET /api/scoreboard?type=team-scoreboard&fop=Platform_A
+        → Helper: Check cache with dataHash=OLD
+        → Cache hit! Athletes unchanged, only timer changed
+        → Return cached team data + fresh timer state (1ms each)
+
+Total time: ~200ms for 200 browsers (no recomputation!)
+```
+
+### Debugging Helper Issues
+
+**Check what the hub contains:**
+```javascript
+// Add to helpers.data.js temporarily
+const fopUpdate = competitionHub.getFopUpdate(fopName);
+console.log('[Debug] FOP Update:', JSON.stringify(fopUpdate, null, 2));
+```
+
+**Check parsed athlete data:**
+```javascript
+const athletes = JSON.parse(fopUpdate.groupAthletes);
+console.log('[Debug] Athletes:', athletes.slice(0, 3)); // First 3
+```
+
+**Check cache efficiency:**
+```javascript
+// Add cache logging
+console.log(`[Cache] Size: ${teamScoreboardCache.size}, Hit rate: ${hits}/${hits+misses}`);
+```
+
+**Verify options passed correctly:**
+```javascript
+console.log('[Options]', { sortBy, topN, gender });
 ```
 
 ## OWLCMS WebSocket Integration
