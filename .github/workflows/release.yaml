@@ -48,7 +48,7 @@ jobs:
         with:
           registry: ${{ secrets.DOCKER_REG }}
           username: ${{ secrets.ORG_DOCKER_USER }}
-          password: ${{ secrets.ORG_DOCKER_TOKEN }}
+          password: ${{ secrets.OWLCMS_DOCKER_TOKEN }}
       
       - name: Build and Push Docker Image
         uses: docker/build-push-action@v5
