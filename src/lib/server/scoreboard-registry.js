@@ -1,20 +1,20 @@
 /**
  * Scoreboard Plugin Registry
- * 
+ *
  * Discovers and manages all scoreboard types.
  * Each scoreboard plugin has:
  * - config.js: metadata (name, description, options)
  * - helpers.data.js: server-side data processing function
  * - page.svelte: display component
+ *
+ * Static discovery (build-time): Vite import.meta.glob eagerly imports all
+ * plugins under src/plugins/* so production builds include them without
+ * runtime filesystem access.
  */
 
-import { readdirSync, existsSync } from 'fs';
-import { join } from 'path';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+// Eager imports so Vite includes all plugins at build time
+const configModules = import.meta.glob('../../plugins/*/config.js', { eager: true });
+const helperModules = import.meta.glob('../../plugins/*/helpers.data.js', { eager: true });
 
 class ScoreboardRegistry {
 	constructor() {
@@ -48,21 +48,17 @@ class ScoreboardRegistry {
 	}
 
 	async _doInitialize() {
-		const pluginsDir = join(__dirname, '../../plugins');
+		const discovered = new Set();
 
-		if (!existsSync(pluginsDir)) {
-			console.warn('[ScoreboardRegistry] Plugins directory not found:', pluginsDir);
-			this.initialized = true;
-			return;
+		for (const configPath of Object.keys(configModules)) {
+			const parts = configPath.split('/');
+			if (parts.length < 3) continue;
+			const folderName = parts[parts.length - 2]; // plugins/<folder>/config.js
+			discovered.add(folderName);
 		}
 
-		const entries = readdirSync(pluginsDir, { withFileTypes: true });
-
-		for (const entry of entries) {
-			// Skip system folders and files
-			if (entry.isDirectory() && !entry.name.startsWith('.')) {
-				await this.registerScoreboard(entry.name);
-			}
+		for (const folderName of discovered) {
+			await this.registerScoreboard(folderName);
 		}
 
 		this.initialized = true;
@@ -73,26 +69,17 @@ class ScoreboardRegistry {
 	 */
 	async registerScoreboard(folderName) {
 		try {
-			const pluginPath = join(__dirname, '../../plugins', folderName);
-			const configPath = join(pluginPath, 'config.js');
-			const helpersPath = join(pluginPath, 'helpers.data.js');
-
-			// Check if config exists
-			if (!existsSync(configPath)) {
+			const configModule = configModules[`../../plugins/${folderName}/config.js`];
+			if (!configModule) {
 				console.warn(`[ScoreboardRegistry] Skipping ${folderName}: no config.js`);
 				return;
 			}
-
-			// Import config
-			const configModule = await import(`../../plugins/${folderName}/config.js`);
 			const config = configModule.default || configModule;
 
-			// Import data helper (optional)
-			let dataHelper = null;
-			if (existsSync(helpersPath)) {
-				const helpersModule = await import(`../../plugins/${folderName}/helpers.data.js`);
-				dataHelper = helpersModule.getScoreboardData || helpersModule.default;
-			}
+			const helpersModule = helperModules[`../../plugins/${folderName}/helpers.data.js`];
+			const dataHelper = helpersModule
+				? helpersModule.getScoreboardData || helpersModule.default
+				: null;
 
 			// Extract scoreboard type from folder name
 			// Folder name IS the type (e.g., "lifting-order")
@@ -103,7 +90,7 @@ class ScoreboardRegistry {
 				folderName,
 				config,
 				dataHelper,
-				path: pluginPath
+				path: `../../plugins/${folderName}`
 			});
 
 		} catch (err) {

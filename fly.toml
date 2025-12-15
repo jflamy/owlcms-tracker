@@ -1,0 +1,78 @@
+# Fly.io configuration for owlcms-tracker
+# Documentation: https://fly.io/docs/reference/configuration/
+
+app = "owlcms-tracker"
+
+# Primary region (change to your preferred region code)
+# Region codes: https://fly.io/docs/reference/regions/
+# Examples: yyz (Toronto), sea (Seattle), iad (Washington DC), lhr (London)
+primary_region = "yyz"
+
+# Backup regions for redundancy (optional)
+# regions = ["yyz", "sea"]
+
+[build]
+  # Use the Dockerfile in the project root
+  dockerfile = "Dockerfile"
+
+# Environment variables
+[env]
+  # Enable learning mode to capture OWLCMS messages for debugging
+  LEARNING_MODE = "false"
+  
+  # Node.js environment
+  NODE_ENV = "production"
+  
+  # Logging level: debug, info, warn, error
+  LOG_LEVEL = "info"
+
+# HTTP Service configuration
+[http_service]
+  # Port inside the container
+  internal_port = 8096
+  
+  # Auto-stop/start machines to save costs
+  auto_stop_machines = true
+  auto_start_machines = true
+  
+  # Force HTTPS (set to true in production)
+  force_https = false
+
+# Service port configuration
+[[services]]
+  protocol = "tcp"
+  internal_port = 8096
+  
+  auto_stop_machines = true
+  auto_start_machines = true
+  
+  [[services.ports]]
+    port = 8096
+    handlers = ["http"]
+    # Uncomment for HTTPS (after setting up a domain and certificate)
+    # handlers = ["http", "https"]
+
+# Machine resource configuration
+# Minimum 1GB memory required for Vite dev server + Node.js runtime
+# Increase cpus for high concurrency scenarios
+[vm]
+  memory = "1gb"    # Minimum required (can increase to 2gb for high traffic)
+  cpus = 1          # Standard (increase to 2+ for many concurrent scoreboards)
+
+# Mounts for persistent data (if needed)
+# [[mounts]]
+#   source = "tracker_data"
+#   destination = "/app/local"
+
+# Service configuration
+[concurrency]
+  type = "notional"
+  value = 10  # Allow up to 10 concurrent connections
+
+# Graceful shutdown timeout (seconds)
+[processes]
+  app = "node build/index.js"
+
+# Health check configuration
+# The Dockerfile includes a HEALTHCHECK instruction
+# Fly.io will use that to determine app health

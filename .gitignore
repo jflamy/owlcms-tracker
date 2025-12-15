@@ -2,6 +2,9 @@ node_modules
 .DS_Store
 dist
 dist-ssr
+dist-windows/
+dist-macos/
+dist-rpi/
 *.local
 .svelte-kit
 .env
@@ -10,6 +13,7 @@ dist-ssr
 vite.config.js.timestamp-*
 samples/
 local/flags/
+build/
 
 # Compliance folder - ignore all files except README.md
 compliance/*

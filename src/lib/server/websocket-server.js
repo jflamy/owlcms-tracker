@@ -77,6 +77,19 @@ export function initWebSocketServer(httpServer) {
 					ws.send(JSON.stringify({ error: 'Invalid message format. Expected {version, type, payload}' }));
 					return;
 				}
+
+				// If a shared secret is configured, enforce it here. OWLCMS may send
+				// an `updateKey` in the payload; if it does not match the configured
+				// `OWLCMS_UPDATEKEY` environment variable, reject with 401 (unauthorized).
+				const expectedKey = process.env.OWLCMS_UPDATEKEY;
+				if (expectedKey) {
+					const incomingKey = message.payload?.updateKey || message.payload?.update_key || message.payload?.updatekey;
+					if (!incomingKey || String(incomingKey) !== String(expectedKey)) {
+						console.warn('[WebSocket] ⚠️ Unauthorized update attempt - missing/invalid OWLCMS_UPDATEKEY');
+						ws.send(JSON.stringify({ status: 401, message: 'Access not authorized' }));
+						return;
+					}
+				}
 				
 				const hasBundledDatabase = Object.prototype.hasOwnProperty.call(message.payload, 'database');
 				if (hasBundledDatabase) {

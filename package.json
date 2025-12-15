@@ -5,6 +5,11 @@
   "scripts": {
     "dev": "node node_modules/vite/bin/vite.js dev --port 8096",
     "dev:learning": "cross-env LEARNING_MODE=true node node_modules/vite/bin/vite.js dev --port 8096",
+    "build": "svelte-kit sync && vite build && node scripts/copy-server.js",
+    "build:windows": "npm run build && node scripts/build-windows.js",
+    "build:macos": "npm run build && node scripts/build-macos.js",
+    "build:rpi": "npm run build && node scripts/build-rpi.js",
+    "build:all": "npm run build:windows && npm run build:macos && npm run build:rpi",
     "preview": "vite preview --port 8096",
     "check": "svelte-kit sync && svelte-check --tsconfig ./jsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./jsconfig.json --watch",
@@ -13,6 +18,7 @@
   },
   "devDependencies": {
     "@sveltejs/adapter-auto": "^3.2.5",
+    "@sveltejs/adapter-node": "^5.4.0",
     "@sveltejs/kit": "^2.7.2",
     "@sveltejs/vite-plugin-svelte": "^4.0.0",
     "@testing-library/jest-dom": "^6.9.1",

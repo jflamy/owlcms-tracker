@@ -55,10 +55,10 @@ function verifySanityAfterFlags() {
  * Sanity check after translations load
  * Verifies locale count and key coverage
  */
-function verifySanityAfterTranslations() {
+async function verifySanityAfterTranslations() {
 	try {
 		// Lazy import to access competition hub
-		const { competitionHub } = require('./competition-hub.js');
+		const { competitionHub } = await import('./competition-hub.js');
 		
 		// Get all available locales (not just one)
 		const availableLocales = competitionHub.getAvailableLocales();
@@ -90,7 +90,7 @@ function verifySanityAfterTranslations() {
  * Parse and route binary message from OWLCMS
  * @param {Buffer} buffer - Binary frame data
  */
-export function handleBinaryMessage(buffer) {
+export async function handleBinaryMessage(buffer) {
 	const startTime = Date.now();
 	const operationId = Math.random().toString(36).substr(2, 9);
 	
@@ -205,16 +205,16 @@ export function handleBinaryMessage(buffer) {
 
 		// Route to handler based on message type
 		if (messageType === 'flags_zip') {
-			handleFlagsMessage(payload);
+			await handleFlagsMessage(payload);
 		} else if (messageType === 'flags') {
 			// Legacy support for old 'flags' message type
-			handleFlagsMessage(payload);
+			await handleFlagsMessage(payload);
 		} else if (messageType === 'pictures') {
 			handlePicturesMessage(payload);
 		} else if (messageType === 'styles') {
 			handleStylesMessage(payload);
 		} else if (messageType === 'translations_zip') {
-			handleTranslationsZipMessage(payload);
+			await handleTranslationsZipMessage(payload);
 		} else {
 			console.warn(`[BINARY] WARNING: Unknown binary message type "${messageType}"`);
 		}
@@ -232,12 +232,12 @@ export function handleBinaryMessage(buffer) {
  * Extract flags ZIP archive to ./local/flags
  * @param {Buffer} zipBuffer - ZIP file buffer
  */
-function handleFlagsMessage(zipBuffer) {
+async function handleFlagsMessage(zipBuffer) {
 	const startTime = Date.now();
 	console.log(`[FLAGS] Starting extraction of ${zipBuffer.length} bytes`);
 	
 	try {
-		const competitionHub = require('./competition-hub.js').competitionHub;
+		const { competitionHub } = await import('./competition-hub.js');
 		// Parse ZIP from buffer
 		const zip = new AdmZip(zipBuffer);
 		const flagsDir = path.join(process.cwd(), 'local', 'flags');
@@ -375,7 +375,7 @@ function handleStylesMessage(zipBuffer) {
  * ZIP contains single file "translations.json" with all 26 locale translation maps
  * @param {Buffer} zipBuffer - ZIP file buffer with translations.json
  */
-function handleTranslationsZipMessage(zipBuffer) {
+async function handleTranslationsZipMessage(zipBuffer) {
 	const startTime = Date.now();
 	
 	try {
@@ -402,7 +402,7 @@ function handleTranslationsZipMessage(zipBuffer) {
 		
 		// Lazy import to avoid circular dependency at module load time
 		// This will be called at runtime when message arrives
-		const competitionHub = require('./competition-hub.js').competitionHub;
+		const { competitionHub } = await import('./competition-hub.js');
 		
 		// Check checksum to determine if content changed
 		const checksum = payload.translationsChecksum;
@@ -470,7 +470,7 @@ function handleTranslationsZipMessage(zipBuffer) {
 		}
 		
 		// Run sanity check after successful translations load
-		verifySanityAfterTranslations();
+		await verifySanityAfterTranslations();
 	} catch (error) {
 		const elapsed = Date.now() - startTime;
 		console.error(`[TRANSLATIONS_ZIP] ❌ ERROR after ${elapsed}ms:`, error.message);
