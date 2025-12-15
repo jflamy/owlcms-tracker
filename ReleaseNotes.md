@@ -10,7 +10,7 @@
 ### Breaking Changes
 - List any breaking changes (if applicable)
 
-## Installation
+## Installing Locally
 
 Extract the ZIP file appropriate for your operating system:
 
@@ -23,7 +23,7 @@ All distributions include Node.js, so no additional installation is needed.
 
 ### Docker Installation
 
-Alternatively, run the tracker in Docker (you may use a version number instead of `latest`)
+Alternatively, run the tracker in Docker
 
 ```bash
 docker run -d \
@@ -34,7 +34,7 @@ docker run -d \
 
 Then access the tracker at: `http://localhost:8096`
 
-**Note:** Replace `2.0.0-alpha00` with the appropriate version tag. Use `latest` for the newest release.
+**Note:** Use `latest` for the newest release. You can also use a specific release number such as `2.0.0-beta01` if needed.
 
 ## OWLCMS Configuration
 
