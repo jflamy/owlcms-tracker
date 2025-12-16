@@ -16,7 +16,13 @@ RUN npm ci
 # Copy source code (plugins included via static import.meta.glob)
 COPY . .
 
-# Build the application
+# Exclude plugins: delete directories before building to reduce bundle size
+# (nvf, video-overlay, and document plugins are excluded from Docker image)
+RUN rm -rf src/plugins/nvf \
+    && rm -rf src/plugins/video-overlay \
+    && rm -rf src/plugins/document
+
+# Build the application (will only include remaining plugins)
 RUN npm run build
 
 # Stage 2: Runtime

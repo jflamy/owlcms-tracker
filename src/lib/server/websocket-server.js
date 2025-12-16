@@ -24,11 +24,28 @@ export function initWebSocketServer(httpServer) {
 	wss.on('connection', (ws) => {
 		console.log('[WebSocket] Client connected');
 		
+		// Track authentication status for this connection
+		// When OWLCMS_UPDATEKEY is configured, client must authenticate via first text frame
+		let clientAuthenticated = !process.env.OWLCMS_UPDATEKEY; // Auto-authenticated if no key required
+		
 		// Use raw message event which provides both data and a flag for isBinary
 		ws.on('message', async (data, isBinary) => {
 			// Strictly follow OWLCMS spec:
 			// - If isBinary is true, frame is binary with [4-byte length][type][payload]
 			// - If isBinary is false, frame is JSON text
+			
+			// Check authentication for ALL frames (text and binary)
+			// If OWLCMS_UPDATEKEY is configured, only accept frames from authenticated clients
+			if (process.env.OWLCMS_UPDATEKEY && !clientAuthenticated) {
+				// For text frames, we'll check the key below
+				// For binary frames, reject because we can't verify the key
+				if (isBinary) {
+					console.warn('[WebSocket] ⚠️ Binary frame rejected - client not authenticated (missing updateKey from previous text frame)');
+					ws.send(JSON.stringify({ status: 401, message: 'Not authenticated. Send text frame with valid updateKey first' }));
+					ws.close(1008, 'Unauthorized: binary frame requires prior authentication');
+					return;
+				}
+			}
 			
 			if (isBinary) {
 				// Binary frame: [4-byte big-endian typeLength][type UTF-8][binary payload]
@@ -87,8 +104,11 @@ export function initWebSocketServer(httpServer) {
 					if (!incomingKey || String(incomingKey) !== String(expectedKey)) {
 						console.warn('[WebSocket] ⚠️ Unauthorized update attempt - missing/invalid OWLCMS_UPDATEKEY');
 						ws.send(JSON.stringify({ status: 401, message: 'Access not authorized' }));
+						ws.close(1008, 'Unauthorized: invalid updateKey');
 						return;
 					}
+					// Authentication successful - mark this client as authenticated for binary frames
+					clientAuthenticated = true;
 				}
 				
 				const hasBundledDatabase = Object.prototype.hasOwnProperty.call(message.payload, 'database');
