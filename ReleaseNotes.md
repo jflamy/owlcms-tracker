@@ -2,14 +2,17 @@
 
 ## What's New
 
-- Initial release
+- First Beta.  
+- Only the typical individual and team scoreboards are included in the cloud release (docker)
+- Experimental/Example plugins are included in the local installation ZIPs.
 
 ### Bug Fixes
+- beta01: authentication for binary frames
 - alpha02: When running the build version, don't abort when owlcms disconnects
 - alpha01: flatten the zip structure so the script is at top level
 
 ### Breaking Changes
-- List any breaking changes (if applicable)
+- none
 
 ## Installing Locally
 
