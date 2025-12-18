@@ -12,7 +12,7 @@ export default {
 	description: 'Lower-third overlay with animated ranking display in SVG box',
 	
 	// Category for grouping in the UI
-	category: 'lower-third',
+	category: 'video-overlay',
 	
 	// Sort order within category
 	order: 200,

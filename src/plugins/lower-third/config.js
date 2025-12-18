@@ -3,7 +3,7 @@ export default {
 	description: 'Minimal overlay showing current athlete, weight, timer, and decision lights. Transparent background for video overlay.',
 	
 	// Category for grouping in the UI
-	category: 'lower-third',
+	category: 'video-overlay',
 	
 	// Sort order within category
 	order: 100,

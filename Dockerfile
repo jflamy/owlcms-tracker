@@ -16,11 +16,14 @@ RUN npm ci
 # Copy source code (plugins included via static import.meta.glob)
 COPY . .
 
-# Exclude plugins: delete directories before building to reduce bundle size
-# (nvf, video-overlay, and document plugins are excluded from Docker image)
-RUN rm -rf src/plugins/nvf \
-    && rm -rf src/plugins/video-overlay \
-    && rm -rf src/plugins/document
+# Explicitly copy only the required plugins to reduce bundle size
+# (nvf-lagkonkurranse, video-overlay, and document plugins are excluded)
+RUN rm -rf src/plugins/*
+COPY src/plugins/attempt-board ./src/plugins/attempt-board
+COPY src/plugins/lifting-order ./src/plugins/lifting-order
+COPY src/plugins/rankings ./src/plugins/rankings
+COPY src/plugins/session-results ./src/plugins/session-results
+COPY src/plugins/team-scoreboard ./src/plugins/team-scoreboard
 
 # Build the application (will only include remaining plugins)
 RUN npm run build

@@ -57,7 +57,7 @@
   // Categorize scoreboards
   $: standardScoreboards = data.scoreboards.filter(s => s.category === 'standard').sort(sortScoreboards);
   
-  $: lowerThirdScoreboards = data.scoreboards.filter(s => s.category === 'lower-third').sort(sortScoreboards);
+  $: videoOverlayScoreboards = data.scoreboards.filter(s => s.category === 'video-overlay').sort(sortScoreboards);
 
   $: documentsScoreboards = data.scoreboards.filter(s => s.category === 'documents').sort(sortScoreboards);
   
@@ -452,17 +452,17 @@
       {/if}
 
       <!-- Video Overlays -->
-      {#if lowerThirdScoreboards.length > 0}
+      {#if videoOverlayScoreboards.length > 0}
         <section class="scoreboard-category collapsible">
           <!-- svelte-ignore a11y-click-events-have-key-events -->
           <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
-          <h2 class="category-title clickable" on:click={() => toggleCategory('video-overlays')}>
-            <span class="toggle-icon">{expandedCategory === 'video-overlays' ? '▼' : '▶'}</span>
+          <h2 class="category-title clickable" on:click={() => toggleCategory('video-overlay')}>
+            <span class="toggle-icon">{expandedCategory === 'video-overlay' ? '▼' : '▶'}</span>
             Video Overlays
           </h2>
-          {#if expandedCategory === 'video-overlays'}
+          {#if expandedCategory === 'video-overlay'}
             <div class="scoreboards-grid">
-              {#each lowerThirdScoreboards as scoreboard}
+              {#each videoOverlayScoreboards as scoreboard}
                 <div class="scoreboard-card">
                   <h3>{scoreboard.name}</h3>
                   <p class="description">{@html scoreboard.description}</p>
