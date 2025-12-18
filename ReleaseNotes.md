@@ -5,12 +5,6 @@
 - Release Candidate
 - The team scoreboard now supports Sinclair, SMHF, Q-Points, Q-Masters, GAMX, GAMX-M, GAMX-A and GAMX-U
 
-### Bug Fixes
-- beta01: authentication for binary frames
-- alpha02: When running the build version, don't abort when owlcms disconnects
-- alpha01: flatten the zip structure so the script is at top level
-
-
 ## Installing Locally
 
 Extract the ZIP file appropriate for your operating system:
