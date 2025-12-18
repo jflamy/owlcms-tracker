@@ -24,6 +24,8 @@ COPY src/plugins/session-results ./src/plugins/session-results
 COPY src/plugins/team-scoreboard ./src/plugins/team-scoreboard
 
 # Build the application (will only include remaining plugins)
+# Increase Node.js heap size to prevent OOM during build
+ENV NODE_OPTIONS="--max-old-space-size=4096"
 RUN npm run build
 
 # Stage 2: Runtime
