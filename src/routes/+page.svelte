@@ -909,7 +909,7 @@
     border: 1px solid rgba(255, 255, 255, 0.2);
     max-width: 700px;
     width: 90%;
-    max-height: 80vh;
+    max-height: 95vh;
     display: flex;
     flex-direction: column;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);

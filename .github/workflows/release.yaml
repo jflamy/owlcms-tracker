@@ -7,7 +7,7 @@ on:
       revision:
         description: 'semver number for the release'
         required: true
-        default: '2.0.0-beta01'
+        default: '2.0.0-rc01'
 
 jobs:
   build:
@@ -41,6 +41,16 @@ jobs:
       
       - name: Install dependencies
         run: npm ci
+      
+      - name: Prepare standard plugins only (matching Docker)
+        run: |
+          echo "Removing all plugins except standard ones..."
+          rm -rf src/plugins/*
+          git checkout src/plugins/lifting-order
+          git checkout src/plugins/rankings
+          git checkout src/plugins/session-results
+          git checkout src/plugins/team-scoreboard
+          echo "✓ Standard plugins restored"
       
       - name: Build base application
         run: npm run build

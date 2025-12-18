@@ -32,7 +32,7 @@ export function resolveFlagPath(countryCode) {
 
 		try {
 			if (fs.existsSync(fullPath)) {
-				console.log(`[Flag] ✓ Found (exact case): ${fileName}`);
+				// console.log(`[Flag] ✓ Found (exact case): ${fileName}`);
 				return `local/flags/${fileName}`;
 			}
 		} catch (error) {
@@ -49,7 +49,7 @@ export function resolveFlagPath(countryCode) {
 
 		try {
 			if (fs.existsSync(fullPath)) {
-				console.log(`[Flag] ✓ Found (uppercase): ${fileName}`);
+				// console.log(`[Flag] ✓ Found (uppercase): ${fileName}`);
 				return `local/flags/${fileName}`;
 			}
 		} catch (error) {
@@ -59,7 +59,7 @@ export function resolveFlagPath(countryCode) {
 	}
 
 	// Not found
-	console.log(`[Flag] ✗ Not found: "${trimmedCode}" (tried exact case and uppercase)`);
+	// console.log(`[Flag] ✗ Not found: "${trimmedCode}" (tried exact case and uppercase)`);
 	return null;
 }
 

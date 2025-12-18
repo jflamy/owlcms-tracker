@@ -103,13 +103,27 @@ class CompetitionHub {
       const now = Date.now();
       const prevDataUpdate = this.fopUpdates[fopName]?.lastDataUpdate || now;
 
-      this.fopUpdates[fopName] = {
+      // Debug: Check currentAthleteKey in incoming update
+      const oldKey = this.fopUpdates[fopName]?.currentAthleteKey;
+      const newKey = normalizedParams.currentAthleteKey;
+      console.log(`[Hub] currentAthleteKey transition for FOP ${fopName}: ${oldKey} -> ${newKey} (exists in update: ${normalizedParams.hasOwnProperty('currentAthleteKey')})`);
+      
+      // Build merged state
+      const mergedState = {
         ...this.fopUpdates[fopName], // Keep existing state (timer, etc.)
         ...normalizedParams,                 // Merge new data
         lastUpdate: now,
         lastDataUpdate: isTimerOrDecision ? prevDataUpdate : now,
         fop: fopName
       };
+      
+      // Clear currentAthleteKey if not present in new update (prevents stale athlete data)
+      if (!normalizedParams.currentAthleteKey && mergedState.currentAthleteKey) {
+        console.log(`[Hub] Clearing stale currentAthleteKey for FOP ${fopName}`);
+        delete mergedState.currentAthleteKey;
+      }
+      
+      this.fopUpdates[fopName] = mergedState;
 
       // Rebuild derived state (session maps, ordered lists, etc.)
       this._rebuildDerivedState(fopName);

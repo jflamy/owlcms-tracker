@@ -30,6 +30,8 @@
 	$: currentAttempt = data.currentAttempt;
 	$: teams = data.teams || [];
 	$: showPredicted = data.options?.showPredicted ?? true;
+	// Default to hidden until data arrives (prevents flash of attempt bar on page load)
+	$: attemptBarClass = data.attemptBarClass ?? 'hide-because-null-session';
 
 	// Sync timer with server when data changes
 	$: if (data.timer) {
@@ -98,10 +100,9 @@ export function shouldRenderFlag(url) {
 </svelte:head>
 
 <div class="scoreboard">
-	{#if data.status !== 'waiting' && !data.sessionStatus?.isDone}
-		<div class="session-header-wrapper" role="button" aria-label="Open gender menu" tabindex="0">
-			<CurrentAttemptBar 
-				currentAttempt={data.currentAttempt}
+	<div class="session-header-wrapper {attemptBarClass}" role="button" aria-label="Open gender menu" tabindex="0">
+		<CurrentAttemptBar 
+			currentAttempt={data.currentAttempt}
 				timerData={data.timer}
 				breakTimerData={data.breakTimer}
 				displayMode={data.displayMode || 'none'}
@@ -112,7 +113,7 @@ export function shouldRenderFlag(url) {
 				showDecisionLights={true}
 				showTimer={true}
 				compactMode={true}
-				showLifterInfo={data.options?.currentAttemptInfo ?? true}
+				showLifterInfo={data.attemptBarClass === 'hidden' ? false : (data.options?.currentAttemptInfo ?? true)}
 				translations={{
 					session: data.headers?.session || 'Session',
 					snatch: data.headers?.snatch || 'Snatch',
@@ -120,7 +121,6 @@ export function shouldRenderFlag(url) {
 				}}
 			/>
 		</div>
-	{/if}
 
 	<!-- Context menu disabled for DOM inspection -->
 
@@ -248,6 +248,24 @@ export function shouldRenderFlag(url) {
 		display: flex;
 		flex-direction: column;
 		overflow: hidden;
+	}
+
+	.session-header-wrapper.hidden {
+		display: none !important;
+		visibility: hidden;
+		height: 0;
+		overflow: hidden;
+		padding: 0;
+		margin: 0;
+	}
+
+	.session-header-wrapper.hide-because-null-session {
+		display: none !important;
+		visibility: hidden;
+		height: 0;
+		overflow: hidden;
+		padding: 0;
+		margin: 0;
 	}
 
 	/* Main grid */

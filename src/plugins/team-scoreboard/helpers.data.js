@@ -18,7 +18,9 @@
 
 import { competitionHub } from '$lib/server/competition-hub.js';
 import { getFlagUrl } from '$lib/server/flag-resolver.js';
-import { CalculateSinclair2024 } from '$lib/sinclair-coefficients.js';
+import { CalculateSinclair2024, CalculateSinclair2020, getMastersAgeFactor } from '$lib/sinclair-coefficients.js';
+import { CalculateQPoints } from '$lib/qpoints-coefficients.js';
+import { computeGamx, Variant } from '$lib/gamx2.js';
 import { buildCacheKey } from '$lib/server/cache-utils.js';
 import { extractTimers, computeDisplayMode, extractDecisionState } from '$lib/server/timer-decision-helpers.js';
 
@@ -96,6 +98,41 @@ function extractYearOfBirth(fullBirthDate) {
 function normalizeLotNumber(value) {
 	if (value === undefined || value === null) return '';
 	return String(value).trim();
+}
+
+/**
+ * Calculate score based on selected scoring system
+ * @param {number} total - Athlete total
+ * @param {number} bw - Body weight
+ * @param {string} gender - 'M' or 'F'
+ * @param {number} age - Athlete age
+ * @param {string} system - Scoring system name
+ * @returns {number} Calculated score
+ */
+function calculateScore(total, bw, gender, age, system = 'Sinclair') {
+	if (!total || total <= 0 || !bw || bw <= 0 || !gender) return 0;
+	
+	const normalizedGender = gender === 'M' || gender === 'F' ? gender : (gender.startsWith('M') ? 'M' : 'F');
+
+	switch (system) {
+		case 'SMHF':
+			return CalculateSinclair2020(total, bw, normalizedGender) * getMastersAgeFactor(age, normalizedGender);
+		case 'Q-Points':
+			return CalculateQPoints(total, bw, normalizedGender, 0); // No age factor
+		case 'Q-Masters':
+			return CalculateQPoints(total, bw, normalizedGender, age);
+		case 'GAMX':
+			return computeGamx(normalizedGender, bw, total, Variant.SENIOR, null);
+		case 'GAMX-M':
+			return computeGamx(normalizedGender, bw, total, Variant.MASTERS, age);
+		case 'GAMX-A':
+			return computeGamx(normalizedGender, bw, total, Variant.AGE_ADJUSTED, age);
+		case 'GAMX-U':
+			return computeGamx(normalizedGender, bw, total, Variant.U17, age);
+		case 'Sinclair':
+		default:
+			return CalculateSinclair2024(total, bw, normalizedGender);
+	}
 }
 
 /**
@@ -369,28 +406,29 @@ function isDefinitiveTotalZero(athlete) {
  * @returns {Object} TeamAthlete with uniform structure for team scoring
  */
 function teamAthleteFromSession(sessionAthlete, context = {}) {
-	const { liftingOrder = null, bodyWeight = null, includeCjDeclaration = true } = context;
+	const { liftingOrder = null, bodyWeight = null, includeCjDeclaration = true, scoringSystem = 'Sinclair' } = context;
 	
 	// Use body weight from context (merged from database) or from session athlete
 	const athleteBodyWeight = bodyWeight ?? sessionAthlete.bodyWeight ?? 0;
 	const normalizedGender = normalizeGender(sessionAthlete.gender);
 	
+	// Get age for scoring systems that use it (SMHF, Q-Masters, GAMX)
+	const birthYear = parseInt(sessionAthlete.yearOfBirth || extractYearOfBirth(sessionAthlete.fullBirthDate) || 0);
+	const currentYear = new Date().getFullYear();
+	const age = birthYear > 0 ? currentYear - birthYear : 0;
+
 	// Calculate actual values from session athlete data
 	const bestSnatchValue = parseFormattedNumber(sessionAthlete.bestSnatch);
 	const bestCleanJerkValue = parseFormattedNumber(sessionAthlete.bestCleanJerk);
 	const actualTotal = bestSnatchValue + bestCleanJerkValue;
 	const hasResults = bestSnatchValue > 0 || bestCleanJerkValue > 0;
 	
-	// Calculate actual score (Sinclair)
-	const actualScore = (actualTotal > 0 && normalizedGender && athleteBodyWeight > 0)
-		? CalculateSinclair2024(actualTotal, athleteBodyWeight, normalizedGender)
-		: 0;
+	// Calculate actual score
+	const actualScore = calculateScore(actualTotal, athleteBodyWeight, normalizedGender, age, scoringSystem);
 	
 	// Calculate predicted total if next lift succeeds
 	const predictedTotal = calculatePredictedTotal(sessionAthlete, includeCjDeclaration);
-	const predictedScore = (predictedTotal > 0 && normalizedGender && athleteBodyWeight > 0)
-		? CalculateSinclair2024(predictedTotal, athleteBodyWeight, normalizedGender)
-		: 0;
+	const predictedScore = calculateScore(predictedTotal, athleteBodyWeight, normalizedGender, age, scoringSystem);
 	
 	// Determine if total is definitively zero
 	const definitiveZero = isDefinitiveTotalZero(sessionAthlete);
@@ -628,13 +666,18 @@ function mapAttemptsToDisplayInfo(formattedAttempts) {
  * @returns {Object} TeamAthlete with uniform structure for team scoring (same as teamAthleteFromSession)
  */
 function teamAthleteFromDatabase(dbAthlete, context = {}) {
-	const { liftingOrder = null, includeCjDeclaration = true } = context;
+	const { liftingOrder = null, includeCjDeclaration = true, scoringSystem = 'Sinclair' } = context;
 	
 	if (!dbAthlete) return null;
 	
 	const normalizedGender = normalizeGender(dbAthlete.gender);
 	const athleteBodyWeight = parseFormattedNumber(dbAthlete.bodyWeight) || 0;
 	
+	// Get age for scoring systems that use it
+	const birthYear = parseInt(extractYearOfBirth(dbAthlete.fullBirthDate) || 0);
+	const currentYear = new Date().getFullYear();
+	const age = birthYear > 0 ? currentYear - birthYear : 0;
+
 	// Format name as "LASTNAME, Firstname" to match OWLCMS session format
 	const lastName = (dbAthlete.lastName || '').toUpperCase();
 	const firstName = dbAthlete.firstName || '';
@@ -686,16 +729,12 @@ function teamAthleteFromDatabase(dbAthlete, context = {}) {
 	const actualTotal = bestSnatch + bestCleanJerk;
 	const hasResults = bestSnatch > 0 || bestCleanJerk > 0;
 	
-	// Calculate actual score (Sinclair)
-	const actualScore = (actualTotal > 0 && normalizedGender && athleteBodyWeight > 0)
-		? CalculateSinclair2024(actualTotal, athleteBodyWeight, normalizedGender)
-		: 0;
+	// Calculate actual score
+	const actualScore = calculateScore(actualTotal, athleteBodyWeight, normalizedGender, age, scoringSystem);
 	
 	// Calculate predicted total if next lift succeeds
 	const predictedTotal = calculatePredictedTotal(normalizedAthlete, includeCjDeclaration);
-	const predictedScore = (predictedTotal > 0 && normalizedGender && athleteBodyWeight > 0)
-		? CalculateSinclair2024(predictedTotal, athleteBodyWeight, normalizedGender)
-		: 0;
+	const predictedScore = calculateScore(predictedTotal, athleteBodyWeight, normalizedGender, age, scoringSystem);
 	
 	// Determine if total is definitively zero
 	const definitiveZero = isDefinitiveTotalZero(normalizedAthlete);
@@ -1115,6 +1154,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	const showPredicted = options.showPredicted !== 'false' && options.showPredicted !== false;
 	const topN = options.topN ?? 0;
 	const includeCjDeclaration = Boolean(options.cjDecl ?? true);
+	const scoringSystem = options.scoringSystem || 'Sinclair';
 	const language = options.lang || options.language || 'no';
 	const translations = competitionHub.getTranslations(language);
 	const learningMode = process.env.LEARNING_MODE === 'true' ? 'enabled' : 'disabled';
@@ -1229,6 +1269,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		best: translations.Best || '✔',
 		rank: translations.Rank || 'Rank',
 		session: translations['Tracker.Session'] || translations.Session || 'Session',
+		scoringSystem: translations['Tracker.ScoringSystem'] || translations.ScoringSystems || 'Scoring System',
 		// Translation templates for top scores labels
 		topMScores: translations['Tracker.TopNScores'] || 'top {0} scores',
 		topMFScores: translations['Tracker.TopNPlusNScores'] || 'top {0}+{1} scores',
@@ -1258,8 +1299,9 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// If gender=Current (or no explicit gender) and no session history exists,
 	// return minimal UI showing just the attempt bar without team data
 	// This avoids showing arbitrary gender data before any session has started
-	if (noGenderHistory && helperDetectedGender === 'unknown') {
-		console.log(`[Team helpers] No gender history and no active session - showing minimal UI`);
+	// unless we have database data to show.
+	if (noGenderHistory && helperDetectedGender === 'unknown' && (!databaseState?.athletes || databaseState.athletes.length === 0)) {
+		console.log(`[Team helpers] No gender history, no active session, and no database data - showing minimal UI`);
 		const { timer, breakTimer } = extractTimers(fopUpdate, language);
 		const decision = extractDecisionState(fopUpdate);
 		const { displayMode, displayClass, activeTimer } = computeDisplayMode(timer, breakTimer, decision);
@@ -1289,6 +1331,8 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			hideHeaders: true,  // Signal to hide table headers when no data
 			status: 'waiting_for_session',
 			message: headers.noAthleteLifting || 'No athlete currently lifting',
+			hasCurrentAthlete: false,
+			attemptBarClass: 'hide-because-null-session',  // Always hide when no active session
 			gender,
 			learningMode
 		};
@@ -1303,9 +1347,11 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	}
 
 	// Check cache - include hub FOP version and resolved gender in cache key
-	// Use shared buildCacheKey; include gender + options to differentiate views.
-	const cacheKey = buildCacheKey({ fopName, includeFop: true, opts: { gender, ...options } });
+	// Also include whether a session is selected (groupName present) so null-session switches invalidate cache
+	const sessionKeyState = (fopUpdate?.groupName != null && fopUpdate?.groupName !== '') ? 'session' : 'no-session';
+	const cacheKey = buildCacheKey({ fopName, includeFop: true, opts: { gender, sessionKeyState, ...options } });
 	console.log(`[Team helpers] Cache check: key=${String(cacheKey).substring(0, 120)}..., gender=${gender}`);
+	console.log(`[Team helpers] Debug state: fopState=${fopUpdate?.fopState}, currentAthleteKey=${fopUpdate?.currentAthleteKey}, groupName=${fopUpdate?.groupName}`);
 	
 	if (teamScoreboardCache.has(cacheKey)) {
 		const cached = teamScoreboardCache.get(cacheKey);
@@ -1320,8 +1366,45 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		const decision = extractDecisionState(fopUpdate);
 		const { displayMode, displayClass, activeTimer } = computeDisplayMode(timer, breakTimer, decision);
 		
+		// Determine if there's a current athlete lifting
+		const platformState = fopUpdate?.fopState || 'INACTIVE';
+		const hasCurrentAthlete = Boolean(fopUpdate?.fullName && platformState !== 'INACTIVE' && !sessionStatus.isDone);
+		// Show attempt bar unless INACTIVE and no currentAthleteKey (null session)
+		const hasCurrentAthleteKey = Boolean(fopUpdate?.currentAthleteKey);
+		const hasActiveSession = platformState !== 'INACTIVE';
+		let attemptBarClass = '';
+		if (!hasActiveSession && !hasCurrentAthleteKey) {
+			attemptBarClass = 'hide-because-null-session';
+		}
+		
+		console.log(`[Team helpers] Cache HIT debug: hasActiveSession=${hasActiveSession}, hasCurrentAthleteKey=${hasCurrentAthleteKey}, attemptBarClass=${attemptBarClass}`);
+
+		// Build fresh competition object (never cached) with current session info
+		// Need to determine lift type for sessionInfo
+		const liftTypeKey = fopUpdate?.liftTypeKey || 'Snatch';
+		const liftType = liftTypeKey === 'Snatch' ? 'snatch' : 'cleanJerk';
+		const liftTypeLabel = translations[liftType === 'snatch' ? 'Snatch' : 'CleanJerk'] || (liftType === 'snatch' ? 'Snatch' : 'Clean & Jerk');
+		const session = translations['Tracker.Session'] || translations.Session || 'Session';
+		
+		let sessionInfo;
+		// Only show session info if a session is actually selected (groupName is reliable)
+		const hasGroupName = fopUpdate?.groupName != null && fopUpdate?.groupName !== '';
+		if (hasGroupName && fopUpdate?.sessionName) {
+			sessionInfo = `${session} ${fopUpdate?.sessionName || 'A'}${liftTypeLabel ? ' - ' + liftTypeLabel : ''}`;
+		} else {
+			sessionInfo = '&nbsp;';
+		}
+
 		return {
 			...cached,
+			competition: {
+				name: fopUpdate?.competitionName || databaseState?.competition?.name || 'Competition',
+				fop: fopName,
+				state: platformState,
+				session: hasGroupName ? (fopUpdate?.sessionName || '') : '',
+				liftType: hasActiveSession ? liftType : null,
+				sessionInfo
+			},
 			timer: activeTimer,
 			breakTimer,
 			displayMode,
@@ -1329,6 +1412,8 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			decision,
 			sessionStatus,
 			sessionStatusMessage,
+			hasCurrentAthlete,
+			attemptBarClass,
 			learningMode
 		};
 	}
@@ -1404,14 +1489,16 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 					liftType,
 					liftingOrder: liftingOrderMap.get(athleteKey) ?? null,
 					bodyWeight: dbAthlete.bodyWeight || sessionAthlete.bodyWeight || 0,
-					includeCjDeclaration
+					includeCjDeclaration,
+					scoringSystem
 				});
 				allTeamAthletes.push(wrapped);
 			} else {
 				// Athlete is NOT in current session - use database data
 				const wrapped = teamAthleteFromDatabase(dbAthlete, {
 					liftingOrder: null, // Not in current lifting order
-					includeCjDeclaration
+					includeCjDeclaration,
+					scoringSystem
 				});
 				if (wrapped) {
 					allTeamAthletes.push(wrapped);
@@ -1443,22 +1530,19 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// Determine if there's a current athlete lifting
 	const hasCurrentAthlete = Boolean(fopUpdate?.fullName && platformState !== 'INACTIVE' && !sessionStatus.isDone);
 	
-	// Use sessionInfo from OWLCMS if available, otherwise build fallback
-	// OWLCMS sends sessionInfo with format like "pulje P1.1 Rykk" (session name + lift type)
+	// Check if a session is selected: OWLCMS clears currentAthleteKey when session is null
+	// Only use currentAthleteKey + fopState to determine session status (not groupName which can be stale)
+	const hasCurrentAthleteKey = Boolean(fopUpdate?.currentAthleteKey);
+	const hasSessionSelected = hasCurrentAthleteKey || (platformState !== 'INACTIVE');
+	
+	// Build sessionInfo only when session is selected; otherwise blank
 	let sessionInfo;
-	if (fopUpdate?.sessionInfo) {
-		// Use OWLCMS-provided sessionInfo directly
-		sessionInfo = fopUpdate.sessionInfo;
-	} else if (hasActiveSession && fopUpdate?.sessionName) {
-		// Fallback: build from sessionName + lift type
-		sessionInfo = `${headers.session} ${fopUpdate?.sessionName || 'A'} - ${liftTypeLabel}`;
-	} else if (hasActiveSession) {
-		// Active but no sessionName in message (e.g., timer-only message) - just show lift type
-		sessionInfo = liftTypeLabel;
+	if (hasSessionSelected && fopUpdate?.sessionName) {
+		// Build from sessionName + lift type - never use OWLCMS-provided sessionInfo as it can be stale/wrong
+		sessionInfo = `${headers.session} ${fopUpdate?.sessionName || 'A'}${liftTypeLabel ? ' - ' + liftTypeLabel : ''}`;
 	} else {
-		// No active session - show "Platform X"
-		const platformLabel = translations.Platform || 'Platform';
-		sessionInfo = `${platformLabel} ${fopName}`;
+		// No active session and no session selected - don't show platform name for one-platform competitions
+		sessionInfo = '&nbsp;';
 	}
 	
 	// Extract competition info
@@ -1466,7 +1550,8 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		name: fopUpdate?.competitionName || databaseState?.competition?.name || 'Competition',
 		fop: fopName,
 		state: platformState,
-		session: fopUpdate?.sessionName || '',
+		// Only show session name if a session is actually selected (groupName/currentAthleteKey present)
+		session: hasSessionSelected ? (fopUpdate?.sessionName || '') : '',
 		liftType: hasActiveSession ? liftType : null,
 		sessionInfo,
 		// Visibility flags - no logic in svelte, all controlled here
@@ -1532,9 +1617,18 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		cjDecl: includeCjDeclaration
 	};
 
+	// Show attempt bar unless inactive with no currentAthleteKey (covers breaks)
+	// Note: hasCurrentAthleteKey already defined above for session info logic
+	let attemptBarClass = '';
+	if (!hasActiveSession && !hasCurrentAthleteKey) {
+		attemptBarClass = 'hide-because-null-session';
+	}
+
 	const result = {
 		competition,
 		currentAttempt,
+		hasCurrentAthlete,
+		attemptBarClass,
 		detectedAthlete: {
 			fullName: helperDetectedAthlete?.fullName || helperDetectedAthlete?.startNumber || null,
 			gender: helperDetectedGender || null
@@ -1565,8 +1659,12 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	
 	// Cache result (excluding frequently changing fields)
 	teamScoreboardCache.set(cacheKey, {
-		competition: result.competition,
+		// NOTE: competition object is NOT cached because it contains session-dependent fields
+		// sessionInfo and session change based on current groupName/sessionName, so we recompute them
+		// on every request even if everything else is cached
 		currentAttempt: result.currentAttempt,
+		hasCurrentAthlete: result.hasCurrentAthlete,
+		attemptBarClass: result.attemptBarClass,
 		detectedAthlete: result.detectedAthlete,
 		teams: result.teams,
 		allAthletes: result.allAthletes,
@@ -1588,12 +1686,20 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		teamScoreboardCache.delete(firstKey);
 	}
 
-	return {
+	const finalResult = {
 		...result,
 		sessionStatus,
 		decision,
 		learningMode
 	};
+
+	// ALWAYS ensure competition object is fresh (never cached)
+	// because it contains session-dependent fields like sessionInfo and session
+	if (!finalResult.competition) {
+		finalResult.competition = result.competition;
+	}
+
+	return finalResult;
 }
 
 /**
@@ -1609,6 +1715,8 @@ function createWaitingResponse(fopName, fopUpdate, databaseState, headers, learn
 		teams: [],
 		headers,
 		status: 'waiting',
+		hasCurrentAthlete: false,
+		attemptBarClass: 'hide-because-null-session',
 		learningMode,
 		options: { showRecords, sortBy, gender, currentAttemptInfo, topN }
 	};

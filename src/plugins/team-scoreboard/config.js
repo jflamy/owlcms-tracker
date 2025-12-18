@@ -23,6 +23,15 @@ export default {
 	// User-configurable options
 	options: [
 		{
+			key: 'scoringSystem',
+			label: 'Scoring System',
+			type: 'select',
+			options: ['Sinclair', 'SMHF', 'Q-Points', 'Q-Masters', 'GAMX', 'GAMX-M', 'GAMX-A', 'GAMX-U'],
+			default: 'Sinclair',
+			group: 'display',
+			description: 'Select the scoring system to use for individual and team scores.'
+		},
+		{
 			key: 'gender',
 			label: 'Gender',
 			type: 'select',

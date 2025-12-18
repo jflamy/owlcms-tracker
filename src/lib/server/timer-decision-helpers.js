@@ -19,6 +19,10 @@
 export function extractTimers(fopUpdate, language = 'en') {
 	const athleteEvent = fopUpdate?.athleteTimerEventType;
 	const athleteTimeRemaining = parseInt(fopUpdate?.athleteMillisRemaining || 0);
+	
+	// Check if platform is inactive - if so, no timers should be visible
+	const fopState = String(fopUpdate?.fopState || '').toUpperCase();
+	const isInactive = fopState === 'INACTIVE';
 
 	// Athlete timer state - simple mapping
 	const athleteState = athleteEvent === 'StartTime' ? 'running' : 
@@ -29,8 +33,8 @@ export function extractTimers(fopUpdate, language = 'en') {
 	const athleteTimer = {
 		type: 'athlete',
 		state: athleteState,
-		isActive: Boolean(athleteEvent || athleteTimeRemaining > 0),
-		visible: Boolean(athleteEvent || athleteTimeRemaining > 0),
+		isActive: !isInactive && Boolean(athleteEvent || athleteTimeRemaining > 0),
+		visible: !isInactive && Boolean(athleteEvent || athleteTimeRemaining > 0),
 		timeRemaining: athleteTimeRemaining,
 		duration: fopUpdate?.timeAllowed ? parseInt(fopUpdate.timeAllowed) : 60000,
 		startTime: null
@@ -41,7 +45,6 @@ export function extractTimers(fopUpdate, language = 'en') {
 	const breakRemainingReported = parseInt(fopUpdate?.breakMillisRemaining || 0);
 	const breakStartMillisReported = parseInt(fopUpdate?.breakStartTimeMillis || fopUpdate?.breakStartTime || 0);
 	const decisionEvent = Boolean(fopUpdate?.decisionEventType || fopUpdate?.decisionsVisible === 'true' || fopUpdate?.down === 'true');
-	const fopState = String(fopUpdate?.fopState || '').toUpperCase();
 	const mode = String(fopUpdate?.mode || '').toUpperCase();
 
 	const normBreakEvent = (breakEvent || '').toString().toLowerCase();
@@ -88,17 +91,16 @@ export function extractTimers(fopUpdate, language = 'en') {
 	const breakTimer = {
 		type: 'break',
 		state: inBreakState ? 'running' : 'stopped',
-		isActive: inBreakState,
-		visible: isSessionDone ? false : (inBreakState && !decisionEvent),  // During SESSION_DONE, show nothing
+		isActive: !isInactive && inBreakState,
+		visible: !isInactive && !isSessionDone && (inBreakState && !decisionEvent),  // During INACTIVE or SESSION_DONE, show nothing
 		timeRemaining: computedBreakRemaining,    // 0 if no timing data
 		duration: breakRemainingReported || parseInt(fopUpdate?.breakTimeAllowed || fopUpdate?.timeAllowed || 600000),
 		startTime: breakStartMillisReported || null,
 		displayText: breakDisplayText  // "STOP"/"STOPP" for INTERRUPTION mode, null otherwise
 	};
 
-	// Update athlete timer visibility: hide during break, show when not in break
-	// During SESSION_DONE, also hide athlete timer
-	athleteTimer.visible = !isSessionDone && !inBreakState && athleteTimer.isActive;
+	// Update athlete timer visibility: hide during break, inactive, or SESSION_DONE
+	athleteTimer.visible = !isInactive && !isSessionDone && !inBreakState && athleteTimer.isActive;
 
 	return { timer: athleteTimer, breakTimer };
 }

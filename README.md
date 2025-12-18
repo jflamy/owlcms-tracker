@@ -15,8 +15,7 @@ Scoreboards can be created using AI agents like ChatGPT, Claude, etc.  The examp
 
 Since the tracker has the full database available and the current session, it can do team scoreboards.  In this example, the AI assistant was asked to implement grouping by teams, filtering by gender, score totals based on top athletes per team, and even next attempt predictions.  The teams are reordered based on the team score.  There was no actual programming used.  The translation strings are provided by owlcms as part of the initialization.
 
-![nvf](https://github.com/user-attachments/assets/cccf32f8-3ec9-450b-90ab-f4a76f2f244e)
-
+![example](https://github.com/user-attachments/assets/cccf32f8-3ec9-450b-90ab-f4a76f2f244e)
 
 
 ## Documentation

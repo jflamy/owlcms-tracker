@@ -8,8 +8,8 @@
  * 
  * Supports four parameter variants:
  * - SENIOR: Standard GAMX (params_sen files) - no age column
- * - AGE_ADJUSTED: GAMX-A for age-adjusted athletes (params_iwf files) - no age column
- * - U17: GAMX-U for U17 athletes (params_usa files) - no age column
+ * - AGE_ADJUSTED: GAMX-A for age-adjusted athletes (params_iwf files) - HAS age column
+ * - U17: GAMX-U for U17 athletes (params_usa files) - HAS age column
  * - MASTERS: GAMX-M for masters athletes (params_mas files) - HAS age column
  */
 
@@ -17,6 +17,10 @@ import { GAMX_PARAMS_SEN_MEN } from './gamx/params-sen-men.js';
 import { GAMX_PARAMS_SEN_WOM } from './gamx/params-sen-wom.js';
 import { GAMX_PARAMS_MAS_MEN } from './gamx/params-mas-men.js';
 import { GAMX_PARAMS_MAS_WOM } from './gamx/params-mas-wom.js';
+import { GAMX_PARAMS_IWF_MEN } from './gamx/params-iwf-men.js';
+import { GAMX_PARAMS_IWF_WOM } from './gamx/params-iwf-wom.js';
+import { GAMX_PARAMS_USA_MEN } from './gamx/params-usa-men.js';
+import { GAMX_PARAMS_USA_WOM } from './gamx/params-usa-wom.js';
 
 /**
  * Parameter variants
@@ -33,8 +37,8 @@ export const Variant = {
  */
 const VARIANT_META = {
     SENIOR: { hasAge: false },
-    AGE_ADJUSTED: { hasAge: false },
-    U17: { hasAge: false },
+    AGE_ADJUSTED: { hasAge: true },
+    U17: { hasAge: true },
     MASTERS: { hasAge: true }
 };
 
@@ -46,11 +50,18 @@ const PARAM_TABLES = {
         M: GAMX_PARAMS_SEN_MEN,
         F: GAMX_PARAMS_SEN_WOM
     },
+    AGE_ADJUSTED: {
+        M: GAMX_PARAMS_IWF_MEN,
+        F: GAMX_PARAMS_IWF_WOM
+    },
+    U17: {
+        M: GAMX_PARAMS_USA_MEN,
+        F: GAMX_PARAMS_USA_WOM
+    },
     MASTERS: {
         M: GAMX_PARAMS_MAS_MEN,
         F: GAMX_PARAMS_MAS_WOM
     }
-    // AGE_ADJUSTED, U17 can be added here when parameter files are available
 };
 
 /**
