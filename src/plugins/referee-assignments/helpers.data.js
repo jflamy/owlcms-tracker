@@ -165,6 +165,11 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	refereeAssignmentsCache.set(cacheKey, result);
 	if (refereeAssignmentsCache.size > 3) {
 		const firstKey = refereeAssignmentsCache.keys().next().value;
+		const expiredEntry = refereeAssignmentsCache.get(firstKey);
+		if (expiredEntry) {
+			if (expiredEntry.referees) expiredEntry.referees = null;
+			if (expiredEntry.sessions) expiredEntry.sessions = null;
+		}
 		refereeAssignmentsCache.delete(firstKey);
 	}
 

@@ -185,6 +185,10 @@ export function getScoreboardData(fopName = 'A', options = {}) {
     rankingBoxCache.set(cacheKey, toCache);
     if (rankingBoxCache.size > 3) {
         const firstKey = rankingBoxCache.keys().next().value;
+        const expiredEntry = rankingBoxCache.get(firstKey);
+        if (expiredEntry) {
+            if (expiredEntry.athletes) expiredEntry.athletes = null;
+        }
         rankingBoxCache.delete(firstKey);
     }
 }

@@ -54,6 +54,14 @@ jobs:
       
       - name: Build base application
         run: npm run build
+        env:
+          NODE_OPTIONS: "--max-old-space-size=4096"
+      
+      - name: Remove pre-compressed files (server-side only)
+        run: |
+          find build/client -name '*.gz' -delete
+          find build/client -name '*.br' -delete
+          echo "✓ Removed .gz and .br files from build"
       
       - name: Build Windows package
         run: node scripts/build-windows.js

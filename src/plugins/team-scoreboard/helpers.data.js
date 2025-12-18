@@ -1681,8 +1681,15 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	console.log(`[Team] Cache now has ${teamScoreboardCache.size} entries`);
     
 	// Cleanup old cache entries (keep last 3)
+	// Null out large objects before deletion to help V8 GC
 	if (teamScoreboardCache.size > 3) {
 		const firstKey = teamScoreboardCache.keys().next().value;
+		const expiredEntry = teamScoreboardCache.get(firstKey);
+		if (expiredEntry) {
+			// Null out large arrays to help GC
+			if (expiredEntry.teams) expiredEntry.teams = null;
+			if (expiredEntry.allAthletes) expiredEntry.allAthletes = null;
+		}
 		teamScoreboardCache.delete(firstKey);
 	}
 

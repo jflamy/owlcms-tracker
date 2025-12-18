@@ -228,8 +228,15 @@ export function getScoreboardData(scoreboardType, fopName = 'A', options = {}) {
 	});
 	
 	// Cleanup old cache entries
+	// Null out large objects before deletion to help V8 GC
 	if (scoreboardCache.size > 10) {
 		const firstKey = scoreboardCache.keys().next().value;
+		const expiredEntry = scoreboardCache.get(firstKey);
+		if (expiredEntry) {
+			// Null out large arrays to help GC
+			if (expiredEntry.resultRows) expiredEntry.resultRows = null;
+			if (expiredEntry.leaderRows) expiredEntry.leaderRows = null;
+		}
 		scoreboardCache.delete(firstKey);
 	}
 

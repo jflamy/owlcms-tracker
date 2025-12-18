@@ -11,16 +11,14 @@
  * - AGE_ADJUSTED: GAMX-A for age-adjusted athletes (params_iwf files) - HAS age column
  * - U17: GAMX-U for U17 athletes (params_usa files) - HAS age column
  * - MASTERS: GAMX-M for masters athletes (params_mas files) - HAS age column
+ * 
+ * RUNTIME JSON LOADING:
+ * Parameter tables are loaded from static/gamx/*.json at runtime to avoid bundling
+ * 23MB of data into the JavaScript output.
  */
 
-import { GAMX_PARAMS_SEN_MEN } from './gamx/params-sen-men.js';
-import { GAMX_PARAMS_SEN_WOM } from './gamx/params-sen-wom.js';
-import { GAMX_PARAMS_MAS_MEN } from './gamx/params-mas-men.js';
-import { GAMX_PARAMS_MAS_WOM } from './gamx/params-mas-wom.js';
-import { GAMX_PARAMS_IWF_MEN } from './gamx/params-iwf-men.js';
-import { GAMX_PARAMS_IWF_WOM } from './gamx/params-iwf-wom.js';
-import { GAMX_PARAMS_USA_MEN } from './gamx/params-usa-men.js';
-import { GAMX_PARAMS_USA_WOM } from './gamx/params-usa-wom.js';
+import fs from 'fs';
+import path from 'path';
 
 /**
  * Parameter variants
@@ -43,26 +41,87 @@ const VARIANT_META = {
 };
 
 /**
- * Parameter tables indexed by variant and gender
+ * File paths for each variant and gender
  */
-const PARAM_TABLES = {
+const PARAM_FILES = {
     SENIOR: {
-        M: GAMX_PARAMS_SEN_MEN,
-        F: GAMX_PARAMS_SEN_WOM
+        M: 'params-sen-men.json',
+        F: 'params-sen-wom.json'
     },
     AGE_ADJUSTED: {
-        M: GAMX_PARAMS_IWF_MEN,
-        F: GAMX_PARAMS_IWF_WOM
+        M: 'params-iwf-men.json',
+        F: 'params-iwf-wom.json'
     },
     U17: {
-        M: GAMX_PARAMS_USA_MEN,
-        F: GAMX_PARAMS_USA_WOM
+        M: 'params-usa-men.json',
+        F: 'params-usa-wom.json'
     },
     MASTERS: {
-        M: GAMX_PARAMS_MAS_MEN,
-        F: GAMX_PARAMS_MAS_WOM
+        M: 'params-mas-men.json',
+        F: 'params-mas-wom.json'
     }
 };
+
+/**
+ * Cache for loaded parameter tables (loaded on first use)
+ */
+const paramsCache = new Map();
+
+/**
+ * Get the base path for GAMX JSON files
+ * Works in both dev and production builds
+ */
+function getGamxBasePath() {
+    // Try various possible locations
+    const candidates = [
+        path.join(process.cwd(), 'static', 'gamx'),           // Dev mode
+        path.join(process.cwd(), 'build', 'client', 'gamx'),  // Production build
+        path.join(process.cwd(), 'client', 'gamx'),           // Alternative production
+    ];
+    
+    for (const candidate of candidates) {
+        if (fs.existsSync(candidate)) {
+            return candidate;
+        }
+    }
+    
+    // Default to static/gamx
+    return candidates[0];
+}
+
+/**
+ * Load parameters for a variant and gender (cached)
+ * @param {string} variant - Parameter variant
+ * @param {string} gender - 'M' or 'F'
+ * @returns {Array|null} Parameter array or null if not found
+ */
+function loadParams(variant, gender) {
+    const cacheKey = `${variant}-${gender}`;
+    
+    if (paramsCache.has(cacheKey)) {
+        return paramsCache.get(cacheKey);
+    }
+    
+    const fileName = PARAM_FILES[variant]?.[gender];
+    if (!fileName) {
+        console.warn(`GAMX: No file mapping for variant ${variant} gender ${gender}`);
+        return null;
+    }
+    
+    const basePath = getGamxBasePath();
+    const filePath = path.join(basePath, fileName);
+    
+    try {
+        const jsonData = fs.readFileSync(filePath, 'utf-8');
+        const params = JSON.parse(jsonData);
+        paramsCache.set(cacheKey, params);
+        console.log(`[GAMX] Loaded ${params.length} rows from ${fileName}`);
+        return params;
+    } catch (err) {
+        console.warn(`GAMX: Failed to load ${filePath}: ${err.message}`);
+        return null;
+    }
+}
 
 /**
  * Standard normal distribution functions
@@ -241,10 +300,10 @@ function pBCCG(y, mu, sigma, nu) {
 /**
  * Interpolate parameters from the lookup table based on body mass (and optionally age).
  * 
- * For tables WITHOUT age column (SENIOR, AGE_ADJUSTED, U17):
+ * For tables WITHOUT age column (SENIOR):
  *   params format: [[bodyMass, mu, sigma, nu], ...]
  * 
- * For tables WITH age column (MASTERS):
+ * For tables WITH age column (MASTERS, AGE_ADJUSTED, U17):
  *   params format: [[age, bodyMass, mu, sigma, nu], ...]
  *   - Binary search to find rows matching normalized age
  *   - Then interpolate by body mass within those rows
@@ -440,16 +499,10 @@ export function computeGamx(gender, bodyMass, total, variant = Variant.SENIOR, a
         return 0.0;
     }
 
-    // Get parameter table and metadata
-    const variantTables = PARAM_TABLES[variant];
-    if (!variantTables) {
-        console.warn(`GAMX: No parameters for variant ${variant}`);
-        return 0.0;
-    }
-
-    const params = variantTables[g];
+    // Load parameter table (cached after first load)
+    const params = loadParams(variant, g);
     if (!params) {
-        console.warn(`GAMX: No parameters for gender ${g} variant ${variant}`);
+        console.warn(`GAMX: No parameters for variant ${variant} gender ${g}`);
         return 0.0;
     }
 
@@ -560,13 +613,8 @@ export function kgTarget(gender, targetScore, bodyMass, variant = Variant.SENIOR
         return 0;
     }
 
-    // Get parameter table and metadata
-    const variantTables = PARAM_TABLES[variant];
-    if (!variantTables) {
-        return 0;
-    }
-
-    const params = variantTables[g];
+    // Load parameter table (cached after first load)
+    const params = loadParams(variant, g);
     if (!params) {
         return 0;
     }

@@ -117,6 +117,10 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 
 	if (lowerThirdCache.size > 3) {
 		const firstKey = lowerThirdCache.keys().next().value;
+		const expiredEntry = lowerThirdCache.get(firstKey);
+		if (expiredEntry) {
+			if (expiredEntry.currentAthleteInfo) expiredEntry.currentAthleteInfo = null;
+		}
 		lowerThirdCache.delete(firstKey);
 	}
 
