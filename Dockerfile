@@ -28,6 +28,9 @@ COPY src/plugins/team-scoreboard ./src/plugins/team-scoreboard
 ENV NODE_OPTIONS="--max-old-space-size=4096"
 RUN npm run build
 
+# Remove pre-compressed static files (server-side only, not needed)
+RUN find build/client -name '*.gz' -delete && find build/client -name '*.br' -delete
+
 # Stage 2: Runtime
 FROM node:22-alpine
 
