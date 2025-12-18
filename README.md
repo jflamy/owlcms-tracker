@@ -9,7 +9,7 @@ A SvelteKit application that receives real-time competition updates from OWLCMS 
 
 This project aims at giving users of owlcms the capability to create their own scoreboards, TV graphics, and documents.  The program receives the database from owlcms and all lifting order, decisions and timer updates.
 
-Scoreboards can be created using AI agents like ChatGPT, Claude, etc.  The examples in this repository have been built in this way.  The author spelled  provided screen shots of existing scoreboards to start the process, and spelled out the required modifications.
+Scoreboards can be created using AI agents like ChatGPT, Claude, etc.  The examples in this repository have been built in this way.  The author provided screen shots of existing scoreboards to start the process, and spelled out the required modifications.
 
 ## Example
 
