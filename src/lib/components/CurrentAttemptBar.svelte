@@ -80,9 +80,14 @@
 									/>
 								</div>
 							{/if}
-							<!-- Decision lights shown when displayMode is 'decision' -->
-							{#if showDecisions}
-								<div class="decision-slot">
+						<!-- Decision display: down signal (▼) or referee lights -->
+						{#if showDecisions}
+							<div class="decision-slot">
+								{#if decisionState?.down && !decisionState?.ref1 && !decisionState?.ref2 && !decisionState?.ref3}
+									<!-- Down signal: green triangle -->
+									<div class="down-signal" aria-label="Down signal">▼</div>
+								{:else}
+									<!-- Referee decision lights -->
 									<div class="decision-lights" aria-label="Referee decisions">
 										{#if !decisionState?.isSingleReferee}
 											<div class="referee-light {getRefereeClass(decisionState?.ref1)}"></div>
@@ -92,6 +97,7 @@
 											<div class="referee-light {getRefereeClass(decisionState?.ref3)}"></div>
 										{/if}
 									</div>
+								{/if}
 								</div>
 							{/if}
 						</div>
@@ -143,18 +149,24 @@
 									/>
 								</div>
 							{/if}
-							<!-- Decision lights shown when displayMode is 'decision' -->
+							<!-- Decision display: down signal (▼) or referee lights -->
 							{#if showDecisions}
 								<div class="decision-slot">
-									<div class="decision-lights" aria-label="Referee decisions">
-										{#if !decisionState?.isSingleReferee}
-											<div class="referee-light {getRefereeClass(decisionState?.ref1)}"></div>
-										{/if}
-										<div class="referee-light {getRefereeClass(decisionState?.ref2)}"></div>
-										{#if !decisionState?.isSingleReferee}
-											<div class="referee-light {getRefereeClass(decisionState?.ref3)}"></div>
-										{/if}
-									</div>
+									{#if decisionState?.down && !decisionState?.ref1 && !decisionState?.ref2 && !decisionState?.ref3}
+										<!-- Down signal: green triangle -->
+										<div class="down-signal" aria-label="Down signal">▼</div>
+									{:else}
+										<!-- Referee decision lights -->
+										<div class="decision-lights" aria-label="Referee decisions">
+											{#if !decisionState?.isSingleReferee}
+												<div class="referee-light {getRefereeClass(decisionState?.ref1)}"></div>
+											{/if}
+											<div class="referee-light {getRefereeClass(decisionState?.ref2)}"></div>
+											{#if !decisionState?.isSingleReferee}
+												<div class="referee-light {getRefereeClass(decisionState?.ref3)}"></div>
+											{/if}
+										</div>
+									{/if}
 								</div>
 							{/if}
 						</div>
@@ -266,6 +278,7 @@
 		align-items: center;
 		justify-content: center;
 		height: 100%;
+		width: 100%;
 		border-radius: 0.25rem;
 		padding: 0.35rem 0.75rem;
 	}
@@ -284,6 +297,17 @@
 
 	.decision-slot {
 		background: rgba(26, 26, 26, 0.95);
+	}
+
+	.down-signal {
+		font-size: 2.5rem;
+		color: #4ade80;
+		font-weight: bold;
+		line-height: 1;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 0 0.5rem;
 	}
 
 	.decision-lights {
