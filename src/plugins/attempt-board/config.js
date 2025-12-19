@@ -1,63 +1,77 @@
 /**
- * Scoreboard Configuration
+ * Attempt Board - Full screen display for current athlete
  * 
- * Metadata for the "Attempt Bar" scoreboard
+ * Matches the OWLCMS Attempt Board layout:
+ * - Athlete name (last name, first name)
+ * - Team name
+ * - Start number in colored box
+ * - Category
+ * - Weight in kg (large, cyan)
+ * - Barbell/plates visualization
+ * - Attempt info (e.g., "C. & J. #2")
+ * - Timer countdown (large, yellow/green)
+ * - Decision lights (down signal or referee decisions)
  */
 
 export default {
-	// Display name
-	name: 'Attempt Bar',
-	
-	// Description for AI assistants
-	description: 'Displays just the current attempt bar with athlete info, timer, and decision lights. Useful for overlay graphics.',
-	
-	// Category for grouping in the UI
+	name: 'Attempt Board',
+	description: 'Full-screen display showing current athlete with weight, barbell plates visualization, timer, and decisions. Matches OWLCMS Attempt Board layout.',
 	category: 'attempt-board',
-	
-	// Sort order within category
-	order: 100,
-
-	// Whether this scoreboard requires athlete pictures
+	order: 30,
 	requiresPictures: false,
 	
-	// User-configurable options
 	options: [
 		{
-			key: 'showLeaders',
-			label: 'Show Leaders Section',
+			key: 'showPlates',
+			label: 'Show Plates',
 			type: 'boolean',
 			default: true,
-			description: 'Display the leaders section on the grid'
+			description: 'Show barbell plate visualization'
 		},
 		{
-			key: 'showRecords',
-			label: 'Show Records',
+			key: 'showTimer',
+			label: 'Show Timer',
 			type: 'boolean',
 			default: true,
-			description: 'Display competition records'
+			description: 'Show countdown timer'
+		},
+		{
+			key: 'showDecisions',
+			label: 'Show Decisions',
+			type: 'boolean',
+			default: true,
+			description: 'Show referee decision lights'
 		}
 	],
 	
-	// Required FOP data fields
 	requiredFields: [
 		'fullName',
 		'startNumber',
 		'teamName',
 		'categoryName',
-		'athletes'
+		'weight',
+		'attempt'
 	],
 	
-	// AI prompt for modifications
 	aiPrompt: `
-This scoreboard displays attempts with focus on lift progression and decisions.
+This is a full-screen attempt board matching OWLCMS Attempt Board.
 
-Data Structure:
-- athletes: Array of all athletes in the session with their attempts
-- status: 'ready' | 'waiting'
+Layout (CSS Grid):
+- Last name (large, top left, cyan)
+- First name (below last name)
+- Team name (below first name, italic)
+- Start number in red box (left side)
+- Category (next to start number)
+- Weight in kg (large, left side, cyan color)
+- Barbell with plates visualization (center)
+- Attempt label e.g. "C. & J. #2" (right side)
+- Timer (large, right side, yellow when running)
+- Decision lights or down signal (replaces plates/timer area)
 
-To modify this scoreboard:
-1. Update helpers.data.js to change how data is extracted/processed
-2. Update page.svelte to change the display
-3. Update this config to add new options
+Key features:
+- Plates are calculated from platform configuration in database
+- Timer is autonomous countdown (client-side)
+- Decision shows green down arrow (▼) then referee lights
+- Grid layout matches OWLCMS attemptboard.css
 	`
 };

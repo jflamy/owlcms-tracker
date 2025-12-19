@@ -121,7 +121,8 @@
 
 <style>
     .timer-display {
-        font-size: 1.5rem;
+        font-size: inherit; /* inherit from parent so outer layout controls sizing */
+        line-height: 1;
         font-family: 'Courier New', monospace;
         letter-spacing: 2px;
         text-align: center;

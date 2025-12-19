@@ -1,0 +1,63 @@
+/**
+ * Scoreboard Configuration
+ * 
+ * Metadata for the "Attempt Bar" scoreboard
+ */
+
+export default {
+	// Display name
+	name: 'Attempt Bar',
+	
+	// Description for AI assistants
+	description: 'Displays just the current attempt bar with athlete info, timer, and decision lights. Useful for overlay graphics.',
+	
+	// Category for grouping in the UI
+	category: 'video-overlay',
+	
+	// Sort order within category
+	order: 100,
+
+	// Whether this scoreboard requires athlete pictures
+	requiresPictures: false,
+	
+	// User-configurable options
+	options: [
+		{
+			key: 'showLeaders',
+			label: 'Show Leaders Section',
+			type: 'boolean',
+			default: true,
+			description: 'Display the leaders section on the grid'
+		},
+		{
+			key: 'showRecords',
+			label: 'Show Records',
+			type: 'boolean',
+			default: true,
+			description: 'Display competition records'
+		}
+	],
+	
+	// Required FOP data fields
+	requiredFields: [
+		'fullName',
+		'startNumber',
+		'teamName',
+		'categoryName',
+		'athletes'
+	],
+	
+	// AI prompt for modifications
+	aiPrompt: `
+This scoreboard displays attempts with focus on lift progression and decisions.
+
+Data Structure:
+- athletes: Array of all athletes in the session with their attempts
+- status: 'ready' | 'waiting'
+
+To modify this scoreboard:
+1. Update helpers.data.js to change how data is extracted/processed
+2. Update page.svelte to change the display
+3. Update this config to add new options
+	`
+};

@@ -9,13 +9,13 @@ export default {
 	name: 'Ranking Box',
 	
 	// Description for AI assistants
-	description: 'Lower-third overlay with animated ranking display in SVG box',
+	description: 'Lower-third overlay with animated ranking display in SVG box (Experimental)',
 	
 	// Category for grouping in the UI
 	category: 'video-overlay',
 	
 	// Sort order within category
-	order: 200,
+	order: 300,
 
 	// Lower-third scoreboard marker
 	isLowerThird: true,
