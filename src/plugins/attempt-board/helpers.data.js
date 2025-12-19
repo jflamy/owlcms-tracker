@@ -70,12 +70,12 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		liftsDone: fopUpdate?.liftsDone || ''
 	};
 
-	// Get precomputed groupAthletes from UPDATE message
-	const groupAthletes = fopUpdate?.groupAthletes || [];
+	// Get precomputed athletes from UPDATE message
+	const athletes = fopUpdate?.athletes || [];
 	
-	// Extract current athlete from groupAthletes
+	// Extract current athlete from athletes
 	let currentAttempt = null;
-	const currentAthlete = groupAthletes.find(a => a.classname && a.classname.includes('current'));
+	const currentAthlete = athletes.find(a => a.classname && a.classname.includes('current'));
 	if (currentAthlete) {
 		currentAttempt = {
 			fullName: currentAthlete.fullName,

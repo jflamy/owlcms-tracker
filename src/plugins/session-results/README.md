@@ -49,7 +49,7 @@ This scoreboard displays all athletes in the session sorted by standard order (c
 ## Files
 
 - **config.js** - Metadata and user-configurable options
-- **helpers.data.js** - Server-side data processing (extracts groupAthletes in standard order)
+- **helpers.data.js** - Server-side data processing (extracts sessionAthletes in standard order)
 - **page.svelte** - Display component (18-column table with OWLCMS styling, client-side timer)
 
 ## URL Parameters
@@ -203,7 +203,7 @@ The `helpers.data.js` function receives OWLCMS data and extracts:
 ### Input (from Competition Hub)
 ```javascript
 fopUpdate = {
-  groupAthletes: '[ {...}, {...} ]',         // JSON string (standard order: category, lot)
+  sessionAthletes: '[ {...}, {...} ]',       // JSON string (standard order: category, lot)
   fullName: 'John Doe',
   teamName: 'Team ABC',
   startNumber: 123,
@@ -236,7 +236,7 @@ fopUpdate = {
     timeRemaining: number,  // milliseconds
     duration: number        // milliseconds
   },
-  liftingOrderAthletes: [  // All athletes in standard order (from groupAthletes)
+  liftingOrderAthletes: [  // All athletes in standard order (from sessionAthletes)
     {
       fullName: string,
       teamName: string,
@@ -270,14 +270,14 @@ cp -r src/plugins/session-results src/plugins/lifting-order
 
 # Modify the new variation:
 # 1. Edit config.js - change name to "Lifting Order"
-# 2. Edit helpers.data.js - use liftingOrderAthletes instead of groupAthletes
+# 2. Edit helpers.data.js - use liftingOrderAthletes instead of sessionAthletes
 # 3. Edit page.svelte - adjust layout/styling as needed
 ```
 
 ### Common Variations to Create
 
 **Lifting Order (Upcoming Lifters):**
-- Use liftingOrderAthletes instead of groupAthletes
+- Use liftingOrderAthletes instead of sessionAthletes
 - Show only next N lifters (not full session)
 - Emphasize current and next lifter
 

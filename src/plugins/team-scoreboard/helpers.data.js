@@ -23,6 +23,7 @@ import { CalculateQPoints } from '$lib/qpoints-coefficients.js';
 import { computeGamx, Variant } from '$lib/gamx2.js';
 import { buildCacheKey } from '$lib/server/cache-utils.js';
 import { extractTimers, computeDisplayMode, extractDecisionState } from '$lib/server/timer-decision-helpers.js';
+import { computeAttemptBarVisibility, hasCurrentAthlete, logAttemptBarDebug } from '$lib/server/attempt-bar-visibility.js';
 
 // =============================================================================
 // CACHE
@@ -768,7 +769,7 @@ function teamAthleteFromDatabase(dbAthlete, context = {}) {
 		total: displayTotal,
 		sinclairRank: '-',
 		classname: '',
-		group: dbAthlete.sessionName || '',
+		session: dbAthlete.sessionName || '',
 		subCategory: '',
 		flagURL: '',
 		flagClass: '',
@@ -800,7 +801,6 @@ function teamAthleteFromDatabase(dbAthlete, context = {}) {
 		bodyWeight: athleteBodyWeight,
 		yearOfBirth: extractYearOfBirth(dbAthlete.fullBirthDate),
 		sessionName: dbAthlete.sessionName || '',
-		group: dbAthlete.sessionName || '',
 		
 		// Computed attempts arrays (same format as session athlete)
 		sattempts,
@@ -1347,11 +1347,11 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	}
 
 	// Check cache - include hub FOP version and resolved gender in cache key
-	// Also include whether a session is selected (groupName present) so null-session switches invalidate cache
-	const sessionKeyState = (fopUpdate?.groupName != null && fopUpdate?.groupName !== '') ? 'session' : 'no-session';
+	// Also include whether a session is selected (sessionName present) so null-session switches invalidate cache
+	const sessionKeyState = (fopUpdate?.sessionName != null && fopUpdate?.sessionName !== '') ? 'session' : 'no-session';
 	const cacheKey = buildCacheKey({ fopName, includeFop: true, opts: { gender, sessionKeyState, ...options } });
 	console.log(`[Team helpers] Cache check: key=${String(cacheKey).substring(0, 120)}..., gender=${gender}`);
-	console.log(`[Team helpers] Debug state: fopState=${fopUpdate?.fopState}, currentAthleteKey=${fopUpdate?.currentAthleteKey}, groupName=${fopUpdate?.groupName}`);
+	console.log(`[Team helpers] Debug state: fopState=${fopUpdate?.fopState}, currentAthleteKey=${fopUpdate?.currentAthleteKey}, sessionName=${fopUpdate?.sessionName}`);
 	
 	if (teamScoreboardCache.has(cacheKey)) {
 		const cached = teamScoreboardCache.get(cacheKey);
@@ -1366,18 +1366,11 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		const decision = extractDecisionState(fopUpdate);
 		const { displayMode, displayClass, activeTimer } = computeDisplayMode(timer, breakTimer, decision);
 		
-		// Determine if there's a current athlete lifting
-		const platformState = fopUpdate?.fopState || 'INACTIVE';
-		const hasCurrentAthlete = Boolean(fopUpdate?.fullName && platformState !== 'INACTIVE' && !sessionStatus.isDone);
-		// Show attempt bar unless INACTIVE and no currentAthleteKey (null session)
-		const hasCurrentAthleteKey = Boolean(fopUpdate?.currentAthleteKey);
-		const hasActiveSession = platformState !== 'INACTIVE';
-		let attemptBarClass = '';
-		if (!hasActiveSession && !hasCurrentAthleteKey) {
-			attemptBarClass = 'hide-because-null-session';
-		}
+		// Determine attempt bar visibility based on session and athlete state
+		const attemptBarClass = computeAttemptBarVisibility(fopUpdate);
+		const hasCurrentAthleteFlag = hasCurrentAthlete(fopUpdate, sessionStatus);
 		
-		console.log(`[Team helpers] Cache HIT debug: hasActiveSession=${hasActiveSession}, hasCurrentAthleteKey=${hasCurrentAthleteKey}, attemptBarClass=${attemptBarClass}`);
+		logAttemptBarDebug(fopUpdate, sessionStatus, 'Team helpers [cache HIT]');
 
 		// Build fresh competition object (never cached) with current session info
 		// Need to determine lift type for sessionInfo
@@ -1387,9 +1380,9 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		const session = translations['Tracker.Session'] || translations.Session || 'Session';
 		
 		let sessionInfo;
-		// Only show session info if a session is actually selected (groupName is reliable)
-		const hasGroupName = fopUpdate?.groupName != null && fopUpdate?.groupName !== '';
-		if (hasGroupName && fopUpdate?.sessionName) {
+		// Only show session info if a session is actually selected (sessionName is reliable)
+		const hasSessionName = fopUpdate?.sessionName != null && fopUpdate?.sessionName !== '';
+		if (hasSessionName && fopUpdate?.sessionName) {
 			sessionInfo = `${session} ${fopUpdate?.sessionName || 'A'}${liftTypeLabel ? ' - ' + liftTypeLabel : ''}`;
 		} else {
 			sessionInfo = '&nbsp;';
@@ -1401,7 +1394,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 				name: fopUpdate?.competitionName || databaseState?.competition?.name || 'Competition',
 				fop: fopName,
 				state: platformState,
-				session: hasGroupName ? (fopUpdate?.sessionName || '') : '',
+				session: hasSessionName ? (fopUpdate?.sessionName || '') : '',
 				liftType: hasActiveSession ? liftType : null,
 				sessionInfo
 			},
@@ -1412,7 +1405,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			decision,
 			sessionStatus,
 			sessionStatusMessage,
-			hasCurrentAthlete,
+			hasCurrentAthlete: hasCurrentAthleteFlag,
 			attemptBarClass,
 			learningMode
 		};
@@ -1528,10 +1521,10 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	}
 	
 	// Determine if there's a current athlete lifting
-	const hasCurrentAthlete = Boolean(fopUpdate?.fullName && platformState !== 'INACTIVE' && !sessionStatus.isDone);
+	const hasCurrentAthleteFlag = hasCurrentAthlete(fopUpdate, sessionStatus);
 	
 	// Check if a session is selected: OWLCMS clears currentAthleteKey when session is null
-	// Only use currentAthleteKey + fopState to determine session status (not groupName which can be stale)
+	// Use currentAthleteKey + fopState to determine session status
 	const hasCurrentAthleteKey = Boolean(fopUpdate?.currentAthleteKey);
 	const hasSessionSelected = hasCurrentAthleteKey || (platformState !== 'INACTIVE');
 	
@@ -1550,13 +1543,13 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		name: fopUpdate?.competitionName || databaseState?.competition?.name || 'Competition',
 		fop: fopName,
 		state: platformState,
-		// Only show session name if a session is actually selected (groupName/currentAthleteKey present)
+		// Only show session name if a session is actually selected (sessionName/currentAthleteKey present)
 		session: hasSessionSelected ? (fopUpdate?.sessionName || '') : '',
 		liftType: hasActiveSession ? liftType : null,
 		sessionInfo,
 		// Visibility flags - no logic in svelte, all controlled here
 		// showTimer: true if fopState indicates active competition (not INACTIVE)
-		showWeight: hasCurrentAthlete,
+		showWeight: hasCurrentAthleteFlag,
 		showTimer: hasActiveSession,
 		showLiftType: hasActiveSession
 	};
@@ -1569,12 +1562,11 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			});
 		});
 	}
-
 	// Extract current attempt - only if there's actually an athlete lifting
 	let currentAttempt = null;
 	let sessionStatusMessage = null;
 	
-	if (hasCurrentAthlete && fopUpdate?.fullName) {
+	if (hasCurrentAthleteFlag && fopUpdate?.fullName) {
 		const cleanFullName = (fopUpdate.fullName || '').replace(/&ndash;/g, '–').replace(/&mdash;/g, '—');
 		
 		currentAttempt = {
@@ -1627,7 +1619,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	const result = {
 		competition,
 		currentAttempt,
-		hasCurrentAthlete,
+		hasCurrentAthlete: hasCurrentAthleteFlag,
 		attemptBarClass,
 		detectedAthlete: {
 			fullName: helperDetectedAthlete?.fullName || helperDetectedAthlete?.startNumber || null,
@@ -1660,10 +1652,10 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// Cache result (excluding frequently changing fields)
 	teamScoreboardCache.set(cacheKey, {
 		// NOTE: competition object is NOT cached because it contains session-dependent fields
-		// sessionInfo and session change based on current groupName/sessionName, so we recompute them
+		// sessionInfo and session change based on current sessionName, so we recompute them
 		// on every request even if everything else is cached
 		currentAttempt: result.currentAttempt,
-		hasCurrentAthlete: result.hasCurrentAthlete,
+		hasCurrentAthlete: hasCurrentAthleteFlag,
 		attemptBarClass: result.attemptBarClass,
 		detectedAthlete: result.detectedAthlete,
 		teams: result.teams,

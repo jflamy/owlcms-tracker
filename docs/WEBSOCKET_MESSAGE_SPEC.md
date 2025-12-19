@@ -4,6 +4,8 @@
 
 OWLCMS can send competition events over WebSocket connections when configured with `ws://` or `wss://` URLs. All messages use a consistent wrapper format with a type indicator and payload.
 
+**Format Version:** V2 only - Tracker expects modern OWLCMS format with `sessionAthletes` (not legacy `groupAthletes`)
+
 ## Message Structure
 
 All messages follow this JSON structure:

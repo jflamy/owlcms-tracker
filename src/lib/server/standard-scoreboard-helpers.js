@@ -269,7 +269,7 @@ function getAthleteEntries(dataSource, fopName, fopUpdate) {
 		if (dataSource === 'liftingOrder') {
 			raw = fopUpdate?.liftingOrderAthletes ?? fopUpdate?.liftingOrderKeys ?? [];
 		} else {
-			raw = fopUpdate?.startOrderAthletes ?? fopUpdate?.groupAthletes ?? fopUpdate?.startOrderKeys ?? [];
+			raw = fopUpdate?.startOrderAthletes ?? fopUpdate?.startOrderKeys ?? [];
 		}
 		
 		if (typeof raw === 'string') {

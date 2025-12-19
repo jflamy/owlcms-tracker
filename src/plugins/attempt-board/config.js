@@ -44,7 +44,7 @@ export default {
 		'startNumber',
 		'teamName',
 		'categoryName',
-		'groupAthletes'
+		'athletes'
 	],
 	
 	// AI prompt for modifications
@@ -52,7 +52,7 @@ export default {
 This scoreboard displays attempts with focus on lift progression and decisions.
 
 Data Structure:
-- groupAthletes: Array of all athletes in the session with their attempts
+- athletes: Array of all athletes in the session with their attempts
 - status: 'ready' | 'waiting'
 
 To modify this scoreboard:

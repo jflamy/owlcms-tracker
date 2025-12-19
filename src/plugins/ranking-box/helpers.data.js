@@ -52,20 +52,20 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	
 	// Parse session athletes from OWLCMS precomputed data
 	let athletes = [];
-	if (fopUpdate?.groupAthletes) {
+	if (fopUpdate?.athletes) {
 		try {
-			const parsed = typeof fopUpdate.groupAthletes === 'string' 
-				? JSON.parse(fopUpdate.groupAthletes)
-				: fopUpdate.groupAthletes;
+			const parsed = typeof fopUpdate.athletes === 'string' 
+				? JSON.parse(fopUpdate.athletes)
+				: fopUpdate.athletes;
 			
 			athletes = Array.isArray(parsed) ? parsed : [];
 			console.log('[Ranking Box] Parsed athletes count:', athletes.length);
 		} catch (e) {
-			console.error('[Ranking Box] Error parsing groupAthletes:', e);
+			console.error('[Ranking Box] Error parsing athletes:', e);
 			athletes = [];
 		}
 	} else {
-		console.warn('[Ranking Box] No groupAthletes found in fopUpdate');
+		console.warn('[Ranking Box] No athletes found in fopUpdate');
 	}
 	
 	// Filter athletes with valid data and sort by total (descending)
