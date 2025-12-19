@@ -88,8 +88,8 @@
 </svelte:head>
 
 <div class="scoreboard">
-	<!-- Current Lifter Header (only show when we have data) -->
-	{#if data.status !== 'waiting'}
+	<!-- Current Lifter Header (only show when we have data and session is selected) -->
+	{#if data.status !== 'waiting' && data.attemptBarClass !== 'hide-because-null-session'}
 		<CurrentAttemptBar 
 			currentAttempt={data.currentAttempt}
 			timerData={data.timer}
@@ -110,6 +110,10 @@
 		{#if data.status === 'waiting'}
 			<div class="waiting">
 				<p>{data.message || 'Waiting for competition data...'}</p>
+			</div>
+		{:else if data.attemptBarClass === 'hide-because-null-session'}
+			<div class="waiting">
+				<p>{t['Waiting for next session'] || 'Waiting for next session'}</p>
 			</div>
 		{:else}
 			<div class="grid-container" class:no-vfill={!vFill} style="--template-rows: {computedGridTemplateRows}">

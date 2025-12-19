@@ -7,6 +7,7 @@ import { competitionHub } from '$lib/server/competition-hub.js';
 import { getFlagUrl } from '$lib/server/flag-resolver.js';
 import { buildCacheKey } from '$lib/server/cache-utils.js';
 import { extractTimerAndDecisionState } from '$lib/server/timer-decision-helpers.js';
+import { computeAttemptBarVisibility } from '$lib/server/attempt-bar-visibility.js';
 
 /**
  * Plugin-specific cache
@@ -104,6 +105,9 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	const hasData = !!(fopUpdate || databaseState);
 	const status = hasData ? 'ready' : 'waiting';
 	const message = hasData ? null : `⏳ Waiting for competition data for platform "${fopName}"...`;
+	
+	// Compute attempt bar visibility based on session state
+	const attemptBarClass = computeAttemptBarVisibility(fopUpdate);
 
 	return {
 		scoreboardName: 'Attempt Bar',
@@ -119,6 +123,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		breakType: fopUpdate?.breakType,
 		status,
 		message,
+		attemptBarClass,
 		lastUpdate: fopUpdate?.lastUpdate || Date.now(),
 		learningMode
 	};

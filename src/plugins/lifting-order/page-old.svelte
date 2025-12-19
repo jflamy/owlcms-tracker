@@ -129,6 +129,10 @@
 			<div class="waiting">
 				<p>Waiting for competition data...</p>
 			</div>
+		{:else if scoreboardData?.attemptBarClass === 'hide-because-null-session'}
+			<div class="waiting">
+				<p>Waiting for next session...</p>
+			</div>
 		{:else if currentAthlete}
 			<!-- Current Athlete -->
 			<section class="current-athlete">

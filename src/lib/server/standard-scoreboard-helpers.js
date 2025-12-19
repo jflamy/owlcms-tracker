@@ -13,6 +13,7 @@ import { extractRecordsFromUpdate } from '$lib/server/records-extractor.js';
 import { getFlagUrl } from '$lib/server/flag-resolver.js';
 import { buildCacheKey } from '$lib/server/cache-utils.js';
 import { extractTimerAndDecisionState } from '$lib/server/timer-decision-helpers.js';
+import { computeAttemptBarVisibility } from '$lib/server/attempt-bar-visibility.js';
 
 // Shared cache for all standard scoreboards (keyed by scoreboard type + fop + options)
 const scoreboardCache = new Map();
@@ -172,6 +173,9 @@ export function getScoreboardData(scoreboardType, fopName = 'A', options = {}) {
 	const compactTeamColumn = maxTeamNameLength < 7;
 	
 	const { resultRows, leaderRows, gridTemplateRows } = calculateGridLayout(athletesWithFlags, leaders);
+	
+	// Compute attempt bar visibility based on session state
+	const attemptBarClass = computeAttemptBarVisibility(fopUpdate);
 
 	const result = {
 		scoreboardName: config.scoreboardName,
@@ -199,6 +203,7 @@ export function getScoreboardData(scoreboardType, fopName = 'A', options = {}) {
 		records,
 		status,
 		message,
+		attemptBarClass,
 		lastUpdate: fopUpdate?.lastUpdate || Date.now(),
 		options: { showRecords }
 	};
@@ -219,6 +224,7 @@ export function getScoreboardData(scoreboardType, fopName = 'A', options = {}) {
 		breakType: result.breakType,
 		status: result.status,
 		message: result.message,
+		attemptBarClass: result.attemptBarClass,
 		compactTeamColumn: result.compactTeamColumn,
 		gridTemplateRows: result.gridTemplateRows,
 		resultRows: result.resultRows,

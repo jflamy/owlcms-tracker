@@ -150,6 +150,10 @@
 			<div class="status-message">
 				<p>Waiting for competition data...</p>
 			</div>
+		{:else if scoreboardData?.attemptBarClass === 'hide-because-null-session'}
+			<div class="status-message">
+				<p>Waiting for next session...</p>
+			</div>
 		{:else}
 			<!-- Competition Status -->
 			<div class="competition-status">

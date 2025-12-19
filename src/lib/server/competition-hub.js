@@ -1721,7 +1721,9 @@ class CompetitionHub {
       // Merge with base locale keys (regional keys override base)
       mergedMap = { ...baseTranslations, ...decodedMap };
       wasMerged = true;
-      console.log(`[Hub] � Merging regional '${locale}' (${keyCount} keys) + base '${baseLocale}' (${baseKeyCount} keys) → ${Object.keys(mergedMap).length} total`);
+      if (process.env.HUB_LOG_TRANSLATIONS === 'true') {
+        console.log(`[Hub] � Merging regional '${locale}' (${keyCount} keys) + base '${baseLocale}' (${baseKeyCount} keys) → ${Object.keys(mergedMap).length} total`);
+      }
     }
     
     // Cache the (possibly merged) translation map
@@ -1729,18 +1731,26 @@ class CompetitionHub {
     const finalKeyCount = Object.keys(mergedMap).length;
     
     if (isNew) {
-      console.log(`[Hub] Cached locale '${locale}': ${finalKeyCount} keys`);
-      
+      if (process.env.HUB_LOG_TRANSLATIONS === 'true') {
+        console.log(`[Hub] Cached locale '${locale}': ${finalKeyCount} keys`);
+      }
+
       // Log when first translation is received
       if (!hadTranslations && locale === 'en') {
-        console.log(`[Hub] ✅ TRANSLATIONS INITIALIZED - locale: ${locale}, ${finalKeyCount} keys`);
+        if (process.env.HUB_LOG_TRANSLATIONS === 'true') {
+          console.log(`[Hub] ✅ TRANSLATIONS INITIALIZED - locale: ${locale}, ${finalKeyCount} keys`);
+        }
       } else if (!hadTranslations) {
-        console.log(`[Hub] ✅ TRANSLATIONS INITIALIZED - locale: ${locale}, ${finalKeyCount} keys`);
+        if (process.env.HUB_LOG_TRANSLATIONS === 'true') {
+          console.log(`[Hub] ✅ TRANSLATIONS INITIALIZED - locale: ${locale}, ${finalKeyCount} keys`);
+        }
       }
     } else if (!hadTranslations && Object.keys(this.translations).length > 0) {
       // Translations were just fully populated
       const totalLocales = Object.keys(this.translations).length;
-      console.log(`[Hub] ✅ TRANSLATIONS UPDATED - ${totalLocales} locales available`);
+      if (process.env.HUB_LOG_TRANSLATIONS === 'true') {
+        console.log(`[Hub] ✅ TRANSLATIONS UPDATED - ${totalLocales} locales available`);
+      }
     }
     
     // 3. If this is a base locale, update all existing regional variants to include these keys

@@ -42,7 +42,7 @@
 
 <div class="scoreboard">
 	<!-- Current Attempt Bar (same as StandardScoreboard) -->
-	{#if data.status !== 'waiting'}
+	{#if data.status !== 'waiting' && data.attemptBarClass !== 'hide-because-null-session'}
 		<CurrentAttemptBar 
 			currentAttempt={data.currentAttempt}
 			timerData={data.timer}

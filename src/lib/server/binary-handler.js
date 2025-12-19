@@ -448,25 +448,35 @@ async function handleTranslationsZipMessage(zipBuffer) {
 		}
 		
 		if (skippedLocales.length > 0) {
-			console.log(`[TRANSLATIONS_ZIP] ⚠️  Skipped ${skippedLocales.length} invalid locale keys: ${skippedLocales.slice(0, 5).map(l => JSON.stringify(l)).join(', ')}${skippedLocales.length > 5 ? '...' : ''}`);
+			if (process.env.HUB_LOG_TRANSLATIONS === 'true') {
+				console.log(`[TRANSLATIONS_ZIP] ⚠️  Skipped ${skippedLocales.length} invalid locale keys: ${skippedLocales.slice(0, 5).map(l => JSON.stringify(l)).join(', ')}${skippedLocales.length > 5 ? '...' : ''}`);
+			}
 		}
 		
 		// Store checksum after successful processing
 		if (checksum) {
 			competitionHub.lastTranslationsChecksum = checksum;
-			console.log(`[TRANSLATIONS_ZIP] ✅ Checksum stored: ${checksum.substring(0, 8)}...`);
+			if (process.env.HUB_LOG_TRANSLATIONS === 'true') {
+				console.log(`[TRANSLATIONS_ZIP] ✅ Checksum stored: ${checksum.substring(0, 8)}...`);
+			}
 		}
 		
 		const elapsed = Date.now() - startTime;
-		console.log(`[TRANSLATIONS_ZIP] ✅ Complete: ${localesCount} locales processed, ${totalKeys} source keys (${elapsed}ms)`);
+		if (process.env.HUB_LOG_TRANSLATIONS === 'true') {
+			console.log(`[TRANSLATIONS_ZIP] ✅ Complete: ${localesCount} locales processed, ${totalKeys} source keys (${elapsed}ms)`);
+		}
 		
 		// Log when translations are initialized vs updated
 		const hadTranslations = Object.keys(competitionHub.translations).length > localesCount;
 		
 		if (!hadTranslations) {
-			console.log(`[TRANSLATIONS_ZIP] ✅ TRANSLATIONS INITIALIZED (${localesCount} locales, ${totalKeys} keys)`);
+			if (process.env.HUB_LOG_TRANSLATIONS === 'true') {
+				console.log(`[TRANSLATIONS_ZIP] ✅ TRANSLATIONS INITIALIZED (${localesCount} locales, ${totalKeys} keys)`);
+			}
 		} else {
-			console.log(`[TRANSLATIONS_ZIP] ✅ TRANSLATIONS UPDATED (${localesCount} locales, ${totalKeys} keys)`);
+			if (process.env.HUB_LOG_TRANSLATIONS === 'true') {
+				console.log(`[TRANSLATIONS_ZIP] ✅ TRANSLATIONS UPDATED (${localesCount} locales, ${totalKeys} keys)`);
+			}
 		}
 		
 		// Run sanity check after successful translations load
