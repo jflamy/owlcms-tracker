@@ -55,8 +55,8 @@
 	{#if data.status === 'waiting' || !currentAttempt}
 		<div class="waiting-message">
 			<div class="big-title">
-				<div class="competition-name">{data.competition?.name || 'Competition'}</div>
-				<div class="next-group">{data.message || 'Waiting for athlete...'}</div>
+				<div class="competition-name">{data.competition?.name || ''}</div>
+				<div class="next-group">{data.message || ''}</div>
 			</div>
 		</div>
 	{:else}
@@ -129,8 +129,10 @@
 				<div class="barbell-placeholder"></div>
 			{/if}
 			
-			<!-- Attempt Label -->
-			<div class="attempt">{@html currentAttempt.attempt || ''}</div>
+			<!-- Attempt Label (hidden when decisions shown) -->
+			{#if !showDecisionArea}
+				<div class="attempt">{@html currentAttempt.attempt || ''}</div>
+			{/if}
 			
 			<!-- Timer -->
 			{#if options.showTimer}
@@ -189,18 +191,18 @@
 		grid-template-columns: 
 			[name-start number-start weight-start] 1fr 
 			[number-end] 2fr 
-			[weight-end barbell-start] 4fr 
+			[weight-end barbell-start decision-start] 4fr 
 			[barbell-end timer-start attempt-start] 2fr 
-			[timer-end name-end attempt-end];
+			[timer-end name-end decision-end attempt-end];
 		
 		grid-template-rows:
 			[lastname-start] 15vh
 			[lastname-end firstname-start] 15vh
-			[firstname-end teamname-start] 10vh
+			[firstname-end teamname-start decision-start] 10vh
 			[teamname-end] 8vh
 			[number-start attempt-start barbell-start] 20vh
 			[number-end attempt-end weight-start timer-start] 25vh
-			[weight-end barbell-end timer-end];
+			[weight-end barbell-end timer-end decision-end];
 		
 		align-items: stretch;
 		justify-items: stretch;
@@ -262,9 +264,9 @@
 	}
 	
 	.flag img {
-		max-height: 20vh;
-		max-width: 15vw;
 		object-fit: contain;
+		max-height: 25vh;
+		width: 100%;
 	}
 	
 	/* Athlete Picture */
@@ -356,32 +358,39 @@
 	
 	/* === Decision Area === */
 	.decision-area {
-		grid-area: barbell-start / barbell-start / barbell-end / barbell-end;
+		grid-area: decision-start / decision-start / decision-end / decision-end;
 		display: flex;
 		align-items: center;
 		justify-content: center;
+		justify-self: stretch;
+		align-self: stretch;
+		width: 100%;
+		height: 100%;
 	}
 	
 	.down-signal {
-		font-size: 30vh;
-		color: #4ade80;
-		font-weight: bold;
+		color: lime;
+		font-size: 50vh;  /* Scale with viewport */
+		font-weight: 900;
+		font-family: 'Arial Black', Arial, Helvetica, sans-serif;
 		line-height: 1;
 	}
 	
 	.decision-lights {
+		--circle-size: 30vh;
 		display: flex;
-		gap: 3vw;
 		align-items: center;
 		justify-content: center;
+		gap: calc(var(--circle-size) * 0.1);
 	}
 	
 	.ref-light {
-		width: 15vh;
-		height: 15vh;
+		/* Fixed vh-based sizing for predictable circles */
+		width: var(--circle-size);
+		height: var(--circle-size);
 		border-radius: 50%;
 		background: rgba(255, 255, 255, 0.1);
-		border: 4px solid rgba(255, 255, 255, 0.3);
+		border: 2px solid rgba(255, 255, 255, 0.5);
 	}
 	
 	.ref-light.good {
@@ -414,6 +423,7 @@
 	
 	.timer {
 		font-size: 26vh;  /* matches owlcms attemptboard.css */
+		--timer-font-size: 26vh;  /* CSS variable for CountdownTimer component */
 		font-weight: bold;
 		line-height: 1;
 		color: yellow;  /* --athleteTimerColor */

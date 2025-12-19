@@ -24,6 +24,7 @@
 			const result = await response.json();
 			
 			if (result.success) {
+				console.log('[Scoreboard] API returned:', result.data?.currentAttempt?.weight || result.data?.weight || 'no weight');
 				scoreboardData = result.data;
 			} else {
 				console.error('[Scoreboard] API error:', result.error);
@@ -43,6 +44,8 @@
 			
 			// Subscribe to SSE messages
 			unsubscribeSSE = subscribeSSE((message) => {
+				console.log('[Scoreboard] SSE received:', message.type, message.fop || '');
+				
 				// Handle translation updates
 				if (message.type === 'translations') {
 					translations.setLocale(message.locale, message.data);
@@ -50,6 +53,7 @@
 				
 				// Refresh data on any competition update
 				if (message.type === 'fop_update' || message.type === 'state_update' || message.type === 'competition_update') {
+					console.log('[Scoreboard] Triggering fetchData() for', message.type);
 					fetchData();
 				}
 			});

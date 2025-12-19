@@ -187,7 +187,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	if (!fopUpdate && !databaseState) {
 		return {
 			scoreboardName: 'Attempt Board',
-			competition: { name: 'No Competition Data', fop: 'unknown' },
+			competition: { name: '', fop: fopName },
 			currentAttempt: null,
 			plates: [],
 			timer,
@@ -195,9 +195,9 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			decision,
 			displayMode,
 			sessionStatus: { isDone: false },
-			options: { showPlates, showTimer, showDecisions, showFlag },
+			options: { showPlates, showTimer, showDecisions, showFlag: false, showPicture: false },
 			status: 'waiting',
-			message: 'Waiting for competition data...',
+			message: '',
 			learningMode
 		};
 	}
@@ -233,6 +233,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	
 	// Get session athletes from competition hub
 	const sessionAthletes = competitionHub.getSessionAthletes(fopName) || [];
+	
 	const currentAthlete = sessionAthletes.find(a => 
 		a.classname && a.classname.includes('current')
 	);
@@ -289,7 +290,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// Determine overall status
 	const hasData = !!(fopUpdate || databaseState);
 	const status = hasData ? 'ready' : 'waiting';
-	const message = hasData ? null : `Waiting for competition data for platform "${fopName}"...`;
+	const message = hasData ? null : '';
 
 	return {
 		scoreboardName: 'Attempt Board',
@@ -311,7 +312,13 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		sessionStatusMessage,
 		isBreak: fopUpdate?.break === 'true' || false,
 		breakType: fopUpdate?.breakType,
-		options: { showPlates, showTimer, showDecisions, showFlag },
+		options: { 
+			showPlates, 
+			showTimer, 
+			showDecisions, 
+			showFlag: !!currentAttempt?.flagUrl, 
+			showPicture: !!currentAttempt?.pictureUrl 
+		},
 		status,
 		message,
 		lastUpdate: fopUpdate?.lastUpdate || Date.now(),

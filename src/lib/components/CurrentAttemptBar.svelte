@@ -287,10 +287,12 @@
 	.break-slot {
 		background: #1a1a1a;
 		font-weight: bold;
+		--timer-font-size: 1.5rem;
 	}
 
-	.timer-display {
-		font-size: 1.5rem;
+	/* Override CountdownTimer component styles */
+	.timer-slot :global(.timer-display),
+	.break-slot :global(.timer-display) {
 		font-family: 'Courier New', monospace;
 		letter-spacing: 2px;
 	}

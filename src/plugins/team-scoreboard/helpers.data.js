@@ -1347,6 +1347,12 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	}
 
 	// Check cache - include hub FOP version and resolved gender in cache key
+	// Determine platform state early (needed for cache hit path)
+	// fopState values: INACTIVE, BREAK, CURRENT_ATHLETE, TIME_STARTED, TIME_STOPPED, DOWN_SIGNAL, DECISION_VISIBLE, etc.
+	// Any fopState other than INACTIVE means we have an active session
+	const platformState = fopUpdate?.fopState || 'INACTIVE';
+	const hasActiveSession = platformState !== 'INACTIVE';
+	
 	// Also include whether a session is selected (sessionName present) so null-session switches invalidate cache
 	const sessionKeyState = (fopUpdate?.sessionName != null && fopUpdate?.sessionName !== '') ? 'session' : 'no-session';
 	const cacheKey = buildCacheKey({ fopName, includeFop: true, opts: { gender, sessionKeyState, ...options } });
@@ -1388,6 +1394,9 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			sessionInfo = '&nbsp;';
 		}
 
+		// Determine if there's a current athlete in the cache hit path
+		const hasCurrentAthleteForCompetition = hasCurrentAthlete(fopUpdate, sessionStatus);
+
 		return {
 			...cached,
 			competition: {
@@ -1396,7 +1405,11 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 				state: platformState,
 				session: hasSessionName ? (fopUpdate?.sessionName || '') : '',
 				liftType: hasActiveSession ? liftType : null,
-				sessionInfo
+				sessionInfo,
+				// Visibility flags - must match cache miss path
+				showWeight: hasCurrentAthleteForCompetition,
+				showTimer: hasActiveSession,
+				showLiftType: hasActiveSession
 			},
 			timer: activeTimer,
 			breakTimer,
@@ -1433,12 +1446,6 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			orderPosition += 1;
 		}
 	}
-	
-	// Determine platform state early (needed for session athlete processing)
-	// fopState values: INACTIVE, BREAK, CURRENT_ATHLETE, TIME_STARTED, TIME_STOPPED, DOWN_SIGNAL, DECISION_VISIBLE, etc.
-	// Any fopState other than INACTIVE means we have an active session
-	const platformState = fopUpdate?.fopState || 'INACTIVE';
-	const hasActiveSession = platformState !== 'INACTIVE';
 	
 	// =========================================================================
 	// LAYER 2: Build ALL team athletes (session + database)

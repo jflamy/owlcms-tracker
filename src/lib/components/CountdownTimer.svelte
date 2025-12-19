@@ -69,12 +69,10 @@
         lastSyncedState = stateKey;
 
         if (data.state === 'running') {
-            // Start or continue countdown
-            if (!isRunning) {
-                startTime = Date.now();
-                initialRemaining = Math.max(0, data.timeRemaining || 0);
-                isRunning = true;
-            }
+            // Start or re-sync countdown with server's computed remaining time
+            startTime = Date.now();
+            initialRemaining = Math.max(0, data.timeRemaining || 0);
+            isRunning = true;
         } else {
             // Stopped or set - show static time
             isRunning = false;
@@ -94,9 +92,7 @@
 
         // Start 100ms update interval
         timerInterval = setInterval(() => {
-            if (isRunning) {
-                updateDisplay();
-            }
+            updateDisplay();  // Always update to catch initial state
         }, 100);
     });
 
@@ -121,7 +117,7 @@
 
 <style>
     .timer-display {
-        font-size: inherit; /* inherit from parent so outer layout controls sizing */
+        font-size: var(--timer-font-size, inherit);
         line-height: 1;
         font-family: 'Courier New', monospace;
         letter-spacing: 2px;

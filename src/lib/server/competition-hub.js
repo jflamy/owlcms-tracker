@@ -468,7 +468,9 @@ class CompetitionHub {
     // Debounce only identical event types for same FOP
     // Example: stop-stop can be debounced, but stop-start-stop should all go through
     const fopName = message.fop || 'global';
-    const eventType = message.data?.athleteTimerEventType || message.data?.uiEvent || message.type || 'unknown';
+    // IMPORTANT: Check uiEvent FIRST - UPDATE messages have both uiEvent and athleteTimerEventType,
+    // and we want to debounce based on the primary event type (uiEvent for updates)
+    const eventType = message.data?.uiEvent || message.data?.athleteTimerEventType || message.type || 'unknown';
     const debounceKey = `${fopName}-${eventType}`;
     
     const now = Date.now();
