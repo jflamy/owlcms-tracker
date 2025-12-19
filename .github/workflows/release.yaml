@@ -51,6 +51,7 @@ jobs:
           git checkout src/plugins/session-results
           git checkout src/plugins/team-scoreboard
           echo "✓ Standard plugins restored"
+          ls -la src/plugins/
       
       - name: Build base application
         run: npm run build
