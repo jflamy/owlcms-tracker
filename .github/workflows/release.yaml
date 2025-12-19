@@ -7,7 +7,7 @@ on:
       revision:
         description: 'semver number for the release'
         required: true
-        default: '2.0.0-rc03'
+        default: '2.0.0-rc04'
 
 jobs:
   build:
@@ -46,9 +46,10 @@ jobs:
         run: |
           echo "Removing all plugins except standard ones..."
           rm -rf src/plugins/*
+          git checkout src/plugins/attempt-board
           git checkout src/plugins/lifting-order
           git checkout src/plugins/rankings
-          git checkout src/plugins/session-results
+          git checkout src/plugins/start-order
           git checkout src/plugins/team-scoreboard
           echo "✓ Standard plugins restored"
           ls -la src/plugins/
