@@ -1,21 +1,21 @@
 /**
  * Scoreboard Configuration
  * 
- * Metadata for the "Session Scoreboard" scoreboard
+ * Metadata for the "Standard Scoreboard" scoreboard
  */
 
 export default {
 	// Display name
-	name: 'Session Scoreboard',
+	name: 'Standard Scoreboard',
 	
 	// Description for AI assistants
-	description: 'Shows all athletes in session sorted by standard order (category, lot number)',
+	description: 'Shows all athletes in session sorted by start number order',
 	
 	// Category for grouping in the UI
 	category: 'standard',
 	
 	// Sort order within category
-	order: 200,
+	order: 100,
 
 	// Whether this scoreboard requires athlete pictures
 	requiresPictures: false,

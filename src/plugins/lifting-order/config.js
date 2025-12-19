@@ -8,14 +8,14 @@ export default {
 	// Display name
 	name: 'Lifting Order',
 	
-	// Description for AI assistants
-	description: 'Shows current lifter and upcoming lifting order with timer',
+	// Description for AI assistants 
+	description: 'Shows athletes in the expected lifting order',
 	
 	// Category for grouping in the UI
 	category: 'standard',
 	
 	// Sort order within category
-	order: 100,
+	order: 200,
 
 	// Whether this scoreboard requires athlete pictures
 	requiresPictures: false,
