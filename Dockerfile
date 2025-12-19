@@ -18,9 +18,10 @@ COPY . .
 
 # Explicitly copy only the required plugins to reduce bundle size
 RUN rm -rf src/plugins/*
+COPY src/plugins/attempt-board ./src/plugins/attempt-board
 COPY src/plugins/lifting-order ./src/plugins/lifting-order
 COPY src/plugins/rankings ./src/plugins/rankings
-COPY src/plugins/session-results ./src/plugins/session-results
+COPY src/plugins/start-order ./src/plugins/start-order
 COPY src/plugins/team-scoreboard ./src/plugins/team-scoreboard
 
 # Build the application (will only include remaining plugins)
