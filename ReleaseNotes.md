@@ -4,6 +4,7 @@
 
 - Release Candidate
 - The team scoreboard now supports Sinclair, SMHF, Q-Points, Q-Masters, GAMX, GAMX-M, GAMX-A and GAMX-U
+- The default browser will be opened unless running on Docker. Can be disabled with a NO_BROWSER environment variable.
 
 ## Installing Locally
 

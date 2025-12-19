@@ -5,6 +5,8 @@
  * so the /ws endpoint accepts OWLCMS WebSocket connections in production.
  */
 
+import { exec } from 'child_process';
+
 // Add global uncaught exception handler to prevent crashes from abrupt connection resets
 process.on('uncaughtException', (err) => {
   // ECONNRESET is normal when OWLCMS disconnects abruptly - log but don't crash
@@ -45,6 +47,31 @@ process.on('unhandledRejection', (reason, promise) => {
       }
     } catch (err) {
       console.warn('[Startup] Skipping WebSocket initialization:', err?.message || err);
+    }
+
+    // Open browser automatically (skip in Docker/headless environments)
+    if (!process.env.DOCKER && !process.env.NO_BROWSER) {
+      const url = `http://localhost:${process.env.PORT}`;
+      const platform = process.platform;
+      
+      // Small delay to ensure server is ready
+      setTimeout(() => {
+        let cmd;
+        if (platform === 'win32') {
+          cmd = `start "" "${url}"`;
+        } else if (platform === 'darwin') {
+          cmd = `open "${url}"`;
+        } else {
+          // Linux - try xdg-open (common on desktop Linux)
+          cmd = `xdg-open "${url}" 2>/dev/null || echo "Open browser to ${url}"`;
+        }
+        
+        exec(cmd, (err) => {
+          if (err && platform !== 'linux') {
+            console.log(`[Startup] Could not open browser. Navigate to: ${url}`);
+          }
+        });
+      }, 500);
     }
 
   } catch (err) {
