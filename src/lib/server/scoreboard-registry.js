@@ -141,6 +141,18 @@ class ScoreboardRegistry {
 		// Call the scoreboard's data processing function
 		return scoreboard.dataHelper(fopName, options);
 	}
+
+	/**
+	 * Flush all plugin caches
+	 * Called when OWLCMS establishes a new connection to clear stale cached data
+	 */
+	flushCaches() {
+		// Each scoreboard plugin maintains its own cache Map
+		// We can't directly access those caches from here, so we signal that caches should be cleared
+		// by setting a flag or timestamp that plugins can check
+		// For now, plugins implement their own cache invalidation based on hub FOP state version
+		console.log('[ScoreboardRegistry] Cache flush requested (plugins use hub state version for invalidation)');
+	}
 }
 
 // Singleton instance

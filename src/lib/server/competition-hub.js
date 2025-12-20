@@ -10,11 +10,14 @@
  * - Broadcast changes to all connected browsers via SSE
  */
 
+import { EventEmitter } from 'events';
 import { logLearningModeStatus } from './learning-mode.js';
 import { parseV2Database } from './parser-v2.js';
 
-class CompetitionHub {
+class CompetitionHub extends EventEmitter {
   constructor() {
+    super();
+    
     // Full database state (raw athlete data from /database)
     this.databaseState = null;
     
@@ -61,6 +64,35 @@ class CompetitionHub {
     
     // Indicate system is ready
     console.log('[Hub] Competition Hub initialized');
+  }
+
+  /**
+   * Wait for database to be ready (handles JSON, binary, or empty+binary sequences)
+   * Returns immediately if database exists and is not loading
+   * Otherwise waits for 'database:ready' event
+   * @param {number} timeoutMs - Maximum time to wait (default 10000ms)
+   * @returns {Promise<object>} The database state
+   */
+  async waitForDatabase(timeoutMs = 10000) {
+    // Already ready?
+    if (this.databaseState && !this.isLoadingDatabase) {
+      return this.databaseState;
+    }
+
+    // Not ready - wait for signal
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this.removeListener('database:ready', onReady);
+        reject(new Error(`Database not ready after ${timeoutMs}ms`));
+      }, timeoutMs);
+
+      const onReady = () => {
+        clearTimeout(timeout);
+        resolve(this.databaseState);
+      };
+
+      this.once('database:ready', onReady);
+    });
   }
 
   /**
@@ -282,14 +314,16 @@ class CompetitionHub {
       this.databaseRequested = 0; // Reset request flag since database has arrived
       this.lastDatabaseChecksum = this.databaseState.databaseChecksum;
       
+      // ✅ Signal all waiters that database is ready (handles JSON, binary, and empty+binary paths)
+      this.emit('database:ready');
+
+      this.isLoadingDatabase = false;
+      
       return { accepted: true };
 
     } catch (error) {
       console.error('[Hub] Error processing full competition data:', error);
-      
-      // Release loading latch on error
       this.isLoadingDatabase = false;
-      
       return { accepted: false, reason: 'processing_error', error: error.message };
     }
   }

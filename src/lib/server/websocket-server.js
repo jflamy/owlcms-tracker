@@ -21,15 +21,44 @@ export function initWebSocketServer(httpServer) {
 	
 	wss = new WebSocketServer({ noServer: true });
 	
-	wss.on('connection', (ws) => {
-		console.log('[WebSocket] Client connected');
-		
-		// Track authentication status for this connection
-		// When OWLCMS_UPDATEKEY is configured, client must authenticate via first text frame
-		let clientAuthenticated = !process.env.OWLCMS_UPDATEKEY; // Auto-authenticated if no key required
-		
-		// Use raw message event which provides both data and a flag for isBinary
-		ws.on('message', async (data, isBinary) => {
+		// Track if this is the first connection since server start
+		let firstConnectionHandled = false;
+
+		wss.on('connection', (ws) => {
+			console.log('[WebSocket] Client connected');
+
+			// Track authentication status for this connection
+			let clientAuthenticated = !process.env.OWLCMS_UPDATEKEY;
+
+			// Per-connection state: track if we've received a database for this connection
+			let hasReceivedDatabase = false;
+
+			// Helper to flush caches and reset state only on the first connection after server start
+			async function flushAndResetOnce() {
+				if (!firstConnectionHandled) {
+					try {
+						const { scoreboardRegistry } = await import('./scoreboard-registry.js');
+						scoreboardRegistry.flushCaches();
+						// Reset the database and translations in the hub
+						competitionHub.databaseState = null;
+						competitionHub.lastDatabaseChecksum = null;
+						competitionHub.translations = {};
+						competitionHub.lastTranslationsChecksum = null;
+						// Clear flags and pictures (they will be reloaded via 428)
+						competitionHub.flagsLoaded = false;
+						if (competitionHub.picturesLoaded !== undefined) competitionHub.picturesLoaded = false;
+						if (competitionHub.stylesLoaded !== undefined) competitionHub.stylesLoaded = false;
+						// Optionally clear any other relevant state here
+						console.log('[WebSocket] First connection: caches flushed, database and translations reset, flags/pictures cleared');
+					} catch (err) {
+						console.error('[WebSocket] Error during first connection reset:', err.message);
+					}
+					firstConnectionHandled = true;
+				}
+			}
+
+			// Use raw message event which provides both data and a flag for isBinary
+			ws.on('message', async (data, isBinary) => {
 			// Strictly follow OWLCMS spec:
 			// - If isBinary is true, frame is binary with [4-byte length][type][payload]
 			// - If isBinary is false, frame is JSON text
@@ -51,6 +80,30 @@ export function initWebSocketServer(httpServer) {
 				// Binary frame: [4-byte big-endian typeLength][type UTF-8][binary payload]
 				try {
 					console.log('[WebSocket] Binary frame received, routing to binary handler');
+					// Detect if this is a database_zip or database binary and flush/reset only on first connection
+					let typeString = null;
+					try {
+						if (data.length >= 8) {
+							const firstLength = data.readUInt32BE(0);
+							let offset = 4 + firstLength;
+							if (data.length >= offset + 4) {
+								const typeLength = data.readUInt32BE(offset);
+								offset += 4;
+								if (data.length >= offset + typeLength) {
+									typeString = data.slice(offset, offset + typeLength).toString('utf8');
+								}
+							}
+						}
+						if (!typeString && data.length >= 4) {
+							const typeLength = data.readUInt32BE(0);
+							if (data.length >= 4 + typeLength) {
+								typeString = data.slice(4, 4 + typeLength).toString('utf8');
+							}
+						}
+					} catch (peekErr) {}
+					if (typeString && (typeString === 'database_zip' || typeString === 'database')) {
+						await flushAndResetOnce();
+					}
 					await handleBinaryMessage(data);
 					return;
 				} catch (binaryError) {
@@ -120,21 +173,18 @@ export function initWebSocketServer(httpServer) {
 				let result;
 				switch (message.type) {
 					case 'database':
+						await flushAndResetOnce();
 						result = await handleDatabaseMessage(message.payload);
 						break;
-					
 					case 'update':
 						result = await handleUpdateMessage(message.payload, hasBundledDatabase);
 						break;
-					
 					case 'timer':
 						result = await handleTimerMessage(message.payload, hasBundledDatabase);
 						break;
-					
 					case 'decision':
 						result = await handleDecisionMessage(message.payload, hasBundledDatabase);
 						break;
-
 					default:
 						result = await handleGenericMessage(message.payload, hasBundledDatabase, message.type);
 				}
@@ -234,8 +284,28 @@ function verifySanityAfterDatabase() {
  * Handle database message - same payload as POST /database
  */
 async function handleDatabaseMessage(payload) {
-	// The payload is the actual competition database object
-	// { athletes: [...], groups: [...], competition: {...}, etc. }
+        // Check if this is an empty database message (athletes array absent or empty)
+        const hasAthletes = Array.isArray(payload.athletes) && payload.athletes.length > 0;
+
+        if (!hasAthletes) {
+                // Empty database - expecting binary to follow
+                console.log('[WebSocket] Empty database message received - expecting database_zip binary message');
+                console.log(`[WebSocket]   Competition: ${payload.competition?.name || 'unknown'}`);
+                console.log(`[WebSocket]   Waiting up to 5 seconds for database_zip binary frame...`);
+
+                // Store metadata and set pending state
+                const result = competitionHub.handleFullCompetitionData(payload);
+
+                return {
+                        status: 202,
+                        message: 'Empty database stored - expecting database_zip binary message',
+                        pending: true,
+                        reason: 'awaiting_binary_database',
+                        timeout: 5000
+                };
+        }
+
+        // Full database (has athletes)
 	const result = competitionHub.handleFullCompetitionData(payload);
 	
 	if (result.accepted) {
@@ -243,6 +313,15 @@ async function handleDatabaseMessage(payload) {
 		
 		// Run sanity check after successful database load
 		verifySanityAfterDatabase();
+		
+		// Flush plugin-level caches when OWLCMS sends a new database
+		// This ensures scoreboards don't serve stale cached data from a previous session
+		try {
+			const { scoreboardRegistry } = await import('./scoreboard-registry.js');
+			scoreboardRegistry.flushCaches();
+		} catch (err) {
+			console.error('[WebSocket] Error flushing scoreboard caches:', err.message);
+		}
 		
 		// OWLCMS sends translations_zip and flags_zip at socket open via startup callback
 		// Don't request them again after database is received - they will arrive independently

@@ -215,8 +215,8 @@ export async function handleBinaryMessage(buffer) {
 			handleStylesMessage(payload);
 		} else if (messageType === 'translations_zip') {
 			await handleTranslationsZipMessage(payload);
-		} else {
-			console.warn(`[BINARY] WARNING: Unknown binary message type "${messageType}"`);
+                } else if (messageType === 'database_zip' || messageType === 'database') {
+                        await handleDatabaseZipMessage(payload);
 		}
 		
 		const elapsed = Date.now() - startTime;
@@ -488,3 +488,72 @@ async function handleTranslationsZipMessage(zipBuffer) {
 	}
 }
 
+/**
+ * Extract and process database from ZIP archive
+ * Handles Option C: compressed database with binary transmission
+ * @param {Buffer} zipBuffer - ZIP file containing competition.json
+ */
+async function handleDatabaseZipMessage(zipBuffer) {
+        const startTime = Date.now();
+        const operationId = Math.random().toString(36).substr(2, 9);
+
+        console.log(`[DATABASE_ZIP] Starting operation ${operationId}: extracting ${zipBuffer.length} bytes`);
+
+        try {
+                const { competitionHub } = await import('./competition-hub.js');
+
+                // Parse ZIP from buffer
+                const zip = new AdmZip(zipBuffer);
+                const entries = zip.getEntries();
+
+                // Find competition.json in the ZIP
+                const competitionJsonEntry = entries.find(entry =>
+                        entry.entryName === 'competition.json' || entry.entryName.endsWith('.json')
+                );
+
+                if (!competitionJsonEntry) {
+                        console.error('[DATABASE_ZIP] ERROR: No competition.json found in ZIP');
+                        throw new Error('Missing competition.json in database ZIP');
+                }
+
+                // Extract and parse JSON
+                const jsonString = competitionJsonEntry.getData().toString('utf8');
+                const payload = JSON.parse(jsonString);
+
+				// Also save the raw competition.json to the samples directory for debugging/learning mode
+				// Use DATABASE_ZIP as the message type suffix to distinguish from HTTP text database messages
+				try {
+					// Lazy import to get LEARNING_MODE and captureMessage
+					const { captureMessage, LEARNING_MODE } = await import('./learning-mode.js');
+					if (LEARNING_MODE) {
+						// Call captureMessage with overrideType='DATABASE_ZIP' to produce filenames like:
+						// 2025-12-20T13-39-43-219-DATABASE_ZIP.json
+						captureMessage(payload, jsonString, '', 'DATABASE_ZIP');
+					}
+				} catch (err) {
+					console.error('[DATABASE_ZIP] ERROR capturing message in learning mode:', err.message);
+				}
+
+                console.log(`[DATABASE_ZIP] ✅ Extracted competition.json (${jsonString.length} bytes uncompressed)`);
+                console.log(`[DATABASE_ZIP] Processing database with ${payload.athletes?.length || 0} athletes`);
+
+                // Process through competition hub (same path as JSON database)
+                const result = competitionHub.handleFullCompetitionData(payload);
+
+                const elapsed = Date.now() - startTime;
+                const ratio = ((1 - zipBuffer.length / jsonString.length) * 100).toFixed(1);
+                console.log(`[DATABASE_ZIP] ✅ Operation ${operationId} complete (${zipBuffer.length} → ${jsonString.length} bytes, ${ratio}% reduction, ${elapsed}ms)`);
+
+                if (!result.accepted) {
+                        console.error(`[DATABASE_ZIP] ⚠️  Database processing result: ${result.reason}`);
+                }
+
+                return result;
+
+        } catch (error) {
+                const elapsed = Date.now() - startTime;
+                console.error(`[DATABASE_ZIP] ❌ Operation ${operationId} FAILED after ${elapsed}ms:`, error.message);
+                console.error('[DATABASE_ZIP] Stack trace:', error.stack);
+                throw error;
+        }
+}
