@@ -5,7 +5,9 @@
 - Release Candidate
 - The team scoreboard now supports Sinclair, SMHF, Q-Points, Q-Masters, GAMX, GAMX-M, GAMX-A and GAMX-U
 - There is now an attempt-board screen emulating the OWLCMS one.
-- The zip distributions will open the default browser on the screen running tracker.
+- The local packaging (zip distributions) will open the default browser when started.
+- Responsive versions of the scoreboards.  The standard scoreboards also work in portrait mode.
+- The database is sent in compressed format.
 
 ## Installing Locally
 
