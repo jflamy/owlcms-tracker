@@ -198,10 +198,10 @@ export function shouldRenderFlag(url) {
 							role="row"
 						>
 							<div class="cell start-num" role="gridcell">{athlete.inCurrentSession ? (athlete.liftingOrder ?? '') : ''}</div>
-							<div class="cell name" role="gridcell">{athlete.fullName}</div>
+							<div class="cell name" role="gridcell"><span class="name-text">{athlete.fullName}</span></div>
 							<div class="cell cat" role="gridcell">{athlete.category || ''}</div>
 							<div class="cell born" role="gridcell">{athlete.yearOfBirth || ''}</div>
-							<div class="cell team-name" role="gridcell">{athlete.teamName || ''}</div>
+							<div class="cell team-name" role="gridcell"><span class="team-name-text">{athlete.teamName || ''}</span></div>
 							<div class="cell v-spacer" aria-hidden="true"></div>
 							<div class="cell attempt {getAttemptClass(athlete.sattempts?.[0])}" role="gridcell"><span class="attempt-value">{displayAttempt(athlete.sattempts?.[0])}</span></div>
 							<div class="cell attempt {getAttemptClass(athlete.sattempts?.[1])}" role="gridcell"><span class="attempt-value">{displayAttempt(athlete.sattempts?.[1])}</span></div>
@@ -411,6 +411,23 @@ export function shouldRenderFlag(url) {
 		justify-content: flex-start;
 		padding-left: 0.625rem;
 		text-align: left;
+		min-width: 0;
+	}
+
+	.cell.name .name-text {
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		min-width: 0;
+		flex: 1;
+	}
+
+	.cell.team-name .team-name-text {
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		min-width: 0;
+		flex: 1;
 	}
 
 	.cell.cat { justify-content: center; padding: 0; text-align: center; white-space: nowrap; }
@@ -566,84 +583,180 @@ export function shouldRenderFlag(url) {
 	.header-secondary .col-next-score-portrait { visibility: hidden; pointer-events: none; padding: 0; height: 0; border: none; }
 	.header-secondary .v-spacer { background: #000; border: none; height: 0; padding: 0; }
 
-	@media (max-width: 1160px) {
+	/* Responsive adjustments for landscape mode */
+	/* iPad landscape and 1366x768: Moderate reduction */
+	@media (max-width: 1366px) and (orientation: landscape) {
 		.main { --grid-gap-size: 0.55rem; }
+		
 		.scoreboard-grid {
-			--col-name: minmax(12rem, 2.2fr);
-			--col-team-min: 7rem;
-			--col-team-max: 1.6fr;
+			--col-start: 4.5rem;
+			--col-name: minmax(12rem, 2.3fr);
 			--col-cat: 12ch;
 			--col-born: 12ch;
-			--col-attempt: 3.8rem;
-			--col-best: 3.8rem;
+			--col-attempt: 4rem;
+			--col-best: 4rem;
 			--col-total: 4.5rem;
-			--col-score: 12ch;
+			--col-score: 11ch;
 			--col-next-total: 5.5rem;
-			--col-next-score: 12ch;
-		}
-		.scoreboard-grid.compact-team-column {
-			--col-team-min: 0;
-			--col-team-max: 0;
-			--col-team: 0;
-		}
-	}
-
-	@media (max-width: 932px) {
-		.main { --grid-gap-size: 0.45rem; }
-		.header { padding: 0.19rem; font-size: 0.49rem; }
-		.session-info { display: none; }
-		.lifter-name, .team, .attempt-label, .weight { font-size: 1.125rem; }
-		.timer { font-size: 1.125rem; padding: 0.3rem 0.75rem; min-width: 3.75rem; }
-		.start-number { font-size: 1.125rem; padding: 0.15rem 0.25rem; min-width: 2.25rem; }
-		.scoreboard-grid {
-			--col-name: minmax(10.5rem, 2fr);
-			--col-team-min: 6rem;
-			--col-team-max: 1.4fr;
-			--col-attempt: 3.4rem;
-			--col-best: 3.4rem;
-			--col-born: 0;
-			--col-score: 12ch;
-			--col-next-total: 5.2rem;
 			--col-next-score: 11ch;
-			--header-primary-height: 2.5rem;
 		}
-		.scoreboard-grid.compact-team-column {
-			--col-team-min: 5rem;
-			--col-team-max: 5rem;
+
+		/* Tighter layout when predictions are shown to fit all columns */
+		.scoreboard-grid:not(.hide-predicted) {
+			--col-start: 3.5rem;
+			--col-name: minmax(9rem, 1.8fr);
+			--col-cat: 9ch;
+			--col-born: 5ch;
+			--col-attempt: 3.2rem;
+			--col-best: 3.2rem;
+			--col-total: 3.8rem;
+			--col-score: 8ch;
+			--col-next-total: 4.5rem;
+			--col-next-score: 8ch;
 		}
-		.cell { font-size: 0.95rem; padding: 0.25rem 0.2rem; }
-		.header-secondary > .cell { font-size: 0.9rem; }
-		.header-primary .col-born, .grid-row.data-row > .born { display: none; }
-		.grid-row.team-header > .team-stats { font-size: 0.85rem; }
+
+		.scoreboard-grid:not(.hide-predicted) .cell {
+			font-size: 1rem;
+		}
+
+		.scoreboard-grid:not(.hide-predicted) .grid-row.team-header > .team-name-header {
+			font-size: 1.3rem;
+		}
+
+		.scoreboard-grid:not(.hide-predicted) .grid-row.team-header > .team-score,
+		.scoreboard-grid:not(.hide-predicted) .grid-row.team-header > .team-next-total,
+		.scoreboard-grid:not(.hide-predicted) .grid-row.team-header > .team-next-score {
+			font-size: 1.1rem;
+		}
+
+		.cell {
+			font-size: 1.15rem;
+		}
+
+		.grid-row.team-header > .team-name-header {
+			font-size: 1.5rem;
+		}
+
+		.grid-row.team-header > .team-score,
+		.grid-row.team-header > .team-next-total,
+		.grid-row.team-header > .team-next-score {
+			font-size: 1.3rem;
+		}
+
+		.grid-row.team-header > .team-stats {
+			font-size: 0.9rem;
+		}
 	}
 
-	@media (max-width: 932px) and (orientation: portrait) {
-		.header { font-size: 0.75rem; }
-		.lifter-info { gap: 0.3rem; line-height: 1.1; }
-		.timer { font-size: 1.4rem; }
-		.start-number { font-size: 0.75rem; padding: 0.2rem 0.3rem; }
-		.main { --grid-gap-size: 0.3rem; }
-		.scoreboard-grid { --col-start: 0; --col-cat: 0; --col-team: 0; --col-best: 0; --col-attempt: 2.75rem; --header-primary-height: 2.3rem; }
-		.scoreboard-grid.compact-team-column { --col-team: 0; }
-		.header-primary .col-start,
-		.grid-row.data-row > .start-num,
-		.header-primary .col-cat,
-		.grid-row.data-row > .cat,
-		.header-primary .col-team,
-		.grid-row.data-row > .team-name { display: none; }
-		.grid-row.data-row > .best { display: none; }
-		.header-secondary .col-name-portrait,
-		.header-secondary .col-total-portrait,
-		.header-secondary .col-score-portrait,
-		.header-secondary .col-next-total-portrait,
-		.header-secondary .col-next-score-portrait { visibility: visible; pointer-events: auto; height: auto; padding: 0.12rem 0.2rem; border: 1px solid #555; }
-		.header-secondary .col-name-portrait { text-align: left; }
-		.grid-row.team-header > .team-name-header { grid-column: 2 / 12; border-left-width: 0; font-size: 1.2rem; }
-		.grid-row.team-header > .team-stats { grid-column: 12 / 17; font-size: 0.8rem; }
-		.grid-row.team-header > .team-score { grid-column: 17 / 19; font-size: 1.2rem; font-weight: bold; }
-		.grid-row.team-header > .team-next-score { grid-column: 19 / 22; font-size: 1.2rem; font-weight: normal; border-right-width: 0; }
-		.grid-row.team-athlete > .cell:first-of-type { border-left-width: 4px !important; }
-		.grid-row.team-athlete > .cell:last-of-type { border-right-width: 4px !important; }
+	/* 720p (1280x720) and iPad Mini landscape: Tighter layout */
+	@media (max-width: 1280px) and (orientation: landscape) {
+		.main { --grid-gap-size: 0.5rem; }
+		
+		.scoreboard-grid {
+			--col-start: 4rem;
+			--col-name: minmax(11rem, 2.1fr);
+			--col-cat: 10ch;
+			--col-born: 10ch;
+			--col-attempt: 3.6rem;
+			--col-best: 3.6rem;
+			--col-total: 4.2rem;
+			--col-score: 10ch;
+			--col-next-total: 5.2rem;
+			--col-next-score: 10ch;
+		}
+
+		.cell {
+			font-size: 1.05rem;
+			padding: 0.3rem 0.2rem;
+		}
+
+		.header-secondary > .cell {
+			font-size: 1rem;
+		}
+
+		.col-group {
+			font-size: 1.05rem;
+		}
+
+		.grid-row.team-header > .team-name-header {
+			font-size: 1.4rem;
+		}
+
+		.grid-row.team-header > .team-name-header .team-flag {
+			height: 1.3rem;
+			max-width: 1.8rem;
+		}
+
+		.grid-row.team-header > .team-score,
+		.grid-row.team-header > .team-next-total,
+		.grid-row.team-header > .team-next-score {
+			font-size: 1.2rem;
+		}
+
+		.grid-row.team-header > .team-stats {
+			font-size: 0.85rem;
+		}
+	}
+
+	/* iPhone XR+ landscape (896x414) and smaller tablets: Compact layout */
+	@media (max-width: 926px) and (orientation: landscape) {
+		.main { --grid-gap-size: 0.4rem; }
+		
+		.scoreboard-grid {
+			--col-start: 3.5rem;
+			--col-name: minmax(9rem, 1.8fr);
+			--col-cat: 8ch;
+			--col-born: 0; /* Hide birth year on small screens */
+			--col-attempt: 3.2rem;
+			--col-best: 3.2rem;
+			--col-total: 3.8rem;
+			--col-score: 9ch;
+			--col-next-total: 4.8rem;
+			--col-next-score: 9ch;
+			--header-primary-height: 2.3rem;
+		}
+
+		.cell {
+			font-size: 0.95rem;
+			padding: 0.25rem 0.15rem;
+		}
+
+		.header-secondary > .cell {
+			font-size: 0.9rem;
+		}
+
+		.col-group {
+			font-size: 1rem;
+		}
+
+		/* Hide birth year column on small screens */
+		.header-primary .col-born,
+		.grid-row.data-row > .born {
+			display: none;
+		}
+
+		.grid-row.team-header > .team-name-header {
+			font-size: 1.2rem;
+		}
+
+		.grid-row.team-header > .team-name-header .team-flag {
+			height: 1.1rem;
+			max-width: 1.5rem;
+		}
+
+		.grid-row.team-header > .team-score,
+		.grid-row.team-header > .team-next-total,
+		.grid-row.team-header > .team-next-score {
+			font-size: 1.1rem;
+		}
+
+		.grid-row.team-header > .team-stats {
+			font-size: 0.75rem;
+		}
+
+		.grid-row.team-header > .cell {
+			padding: 0.25rem 0.4rem;
+		}
 	}
 	
 	/* Compact team column for small team sizes (< 7 athletes) */

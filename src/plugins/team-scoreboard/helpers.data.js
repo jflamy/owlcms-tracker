@@ -1151,7 +1151,8 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	const showRecords = options.showRecords ?? false;
 	const sortBy = 'score';
 	const currentAttemptInfo = options.currentAttemptInfo ?? true;
-	const showPredicted = options.showPredicted !== 'false' && options.showPredicted !== false;
+	// showPredicted defaults to false (config.js default: false)
+	const showPredicted = options.showPredicted === 'true' || options.showPredicted === true;
 	const topN = options.topN ?? 0;
 	const includeCjDeclaration = Boolean(options.cjDecl ?? true);
 	const scoringSystem = options.scoringSystem || 'Sinclair';

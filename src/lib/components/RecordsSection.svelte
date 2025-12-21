@@ -207,4 +207,92 @@
 		color: #4ade80;
 		font-weight: bold;
 	}
+
+	/* Responsive adjustments for landscape mode */
+	@media (max-width: 1366px) and (orientation: landscape) {
+		.records-table-grid {
+			--col-lift: 3.3rem;
+			--col-spacer: 0.5rem;
+			--data-row-height: 1.9rem;
+		}
+
+		.records-category-header {
+			font-size: 1.15rem;
+		}
+
+		.records-subheader,
+		.records-federation-cell,
+		.records-cell {
+			font-size: 1.05rem;
+		}
+	}
+
+	@media (max-width: 1280px) and (orientation: landscape) {
+		.records-table-grid {
+			--col-lift: 3.1rem;
+			--col-spacer: 0.4rem;
+			--data-row-height: 1.8rem;
+		}
+
+		.records-title-cell {
+			font-size: 1.1rem;
+		}
+
+		.records-category-header {
+			font-size: 1.1rem;
+			padding: var(--header-primary-vpad) 0.1rem;
+		}
+
+		.records-subheader {
+			font-size: 1rem;
+			padding: var(--header-secondary-vpad) 0.1rem;
+		}
+
+		.records-federation-cell {
+			font-size: 1rem;
+			padding: 0.2rem 0.6rem;
+		}
+
+		.records-cell {
+			font-size: 1rem;
+			padding: 0.2rem;
+		}
+	}
+
+	@media (max-width: 926px) and (orientation: landscape) {
+		.records-section {
+			padding: 1.5em 0 0 0;
+		}
+
+		.records-table-grid {
+			--col-lift: 2.8rem;
+			--col-spacer: 0.35rem;
+			--data-row-height: 1.6rem;
+		}
+
+		.records-title-cell {
+			font-size: 1rem;
+			grid-template-columns: 25ch;
+		}
+
+		.records-category-header {
+			font-size: 1rem;
+			padding: 0.2rem 0.1rem;
+		}
+
+		.records-subheader {
+			font-size: 0.9rem;
+			padding: 0.15rem 0.1rem;
+		}
+
+		.records-federation-cell {
+			font-size: 0.9rem;
+			padding: 0.15rem 0.5rem;
+		}
+
+		.records-cell {
+			font-size: 0.9rem;
+			padding: 0.15rem;
+		}
+	}
 </style>

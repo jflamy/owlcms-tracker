@@ -206,22 +206,26 @@
 		background: #555;
 	}
 
-	/* Responsive adjustments */
-	@media (max-width: 1160px) {
+	/* Responsive adjustments for landscape mode */
+	@media (max-width: 1366px) and (orientation: landscape) {
 		.main {
-			padding: 8px;
+			padding: 6px;
 		}
 	}
 
-	@media (max-width: 932px) {
+	@media (max-width: 1280px) and (orientation: landscape) {
 		.main {
-			padding: 8px;
+			padding: 5px;
 		}
 	}
 
-	@media (max-width: 932px) and (orientation: portrait) {
+	@media (max-width: 926px) and (orientation: landscape) {
 		.main {
-			padding: 8px;
+			padding: 4px;
+		}
+
+		.waiting {
+			font-size: 1.2rem;
 		}
 	}
 </style>

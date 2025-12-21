@@ -347,4 +347,317 @@
 		font-weight: bold;
 		padding: 0.25rem 0;
 	}
+
+	/* Responsive adjustments for landscape mode */
+	/* iPad landscape and 1366x768: Slight reduction */
+	@media (max-width: 1366px) and (orientation: landscape) {
+		.lifter-name {
+			font-size: 1.4rem;
+		}
+
+		.team {
+			font-size: 1.15rem;
+		}
+
+		.attempt-label,
+		.weight {
+			font-size: 1.4rem;
+		}
+
+		.timer-slot,
+		.break-slot {
+			--timer-font-size: 1.4rem;
+		}
+
+		.referee-light {
+			width: 2rem;
+			height: 2rem;
+		}
+
+		.down-signal {
+			font-size: 2.3rem;
+		}
+	}
+
+	/* 720p (1280x720) and iPad Mini landscape: More compact */
+	@media (max-width: 1280px) and (orientation: landscape) {
+		.header {
+			padding: 0.6rem 1.2rem;
+		}
+
+		.header.compact {
+			padding: 0.4rem 1.2rem;
+		}
+
+		.lifter-info {
+			gap: 0.8rem;
+		}
+
+		.lifter-name {
+			font-size: 1.3rem;
+		}
+
+		.team {
+			font-size: 1.1rem;
+		}
+
+		.attempt-label,
+		.weight {
+			font-size: 1.3rem;
+		}
+
+		.timer-slot,
+		.break-slot {
+			--timer-font-size: 1.3rem;
+			padding: 0.3rem 0.6rem;
+		}
+
+		.decision-slot {
+			padding: 0.3rem 0.6rem;
+		}
+
+		.referee-light {
+			width: 1.8rem;
+			height: 1.8rem;
+		}
+
+		.down-signal {
+			font-size: 2.1rem;
+		}
+
+		.session-info {
+			font-size: 1.1rem;
+		}
+	}
+
+	/* iPhone XR+ landscape (896x414) and smaller tablets: Very compact */
+	@media (max-width: 926px) and (orientation: landscape) {
+		.header {
+			padding: 0.4rem 0.8rem;
+			border-bottom-width: 1px;
+		}
+
+		.header.compact {
+			padding: 0.3rem 0.8rem;
+		}
+
+		.lifter-info {
+			gap: 0.6rem;
+			margin-bottom: 0.15rem;
+		}
+
+		.name-and-team {
+			gap: 0.6rem;
+		}
+
+		.lifter-name {
+			font-size: 1.1rem;
+		}
+
+		.team {
+			font-size: 0.95rem;
+		}
+
+		.attempt-label,
+		.weight {
+			font-size: 1.1rem;
+		}
+
+		.timer-decision-container {
+			min-width: 7rem;
+			height: 2rem;
+		}
+
+		.timer-slot,
+		.break-slot {
+			--timer-font-size: 1.1rem;
+			padding: 0.25rem 0.5rem;
+		}
+
+		.decision-slot {
+			padding: 0.25rem 0.4rem;
+		}
+
+		.referee-light {
+			width: 1.5rem;
+			height: 1.5rem;
+		}
+
+		.decision-lights {
+			gap: 0.35rem;
+		}
+
+		.down-signal {
+			font-size: 1.8rem;
+		}
+
+		.session-info {
+			font-size: 1rem;
+		}
+	}
+
+	/* ===== PORTRAIT MODE ===== */
+
+	/* iPad portrait (768x1024): Stack layout vertically */
+	@media (max-width: 1024px) and (orientation: portrait) {
+		.header {
+			padding: 0.5rem 1rem;
+			flex-wrap: wrap;
+		}
+
+		.header.compact {
+			padding: 0.4rem 1rem;
+		}
+
+		.lifter-info {
+			gap: 0.8rem;
+			flex: 1 1 100%;
+			justify-content: center;
+			margin-bottom: 0.3rem;
+		}
+
+		.lifter-name {
+			font-size: 1.2rem;
+		}
+
+		.team {
+			font-size: 1rem;
+		}
+
+		.attempt-label,
+		.weight {
+			font-size: 1.2rem;
+		}
+
+		.timer-slot,
+		.break-slot {
+			--timer-font-size: 1.2rem;
+			padding: 0.3rem 0.6rem;
+		}
+
+		.referee-light {
+			width: 1.6rem;
+			height: 1.6rem;
+		}
+
+		.session-info {
+			font-size: 1rem;
+		}
+	}
+
+	/* Large phones portrait (430px - iPhone Plus/Pro Max) */
+	@media (max-width: 430px) and (orientation: portrait) {
+		.header {
+			padding: 0.4rem 0.6rem;
+			flex-wrap: wrap;
+		}
+
+		.header.compact {
+			padding: 0.3rem 0.6rem;
+		}
+
+		.lifter-info {
+			gap: 0.5rem;
+			flex: 1 1 100%;
+			justify-content: center;
+			margin-bottom: 0.25rem;
+		}
+
+		.name-and-team {
+			gap: 0.4rem;
+		}
+
+		.lifter-name {
+			font-size: 1rem;
+		}
+
+		.team {
+			font-size: 0.85rem;
+		}
+
+		.attempt-label,
+		.weight {
+			font-size: 1rem;
+		}
+
+		.timer-decision-container {
+			min-width: 5rem;
+			height: 1.8rem;
+		}
+
+		.timer-slot,
+		.break-slot {
+			--timer-font-size: 1rem;
+			padding: 0.2rem 0.4rem;
+		}
+
+		.referee-light {
+			width: 1.3rem;
+			height: 1.3rem;
+		}
+
+		.decision-lights {
+			gap: 0.25rem;
+		}
+
+		.down-signal {
+			font-size: 1.5rem;
+		}
+
+		.session-info {
+			font-size: 0.85rem;
+		}
+	}
+
+	/* Standard phones portrait (390px - iPhone 15/16) */
+	@media (max-width: 390px) and (orientation: portrait) {
+		.header {
+			padding: 0.3rem 0.4rem;
+		}
+
+		.header.compact {
+			padding: 0.25rem 0.4rem;
+		}
+
+		.lifter-info {
+			gap: 0.4rem;
+		}
+
+		.lifter-name {
+			font-size: 0.9rem;
+		}
+
+		.team {
+			font-size: 0.75rem;
+		}
+
+		.attempt-label,
+		.weight {
+			font-size: 0.9rem;
+		}
+
+		.timer-decision-container {
+			min-width: 4rem;
+			height: 1.6rem;
+		}
+
+		.timer-slot,
+		.break-slot {
+			--timer-font-size: 0.9rem;
+			padding: 0.15rem 0.3rem;
+		}
+
+		.referee-light {
+			width: 1.1rem;
+			height: 1.1rem;
+		}
+
+		.down-signal {
+			font-size: 1.3rem;
+		}
+
+		.session-info {
+			font-size: 0.75rem;
+		}
+	}
 </style>

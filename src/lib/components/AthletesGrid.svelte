@@ -120,15 +120,15 @@
 				class:next={athlete.classname && athlete.classname.includes('next')}
 				role="row"
 			>
-				<div class="cell start-num" role="gridcell">{athlete.startNumber}</div>
-				<div class="cell name" role="gridcell">{athlete.fullName}</div>
+			<div class="cell start-num" role="gridcell">{athlete.startNumber}</div>
+				<div class="cell name" role="gridcell"><span class="name-text">{athlete.fullName}</span></div>
 				<div class="cell cat" role="gridcell">{athlete.category || ''}</div>
 				<div class="cell born" role="gridcell">{athlete.yearOfBirth || ''}</div>
 				<div class="cell team-name" role="gridcell">
 					{#if shouldRenderFlag(athlete.flagUrl)}
 						<img src={athlete.flagUrl} alt={athlete.teamName} class="team-flag" />
 					{/if}
-					{athlete.teamName || ''}
+				<span class="team-name-text">{athlete.teamName || ''}</span>
 				</div>
 				<div class="cell v-spacer" aria-hidden="true"></div>
 				<div class="cell attempt {getAttemptClass(athlete.sattempts?.[0])}" role="gridcell">
@@ -181,7 +181,7 @@
 			{:else}
 				<div class="grid-row leader-row" role="row">
 					<div class="cell start-num" role="gridcell">{leader.subCategory || ''}</div>
-					<div class="cell name" role="gridcell">{leader.fullName || ''}</div>
+					<div class="cell name" role="gridcell"><span class="name-text">{leader.fullName || ''}</span></div>
 					<div class="cell cat" role="gridcell">{leader.category || ''}</div>
 					<div class="cell born" role="gridcell">{leader.yearOfBirth || ''}</div>
 					<div class="cell team-name" role="gridcell">
@@ -364,6 +364,24 @@
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
+		min-width: 0;
+	}
+
+	.cell.name .name-text,
+	.cell.team-name {
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		min-width: 0;
+		flex: 1;
+	}
+
+	.cell.team-name .team-name-text {
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		min-width: 0;
+		flex: 1;
 	}
 
 	.team-flag {
@@ -561,39 +579,82 @@
 		padding: 0;
 	}
 
-	/* Responsive adjustments */
-	@media (max-width: 1160px) {
+	/* Responsive adjustments for landscape mode */
+	/* iPad landscape and 1366x768: Moderate reduction */
+	@media (max-width: 1366px) and (orientation: landscape) {
 		.scoreboard-grid {
-			--col-name: minmax(12rem, 2.2fr);
-			--col-team: minmax(7rem, 1.6fr);
+			--col-start: 4.5rem;
+			--col-name: minmax(12rem, 2.3fr);
+			--col-team: minmax(7.5rem, 1.7fr);
 			--col-cat: 12ch;
 			--col-born: 12ch;
-			--col-attempt: 3.8rem;
-			--col-best: 3.8rem;
+			--col-attempt: 4rem;
+			--col-best: 4rem;
 			--col-total: 4.5rem;
-			--col-rank: 3.5rem;
-		}
-	}
-
-	@media (max-width: 932px) {
-		.scoreboard-grid {
-			--col-name: minmax(10.5rem, 2fr);
-			--col-team: minmax(6rem, 1.4fr);
-			--col-attempt: 3.4rem;
-			--col-best: 3.4rem;
-			--col-born: 0;
-			--header-primary-height: 2.5rem;
+			--col-rank: 4.5rem;
+			--col-gap: 0.5rem;
 		}
 
 		.cell {
-			font-size: 0.95rem;
-			padding: 0.25rem 0.2rem;
+			font-size: 1.05rem;
+		}
+	}
+
+	/* 720p (1280x720) and iPad Mini landscape: Tighter layout */
+	@media (max-width: 1280px) and (orientation: landscape) {
+		.scoreboard-grid {
+			--col-start: 4rem;
+			--col-name: minmax(11rem, 2.1fr);
+			--col-team: minmax(7rem, 1.5fr);
+			--col-cat: 10ch;
+			--col-born: 10ch;
+			--col-attempt: 3.6rem;
+			--col-best: 3.6rem;
+			--col-total: 4.2rem;
+			--col-rank: 4rem;
+			--col-gap: 0.4rem;
+		}
+
+		.cell {
+			font-size: 1rem;
+			padding: 0.3rem 0.2rem;
 		}
 
 		.header-secondary > .cell {
-			font-size: 0.9rem;
+			font-size: 0.95rem;
+		}
+	}
+
+	/* iPhone XR+ landscape (896x414) and smaller tablets: Compact layout */
+	@media (max-width: 926px) and (orientation: landscape) {
+		.scoreboard-grid {
+			--col-start: 3.5rem;
+			--col-name: minmax(9rem, 1.8fr);
+			--col-team: minmax(6rem, 1.3fr);
+			--col-cat: 8ch;
+			--col-born: 0; /* Hide birth year on small screens */
+			--col-attempt: 3.2rem;
+			--col-best: 3.2rem;
+			--col-total: 3.8rem;
+			--col-rank: 3.5rem;
+			--col-gap: 0.35rem;
+			--header-primary-height: 2.3rem;
 		}
 
+		.cell {
+			font-size: 0.9rem;
+			padding: 0.25rem 0.15rem;
+		}
+
+		.header-secondary > .cell {
+			font-size: 0.85rem;
+		}
+
+		.col-group {
+			font-size: 1rem;
+		}
+
+		/* Hide birth year column on small screens */
 		.header-primary .col-born,
 		.grid-row.data-row > .born,
 		.grid-row.leader-row > .born {
@@ -601,46 +662,105 @@
 		}
 	}
 
-	@media (max-width: 932px) and (orientation: portrait) {
+	/* ===== PORTRAIT MODE ===== */
+	
+	/* All portrait modes: Hide team, born, and best columns */
+	@media (orientation: portrait) {
 		.scoreboard-grid {
-			--col-start: 0;
-			--col-cat: 0;
 			--col-team: 0;
-			--col-rank: 0;
+			--col-born: 0;
 			--col-best: 0;
-			--col-attempt: 2.75rem;
-			--header-primary-height: 2.3rem;
 		}
 
-		.header-primary .col-start,
-		.grid-row.data-row > .start-num,
-		.grid-row.leader-row > .start-num,
-		.header-primary .col-cat,
-		.grid-row.data-row > .cat,
-		.grid-row.leader-row > .cat,
+		/* Hide team, born, and best columns with visibility */
 		.header-primary .col-team,
+		.header-primary .col-born,
+		.header-secondary .col-best,
 		.grid-row.data-row > .team-name,
-		.grid-row.leader-row > .team-name,
-		.header-primary .col-rank,
-		.grid-row.data-row > .rank,
-		.grid-row.leader-row > .rank,
+		.grid-row.data-row > .born,
 		.grid-row.data-row > .best,
+		.grid-row.leader-row > .team-name,
+		.grid-row.leader-row > .born,
 		.grid-row.leader-row > .best {
-			display: none;
+			visibility: hidden;
+			width: 0;
+			padding: 0;
+			border: none;
+			overflow: hidden;
+		}
+	}
+
+	/* iPad portrait (768x1024): Comfortable sizing */
+	@media (max-width: 1024px) and (orientation: portrait) {
+		.scoreboard-grid {
+			--col-start: 3.5rem;
+			--col-name: minmax(10rem, 2fr);
+			--col-cat: 9ch;
+			--col-attempt: 3.5rem;
+			--col-total: 4rem;
+			--col-rank: 3.5rem;
+			--col-gap: 0.4rem;
 		}
 
-		.header-secondary .col-name-portrait,
-		.header-secondary .col-total-portrait,
-		.header-secondary .col-rank-portrait {
-			visibility: visible;
-			pointer-events: auto;
-			height: auto;
-			padding: 0.12rem 0.2rem;
-			border: 1px solid #555;
+		.cell {
+			font-size: 1rem;
+			padding: 0.3rem 0.2rem;
 		}
 
-		.header-secondary .col-name-portrait {
-			text-align: left;
+		.header-secondary > .cell {
+			font-size: 0.95rem;
+		}
+	}
+
+	/* Large phones portrait (430px - iPhone Plus/Pro Max): Very compact */
+	@media (max-width: 430px) and (orientation: portrait) {
+		.scoreboard-grid {
+			--col-start: 2.5rem;
+			--col-name: minmax(7rem, 1.5fr);
+			--col-cat: 7ch;
+			--col-attempt: 2.5rem;
+			--col-total: 3rem;
+			--col-rank: 2.8rem;
+			--col-gap: 0.25rem;
+		}
+
+		.cell {
+			font-size: 0.85rem;
+			padding: 0.2rem 0.1rem;
+		}
+
+		.header-secondary > .cell {
+			font-size: 0.8rem;
+		}
+
+		.col-group {
+			font-size: 0.9rem;
+		}
+	}
+
+	/* Standard phones portrait (390px - iPhone 15/16): Minimal layout */
+	@media (max-width: 390px) and (orientation: portrait) {
+		.scoreboard-grid {
+			--col-start: 2.2rem;
+			--col-name: minmax(6rem, 1.3fr);
+			--col-cat: 6ch;
+			--col-attempt: 2.2rem;
+			--col-total: 2.8rem;
+			--col-rank: 2.5rem;
+			--col-gap: 0.2rem;
+		}
+
+		.cell {
+			font-size: 0.75rem;
+			padding: 0.15rem 0.1rem;
+		}
+
+		.header-secondary > .cell {
+			font-size: 0.7rem;
+		}
+
+		.col-group {
+			font-size: 0.8rem;
 		}
 	}
 </style>
