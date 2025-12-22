@@ -191,18 +191,18 @@
 		grid-template-columns: 
 			[name-start number-start weight-start] 1fr 
 			[number-end] 2fr 
-			[weight-end barbell-start decision-start] 4fr 
+			[weight-end barbell-start] 4fr 
 			[barbell-end timer-start attempt-start] 2fr 
-			[timer-end name-end decision-end attempt-end];
+			[timer-end name-end attempt-end];
 		
 		grid-template-rows:
 			[lastname-start] 15vh
 			[lastname-end firstname-start] 15vh
-			[firstname-end teamname-start decision-start] 10vh
+			[firstname-end teamname-start] 10vh
 			[teamname-end] 8vh
 			[number-start attempt-start barbell-start] 20vh
 			[number-end attempt-end weight-start timer-start] 25vh
-			[weight-end barbell-end timer-end decision-end];
+			[weight-end barbell-end timer-end];
 		
 		align-items: stretch;
 		justify-items: stretch;
@@ -370,14 +370,10 @@
 	
 	/* === Decision Area === */
 	.decision-area {
-		grid-area: decision-start / decision-start / decision-end / decision-end;
+		grid-area: barbell-start / barbell-start / timer-end / timer-end;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		justify-self: stretch;
-		align-self: stretch;
-		width: 100%;
-		height: 100%;
 	}
 	
 	.down-signal {
