@@ -1,8 +1,11 @@
 # OWLCMS Tracker Release Notes
 
-## What's New
+## Maintenance Log
+- 2.1.0-rc01: attempt-board plugin now correctly shows the athlete picture
+- 2.1.0-rc01: attempt-board plugin now has better vertical positioning of the down and decision lights
 
-- Back to beta level due to protocol update
+## New in Release 2.1.0
+
 - Version 2.1.0 of the protocol. The database is sent in compressed format.
 - The team scoreboard now supports Sinclair, SMHF, Q-Points, Q-Masters, GAMX, GAMX-M, GAMX-A and GAMX-U
 - There is now an attempt-board screen emulating the OWLCMS one.
