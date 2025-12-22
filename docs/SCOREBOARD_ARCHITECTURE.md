@@ -1,6 +1,32 @@
 <!-- markdownlint-disable -->
 # Scoreboard Architecture - Multi-FOP, Multi-Scoreboard System
 
+## System Architecture Overview
+
+```mermaid
+graph TD
+    OWLCMS([OWLCMS Java Backend])
+
+    subgraph Client[Client]
+        Browser[Browser Display page.svelte]
+    end
+
+    subgraph Tracker[OWLCMS Tracker]
+        Hub[Competition Hub]
+        Helpers[Plugin Helpers helpers.data.js]
+        API[API Endpoint /api/scoreboard]
+    end
+
+    OWLCMS -- Competition Data via WebSocket --> Hub
+    Helpers -. Fetches database and session data .-> Hub
+    Hub -- Provides database and session data --> Helpers
+    API -. Fetches data .-> Helpers
+    Helpers -- Provides formatted data --> API
+    API -- Provides formatted data --> Browser
+    Browser -. Fetches data .-> API
+    Hub -. SSE Push notification .-> Browser
+```
+
 ## Overview
 
 This system targts **15+ different scoreboard types** with **up to 6 simultaneous FOPs** for each scoreboard type. 
@@ -281,7 +307,7 @@ T=1s:   OWLCMS recomputes rankings
 
 **Benefits:**
 - ✅ **Instant decision feedback** - Cache hit for immediate display
-- ✅ **Deferred ranking update** - Only recomputes when OWLCMS sends new data
+- ✅ **Deferred ranking update** - Only recomputtes when OWLCMS sends new data
 - ✅ **Two-phase processing** - Visual feedback first, data update second
 - ✅ **Scalable** - Same cache efficiency as timer events
 - ✅ **No redundant computation** - Decision doesn't trigger unnecessary work
@@ -541,7 +567,7 @@ export function getScoreboardData(fopName = 'A', options = {}, locale = 'en') {
   };
 }
 
-// Extract timer state separately (changes frequently, not cached)
+// Extract timer state separately (changes frequently)
 function extractTimerState(fopUpdate) {
   return {
     state: fopUpdate?.athleteTimerEventType === 'StartTime' ? 'running' : 'stopped',
@@ -550,7 +576,7 @@ function extractTimerState(fopUpdate) {
   };
 }
 
-// Extract decision state separately (changes frequently, not cached)
+// Extract decision state separately (changes frequently)
 function extractDecisionState(fopUpdate) {
   return {
     type: fopUpdate?.decisionEventType || null,
@@ -677,16 +703,16 @@ fopUpdate.fopName                                 // FOP name (for reference)
 1. **Session athletes (Primary):** `fopUpdate.groupAthletes` from WebSocket `type="update"`
    - Contains current session athletes with **display-ready fields**
    - Includes `classname` flags (e.g., "current", "finished", "good-lift")
-   - **Display fields ALREADY COMPUTED BY OWLCMS** - use directly, don't transform
+   - Pre-computed by OWLCMS - use directly, don't transform
    - Parsed as nested JSON object
 
 2. **Lifting order (Secondary):** `fopUpdate.liftingOrderAthletes` from WebSocket `type="update"`
    - Contains upcoming lifters with **display-ready fields**
-   - **Display fields ALREADY COMPUTED BY OWLCMS** - use directly
+   - Pre-computed by OWLCMS - use directly
    - Parsed as nested JSON object
 
 3. **Database athletes (Fallback):** `databaseState.athletes` from WebSocket `type="database"`
-   - ONLY use for athletes NOT in current session
+   - ONLY use for athletes NOT in current session (i.e., NOT in `groupAthletes`)
    - Examples: Athletes from other teams, previous sessions, not competing today
    - **RAW DATA - YOU MUST COMPUTE display fields** from database fields
    - Direct objects - no parsing needed
@@ -1368,7 +1394,7 @@ export const competitionHub = globalThis.__competitionHub;
    - Includes `classname` and `className` for visual highlighting
    - Note: The variable is called `groupAthletes` for historical reasons, but refers to the current lifting session
 
-2. **Secondary source**: `databaseState.athletes` (from WebSocket type="database")
+2. **Secondary source**: `databaseState.athletes` (from WebSocket `type="database"`)
    - ONLY use for athletes NOT in current session (i.e., NOT in `groupAthletes`)
    - Examples: Previous sessions, different teams
    - Requires field transformation (see field mapping docs)
@@ -1608,11 +1634,6 @@ const cacheKey = `${fopName}-v${hubFopVersion}-${gender}-${topN}-${sortBy}`;
 ```javascript
 const liftingOrderCache = new Map();
 const hubFopVersion = competitionHub.getFopStateVersion(fopName);
-const cacheKey = `${fopName}-v${hubFopVersion}-${showRecords}-${maxLifters}`;
-```
-**Heavy operations cached:**
-- Parsing `liftingOrderAthletes` JSON
-- Extracting top N lifters
 - Building rankings from database
 
 #### Session Results Cache
@@ -1646,7 +1667,7 @@ if (scoreboardCache.size > 20) {
 ✅ **Minimal work per browser** - Most requests are cache hits
 ✅ **Plugin-specific rules** - Each scoreboard defines its own processing logic
 ✅ **Timer efficiency** - Timer events don't invalidate cache
-✅ **Extensible** - Future plugins automatically benefit from pattern
+✅ **Extensible** - Supports new scoreboards with different rules
 ✅ **Scalable** - Supports hundreds of concurrent browsers per FOP
 
 ## Debugging

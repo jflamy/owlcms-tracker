@@ -2,7 +2,7 @@
 
 ## Maintenance Log
 - 2.1.0-rc01: attempt-board plugin now correctly shows the athlete picture
-- 2.1.0-rc01: attempt-board plugin now has better vertical positioning of the down and decision lights
+- 2.1.0-rc01: attempt-board plugin fixes the vertical positioning of the down and decision lights
 
 ## New in Release 2.1.0
 
