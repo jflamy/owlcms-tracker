@@ -13,7 +13,7 @@ import { extractTimerAndDecisionState } from '$lib/server/timer-decision-helpers
 import fs from 'fs';
 import path from 'path';
 
-const PICTURE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp'];
+const PICTURE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.svg'];
 const PICTURES_DIR = path.join(process.cwd(), 'local', 'pictures');
 
 /**
@@ -22,19 +22,26 @@ const PICTURES_DIR = path.join(process.cwd(), 'local', 'pictures');
  * @returns {string|null} Path to picture or null if not found
  */
 function getPictureUrl(membership) {
-	if (!membership) return null;
+	if (!membership) {
+		return null;
+	}
 	
+	// Try direct membership ID first
 	for (const ext of PICTURE_EXTENSIONS) {
 		const fileName = `${membership}${ext}`;
 		const fullPath = path.join(PICTURES_DIR, fileName);
 		try {
 			if (fs.existsSync(fullPath)) {
+				console.log(`[Pictures] Found: ${fileName}`);
 				return `local/pictures/${fileName}`;
 			}
 		} catch (error) {
-			continue;
+			console.error(`[Pictures] Error checking ${fileName}: ${error.message}`);
 		}
 	}
+	
+	// Log if not found
+	console.log(`[Pictures] No picture found for membership: ${membership} in ${PICTURES_DIR}`);
 	return null;
 }
 
@@ -259,13 +266,21 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		// Get weight from fopUpdate (current requested weight)
 		const weight = parseInt(fopUpdate?.weight) || 0;
 		
+		// Debug logging for picture resolution
+		const pictureUrl = getPictureUrl(currentAthlete.membership);
+		if (currentAthlete.membership) {
+			console.log(`[Attempt Board] Membership: ${currentAthlete.membership}, Picture found: ${!!pictureUrl}`);
+		} else {
+			console.log(`[Attempt Board] No membership ID available for athlete: ${fullName}`);
+		}
+		
 		currentAttempt = {
 			fullName,
 			lastName,
 			firstName,
 			teamName: currentAthlete.teamName || '',
 			flagUrl: getFlagUrl(currentAthlete.teamName, true),
-			pictureUrl: getPictureUrl(currentAthlete.membership),
+			pictureUrl,
 			startNumber: currentAthlete.startNumber || fopUpdate?.startNumber || '',
 			categoryName: currentAthlete.category || fopUpdate?.categoryName || '',
 			attempt: fopUpdate?.attempt || '',

@@ -209,8 +209,11 @@ export async function handleBinaryMessage(buffer) {
 		} else if (messageType === 'flags') {
 			// Legacy support for old 'flags' message type
 			await handleFlagsMessage(payload);
+		} else if (messageType === 'pictures_zip') {
+			await handlePicturesMessage(payload);
 		} else if (messageType === 'pictures') {
-			handlePicturesMessage(payload);
+			// Legacy support for old 'pictures' message type
+			await handlePicturesMessage(payload);
 		} else if (messageType === 'styles') {
 			handleStylesMessage(payload);
 		} else if (messageType === 'translations_zip') {
@@ -296,7 +299,7 @@ async function handleFlagsMessage(zipBuffer) {
  * Extract pictures ZIP archive to ./local/pictures
  * @param {Buffer} zipBuffer - ZIP file buffer
  */
-function handlePicturesMessage(zipBuffer) {
+async function handlePicturesMessage(zipBuffer) {
 	try {
 		// Parse ZIP from buffer
 		const zip = new AdmZip(zipBuffer);
@@ -325,7 +328,11 @@ function handlePicturesMessage(zipBuffer) {
 			}
 		});
 
+		// Mark pictures as loaded in hub
+		const hub = (await import('./competition-hub.js')).competitionHub;
+		hub.picturesLoaded = true;
 		console.log(`[PICTURES] ✓ Extracted ${extractedCount} picture files`);
+		console.log(`[Hub] ✅ Pictures ZIP processed and cached`);
 	} catch (error) {
 		console.error('[PICTURES] ERROR:', error.message);
 	}

@@ -554,7 +554,7 @@ class CompetitionHub extends EventEmitter {
   
   /**
    * Check which preconditions are missing
-   * @returns {string[]} Array of missing precondition names: 'database', 'translations', 'flags'
+   * @returns {string[]} Array of missing precondition names: 'database', 'translations', 'flags', 'pictures'
    * 
    * Precondition Details:
    * - 'database': Full competition data (athletes, categories, FOPs) via type="database" message
@@ -563,7 +563,8 @@ class CompetitionHub extends EventEmitter {
    *   * OWLCMS can send as JSON text message OR as binary frame with ZIP payload
    *   * If using ZIP: Send as binary frame with [type_length:4] ["translations_zip"] [ZIP buffer]
    *   * ZIP should contain single file "translations.json" with all 26 locales
-   * - 'flags': Country/team flag images as binary ZIP frames with type="flags"
+   * - 'flags': Country/team flag images as binary ZIP frames with type="flags_zip"
+   * - 'pictures': Athlete/team pictures as binary ZIP frames with type="pictures_zip"
    */
   getMissingPreconditions() {
     const missing = [];
@@ -583,6 +584,12 @@ class CompetitionHub extends EventEmitter {
     if (!this.flagsLoaded) {
       missing.push('flags_zip');
       console.log(`[Hub] 🔄 Requesting flags_zip from OWLCMS (428 response)`);
+    }
+    
+    // Check pictures (OWLCMS sends as binary frame type="pictures_zip")
+    if (!this.picturesLoaded) {
+      missing.push('pictures_zip');
+      console.log(`[Hub] 🔄 Requesting pictures_zip from OWLCMS (428 response)`);
     }
     
     return missing;

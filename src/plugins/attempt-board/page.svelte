@@ -256,17 +256,29 @@
 		grid-area: firstname-start / timer-start / teamname-end / timer-end;
 		display: grid;
 		place-items: center;
+		border: none;
+		width: fit-content;
+		height: fit-content;
+		justify-self: center;
+		align-self: center;
 	}
 	
 	/* Flag with picture present - smaller and positioned differently */
 	.flag.with-picture {
-		grid-area: firstname-start / timer-start / firstname-end / timer-end;
+		grid-area: teamname-start / barbell-start / barbell-start / barbell-end;
+		justify-self: center;
+		align-self: start;
 	}
 	
 	.flag img {
 		object-fit: contain;
 		max-height: 25vh;
 		width: 100%;
+	}
+	
+	.flag.with-picture img {
+		max-height: 18vh;
+		align-self: start;
 	}
 	
 	/* Athlete Picture */

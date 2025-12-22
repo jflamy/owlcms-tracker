@@ -18,3 +18,16 @@ build/
 # Compliance folder - ignore all files except README.md
 compliance/*
 !compliance/README.md
+local/pictures/.gitkeep
+local/pictures/4123.JPG
+local/pictures/Alicia Valentina Scacabarozi Alhadef.jpeg
+local/pictures/Amanda Souza Louredo square.jpg
+local/pictures/Amanda Souza Louredo.jpg
+local/pictures/Dafny Melgar Mantelli.jpg
+local/pictures/Dragos Doru Stanica.jpg
+local/pictures/Isanelly Cristina Da Silva.jpg
+local/pictures/Lia de Souza Matos.jpg
+local/pictures/Luanne Cristiny Pereira Ramos.jpg
+local/pictures/Maria Isabella De Lima Santos.jpg
+local/pictures/Olga Beatriz Da Silva Sampaio.jpeg
+local/pictures/Rafaela Paschotto Costa.jpg
