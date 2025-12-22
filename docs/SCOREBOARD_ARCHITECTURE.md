@@ -13,16 +13,18 @@ graph TD
 
     subgraph Tracker[OWLCMS Tracker]
         Hub[Competition Hub]
-        Helpers[Plugin Helpers helpers.data.js]
-        API[API Endpoint /api/scoreboard]
+        subgraph Plugin[Scoreboard Plugin]
+            Helpers[Plugin Helpers helpers.data.js]
+            API[API Endpoint /api/scoreboard]
+        end
     end
 
     OWLCMS -- Competition Data via WebSocket --> Hub
     Helpers -. Fetches database and session data .-> Hub
-    Hub -- Provides database and session data --> Helpers
-    API -. Fetches data .-> Helpers
-    Helpers -- Provides formatted data --> API
-    API -- Provides formatted data --> Browser
+    Hub ~~~ Helpers
+    API -. Fetches (cached) formatted data .-> Helpers
+    Helpers ~~~ API
+    API ~~~ Browser
     Browser -. Fetches data .-> API
     Hub -. SSE Push notification .-> Browser
 ```
