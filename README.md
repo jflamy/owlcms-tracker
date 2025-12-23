@@ -11,12 +11,15 @@ This project aims at giving users of owlcms the capability to create their own s
 
 Scoreboards can be created using AI agents like ChatGPT, Claude, etc.  The examples in this repository have been built in this way.  The author provided screen shots of existing scoreboards to start the process, and spelled out the required modifications.
 
-## Example
+## Examples
 
 Since the tracker has the full database available and the current session, it can do team scoreboards.  In this example, the AI assistant was asked to implement grouping by teams, filtering by gender, score totals based on top athletes per team, and even next attempt predictions.  The teams are reordered based on the team score.  There was no actual programming used.  The translation strings are provided by owlcms as part of the initialization.
 
 ![example](https://github.com/user-attachments/assets/cccf32f8-3ec9-450b-90ab-f4a76f2f244e)
 
+In this other example, a customized attempt board was created by cloning.  owlcms-tracker includes a replica of the standard attempt board. It was cloned and modified using an AI agent to meet the needs of the federation.
+
+<img width="1896" height="1062" alt="image" src="https://github.com/user-attachments/assets/fb408431-221c-45f6-8802-1d1cf71e5c35" />
 
 ## Documentation
 
