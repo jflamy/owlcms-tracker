@@ -424,12 +424,12 @@
                               target="_blank"
                               rel="noopener noreferrer"
                             >
-                              Platform {fop}
+                              {scoreboard.type === 'iwf-results' ? 'Extract' : `Platform ${fop}`}
                             </a>
                             <button
                               class="options-btn"
                               on:click={() => openOptionsModal(scoreboard, fop)}
-                              title="Configure document options for Platform {fop}"
+                              title="Configure document options for {scoreboard.type === 'iwf-results' ? 'Extract' : `Platform ${fop}`}"
                             >
                               ⚙️ Options
                             </button>
@@ -519,7 +519,7 @@
     <!-- svelte-ignore a11y-no-static-element-interactions -->
     <div class="modal-content" on:click|stopPropagation>
       <div class="modal-header">
-        <h3>{modalScoreboard.name} - Platform {modalFop}</h3>
+        <h3>{modalScoreboard.name} - {modalScoreboard.type === 'iwf-results' ? 'Extract' : `Platform ${modalFop}`}</h3>
         <button class="close-btn" on:click={closeModal}>×</button>
       </div>
       

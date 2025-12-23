@@ -255,7 +255,107 @@ UPDATE messages also include ordering arrays that reference athletes by key:
 
 **Purpose:** Full competition state synchronization - complete data dump
 
-**Payload:** Complete competition data structure (format differs from other message types - this is a full export of all competition data)
+**Payload Structure:**
+
+The DATABASE message contains the complete competition export with the following top-level keys:
+
+```json
+{
+  "formatVersion": "2.0",
+  "competition": { ... },
+  "config": { ... },
+  "ageGroups": [ ... ],
+  "sessions": [ ... ],
+  "platforms": [ ... ],
+  "teams": [ ... ],
+  "athletes": [ ... ],
+  "records": [ ... ],
+  "technicalOfficials": [ ... ]
+}
+```
+
+**Key Differences from UPDATE Messages:**
+
+| Field | DATABASE format | UPDATE format (sessionAthletes) |
+|-------|----------------|--------------------------------|
+| Athletes | Raw `athletes[]` array | Wrapped `{ athlete, displayInfo }` |
+| Birth date | `fullBirthDate: [year, month, day]` | `displayInfo.yearOfBirth: "1995"` |
+| Team | `team: 12345` (numeric ID) | `displayInfo.teamName: "USA"` |
+| Category | `categoryCode: "SR_M89"` | `displayInfo.category: "M89 Senior"` |
+| Attempts | `snatch1ActualLift: -100` (negative=fail) | `displayInfo.sattempts: [{value, status}]` |
+| Full name | `firstName + lastName` (separate) | `displayInfo.fullName: "DOE, John"` |
+
+**Athlete Object (DATABASE format):**
+
+```json
+{
+  "key": -1204379830,
+  "lastName": "DOE",
+  "firstName": "John",
+  "fullBirthDate": [1996, 6, 17],
+  "gender": "F",
+  "bodyWeight": 45.9,
+  "categoryCode": "SR_F48",
+  "team": 74797,
+  "sessionName": "1",
+  "startNumber": 1,
+  "lotNumber": 4,
+  "snatch1Declaration": 40,
+  "snatch1Change1": null,
+  "snatch1Change2": null,
+  "snatch1ActualLift": 40,
+  "snatch1LiftTime": [2025, 11, 8, 13, 24, 11, 221181000],
+  "snatch2Declaration": 43,
+  "snatch2ActualLift": -43,
+  ...
+  "cleanJerk1Declaration": 50,
+  "cleanJerk1ActualLift": 58,
+  ...
+  "participations": [
+    {
+      "categoryCode": "SR_F48",
+      "snatchRank": 6,
+      "cleanJerkRank": 5,
+      "totalRank": 6,
+      "teamMember": true,
+      "championshipType": "IWF"
+    }
+  ]
+}
+```
+
+**Attempt Value Convention (DATABASE format):**
+- Positive value (e.g., `100`): Successful lift
+- Negative value (e.g., `-100`): Failed lift
+- `null`: Not yet attempted or no declaration
+- Declaration/Change fields contain requested weights
+
+**Records Array:**
+
+```json
+{
+  "records": [
+    {
+      "id": 1848108757857399600,
+      "recordValue": 87,
+      "ageGrp": "JR",
+      "athleteName": "Asian Standard",
+      "bwCatLower": 0,
+      "bwCatUpper": 48,
+      "gender": "F",
+      "recordFederation": "AWF",
+      "recordLift": "SNATCH",
+      "recordName": "Asia",
+      "bwCatString": "48",
+      "groupNameString": ""
+    }
+  ]
+}
+```
+
+**New Records Detection:**
+- `groupNameString` is empty for pre-existing records
+- `groupNameString` contains the session name (e.g., `"1"`) for records broken during the competition
 
 **Frequency:** Sent when remote system requests full data (typically in response to HTTP 428 status or missing data)
 

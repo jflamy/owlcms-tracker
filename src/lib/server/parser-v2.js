@@ -52,6 +52,12 @@ export function parseV2Database(params) {
   // Parse sessions
   const sessions = db.sessions || [];
   
+  // Parse records (new in V2 - competition records)
+  const records = db.records || [];
+  
+  // Parse technical officials (new in V2 - referees, jury, etc.)
+  const technicalOfficials = db.technicalOfficials || [];
+  
   // Build normalized result
   const result = {
     formatVersion: '2.0',
@@ -60,13 +66,19 @@ export function parseV2Database(params) {
     categories,
     fops,
     sessions,
+    records,
+    technicalOfficials,
     platforms: db.platforms || [],
     teams: db.teams || [],
     competition: {
       name: db.competition?.competitionName || 'Competition',
       city: db.competition?.competitionCity || '',
+      competitionCity: db.competition?.competitionCity || '',
+      competitionSite: db.competition?.competitionSite || '',
       date: formatV2Date(db.competition?.competitionDate),
+      localizedCompetitionDate: db.competition?.localizedCompetitionDate || '',
       organizer: db.competition?.competitionOrganizer || '',
+      competitionOrganizer: db.competition?.competitionOrganizer || '',
       federation: db.competition?.federation || '',
       scoringSystem: db.competition?.scoringSystem || '',
       ...db.competition
@@ -77,7 +89,7 @@ export function parseV2Database(params) {
     databaseChecksum: providedChecksum || db.databaseChecksum || null
   };
   
-  console.log(`[V2 Parser] ✅ Parsed ${athletes.length} athletes, ${categories.length} categories, ${fops.length} FOPs`);
+  console.log(`[V2 Parser] ✅ Parsed ${athletes.length} athletes, ${categories.length} categories, ${fops.length} FOPs, ${records.length} records, ${technicalOfficials.length} officials`);
   
   return result;
 }
