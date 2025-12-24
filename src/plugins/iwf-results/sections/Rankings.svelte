@@ -3,6 +3,15 @@
   export let competition = {};
   const _keepCompetitionProp = competition;
 
+  // Slugify strings for valid HTML IDs (no spaces, lowercase, URL-safe)
+  function slugify(str) {
+    return String(str || '')
+      .replace(/>\s*(\d+)/g, '999')  // Replace >86 style weight classes with 999
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
+  }
+
   function formatRank(rank) {
     return rank || '-';
   }
@@ -29,7 +38,7 @@
         <h2 class="championship-header">{championship.name} - {genderGroup.genderName}</h2>
 
         {#each genderGroup.categories as category, catIndex}
-          <div class="category-block">
+          <div class="category-block" id="ranking-{slugify(championship.name)}-{slugify(genderGroup.genderName)}-{slugify(category.categoryName)}">
             <table class="protocol-table">
                 <thead>
                   <tr>
@@ -102,11 +111,17 @@
     border-bottom: 2pt solid #333;
     padding-bottom: 10pt;
     width: 100%;
+    bookmark-level: 1;
+    bookmark-label: "Rankings";
   }
 
   .ranking-block {
     padding: 0 20px 20px 20px;
     background: white;
+  }
+
+  .category-block {
+    bookmark-level: 2;
   }
   
   .page-break {

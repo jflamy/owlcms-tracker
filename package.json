@@ -34,6 +34,7 @@
   "dependencies": {
     "adm-zip": "^0.5.10",
     "gsap": "^3.13.0",
+    "puppeteer-core": "^24.34.0",
     "ws": "^8.18.3"
   }
 }

@@ -27,9 +27,12 @@ export async function load({ params, url }) {
 			});
 		}
 		
+		// Check if FOP is required for this scoreboard type
+		const fopRequired = scoreboard.config?.fopRequired !== false; // Default to required if not specified
+		
 		// Extract FOP from query string
 		const fopName = url.searchParams.get('fop');
-		if (!fopName) {
+		if (!fopName && fopRequired) {
 			throw error(400, {
 				message: 'FOP parameter is required',
 				example: `/${type}?fop=Platform_A`

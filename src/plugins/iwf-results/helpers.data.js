@@ -133,12 +133,20 @@ export function getScoreboardData(fopName = '', options = {}, locale = 'en') {
   // Build all records data structure: Federation → Gender → Age Group
   const allRecords = buildAllRecordsData(databaseState);
 
+  // Build medals data
+  const medals = buildMedalsData(databaseState, competition.snatchCJTotalMedals);
+
+  // Build participants matrix (Teams × Categories)
+  const participants = buildParticipationData(databaseState);
+
   // Cache and return
   const processedData = {
     competition,
     sessions,
     rankings,
     allRecords,
+    medals,
+    participants,
     allAthletes: databaseState.athletes || [],
     productionTime: new Date().toLocaleString(locale, { 
       year: 'numeric', 
@@ -409,6 +417,8 @@ function buildRankingsData(db, transformAthleteFn) {
   // Build age group lookup for championship info - map by category CODE (not id)
   const ageGroupMap = new Map();
   ageGroups.forEach(ag => {
+    // Skip inactive age groups — only active groups should contribute mappings
+    if (ag.active === false) return;
     ag.categories?.forEach(cat => {
       // Map by category code (e.g., "SR_F48") which matches athlete.categoryCode
       ageGroupMap.set(cat.code, {
@@ -446,21 +456,16 @@ function buildRankingsData(db, transformAthleteFn) {
     }
     
     participationsToProcess.forEach(p => {
-      const champType = p.championshipType || 'DEFAULT';
       const gender = athlete.gender || 'M';
       const catCode = p.categoryCode || athlete.categoryCode;
       
       // Get category weight for sorting
       const catWeight = extractMaxWeight(catCode);
 
-      // Determine championship name from ageGroup - this is the actual grouping key
-      let champName = getChampionshipDisplayName(champType);  // fallback
-      if (catCode && ageGroupMap.has(catCode)) {
-         const info = ageGroupMap.get(catCode);
-         if (info.championshipName) {
-             champName = info.championshipName;
-         }
-      }
+      // Always resolve championship via category map - never use p.championshipType directly
+      const info = catCode ? ageGroupMap.get(catCode) : null;
+      const champType = info?.championshipType || 'DEFAULT';
+      const champName = info?.championshipName || getChampionshipDisplayName(champType);
       
       // Use championshipName as the grouping key (e.g., "Senior", "Youth", "Masters")
       if (!championshipMap.has(champName)) {
@@ -669,4 +674,407 @@ function buildAllRecordsData(db) {
     });
   });
   return result;
+}
+
+/**
+ * Build team participation matrix: Teams × Categories
+ * Returns { teams: [...], womenCategories: [...], menCategories: [...], matrix: Map<team, Map<catCode, count>> }
+ */
+function buildParticipationData(db) {
+  console.warn('[Participation] buildParticipationData: start');
+  const athletes = db?.athletes || [];
+  console.log(`[Participation] Athletes count: ${athletes.length}`);
+  if (athletes.length === 0) return { championships: [] };
+
+  const ageGroups = db?.ageGroups || [];
+  console.log(`[Participation] Age groups count: ${ageGroups.length}`);
+
+  // Build team ID to name lookup
+  const teamIdToName = new Map();
+  (db?.teams || []).forEach(t => {
+    if (t.id != null && t.name) {
+      teamIdToName.set(t.id, t.name);
+    }
+  });
+  console.log(`[Participation] Teams lookup size: ${teamIdToName.size}`);
+
+  // Build category-to-championship lookup AND category name lookup
+  const catToChampionship = new Map();
+  const catToName = new Map();  // catCode -> categoryName for display
+  const catToWeight = new Map();  // catCode -> maximumWeight for sorting
+  ageGroups.forEach(ag => {
+    if (ag.active === false) return;
+    ag.categories?.forEach(cat => {
+      catToChampionship.set(cat.code, {
+        championshipType: ag.championshipType || 'DEFAULT',
+        championshipName: ag.championshipName || ag.code || 'Open'
+      });
+      catToName.set(cat.code, cat.categoryName || cat.code);
+      catToWeight.set(cat.code, cat.maximumWeight || 999);
+    });
+  });
+  console.log(`[Participation] Category-to-championship map size: ${catToChampionship.size}`);
+
+  // Group by championship: { champName -> { teamCounts, womenCatSet, menCatSet } }
+  const championshipMap = new Map();
+
+  // Helper to resolve team name
+  function resolveTeam(a) {
+    let team = a.team || a.club || 'Unknown';
+    if (typeof team === 'number') {
+      team = teamIdToName.get(team) || `Team ${team}`;
+    }
+    return String(team);
+  }
+
+  // Debug: check first few athletes
+  athletes.slice(0, 3).forEach((a, i) => {
+    console.log(`[Participation] Athlete ${i}: team=${a.team} (type: ${typeof a.team}), categoryCode=${a.categoryCode}, participations=${JSON.stringify(a.participations?.length || 0)}`);
+  });
+
+  // Process each athlete's participations
+  athletes.forEach(a => {
+    const team = resolveTeam(a);
+    const gender = (a.gender || 'M').toUpperCase();
+
+    if (team === 'JOR' || team === 'PLE') {
+      console.warn(`[Participation] Processing athlete for team ${team}: cat=${a.categoryCode}, participations=${JSON.stringify(a.participations || [])}`);
+    }
+
+    // Get participations or create synthetic one
+    let participations = a.participations;
+    if (!participations || participations.length === 0) {
+      if (!a.categoryCode) return;
+      participations = [{ categoryCode: a.categoryCode }];
+    }
+
+    participations.forEach(p => {
+      const catCode = p.categoryCode || a.categoryCode;
+      if (!catCode) return;
+
+      // Resolve championship via category map
+      const info = catToChampionship.get(catCode);
+      const champName = info?.championshipName || 'Open';
+
+      // Initialize championship entry
+      if (!championshipMap.has(champName)) {
+        championshipMap.set(champName, {
+          name: champName,
+          teamCounts: new Map(),
+          womenCatSet: new Set(),
+          menCatSet: new Set()
+        });
+      }
+
+      const champ = championshipMap.get(champName);
+
+      // Track categories by gender
+      if (gender === 'F') {
+        champ.womenCatSet.add(catCode);
+      } else {
+        champ.menCatSet.add(catCode);
+      }
+
+      // Initialize team entry for this championship
+      if (!champ.teamCounts.has(team)) {
+        champ.teamCounts.set(team, { categories: new Map(), womenTotal: 0, menTotal: 0, total: 0 });
+        if (team === 'JOR' || team === 'PLE') {
+          console.warn(`[Participation] Created team entry for ${team} in championship ${champName}`);
+        }
+      }
+      const teamData = champ.teamCounts.get(team);
+
+      // Increment category count
+      const current = teamData.categories.get(catCode) || 0;
+      teamData.categories.set(catCode, current + 1);
+
+      // Increment totals
+      if (gender === 'F') {
+        teamData.womenTotal++;
+      } else {
+        teamData.menTotal++;
+      }
+      teamData.total++;
+    });
+  });
+
+  // Sort categories by weight (using the lookup map)
+  function getCatWeight(catCode) {
+    return catToWeight.get(catCode) || 999;
+  }
+
+  // Build output for each championship
+  console.log(`[Participation] Championship map size: ${championshipMap.size}`);
+  championshipMap.forEach((v, k) => {
+    console.log(`[Participation] Championship "${k}": ${v.teamCounts.size} teams, ${v.womenCatSet.size} women cats, ${v.menCatSet.size} men cats`);
+  });
+  
+  const championships = Array.from(championshipMap.values()).map(champ => {
+    // Sort by weight using the lookup
+    const womenCatCodes = Array.from(champ.womenCatSet).sort((a, b) => getCatWeight(a) - getCatWeight(b));
+    const menCatCodes = Array.from(champ.menCatSet).sort((a, b) => getCatWeight(a) - getCatWeight(b));
+    
+    // Build category objects with code and name
+    const womenCategories = womenCatCodes.map(code => ({ code, name: catToName.get(code) || code }));
+    const menCategories = menCatCodes.map(code => ({ code, name: catToName.get(code) || code }));
+    
+    console.log(`[Participation] Women categories: ${JSON.stringify(womenCategories)}`);
+    console.log(`[Participation] Men categories: ${JSON.stringify(menCategories)}`);
+
+    // Sort teams alphabetically
+    const teams = Array.from(champ.teamCounts.keys()).sort((a, b) => a.localeCompare(b));
+
+    // Build rows for display
+    const rows = teams.map(team => {
+      const teamData = champ.teamCounts.get(team);
+      const row = {
+        team,
+        womenTotal: teamData.womenTotal,
+        menTotal: teamData.menTotal,
+        total: teamData.total,
+        womenCells: womenCatCodes.map(code => teamData.categories.get(code) || 0),
+        menCells: menCatCodes.map(code => teamData.categories.get(code) || 0)
+      };
+
+      if (team === 'JOR' || team === 'PLE') {
+        console.warn(`[Participation] Row for ${team} in ${champ.name}: womenCells=${JSON.stringify(row.womenCells)}, menCells=${JSON.stringify(row.menCells)}, totals w:${row.womenTotal} m:${row.menTotal} t:${row.total}`);
+      }
+
+      return row;
+    });
+
+    // Build column totals
+    const womenColTotals = womenCatCodes.map((code, i) => rows.reduce((sum, r) => sum + r.womenCells[i], 0));
+    const menColTotals = menCatCodes.map((code, i) => rows.reduce((sum, r) => sum + r.menCells[i], 0));
+
+    return {
+      name: champ.name,
+      womenCategories,
+      menCategories,
+      rows,
+      totals: {
+        womenCells: womenColTotals,
+        menCells: menColTotals,
+        womenTotal: rows.reduce((sum, r) => sum + r.womenTotal, 0),
+        menTotal: rows.reduce((sum, r) => sum + r.menTotal, 0),
+        total: rows.reduce((sum, r) => sum + r.total, 0)
+      }
+    };
+  });
+
+  console.log(`[Participation] Returning ${championships.length} championships`);
+  championships.forEach(c => {
+    console.warn(`[Participation] Championship ${c.name}: rows=${c.rows?.length || 0}, womenCats=${c.womenCategories.length}, menCats=${c.menCategories.length}`);
+  });
+  if (championships.length > 0) {
+    console.log(`[Participation] First championship has ${championships[0].rows?.length} rows`);
+  }
+
+  console.warn('[Participation] buildParticipationData: end');
+
+  return { championships };
+}
+
+/**
+ * Build medals counts by scanning all athletes and their ranks.
+ * If includeSnCj is true, include snatch and clean&jerk ranks in the counts
+ * in addition to total ranks. Returns { women:[], men:[], combined:[] } arrays.
+ */
+function buildMedalsData(db, includeSnCj = false) {
+  const athletes = db.athletes || [];
+  const ageGroups = db.ageGroups || [];
+
+  // Build category -> championship mapping
+  const catToChamp = new Map();
+  const catToAgeGroup = new Map(); // map exact category code -> ageGroup object
+  const catToParent = new Map(); // map exact category code -> ageGroup code/key
+  const championships = new Map();
+  ageGroups.forEach(ag => {
+    // Skip inactive age groups — only active groups should contribute mappings
+    if (ag.active === false) return;
+    const champType = ag.championshipType || ag.code || 'DEFAULT';
+    const champName = ag.championshipName || ag.code || champType;
+    if (!championships.has(champType)) {
+      championships.set(champType, { type: champType, name: champName, categories: new Set() });
+    }
+    (ag.categories || []).forEach(cat => {
+      // Use explicit category code fields from DB - do not parse names
+      const codes = [];
+      if (cat.code) codes.push(String(cat.code));
+      if (cat.categoryCode) codes.push(String(cat.categoryCode));
+      if (cat.id !== undefined && cat.id !== null) codes.push(String(cat.id));
+      // Register all explicit keys to point to this championship
+      codes.forEach(code => {
+        if (code) {
+          catToChamp.set(code, champType);
+          championships.get(champType).categories.add(code);
+          // also map exact category code to the ageGroup object for direct lookup
+          catToAgeGroup.set(code, ag);
+          // map category code back to parent ageGroup key/code
+          const parentKey = ag.code || ag.key || ag.championshipName || ag.name || champType;
+          catToParent.set(code, parentKey);
+        }
+      });
+    });
+    // Trace: list all explicit category keys for this age group
+    try {
+      const collected = Array.from((ag.categories || []).flatMap(c => {
+        const list = [];
+        if (c.code) list.push(String(c.code));
+        if (c.categoryCode) list.push(String(c.categoryCode));
+        if (c.id !== undefined && c.id !== null) list.push(String(c.id));
+        return list;
+      }));
+      console.warn(`[Medals Map] AgeGroup=${ag.code || ag.key || ag.championshipName || 'UNKNOWN'} -> categories=${collected.join(',')}`);
+      // Also print the reverse mapping for each explicit category key
+      collected.forEach(k => {
+        const parent = catToParent.get(k) || '(none)';
+        console.warn(`[Medals Map]   mapped ${k} -> parent=${parent}`);
+      });
+    } catch (e) {
+      console.warn('[Medals Map] Error collecting categories for ageGroup', ag, e);
+    }
+  });
+
+  // Summary counts
+  console.warn(`[Medals Map] Built catToParent entries: ${catToParent.size}, catToChamp entries: ${catToChamp.size}`);
+
+  // Ensure there is at least a DEFAULT championship (covers uncategorized participations)
+  if (!championships.has('DEFAULT')) championships.set('DEFAULT', { type: 'DEFAULT', name: 'Open' });
+
+  // helpers to create maps
+  function ensureMap(map, team) {
+    const key = team || 'No Team';
+    if (!map.has(key)) map.set(key, { team: key, gold: 0, silver: 0, bronze: 0 });
+    return map.get(key);
+  }
+  function addMedal(map, team, rank) {
+    const row = ensureMap(map, team);
+    if (rank === 1) row.gold += 1;
+    else if (rank === 2) row.silver += 1;
+    else if (rank === 3) row.bronze += 1;
+  }
+
+  // Determine which championships are actually used by participations
+  const usedChampTypes = new Set();
+  athletes.forEach(a => {
+    const parts = a.participations && a.participations.length > 0 ? a.participations : [];
+    if (!parts || parts.length === 0) {
+      console.warn(`[Medals Debug] Skipping athlete ${a.lastName} - no participations (no fallback)`);
+      return; // skip this athlete entirely
+    }
+    parts.forEach(p => {
+      const cat = p.categoryCode || a.categoryCode || '';
+      // Always resolve via category map - no championshipType searching
+      const matchedAG = catToAgeGroup.get(String(cat)) || null;
+      const champType = matchedAG ? (matchedAG.championshipType || matchedAG.code || 'DEFAULT') : 'DEFAULT';
+      usedChampTypes.add(champType);
+    });
+  });
+
+  // Initialize per-championship maps only for championships that are used
+  const champData = {};
+  usedChampTypes.forEach(type => {
+    const info = championships.get(type) || { name: type };
+    champData[type] = { women: new Map(), men: new Map(), combined: new Map(), name: info.name };
+  });
+
+  // Overall totals
+  const overall = { women: new Map(), men: new Map(), combined: new Map() };
+
+  // Process each athlete and their participations
+  athletes.forEach(a => {
+    const team = a.teamName || (a.team ? (db.teams?.find(t => t.id === a.team)?.name) : '') || 'No Team';
+    const gender = (a.gender || 'M').toUpperCase() === 'F' ? 'F' : 'M';
+
+    const parts = a.participations && a.participations.length > 0 ? a.participations : [];
+    if (!parts || parts.length === 0) {
+      // Do not fallback to eligibility categories — skip athlete
+      console.warn(`[Medals Debug] Skipping athlete ${a.lastName} during medal counting - no participations`);
+      return;
+    }
+
+    parts.forEach(p => {
+      const cat = p.categoryCode || a.categoryCode || '';
+      // Always resolve age group and championship via category map - never search by championshipType
+      const matchedAgeGroup = catToAgeGroup.get(String(cat)) || null;
+      const champType = matchedAgeGroup ? (matchedAgeGroup.championshipType || matchedAgeGroup.code || 'DEFAULT') : 'DEFAULT';
+      const dataForChamp = champData[champType];
+      if (!dataForChamp) return; // skip if unknown
+
+      // Simplified debug trace: show which ageGroup (code/name) contains this participation category
+      const agDisplay = matchedAgeGroup ? (matchedAgeGroup.code || matchedAgeGroup.championshipName || matchedAgeGroup.name) : 'UNKNOWN';
+      console.warn(`[Medals Debug] category=${cat} -> ageGroup=${agDisplay} (champType=${champType})`);
+
+      // If we found an age group and it doesn't look like a Senior group, stop and throw for investigation
+      if (matchedAgeGroup) {
+        const agName = String(matchedAgeGroup.championshipName || matchedAgeGroup.code || matchedAgeGroup.name || '').toLowerCase();
+        const isSenior = agName.includes('senior') || String(matchedAgeGroup.code || '').toUpperCase().includes('SR') || (matchedAgeGroup.minAge && matchedAgeGroup.minAge >= 18);
+        if (!isSenior) {
+          const msg = `[Medals Error] Non-senior ageGroup for category=${cat} -> ageGroup=${JSON.stringify({ code: matchedAgeGroup.code, championshipName: matchedAgeGroup.championshipName || matchedAgeGroup.name, minAge: matchedAgeGroup.minAge, maxAge: matchedAgeGroup.maxAge })} champType=${champType}`;
+          console.error(msg);
+          throw new Error(msg);
+        }
+      }
+
+      const totalRank = parseInt(p.totalRank || a.totalRank || 0, 10) || 0;
+      if (totalRank >= 1 && totalRank <= 3) {
+        if (gender === 'F') addMedal(dataForChamp.women, team, totalRank);
+        else addMedal(dataForChamp.men, team, totalRank);
+        addMedal(dataForChamp.combined, team, totalRank);
+
+        if (gender === 'F') addMedal(overall.women, team, totalRank);
+        else addMedal(overall.men, team, totalRank);
+        addMedal(overall.combined, team, totalRank);
+      }
+
+      if (includeSnCj) {
+        const sRank = parseInt(p.snatchRank || a.snatchRank || 0, 10) || 0;
+        if (sRank >= 1 && sRank <= 3) {
+          if (gender === 'F') addMedal(dataForChamp.women, team, sRank);
+          else addMedal(dataForChamp.men, team, sRank);
+          addMedal(dataForChamp.combined, team, sRank);
+
+          if (gender === 'F') addMedal(overall.women, team, sRank);
+          else addMedal(overall.men, team, sRank);
+          addMedal(overall.combined, team, sRank);
+        }
+
+        const cjRank = parseInt(p.cleanJerkRank || a.cleanJerkRank || 0, 10) || 0;
+        if (cjRank >= 1 && cjRank <= 3) {
+          if (gender === 'F') addMedal(dataForChamp.women, team, cjRank);
+          else addMedal(dataForChamp.men, team, cjRank);
+          addMedal(dataForChamp.combined, team, cjRank);
+
+          if (gender === 'F') addMedal(overall.women, team, cjRank);
+          else addMedal(overall.men, team, cjRank);
+          addMedal(overall.combined, team, cjRank);
+        }
+      }
+    });
+  });
+
+  function mapToSortedArray(map) {
+    return Array.from(map.values()).sort((a, b) => {
+      if (b.gold !== a.gold) return b.gold - a.gold;
+      if (b.silver !== a.silver) return b.silver - a.silver;
+      return b.bronze - a.bronze;
+    });
+  }
+
+  // Build championships array from used championships (preserve ordering by insertion from usedChampTypes)
+  const championshipsArr = Array.from(usedChampTypes).map(type => ({
+    type,
+    name: champData[type] && champData[type].name ? champData[type].name : (championships.get(type)?.name || type),
+    women: mapToSortedArray(champData[type].women),
+    men: mapToSortedArray(champData[type].men),
+    combined: mapToSortedArray(champData[type].combined)
+  }));
+
+  return {
+    championships: championshipsArr,
+    women: mapToSortedArray(overall.women),
+    men: mapToSortedArray(overall.men),
+    combined: mapToSortedArray(overall.combined)
+  };
 }

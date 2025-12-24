@@ -1874,6 +1874,52 @@ class CompetitionHub extends EventEmitter {
   }
 
   /**
+   * Get category-to-ageGroup mapping for all active age groups
+   * Returns a Map: categoryCode -> ageGroup object
+   * This map is cached and only rebuilt when database changes
+   * @returns {Map<string, object>} Map of category codes to their parent age group
+   */
+  getCategoryToAgeGroupMap() {
+    // Check if we have a cached map and database hasn't changed
+    const currentChecksum = this.databaseState?.databaseChecksum || this.databaseState?.lastUpdate || Date.now();
+    if (this._catToAgeGroupMap && this._catToAgeGroupMapChecksum === currentChecksum) {
+      return this._catToAgeGroupMap;
+    }
+
+    // Build fresh map
+    console.log('[Hub] Building category-to-ageGroup map from database');
+    const map = new Map();
+    const ageGroups = this.databaseState?.ageGroups || [];
+    
+    ageGroups.forEach(ag => {
+      // Only include active age groups
+      if (ag.active === false) return;
+      
+      (ag.categories || []).forEach(cat => {
+        // Register all explicit category code fields
+        const codes = [];
+        if (cat.code) codes.push(String(cat.code));
+        if (cat.categoryCode) codes.push(String(cat.categoryCode));
+        if (cat.id !== undefined && cat.id !== null) codes.push(String(cat.id));
+        
+        codes.forEach(code => {
+          if (code) {
+            map.set(code, ag);
+          }
+        });
+      });
+    });
+    
+    console.log(`[Hub] Built category map with ${map.size} entries from ${ageGroups.filter(ag => ag.active !== false).length} active age groups`);
+    
+    // Cache the map
+    this._catToAgeGroupMap = map;
+    this._catToAgeGroupMapChecksum = currentChecksum;
+    
+    return map;
+  }
+
+  /**
    * Force refresh (clear ALL state to trigger 428 and show "waiting for competition data")
    * Called when OWLCMS disconnects - clears everything so browsers show waiting state
    */

@@ -2,6 +2,15 @@
   export let allRecords = [];
   export let labels = {};
 
+  // Slugify strings for valid HTML IDs (no spaces, lowercase, URL-safe)
+  function slugify(str) {
+    return String(str || '')
+      .replace(/>\s*(\d+)/g, '999')  // Replace >86 style weight classes with 999
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
+  }
+
   // Debug: log what we received
   $: if (allRecords.length > 0) {
     console.log('[Records] Received records:', allRecords);
@@ -20,7 +29,7 @@
       <div class="federation-page" class:page-break={fedIdx > 0}>
         {#each fed.genders as genderGroup}
           {#each genderGroup.ageGroups as ageGroup}
-            <div class="record-block">
+            <div class="record-block" id="records-{slugify(fed.federation)}-{slugify(genderGroup.genderName)}-{slugify(ageGroup.name)}">
               <h2 class="record-title">
                 {fed.federation} - {genderGroup.genderName} - {ageGroup.name}
               </h2>
@@ -32,7 +41,7 @@
                     <th>{labels.category || 'Cat.'}</th>
                     <th>{labels.lift || 'Lift'}</th>
                     <th>{labels.value || 'Value'}</th>
-                    <th>{labels.holder || 'Holder'}</th>
+                    <th class="holder-col">{labels.athlete || labels.holder || 'Athlete'}</th>
                     <th>Nation</th>
                   </tr>
                 </thead>
@@ -43,7 +52,7 @@
                       <td>{record.category}</td>
                       <td>{record.lift}</td>
                       <td>{record.value}</td>
-                      <td>{record.holder}</td>
+                      <td class="holder-col">{record.holder}</td>
                       <td>{record.nation}</td>
                     </tr>
                   {/each}
@@ -58,10 +67,13 @@
 </div>
 
 <style>
-  /* Uniform percentage column widths (all columns same size, sum = 100%) */
+  /* Column widths: holder column is 2x others */
   .records-table th,
   .records-table td {
-    width: 16.66%;
+    width: 14.28%;
+  }
+  .records-table .holder-col {
+    width: 28.56%;
   }
   .section-header {
     font-size: 20pt;
@@ -71,12 +83,15 @@
     page-break-before: always;
     border-bottom: 2pt solid #333;
     padding-bottom: 10pt;
+    bookmark-level: 1;
+    bookmark-label: "Records";
   }
   .record-block {
     page-break-inside: avoid;
     margin-bottom: 25pt;
     border-radius: 0;
     background: none;
+    bookmark-level: 2;
   }
   .record-title {
     font-size: 14pt;
@@ -90,7 +105,7 @@
   .records-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 10pt;
+    font-size: 9pt;
     border: 1pt solid #333;
     table-layout: fixed;
     border-radius: 0;
@@ -99,7 +114,7 @@
   .records-table th,
   .records-table td {
     border: 1pt solid #333;
-    padding: 6pt 4pt;
+    padding: 4pt 3pt;
     text-align: center;
     border-radius: 0;
     overflow: hidden;
@@ -110,7 +125,7 @@
     background: #e8e8e8;
     font-weight: bold;
     text-transform: uppercase;
-    font-size: 9pt;
+    font-size: 8pt;
   }
   /* Page break for each federation except the first */
   .federation-page.page-break {
@@ -123,5 +138,3 @@
     color: #666;
   }
 </style>
-
-...existing code...

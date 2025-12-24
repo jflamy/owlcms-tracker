@@ -18,8 +18,12 @@ export async function GET({ url }) {
 		const type = url.searchParams.get('type') || 'lifting-order';
 		const fopName = url.searchParams.get('fop');
 		
-		// If no FOP specified, return error
-		if (!fopName) {
+		// Check if FOP is required for this scoreboard type
+		const scoreboard = scoreboardRegistry.getScoreboard(type);
+		const fopRequired = scoreboard?.config?.fopRequired !== false; // Default to required if not specified
+		
+		// If no FOP specified and FOP is required, return error
+		if (!fopName && fopRequired) {
 			return json({
 				success: false,
 				error: 'missing_fop',

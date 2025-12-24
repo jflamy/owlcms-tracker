@@ -16,6 +16,9 @@ export default {
 	
 	// Sort order within category
 	order: 100,
+	
+	// FOP requirement: false = not used, true = required, 'optional' = show All button
+	fopRequired: false,
 
 	// Whether this scoreboard requires athlete pictures
 	requiresPictures: false,

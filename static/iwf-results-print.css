@@ -1,0 +1,26 @@
+/* Global print styles for IWF Results - Paged.js page definitions */
+
+/* All pages are landscape (mixed orientations not reliably supported by Paged.js) */
+@page {
+  size: A4 landscape;
+  margin: 10mm;
+}
+
+/* Page breaks */
+.title-section {
+  break-after: page;
+}
+
+.toc-section {
+  break-after: page;
+}
+
+/* PDF Bookmarks for main sections */
+#participants, #medals, #rankings, #protocols, #records {
+  bookmark-level: 1;
+}
+#participants { bookmark-label: content(text); }
+#medals { bookmark-label: content(text); }
+#rankings { bookmark-label: content(text); }
+#protocols { bookmark-label: content(text); }
+#records { bookmark-label: content(text); }

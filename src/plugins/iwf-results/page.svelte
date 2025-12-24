@@ -18,10 +18,24 @@
   $: rankings = data.rankings || [];
   $: allRecords = data.allRecords || [];
   $: format = options.format || 'complete';
+  $: competitionName = competition.name || 'Competition';
   
   // Load Paged.js dynamically when format is 'complete'
   onMount(() => {
     if (format === 'complete' && typeof window !== 'undefined') {
+      // Set up Paged.js completion handler BEFORE loading the script
+      window.PagedConfig = {
+        auto: true,
+        after: () => {
+          console.log('[Paged.js] Rendering complete, setting ready flag');
+          // Give extra time for target-counter() to be computed
+          setTimeout(() => {
+            window.__pagedjs_ready = true;
+            console.log('[Paged.js] Ready flag set');
+          }, 500);
+        }
+      };
+      
       const script = document.createElement('script');
       script.src = 'https://unpkg.com/pagedjs/dist/paged.polyfill.js';
       document.head.appendChild(script);
@@ -29,15 +43,24 @@
   });
 </script>
 
+<svelte:head>
+  <title>Result Book - {competitionName}</title>
+  <link rel="stylesheet" href="/iwf-results-print.css" />
+</svelte:head>
+
 <div class="protocol-container">
   {#if data.status === 'waiting'}
     <div class="loading">{data.message}</div>
   {:else if !sessions || sessions.length === 0}
     <div class="no-data">{data.message || 'No session data available.'}</div>
   {:else if format === 'complete'}
-    <TitlePage {competition} />
-    <TableOfContents {sessions} />
-    <Participants data={{ athletes, sessions }} />
+    <div class="title-section">
+      <TitlePage {competition} />
+    </div>
+    <div class="toc-section">
+      <TableOfContents {sessions} {rankings} {allRecords} />
+    </div>
+    <Participants {data} />
     <Medals {data} />
     <Rankings {rankings} {competition} />
     <SessionProtocols {sessions} {competition} productionTime={data.productionTime} />
@@ -67,17 +90,5 @@
     text-align: center;
     color: #666;
     font-size: 14px;
-  }
-
-  @media print {
-    @page {
-      size: A4 landscape;
-      margin: 10mm;
-    }
-
-    .protocol-container {
-      padding: 0;
-      width: 100%;
-    }
   }
 </style>

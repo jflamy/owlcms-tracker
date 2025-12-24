@@ -104,10 +104,15 @@
   
   function openScoreboard(type, fop, withOptions = false) {
     const options = scoreboardOptions[type]?.[fop] || {};
-    const params = new URLSearchParams({ fop });
+    const params = new URLSearchParams();
     
     // Find the scoreboard config to get default values
     const scoreboard = data.scoreboards.find(s => s.type === type);
+    
+    // Only add FOP if it's required or optional (not for fopRequired: false)
+    if (fop && scoreboard?.fopRequired !== false) {
+      params.append('fop', fop);
+    }
     
     // Add configured options to URL (only if different from default)
     Object.entries(options).forEach(([key, value]) => {
@@ -177,10 +182,15 @@
 
   function getScoreboardUrl(type, fop) {
     const options = scoreboardOptions[type]?.[fop] || {};
-    const params = new URLSearchParams({ fop });
+    const params = new URLSearchParams();
     
     // Find the scoreboard config to get default values
     const scoreboard = data.scoreboards.find(s => s.type === type);
+    
+    // Only add FOP if it's required or optional (not for fopRequired: false)
+    if (fop && scoreboard?.fopRequired !== false) {
+      params.append('fop', fop);
+    }
     
     // Add configured options to URL (only if different from default)
     Object.entries(options).forEach(([key, value]) => {
@@ -414,28 +424,99 @@
                   </p>
                   <div class="fop-links">
                     {#if confirmedFops}
-                      <h4>Document Views:</h4>
-                      <div class="fop-list">
-                        {#each data.fops as fop}
+                      {#if scoreboard.fopRequired === false}
+                        <!-- FOP not used - show single Generate button -->
+                        <div class="fop-list">
                           <div class="fop-row">
                             <a 
-                              href={getScoreboardUrl(scoreboard.type, fop)}
+                              href={getScoreboardUrl(scoreboard.type, null)}
                               class="fop-link"
                               target="_blank"
                               rel="noopener noreferrer"
                             >
-                              {scoreboard.type === 'iwf-results' ? 'Extract' : `Platform ${fop}`}
+                              Generate
                             </a>
-                            <button
-                              class="options-btn"
-                              on:click={() => openOptionsModal(scoreboard, fop)}
-                              title="Configure document options for {scoreboard.type === 'iwf-results' ? 'Extract' : `Platform ${fop}`}"
+                            <a 
+                              href="/api/generate-pdf?type={scoreboard.type}"
+                              class="pdf-btn"
+                              title="Generate PDF with mixed page orientations"
                             >
-                              ⚙️ Options
-                            </button>
+                              📄 PDF
+                            </a>
+                            {#if scoreboard.options && scoreboard.options.length > 0}
+                              <button
+                                class="options-btn"
+                                on:click={() => openOptionsModal(scoreboard, data.fops[0] || 'A')}
+                                title="Configure document options"
+                              >
+                                ⚙️ Options
+                              </button>
+                            {/if}
                           </div>
-                        {/each}
-                      </div>
+                        </div>
+                      {:else if scoreboard.fopRequired === 'optional'}
+                        <!-- FOP optional - show per-platform buttons + All button -->
+                        <h4>Document Views:</h4>
+                        <div class="fop-list">
+                          {#each data.fops as fop}
+                            <div class="fop-row">
+                              <a 
+                                href={getScoreboardUrl(scoreboard.type, fop)}
+                                class="fop-link"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                Platform {fop}
+                              </a>
+                              {#if scoreboard.options && scoreboard.options.length > 0}
+                                <button
+                                  class="options-btn"
+                                  on:click={() => openOptionsModal(scoreboard, fop)}
+                                  title="Configure options for Platform {fop}"
+                                >
+                                  ⚙️ Options
+                                </button>
+                              {/if}
+                            </div>
+                          {/each}
+                          <div class="fop-row">
+                            <a 
+                              href={getScoreboardUrl(scoreboard.type, null)}
+                              class="fop-link all-platforms"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              All Platforms
+                            </a>
+                          </div>
+                        </div>
+                      {:else}
+                        <!-- FOP required (default) - show per-platform buttons only -->
+                        <h4>Document Views:</h4>
+                        <div class="fop-list">
+                          {#each data.fops as fop}
+                            <div class="fop-row">
+                              <a 
+                                href={getScoreboardUrl(scoreboard.type, fop)}
+                                class="fop-link"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                Platform {fop}
+                              </a>
+                              {#if scoreboard.options && scoreboard.options.length > 0}
+                                <button
+                                  class="options-btn"
+                                  on:click={() => openOptionsModal(scoreboard, fop)}
+                                  title="Configure document options for Platform {fop}"
+                                >
+                                  ⚙️ Options
+                                </button>
+                              {/if}
+                            </div>
+                          {/each}
+                        </div>
+                      {/if}
                     {:else}
                       <div class="fop-list">
                         <div class="fop-link disabled">
@@ -885,6 +966,30 @@
   .options-btn:hover {
     background: rgba(102, 126, 234, 0.3);
     border-color: #667eea;
+    transform: scale(1.05);
+  }
+  
+  .pdf-btn {
+    width: auto;
+    height: 2.5rem;
+    padding: 0 1rem;
+    background: rgba(234, 102, 102, 0.2);
+    border: 1px solid rgba(234, 102, 102, 0.4);
+    border-radius: 8px;
+    color: white;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    text-decoration: none;
+  }
+  
+  .pdf-btn:hover {
+    background: rgba(234, 102, 102, 0.4);
+    border-color: #ea6666;
     transform: scale(1.05);
   }
   

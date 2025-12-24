@@ -1,54 +1,93 @@
 <script>
   export let sessions = [];
+  export let rankings = [];
+  export let allRecords = [];
+  
+  // Slugify strings for valid HTML IDs (no spaces, lowercase, URL-safe)
+  function slugify(str) {
+    return String(str || '')
+      .replace(/>\s*(\d+)/g, '999')  // Replace >86 style weight classes with 999
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
+  }
 </script>
 
 <div class="toc-page">
   <h1>Table of Contents</h1>
   
   <div class="toc-entries">
-    <div class="toc-entry">
+    <!-- Participants -->
+    <div class="toc-entry" style="font-weight: bold; margin-top: 8pt;">
       <span class="toc-title">Participants</span>
       <span class="toc-leader"></span>
       <span class="toc-page-number" data-ref="#participants"></span>
     </div>
     
-    <div class="toc-entry">
+    <!-- Medals -->
+    <div class="toc-entry" style="font-weight: bold; margin-top: 8pt;">
       <span class="toc-title">Medals</span>
       <span class="toc-leader"></span>
       <span class="toc-page-number" data-ref="#medals"></span>
     </div>
     
-    <div class="toc-entry">
+    <!-- Rankings section -->
+    <div class="toc-entry" style="font-weight: bold; margin-top: 8pt;">
       <span class="toc-title">Rankings</span>
       <span class="toc-leader"></span>
       <span class="toc-page-number" data-ref="#rankings"></span>
     </div>
     
-    <div class="toc-entry toc-section">
+    {#each rankings as championship}
+      {#each championship.genders as genderGroup}
+        {#each genderGroup.categories as category}
+          <div class="toc-entry" style="padding-left: 20pt; font-size: 10pt;">
+            <span class="toc-title">{championship.name} - {genderGroup.genderName} - {category.categoryName}</span>
+            <span class="toc-leader"></span>
+            <span class="toc-page-number" data-ref="#ranking-{slugify(championship.name)}-{slugify(genderGroup.genderName)}-{slugify(category.categoryName)}"></span>
+          </div>
+        {/each}
+      {/each}
+    {/each}
+    
+    <!-- Session Protocols section -->
+    <div class="toc-entry" style="font-weight: bold; margin-top: 8pt;">
       <span class="toc-title">Session Protocols</span>
       <span class="toc-leader"></span>
       <span class="toc-page-number" data-ref="#protocols"></span>
     </div>
     
     {#each sessions as session}
-      <div class="toc-entry toc-subsection">
+      <div class="toc-entry" style="padding-left: 20pt; font-size: 10pt;">
         <span class="toc-title">Session {session.name}: {session.description}</span>
         <span class="toc-leader"></span>
         <span class="toc-page-number" data-ref="#session-{session.name}"></span>
       </div>
     {/each}
     
-    <div class="toc-entry">
+    <!-- Records section -->
+    <div class="toc-entry" style="font-weight: bold; margin-top: 8pt;">
       <span class="toc-title">Records</span>
       <span class="toc-leader"></span>
       <span class="toc-page-number" data-ref="#records"></span>
     </div>
+    
+    {#each allRecords as fed}
+      {#each fed.genders as genderGroup}
+        {#each genderGroup.ageGroups as ageGroup}
+          <div class="toc-entry" style="padding-left: 20pt; font-size: 10pt;">
+            <span class="toc-title">{fed.federation} - {genderGroup.genderName} - {ageGroup.name}</span>
+            <span class="toc-leader"></span>
+            <span class="toc-page-number" data-ref="#records-{slugify(fed.federation)}-{slugify(genderGroup.genderName)}-{slugify(ageGroup.name)}"></span>
+          </div>
+        {/each}
+      {/each}
+    {/each}
   </div>
 </div>
 
 <style>
   .toc-page {
-    page-break-after: always;
     padding: 40pt 60pt;
     background: white;
   }
@@ -63,23 +102,13 @@
   .toc-entries {
     display: flex;
     flex-direction: column;
-    gap: 8pt;
   }
 
   .toc-entry {
     display: flex;
     align-items: baseline;
     font-size: 11pt;
-  }
-
-  .toc-section {
-    font-weight: bold;
-    margin-top: 10pt;
-  }
-
-  .toc-subsection {
-    padding-left: 20pt;
-    font-size: 10pt;
+    margin-bottom: 4pt;
   }
 
   .toc-title {
@@ -99,8 +128,8 @@
     text-align: right;
   }
 
-  /* Paged.js will populate these via content */
-  .toc-page-number[data-ref]::after {
-    content: target-counter(attr(data-ref, url), page);
+  /* Paged.js target-counter - use :global to bypass Svelte scoping */
+  :global(.toc-page-number[data-ref])::after {
+    content: target-counter(attr(data-ref url), page);
   }
 </style>

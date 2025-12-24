@@ -1,8 +1,9 @@
 export default {
   name: 'IWF Results',
-  description: 'Official IWF competition protocol with multi-session support and official signatures.',
+  description: 'Results book with participants, medals, rankings, session protocols and records',
   category: 'documents',
   order: 101,
+  fopRequired: false,
   options: [
     {
       key: 'format',

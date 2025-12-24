@@ -279,6 +279,8 @@
     page-break-before: always;
     border-bottom: 2pt solid #333;
     padding-bottom: 10pt;
+    bookmark-level: 1;
+    bookmark-label: "Session Protocols";
   }
 
   .session-page {
@@ -286,6 +288,7 @@
     padding: 20px;
     position: relative;
     background: white;
+    bookmark-level: 2;
   }
 
   .session-title {

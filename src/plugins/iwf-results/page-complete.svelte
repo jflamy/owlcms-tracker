@@ -91,10 +91,12 @@
     <TitlePage {competition} />
 
     <!-- Table of Contents -->
-    <TableOfContents {sessions} />
+    <div class="toc-break">
+      <TableOfContents {sessions} />
+    </div>
 
     <!-- Participants Section -->
-    <Participants data={{ athletes, sessions }} />
+    <Participants {data} />
 
     <!-- Medals Section -->
     <Medals {data} />
@@ -126,6 +128,10 @@
     background: white;
     color: black;
     font-size: 11px;
+  }
+
+  .toc-break {
+    page-break-after: always;
   }
 
   .loading, .no-data {

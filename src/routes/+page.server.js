@@ -17,7 +17,8 @@ export async function load() {
 		options: sb.config.options || [],
 		isLowerThird: sb.config.isLowerThird || false,
 		category: sb.config.category || 'standard',
-		order: sb.config.order || 999
+		order: sb.config.order || 999,
+		fopRequired: sb.config.fopRequired !== false // Default to true if not specified
 	}));
 	
 	// Get available FOPs from competition data
