@@ -11,6 +11,31 @@ import { handleBinaryMessage } from './binary-handler.js';
 import { extractAndValidateVersion } from './protocol-config.js';
 
 let wss = null;
+let activeConnection = null; // Track active WebSocket connection for sending messages
+
+/**
+ * Request resources from OWLCMS
+ * Called by plugins when they need resources that aren't loaded yet
+ * @param {string[]} resources - Array of resource types to request (e.g., ['flags_zip', 'logos_zip'])
+ */
+export function requestResources(resources) {
+	if (!activeConnection || activeConnection.readyState !== 1) {
+		console.log('[WebSocket] Cannot request resources - no active OWLCMS connection');
+		return;
+	}
+	
+	if (!resources || resources.length === 0) {
+		return;
+	}
+	
+	console.log(`[WebSocket] 📦 Requesting resources from OWLCMS: ${resources.join(', ')}`);
+	activeConnection.send(JSON.stringify({
+		status: 428,
+		message: 'Precondition Required: Plugin needs resources',
+		reason: 'plugin_preconditions',
+		missing: resources
+	}));
+}
 
 /**
  * Initialize WebSocket server
@@ -26,6 +51,7 @@ export function initWebSocketServer(httpServer) {
 
 		wss.on('connection', (ws) => {
 			console.log('[WebSocket] Client connected');
+			activeConnection = ws; // Store active connection for sending resource requests
 
 			// Track authentication status for this connection
 			let clientAuthenticated = !process.env.OWLCMS_UPDATEKEY;
@@ -44,8 +70,9 @@ export function initWebSocketServer(httpServer) {
 						competitionHub.lastDatabaseChecksum = null;
 						competitionHub.translations = {};
 						competitionHub.lastTranslationsChecksum = null;
-						// Clear flags and pictures (they will be reloaded via 428)
-						competitionHub.flagsLoaded = false;
+					// Clear flags, logos, and pictures (they will be reloaded via 428)
+					competitionHub.flagsLoaded = false;
+					competitionHub.logosLoaded = false;
 						if (competitionHub.picturesLoaded !== undefined) competitionHub.picturesLoaded = false;
 						if (competitionHub.stylesLoaded !== undefined) competitionHub.stylesLoaded = false;
 						// Optionally clear any other relevant state here
@@ -198,6 +225,9 @@ export function initWebSocketServer(httpServer) {
 
 		ws.on('close', () => {
 			console.log('[WebSocket] Client disconnected');
+			if (activeConnection === ws) {
+				activeConnection = null;
+			}
 		});
 
 		ws.on('error', (error) => {

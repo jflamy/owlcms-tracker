@@ -18,7 +18,7 @@
  * Current protocol version supported by this tracker
  * Matches PROTOCOL_VERSION in Java backend WebSocketEventSender.java
  */
-export const PROTOCOL_VERSION = '2.0.0';
+export const PROTOCOL_VERSION = '2.2.0';
 
 /**
  * Minimum protocol version accepted from OWLCMS
@@ -34,7 +34,7 @@ export const PROTOCOL_VERSION = '2.0.0';
  * - You need a new feature: increment to '2.1.0'
  * - You're dropping support for old versions: increment to '3.0.0'
  */
-export const MINIMUM_PROTOCOL_VERSION = '2.1.0';
+export const MINIMUM_PROTOCOL_VERSION = '2.2.0';
 
 /**
  * Parse semantic version string into components

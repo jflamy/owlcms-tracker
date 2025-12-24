@@ -13,15 +13,15 @@ export async function GET({ url }) {
 	try {
 		// Initialize registry on first call
 		await scoreboardRegistry.initialize();
-		
+
 		// Extract parameters
 		const type = url.searchParams.get('type') || 'lifting-order';
 		const fopName = url.searchParams.get('fop');
-		
+
 		// Check if FOP is required for this scoreboard type
 		const scoreboard = scoreboardRegistry.getScoreboard(type);
 		const fopRequired = scoreboard?.config?.fopRequired !== false; // Default to required if not specified
-		
+
 		// If no FOP specified and FOP is required, return error
 		if (!fopName && fopRequired) {
 			return json({
@@ -30,7 +30,20 @@ export async function GET({ url }) {
 				message: 'FOP name is required. Example: ?type=lifting-order&fop=Platform_A'
 			}, { status: 400 });
 		}
-		
+
+		// Check plugin-specific preconditions (flags, logos, pictures, etc.)
+		// If resources are missing, request them from OWLCMS (async, non-blocking)
+		const pluginRequires = scoreboard?.config?.requires || [];
+		if (pluginRequires.length > 0) {
+			const { competitionHub } = await import('$lib/server/competition-hub.js');
+			const missingResources = competitionHub.checkPluginPreconditions(pluginRequires);
+			if (missingResources.length > 0) {
+				console.log(`[API /api/scoreboard] Plugin '${type}' needs: ${pluginRequires.join(', ')}. Missing: ${missingResources.join(', ')}`);
+				// Request missing resources from OWLCMS (fire and forget)
+				competitionHub.requestPluginPreconditions(missingResources);
+			}
+		}
+
 		// Extract all other parameters as options
 		const options = {};
 		for (const [key, value] of url.searchParams.entries()) {

@@ -392,6 +392,7 @@ Binary frames are sent as **binary WebSocket frames** (not text) and use a lengt
 | Type | Purpose | Handler Behavior |
 |------|---------|------------------|
 | `flags_zip` or `flags` | Country/team flag images | Extracts ZIP to `./local/flags/`, updates hub state, runs sanity checks |
+| `logos_zip` | Team/federation logos | Extracts ZIP to `./local/logos/`, updates hub state, runs sanity checks |
 | `pictures` | Athlete/team photos | Extracts ZIP to `./local/pictures/`, updates hub state |
 | `styles` | Custom CSS/asset files | Extracts ZIP to `./local/styles/`, updates hub state |
 | `translations_zip` | Localized text for UI | Parses `translations.json`, merges by locale, updates hub, checks checksum |
@@ -410,6 +411,19 @@ Binary frames are sent as **binary WebSocket frames** (not text) and use a lengt
 5. Sanity check: Logs number of flags extracted
 
 **Usage:** Scoreboards access flags via path: `/local/flags/<country-code>.png`
+
+#### `logos_zip` (or `logos`)
+
+**Source:** ZIP archive containing team/federation logo files
+
+**Handler Processing:**
+1. Extract all ZIP entries to `./local/logos/` directory
+2. Files can have any image format (PNG, JPG, SVG, etc.)
+3. Typical naming: `<team-name>.png` or `<logo-id>.png`
+4. After extraction, hub state is updated and marked as ready
+5. Sanity check: Logs number of logos extracted
+
+**Usage:** Scoreboards access logos via path: `/local/logos/<team-name>.png`
 
 #### `pictures`
 
@@ -647,21 +661,22 @@ When the tracker needs additional data before processing messages, it returns a 
   "status": 428,
   "message": "Precondition Required: Missing required data",
   "reason": "missing_preconditions",
-  "missing": ["database"]
+  "missing": ["database", "flags_zip", "logos_zip", "translations_zip"]
 }
 ```
 
 **Preconditions:**
 
 - `"database"` - Full competition data (athletes, categories, FOPs) - **Currently implemented**
-- `"flags"` - Country/team flag images - **Future**
-- `"styles"` - Custom CSS stylesheets - **Future**
-- `"pictures"` - Athlete photos - **Future**
+- `"translations_zip"` - Localized UI text for all locales - **Currently implemented**
+- `"flags_zip"` - Country/team flag images - **Currently implemented**
+- `"logos_zip"` - Team/federation logos - **Currently implemented**
+- `"pictures_zip"` - Athlete/team photos - **Future**
 
 **OWLCMS Response:** When receiving a 428 status, OWLCMS should send the missing data types. The `missing` array indicates which data types are needed. For example:
 
 - If `missing: ["database"]`, send a `type="database"` message
-- If `missing: ["database", "flags"]`, send both `type="database"` and `type="flags"` messages
+- If `missing: ["database", "flags_zip", "logos_zip"]`, send `type="database"`, `type="flags_zip"`, and `type="logos_zip"` messages as binary frames
 
 **Note:** The WebSocket connection remains open after a 428 response - this is NOT a termination code.
 

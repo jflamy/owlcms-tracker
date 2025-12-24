@@ -17,6 +17,10 @@ export default {
 	// Sort order within category
 	order: 100,
 
+	// Required resources that must be loaded before this plugin can render
+	// When accessed, missing resources will be requested from OWLCMS via 428
+	requires: ['flags_zip'],
+
 	// Whether this scoreboard requires athlete pictures
 	requiresPictures: false,
 

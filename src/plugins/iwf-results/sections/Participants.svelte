@@ -35,13 +35,22 @@
     return parts.length ? parts[parts.length - 1] : name;
   }
 
-  // Split rows into chunks of size n
+  // Split rows into chunks - first chunk is smaller to fit with header
   function chunkRows(rows = [], size = 20) {
     const chunks = [];
-    for (let i = 0; i < rows.length; i += size) {
+    const firstChunkSize = 18;
+    
+    if (rows.length === 0) return [rows];
+    
+    // First chunk: 18 items to fit with header
+    chunks.push(rows.slice(0, firstChunkSize));
+    
+    // Remaining chunks: 20 items each
+    for (let i = firstChunkSize; i < rows.length; i += size) {
       chunks.push(rows.slice(i, i + size));
     }
-    return chunks.length ? chunks : [rows];
+    
+    return chunks;
   }
 </script>
 

@@ -35,6 +35,24 @@
     return '';
   })();
   
+  // Format exportDate and version for footer
+  $: footerInfo = (() => {
+    const version = competition.owlcmsVersion || '';
+    const exportDate = competition.exportDate || '';
+    if (exportDate) {
+      // Parse ISO 8601 timestamp and format as YYYY-MM-DD HH:MM
+      const dt = new Date(exportDate);
+      const year = dt.getUTCFullYear();
+      const month = String(dt.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(dt.getUTCDate()).padStart(2, '0');
+      const hours = String(dt.getUTCHours()).padStart(2, '0');
+      const minutes = String(dt.getUTCMinutes()).padStart(2, '0');
+      const formattedDate = `${year}-${month}-${day} ${hours}:${minutes}`;
+      return version ? `OWLCMS ${version} – ${formattedDate}` : `– ${formattedDate}`;
+    }
+    return version ? `OWLCMS ${version}` : '';
+  })();
+  
   // Load Paged.js dynamically when format is 'complete'
   onMount(() => {
     if (format === 'complete' && typeof window !== 'undefined') {
@@ -68,6 +86,7 @@
   <span class="competition-name-string">{competitionName}</span>
   <span class="competition-dates-string">{competitionDates}</span>
   <span class="generation-time-string">{generationTime}</span>
+  <span class="footer-info-string">{footerInfo}</span>
 </div>
 
 <div class="protocol-container">
@@ -110,6 +129,10 @@
   
   :global(.generation-time-string) {
     string-set: generation-time content();
+  }
+  
+  :global(.footer-info-string) {
+    string-set: footer-info content();
   }
 
   .protocol-container {

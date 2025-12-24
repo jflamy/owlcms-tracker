@@ -61,6 +61,7 @@ export function parseV2Database(params) {
   // Build normalized result
   const result = {
     formatVersion: '2.0',
+    exportDate: db.exportDate || null,
     athletes,
     ageGroups: db.ageGroups || [],
     categories,

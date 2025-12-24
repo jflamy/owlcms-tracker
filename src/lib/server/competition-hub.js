@@ -45,6 +45,7 @@ class CompetitionHub extends EventEmitter {
     this.lastDatabaseChecksum = null;
     this._hasConfirmedFops = false;
     this.flagsLoaded = false;
+    this.logosLoaded = false;
     // Always start with translationsReady = false so tracker requests fresh translations on startup
     this.translationsReady = false;
     this.databaseAthleteIndex = new Map();
@@ -563,36 +564,80 @@ class CompetitionHub extends EventEmitter {
    *   * OWLCMS can send as JSON text message OR as binary frame with ZIP payload
    *   * If using ZIP: Send as binary frame with [type_length:4] ["translations_zip"] [ZIP buffer]
    *   * ZIP should contain single file "translations.json" with all 26 locales
-   * - 'flags': Country/team flag images as binary ZIP frames with type="flags_zip"
-   * - 'pictures': Athlete/team pictures as binary ZIP frames with type="pictures_zip"
+   * - 'flags_zip': Country/team flag images as binary ZIP frames (optional, per-plugin)
+   * - 'logos_zip': Team/federation logos as binary ZIP frames (optional, per-plugin)
+   * - 'pictures_zip': Athlete/team pictures as binary ZIP frames (optional, per-plugin)
+   * 
+   * Base preconditions (database, translations) are always checked.
+   * Optional preconditions (flags, logos, pictures) are only requested when a plugin needs them.
    */
   getMissingPreconditions() {
     const missing = [];
     
-    // Check database
+    // Check database - ALWAYS required
     if (!this.databaseState || !this.databaseState.athletes || this.databaseState.athletes.length === 0) {
       missing.push('database');
     }
     
-    // Check translations (OWLCMS sends as binary frame type="translations_zip")
+    // Check translations - ALWAYS required
     if (!this.translationsReady) {
       missing.push('translations_zip');
       console.log(`[Hub] 🔄 Requesting translations_zip from OWLCMS (428 response)`);
     }
     
-    // Check flags (OWLCMS sends as binary frame type="flags_zip")
-    if (!this.flagsLoaded) {
-      missing.push('flags_zip');
-      console.log(`[Hub] 🔄 Requesting flags_zip from OWLCMS (428 response)`);
-    }
+    // NOTE: flags_zip, logos_zip, pictures_zip are NOT checked here anymore
+    // They are requested on-demand when a plugin that needs them is triggered
+    // See: requestPluginPreconditions() and checkPluginPreconditions()
     
-    // Check pictures (OWLCMS sends as binary frame type="pictures_zip")
-    if (!this.picturesLoaded) {
-      missing.push('pictures_zip');
-      console.log(`[Hub] 🔄 Requesting pictures_zip from OWLCMS (428 response)`);
+    return missing;
+  }
+
+  /**
+   * Check if specific plugin preconditions are met
+   * Called by plugin helpers to verify their required resources are loaded
+   * @param {Array<string>} requires - Array of required resource types (e.g., ['flags_zip', 'logos_zip'])
+   * @returns {Array<string>} Array of missing resource types
+   */
+  checkPluginPreconditions(requires = []) {
+    const missing = [];
+    
+    for (const resource of requires) {
+      switch (resource) {
+        case 'flags_zip':
+          if (!this.flagsLoaded) missing.push('flags_zip');
+          break;
+        case 'logos_zip':
+          if (!this.logosLoaded) missing.push('logos_zip');
+          break;
+        case 'pictures_zip':
+          if (!this.picturesLoaded) missing.push('pictures_zip');
+          break;
+        case 'styles':
+          if (!this.stylesLoaded) missing.push('styles');
+          break;
+        // database and translations_zip are handled by getMissingPreconditions()
+      }
     }
     
     return missing;
+  }
+
+  /**
+   * Request missing plugin preconditions from OWLCMS
+   * Sends a JSON message over WebSocket to trigger resource download
+   * @param {Array<string>} missing - Array of missing resource types to request
+   */
+  requestPluginPreconditions(missing = []) {
+    if (missing.length === 0) return;
+    
+    console.log(`[Hub] 📦 Plugin requesting resources: ${missing.join(', ')}`);
+    
+    // Dynamic import to avoid circular dependency
+    import('./websocket-server.js').then(({ requestResources }) => {
+      requestResources(missing);
+    }).catch(err => {
+      console.error('[Hub] Failed to request resources:', err.message);
+    });
   }
   
   /**
@@ -1870,6 +1915,16 @@ class CompetitionHub extends EventEmitter {
     if (!this.flagsLoaded) {
       this.flagsLoaded = true;
       console.log('[Hub] ✅ Flags ZIP processed and cached');
+    }
+  }
+
+  /**
+   * Mark logos data as loaded so we don't keep requesting them
+   */
+  markLogosLoaded() {
+    if (!this.logosLoaded) {
+      this.logosLoaded = true;
+      console.log('[Hub] ✅ Logos ZIP processed and cached');
     }
   }
 

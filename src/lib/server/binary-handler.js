@@ -204,7 +204,9 @@ export async function handleBinaryMessage(buffer) {
 		}
 
 		// Route to handler based on message type
-		if (messageType === 'flags_zip') {
+		if (messageType === 'database_zip' || messageType === 'database') {
+			await handleDatabaseZipMessage(payload);
+		} else if (messageType === 'flags_zip') {
 			await handleFlagsMessage(payload);
 		} else if (messageType === 'flags') {
 			// Legacy support for old 'flags' message type
@@ -218,10 +220,10 @@ export async function handleBinaryMessage(buffer) {
 			handleStylesMessage(payload);
 		} else if (messageType === 'translations_zip') {
 			await handleTranslationsZipMessage(payload);
-                } else if (messageType === 'database_zip' || messageType === 'database') {
-                        await handleDatabaseZipMessage(payload);
+		} else if (messageType === 'logos_zip') {
+			await handleLogosMessage(payload);
 		}
-		
+
 		const elapsed = Date.now() - startTime;
 		console.log(`[BINARY] ✅ Operation ${operationId} completed in ${elapsed}ms (type: ${messageType})`);
 	} catch (error) {
@@ -335,6 +337,98 @@ async function handlePicturesMessage(zipBuffer) {
 		console.log(`[Hub] ✅ Pictures ZIP processed and cached`);
 	} catch (error) {
 		console.error('[PICTURES] ERROR:', error.message);
+	}
+}
+
+/**
+ * Extract logos ZIP archive to ./local/logos
+ * @param {Buffer} zipBuffer - ZIP file buffer
+ */
+async function handleLogosMessage(zipBuffer) {
+	const startTime = Date.now();
+	console.log(`[LOGOS] Starting extraction of ${zipBuffer.length} bytes`);
+	
+	try {
+		const { competitionHub } = await import('./competition-hub.js');
+		// Parse ZIP from buffer
+		const zip = new AdmZip(zipBuffer);
+		const logosDir = path.join(process.cwd(), 'local', 'logos');
+
+		// Ensure target directory exists
+		if (!fs.existsSync(logosDir)) {
+			fs.mkdirSync(logosDir, { recursive: true });
+		}
+
+		// Extract all files from ZIP
+		let extractedCount = 0;
+		const logoFileNames = [];
+		zip.getEntries().forEach((entry) => {
+			if (!entry.isDirectory) {
+				const targetPath = path.join(logosDir, entry.entryName);
+				const parentDir = path.dirname(targetPath);
+
+				// Create parent directory if needed
+				if (!fs.existsSync(parentDir)) {
+					fs.mkdirSync(parentDir, { recursive: true });
+				}
+
+				// Write file
+				fs.writeFileSync(targetPath, entry.getData());
+				extractedCount++;
+				
+				// Track first 10 logo file names
+				if (logoFileNames.length < 10) {
+					logoFileNames.push(entry.entryName);
+				}
+			}
+		});
+
+		const elapsed = Date.now() - startTime;
+		console.log(`[LOGOS] ✓ Extracted ${extractedCount} logo files in ${elapsed}ms (this message)`);
+		
+		// Log first 10 logos from this extraction
+		if (logoFileNames.length > 0) {
+			console.log(`[LOGOS] First ${Math.min(10, extractedCount)} logos from this message:`);
+			logoFileNames.forEach((name, index) => {
+				console.log(`  ${index + 1}. ${name}`);
+			});
+		}
+		
+		// Run sanity check after successful extraction (shows cumulative count)
+		verifySanityAfterLogos();
+		competitionHub.markLogosLoaded();
+	} catch (error) {
+		const elapsed = Date.now() - startTime;
+		console.error(`[LOGOS] ❌ ERROR after ${elapsed}ms:`, error.message);
+		console.error('[LOGOS] Stack trace:', error.stack);
+	}
+}
+
+/**
+ * Sanity check after logos extraction
+ * Verifies logos directory and file count
+ * NOTE: Logos directory is cleared on server startup, count is since server startup
+ */
+function verifySanityAfterLogos() {
+	try {
+		const logosDir = path.join(process.cwd(), 'local', 'logos');
+		if (!fs.existsSync(logosDir)) {
+			console.warn('[Sanity] ⚠️  Logos directory does not exist');
+			return 0;
+		}
+
+		const files = fs.readdirSync(logosDir);
+		const logoCount = files.length;
+		if (logoCount === 0) {
+			console.warn('[Sanity] ⚠️  Logos directory is empty');
+			return 0;
+		}
+
+		console.log(`[Sanity] ✅ Logos: ${logoCount} total files in /local/logos (since server startup)`);
+		return logoCount;
+	} catch (error) {
+		console.error(`[Sanity] ❌ Logos verification failed:`, error.message);
+		return 0;
 	}
 }
 

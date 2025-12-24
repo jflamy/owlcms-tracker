@@ -222,7 +222,7 @@
 
 <div class="container">
   <header class="header">
-    <h1>🏋️ OWLCMS Tracker</h1>
+    <h1><img src="/left.png" alt="OWLCMS" class="header-logo" /> OWLCMS Tracker</h1>
   </header>
 
   {#if !confirmedFops}
@@ -817,6 +817,15 @@
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+  
+  .header-logo {
+    height: 2.5rem;
+    width: auto;
   }
   
   .main {

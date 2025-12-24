@@ -44,7 +44,9 @@ export function getScoreboardData(fopName = '', options = {}, locale = 'en') {
     dateRange,
     organizer: databaseState.competition?.competitionOrganizer || '',
     federation: databaseState.competition?.federation || '',
-    snatchCJTotalMedals: databaseState.competition?.snatchCJTotalMedals || false
+    snatchCJTotalMedals: databaseState.competition?.snatchCJTotalMedals || false,
+    owlcmsVersion: databaseState.config?.appVersion || databaseState.config?.version || '',
+    exportDate: databaseState.exportDate || ''
   };
 
   // 1. Determine which sessions to include

@@ -20,9 +20,9 @@
     font-size: 10pt;
   }
 
-  /* Footer: Generation time (left) and page number (right) */
+  /* Footer: OWLCMS version and export date (left) and page number (right) */
   @bottom-left {
-    content: string(generation-time);
+    content: string(footer-info);
     font-size: 9pt;
     color: #666;
   }
