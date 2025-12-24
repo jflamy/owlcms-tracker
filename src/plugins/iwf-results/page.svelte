@@ -19,6 +19,21 @@
   $: allRecords = data.allRecords || [];
   $: format = options.format || 'complete';
   $: competitionName = competition.name || 'Competition';
+  $: competitionDates = competition.dateRange || '';
+  
+  // Format current date/time for footer (ISO 8601 with 24h time)
+  $: generationTime = (() => {
+    if (data.productionTime) {
+      const dt = new Date(data.productionTime);
+      const year = dt.getFullYear();
+      const month = String(dt.getMonth() + 1).padStart(2, '0');
+      const day = String(dt.getDate()).padStart(2, '0');
+      const hours = String(dt.getHours()).padStart(2, '0');
+      const minutes = String(dt.getMinutes()).padStart(2, '0');
+      return `${year}-${month}-${day} ${hours}:${minutes}`;
+    }
+    return '';
+  })();
   
   // Load Paged.js dynamically when format is 'complete'
   onMount(() => {
@@ -48,6 +63,13 @@
   <link rel="stylesheet" href="/iwf-results-print.css" />
 </svelte:head>
 
+<!-- Hidden elements for Paged.js string() function -->
+<div style="display: none;">
+  <span class="competition-name-string">{competitionName}</span>
+  <span class="competition-dates-string">{competitionDates}</span>
+  <span class="generation-time-string">{generationTime}</span>
+</div>
+
 <div class="protocol-container">
   {#if data.status === 'waiting'}
     <div class="loading">{data.message}</div>
@@ -75,6 +97,19 @@
     background: white;
     margin: 0;
     padding: 0;
+  }
+
+  /* Capture strings for Paged.js headers/footers */
+  :global(.competition-name-string) {
+    string-set: competition-name content();
+  }
+  
+  :global(.competition-dates-string) {
+    string-set: competition-dates content();
+  }
+  
+  :global(.generation-time-string) {
+    string-set: generation-time content();
   }
 
   .protocol-container {

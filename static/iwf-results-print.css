@@ -3,7 +3,42 @@
 /* All pages are landscape (mixed orientations not reliably supported by Paged.js) */
 @page {
   size: A4 landscape;
-  margin: 10mm;
+  margin-top: 20mm;
+  margin-bottom: 15mm;
+  margin-left: 10mm;
+  margin-right: 10mm;
+
+  /* Header: Competition name (left) and date range (right) */
+  @top-left {
+    content: string(competition-name);
+    font-size: 10pt;
+    font-weight: bold;
+  }
+  
+  @top-right {
+    content: string(competition-dates);
+    font-size: 10pt;
+  }
+
+  /* Footer: Generation time (left) and page number (right) */
+  @bottom-left {
+    content: string(generation-time);
+    font-size: 9pt;
+    color: #666;
+  }
+  
+  @bottom-right {
+    content: "Page " counter(page);
+    font-size: 9pt;
+  }
+}
+
+/* No headers/footers on title page */
+@page :first {
+  @top-left { content: none; }
+  @top-right { content: none; }
+  @bottom-left { content: none; }
+  @bottom-right { content: none; }
 }
 
 /* Page breaks */
