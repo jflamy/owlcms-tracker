@@ -1,0 +1,195 @@
+<script>
+  export let rankings = [];
+  export let competition = {};
+  const _keepCompetitionProp = competition;
+
+  function formatRank(rank) {
+    return rank || '-';
+  }
+
+  function getRankClass(rank, type) {
+    const r = parseInt(rank);
+    if (isNaN(r) || r < 1 || r > 3) return '';
+
+    if (type === 'total' || competition.snatchCJTotalMedals) {
+      if (r === 1) return 'rank-1';
+      if (r === 2) return 'rank-2';
+      if (r === 3) return 'rank-3';
+    }
+    return '';
+  }
+</script>
+
+<div class="section-page" id="rankings">
+  <h1 class="section-header">Rankings</h1>
+  
+  {#each rankings as championship, champIndex}
+    {#each championship.genders as genderGroup, genderIndex}
+      <div class="ranking-block" class:page-break={champIndex > 0 || genderIndex > 0}>
+        <h2 class="championship-header">{championship.name} - {genderGroup.genderName}</h2>
+
+        {#each genderGroup.categories as category, catIndex}
+          <div class="category-block">
+            <table class="protocol-table">
+                <thead>
+                  <tr>
+                    <th rowspan="2" class="col-lot">Lot</th>
+                    <th rowspan="2" class="col-name">Last Name</th>
+                    <th rowspan="2" class="col-firstname">First Name</th>
+                    <th rowspan="2" class="col-team">Team</th>
+                    <th rowspan="2" class="col-cat">Cat.</th>
+                    <th rowspan="2" class="col-bw">B.W.</th>
+                    <th rowspan="2" class="col-born">Born</th>
+                    <th colspan="5">Snatch</th>
+                    <th colspan="5">Clean&Jerk</th>
+                    <th colspan="2">Total</th>
+                  </tr>
+                  <tr>
+                    <th class="col-attempt">1</th><th class="col-attempt">2</th><th class="col-attempt">3</th><th class="col-max">Max</th><th class="col-rank">Rank</th>
+                    <th class="col-attempt">1</th><th class="col-attempt">2</th><th class="col-attempt">3</th><th class="col-max">Max</th><th class="col-rank">Rank</th>
+                    <th class="col-total">Total</th><th class="col-rank">Rank</th>
+                  </tr>
+                </thead>
+              <tbody>
+                <tr class="category-row">
+                  <td colspan="19">{category.categoryName}</td>
+                </tr>
+                {#each category.items as athlete}
+                  <tr>
+                    <td class="col-lot">{athlete.lotNumber}</td>
+                    <td class="col-name">{athlete.lastName}</td>
+                    <td class="col-firstname">{athlete.firstName}</td>
+                    <td class="col-team">{athlete.team}</td>
+                    <td class="col-cat">{athlete.categoryName}</td>
+                    <td class="col-bw">{athlete.bodyWeight}</td>
+                    <td class="col-born">{athlete.formattedBirth}</td>
+                    <td class="col-attempt">{athlete.snatch1 || '-'}</td>
+                    <td class="col-attempt">{athlete.snatch2 || '-'}</td>
+                    <td class="col-attempt">{athlete.snatch3 || '-'}</td>
+                    <td class="col-max">{athlete.bestSnatch || '-'}</td>
+                    <td class="col-rank {getRankClass(athlete.snatchRank, 'snatch')}">{formatRank(athlete.snatchRank)}</td>
+                    <td class="col-attempt">{athlete.cleanJerk1 || '-'}</td>
+                    <td class="col-attempt">{athlete.cleanJerk2 || '-'}</td>
+                    <td class="col-attempt">{athlete.cleanJerk3 || '-'}</td>
+                    <td class="col-max">{athlete.bestCleanJerk || '-'}</td>
+                    <td class="col-rank {getRankClass(athlete.cleanJerkRank, 'cj')}">{formatRank(athlete.cleanJerkRank)}</td>
+                    <td class="col-total">{athlete.total || '-'}</td>
+                    <td class="col-rank {getRankClass(athlete.totalRank, 'total')}">{formatRank(athlete.totalRank)}</td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+          </div>
+          <!-- Spacer between categories for page break control -->
+          <div class="category-spacer"></div>
+        {/each}
+      </div>
+    {/each}
+  {/each}
+</div>
+
+<style>
+  .section-page {
+    background: white;
+  }
+
+  .section-header {
+    font-size: 20pt;
+    font-weight: bold;
+    text-align: center;
+    margin: 30pt 0 20pt 0;
+    page-break-before: always;
+    border-bottom: 2pt solid #333;
+    padding-bottom: 10pt;
+    width: 100%;
+  }
+
+  .ranking-block {
+    padding: 0 20px 20px 20px;
+    background: white;
+  }
+  
+  .page-break {
+    page-break-before: always;
+  }
+
+  .championship-header {
+    font-size: 14pt;
+    font-weight: bold;
+    text-align: center;
+    margin: 10pt 0 10pt 0;
+  }
+
+  .protocol-table {
+    width: 100%;
+    border-collapse: collapse;
+    border-radius: 0;
+    margin-bottom: 15px;
+    font-size: 10px;
+    border: 1px solid black;
+    table-layout: fixed;
+    page-break-inside: auto;  /* Allow breaks inside the table */
+  }
+
+  .protocol-table thead {
+    display: table-header-group;  /* Repeat header on each page */
+  }
+
+  .protocol-table th,
+  .protocol-table td {
+    border: 1px solid black;
+    padding: 3px 2px;
+    text-align: center;
+    height: 20px;
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .protocol-table th {
+    background: #f0f0f0;
+    font-weight: bold;
+    padding: 2px 1px;
+    font-size: 8px;
+    text-transform: uppercase;
+  }
+
+  .col-lot { width: 3%; }
+  .col-name { width: 14%; text-align: left !important; padding-left: 5px !important; }
+  .col-firstname { width: 11%; text-align: left !important; padding-left: 5px !important; }
+  .col-team { width: 5%; }
+  .col-cat { width: 6%; }
+  .col-bw { width: 5%; }
+  .col-born { width: 8%; }
+  .col-attempt { width: 3.5%; text-align: center !important; }
+  .col-max { width: 4%; text-align: center !important; }
+  .col-rank { width: 3.5%; text-align: center !important; }
+  .col-total { width: 4%; text-align: center !important; font-weight: bold; }
+
+  .rank-1 { background-color: #FFD700; font-weight: bold; font-size: 1.2em; } /* Gold */
+  .rank-2 { background-color: #C0C0C0; font-weight: bold; font-size: 1.2em; } /* Silver */
+  .rank-3 { background-color: #CD7F32; font-weight: bold; font-size: 1.2em; } /* Bronze */
+
+  .category-row {
+    background: #e8e8e8;
+    font-weight: bold;
+    font-size: 12pt;
+  }
+
+  .category-row td {
+    text-align: left !important;
+    padding-left: 8px !important;
+  }
+
+  /* Each category is its own table - keep it together */
+  .category-block {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* Spacer between categories - this is where page breaks can occur */
+  .category-spacer {
+    height: 8pt;
+  }
+</style>

@@ -1,30 +1,92 @@
-# IWF Results Plugin
+# IWF Results Plugin - Multi-Section Document Structure
 
-This plugin replicates the official IWF competition protocol (`Protocol_All_IWF-A4.xlsx`) as a dynamic, print-ready HTML document.
+## Overview
 
-## Features
+This plugin generates official IWF competition results documents with support for both:
+- **Complete Document** (title page, TOC, all sections with Paged.js pagination)
+- **Session Protocols Only** (individual session results - default)
 
-- **Multi-Session Support**: Automatically generates a new page for each session in the competition.
-- **Category Grouping**: Athletes are grouped by weight category with bold headers.
-- **Official Signatures**: Includes signature lines for Referees, Jury, and Secretary.
-- **Print Optimized**: Designed for A4 portrait printing with CSS page breaks.
-- **Real-time Data**: Pulls directly from the Competition Hub's database state.
+## Document Structure
 
-## URL Parameters
+### Complete Document Sections
 
-- `session`: Filter by a specific session name (e.g., `?session=M1`).
-- `fop`: Filter by a specific platform (e.g., `?fop=A`).
-- `hideOfficials`: Set to `true` to hide the signature section (e.g., `?hideOfficials=true`).
+1. **Title Page** - Competition name, location, dates, organizers
+2. **Table of Contents** - Auto-generated with page numbers (via Paged.js)
+3. **Participants** - Complete athlete list by session and category
+4. **Medals** - Medal standings and podium results
+5. **Rankings** - Overall rankings by various scoring systems
+6. **Session Protocols** - Detailed attempt-by-attempt results (fully implemented)
+7. **Records** - New records set during competition
 
-## Data Mapping
+## File Structure
 
-This plugin uses the `databaseState` from the Competition Hub. It transforms the flat athlete list into a nested structure:
-1. **Sessions** (Top level)
-2. **Categories** (Grouped within sessions)
-3. **Athletes** (Sorted by rank or lot number)
+```
+src/plugins/iwf-results/
+├── page.svelte                    # Main entry point (routes between formats)
+├── config.js                      # Plugin configuration with format option
+├── helpers.data.js                # Server-side data processing
+├── sections/                      # Modular section components
+│   ├── TitlePage.svelte           # ✅ Implemented
+│   ├── TableOfContents.svelte     # ✅ Implemented (with Paged.js)
+│   ├── Participants.svelte        # 🚧 Placeholder
+│   ├── Medals.svelte              # 🚧 Placeholder
+│   ├── Rankings.svelte            # 🚧 Placeholder
+│   ├── SessionProtocols.svelte    # ✅ Fully implemented
+│   └── Records.svelte             # 🚧 Placeholder
+└── README.md                      # This file
+```
 
-## Implementation Details
+## Usage
 
-- **Helpers**: `helpers.data.js` handles the complex grouping and formatting logic.
-- **Svelte**: `page.svelte` provides a clean, table-based layout optimized for printing.
-- **Caching**: Uses a plugin-level cache based on the database checksum to ensure high performance.
+### Default (Session Protocols Only)
+
+```
+http://localhost:8096/iwf-results?fop=all
+```
+
+Shows only the session protocols (existing functionality).
+
+### Complete Document
+
+```
+http://localhost:8096/iwf-results?fop=all&format=complete
+```
+
+Generates the full document with all sections.
+
+### Session-Specific
+
+```
+http://localhost:8096/iwf-results?fop=all&session=M1
+```
+
+Shows protocols for a specific session only.
+
+## Configuration Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `format` | select | `protocols-only` | `complete` or `protocols-only` |
+| `session` | text | `''` | Session name (e.g., `M1`), empty = all |
+| `hideOfficials` | boolean | `false` | Hide officials section |
+
+## Paged.js Integration
+
+Complete format uses [Paged.js](https://pagedjs.org/) for:
+- Automatic page numbering
+- Table of contents with page references
+- Print-ready pagination
+- Page headers/footers
+
+## Print Styling
+
+- **Page size**: A4 landscape
+- **Margins**: 10mm  
+- **Font**: Arial, 11px base
+- **Column widths**: Percentage-based for print consistency
+
+## Development
+
+Each section is a standalone Svelte component that can be developed and tested independently. The modular structure allows generating complete documents or individual sections as needed.
+
+See the old README (README-old.md) for detailed implementation guidance.

@@ -5,6 +5,14 @@ export default {
   order: 101,
   options: [
     {
+      key: 'format',
+      label: 'Document Format',
+      type: 'select',
+      options: ['complete', 'protocols-only'],
+      default: 'complete',
+      description: 'Complete document (title, TOC, all sections) or session protocols only'
+    },
+    {
       key: 'session',
       label: 'Session Name',
       type: 'text',

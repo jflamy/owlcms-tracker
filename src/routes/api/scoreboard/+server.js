@@ -42,6 +42,8 @@ export async function GET({ url }) {
 		// Process data using the scoreboard's helper
 		const data = await scoreboardRegistry.processData(type, fopName, options);
 		
+		console.warn('[API /api/scoreboard] Returning data with allRecords length:', data.allRecords?.length || 0);
+		
 		return json({
 			success: true,
 			type,
