@@ -3,7 +3,7 @@
 
 ## Description
 
-A SvelteKit application that receives real-time competition updates from OWLCMS and displays them through multiple scoreboard types.
+A Node.js SvelteKit application that receives real-time competition updates from OWLCMS and displays them through multiple scoreboard types.
 
 ## **Goals**
 
