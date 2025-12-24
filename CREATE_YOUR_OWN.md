@@ -46,6 +46,56 @@ code .
 
 ---
 
+## Running the Tracker for Development
+
+### Method 1: VS Code Launch Menu
+
+**This workspace is pre-configured for VS Code with Git Bash as the default shell.**
+
+1. Open the project in VS Code
+2. Go to **Run and Debug** (Ctrl+Shift+D) or click the play icon in the sidebar
+3. Select one of the configurations from the dropdown:
+   - **"OWLCMS Tracker - Production Mode"** - Normal operation
+   - **"OWLCMS Tracker - Learning Mode"** - Captures all incoming messages to `samples/` directory (see [Learning Mode](#learning-mode) below)
+4. Press **F5** (or click the green play button) to start
+5. The integrated terminal will open automatically using Git Bash
+
+### Method 2: Command Line
+
+```bash
+# Normal mode (port 8096)
+npm run dev
+
+# Learning mode - captures all OWLCMS messages to samples/ directory
+npm run dev:learning
+```
+
+The app will be available at **http://localhost:8096**
+
+---
+
+## Learning Mode
+
+Learning mode is useful when developing custom scoreboards. It captures every WebSocket message from OWLCMS so you can understand the data structure and build your scoreboard logic accordingly.
+
+**Enable Learning Mode:**
+- VS Code: Use "OWLCMS Tracker - Learning Mode" launch configuration
+- Command Line: `npm run dev:learning` 
+- Environment Variable: `LEARNING_MODE=true`
+
+**What it captures:**
+- Every WebSocket message from OWLCMS with ISO8601 timestamp
+- Message type and parsed payload fields
+- Message size and content
+- Saves to `samples/message-[timestamp].json`
+
+**When to use it:**
+- Understanding what data OWLCMS sends during competition events
+- Debugging custom scoreboard data processing
+- Learning the data structures for building new plugins
+
+---
+
 ## Configure OWLCMS (One-time Setup)
 
 Before creating scoreboards, configure OWLCMS to send data:

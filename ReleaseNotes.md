@@ -30,11 +30,13 @@ To access experimental or additional example plugins, see [Installing from Sourc
 
 ## OWLCMS Configuration
 
-Configure OWLCMS to send data to the tracker:
+**Before using this tracker**, you must configure OWLCMS to send data via WebSocket:
 
 **In OWLCMS:** Prepare Competition → Language and System Settings → Connections → URL for Video Data
 
-Set to: `ws://localhost:8096/ws` (or your tracker host)
+Set to: `ws://localhost:8096/ws` (or `wss://your-tracker-host:8096/ws` for secure connections)
+
+**That's it!** No code changes to OWLCMS needed - just this URL setting.
 
 ## Docker Installation
 
@@ -75,4 +77,4 @@ The tracker will be available at: `http://localhost:8096`
 
 ## Support
 
-For issues and questions, visit: https://github.com/owlcms/owlcms-tracker
+For issues and questions, visit: https://github.com/jflamy/owlcms-tracker/issues

@@ -5,7 +5,7 @@
 
 A Node.js SvelteKit application that receives real-time competition updates from OWLCMS and displays them through multiple scoreboard types.
 
-## **Goals**
+## Goals
 
 This project aims at giving users of owlcms the capability to create their own scoreboards, TV graphics, and documents.  The program receives the database from owlcms and all lifting order, decisions and timer updates.
 
@@ -21,22 +21,6 @@ In this other example, a customized attempt board was created by cloning.  owlcm
 
 <img width="1896" height="1062" alt="image" src="https://github.com/user-attachments/assets/fb408431-221c-45f6-8802-1d1cf71e5c35" />
 
-## Documentation
-
-### Getting Started
-- **[CREATE_YOUR_OWN.md](./CREATE_YOUR_OWN.md)** - Create custom scoreboards (step-by-step guide)
-- **[docs/README.md](./docs/README.md)** - Documentation index and navigation
-
-## OWLCMS Configuration Required
-
-**Before using this tracker**, you must configure OWLCMS to send data via WebSocket:
-
-In OWLCMS: **Prepare Competition → Language and System Settings → Connections → URL for Video Data**
-
-Set to: `ws://localhost:8096/ws` (or `wss://your-tracker-host:8096/ws` for secure connections)
-
-**That's it!** No code changes to OWLCMS needed - just this URL setting.
-
 ## Features
 
 - **Multiple Scoreboard Types** - Lifting order, results, team rankings, and more  
@@ -47,51 +31,12 @@ Set to: `ws://localhost:8096/ws` (or `wss://your-tracker-host:8096/ws` for secur
 - **Real-Time SSE Updates** - Instant display of decisions and timer events  
 - **Server-Side Processing** - Process once, serve hundreds of browsers
 
-## Quick Start
+## Documentation
 
-### Prerequisites
+- **For installation, running, and OWLCMS configuration, see [ReleaseNotes.md](./ReleaseNotes.md).**
 
-- **Node.js** 18+ installed
+- **[CREATE_YOUR_OWN.md](./CREATE_YOUR_OWN.md)** - Create custom scoreboards (step-by-step guide)
+- **[docs/README.md](./docs/README.md)** - Documentation index and navigation
 
-### Method 1: VS Code Launch Menu
-
-**This workspace is pre-configured for VS Code with Git Bash as the default shell.**
-
-1. Open the project in VS Code
-2. Go to **Run and Debug** (Ctrl+Shift+D) or click the play icon in the sidebar
-3. Select one of the configurations from the dropdown:
-   - **"OWLCMS Tracker - Production Mode"** - Normal operation
-   - **"OWLCMS Tracker - Learning Mode"** - Captures all incoming messages to `samples/` directory
-4. Press **F5** (or click the green play button) to start
-5. The integrated terminal will open automatically using Git Bash
-
-### Method 2: Command Line
-
-```bash
-# Normal mode (port 8096)
-npm run dev
-
-# Learning mode - captures all OWLCMS messages to samples/ directory
-npm run dev:learning
-```
-
-The app will be available at **http://localhost:8096**
-
-
-
-## Learning Mode
-
-Learning mode is used to understand what OWLCMS actually sends.  You can use learning mode to see what is actually received during updates. The tracker core was built in this fashion built by observing what was received.
-
-**Enable Learning Mode:**
-- VS Code: Use "OWLCMS Tracker - Learning Mode" launch configuration
-- Command Line: `npm run dev:learning` 
-- Environment Variable: `LEARNING_MODE=true`
-
-**What it captures:**
-- Every WebSocket message from OWLCMS with ISO8601 timestamp
-- Message type and parsed payload fields
-- Message size and content
-- Saves to `samples/message-[timestamp].json`
 
 
