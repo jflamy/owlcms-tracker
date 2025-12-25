@@ -13,16 +13,11 @@
   $: sessions = data.sessions || [];
   $: athletes = data.allAthletes || [];
   
-  // Debug: log allRecords on mount and when data changes
+  // Debug: log records info on data changes
   $: {
-    console.warn('[page-complete] Received data object keys:', Object.keys(data));
-    console.warn('[page-complete] data.allRecords:', data.allRecords);
-    if (data.allRecords) {
-      console.warn('[page-complete] allRecords length:', data.allRecords.length);
-      console.warn('[page-complete] allRecords[0]:', data.allRecords[0]);
-    } else {
-      console.warn('[page-complete] allRecords is undefined or null!');
-    }
+    console.warn('[page-complete] hasRecords:', data.hasRecords);
+    console.warn('[page-complete] newRecordsBroken:', data.newRecordsBroken);
+    console.warn('[page-complete] allRecords length:', data.allRecords?.length);
   }
 </script>
 

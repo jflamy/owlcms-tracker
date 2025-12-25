@@ -17,6 +17,8 @@
   $: athletes = data.allAthletes || [];
   $: rankings = data.rankings || [];
   $: allRecords = data.allRecords || [];
+  $: hasRecords = data.hasRecords || false;
+  $: newRecordsBroken = data.newRecordsBroken || false;
   $: format = options.format || 'complete';
   $: competitionName = competition.name || 'Competition';
   $: competitionDates = competition.dateRange || '';
@@ -111,13 +113,13 @@
       <TitlePage {competition} />
     </div>
     <div class="toc-section">
-      <TableOfContents {sessions} {rankings} {allRecords} />
+      <TableOfContents {sessions} {rankings} {allRecords} {hasRecords} />
     </div>
     <Participants {data} />
     <Medals {data} />
     <Rankings {rankings} {competition} />
     <SessionProtocols {sessions} {competition} productionTime={data.productionTime} />
-    <Records {allRecords} {labels} />
+    <Records {allRecords} {hasRecords} {newRecordsBroken} {labels} />
   {:else}
     <SessionProtocols {sessions} {competition} productionTime={data.productionTime} />
   {/if}

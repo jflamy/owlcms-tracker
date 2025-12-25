@@ -16,11 +16,13 @@ export function getScoreboardData(fopName = '', options = {}, locale = 'en') {
   // 🎯 FILTERING: If no session specified, use all sessions combined
   const sessionFilter = options.session;
   
-  // Cache key based on database checksum and options
+  // Cache key based on database checksum, options, and records state
   const dbVersion = databaseState.databaseChecksum || databaseState.lastUpdate;
+  const recordsCount = (databaseState.records || []).length;
+  const newRecordsCount = (databaseState.records || []).filter(r => r.groupNameString && r.groupNameString !== '').length;
   const cacheKey = sessionFilter 
-    ? `${dbVersion}-session-${sessionFilter}-${locale}`
-    : `${dbVersion}-all-sessions-${locale}`;
+    ? `${dbVersion}-session-${sessionFilter}-${locale}-r${recordsCount}-n${newRecordsCount}`
+    : `${dbVersion}-all-sessions-${locale}-r${recordsCount}-n${newRecordsCount}`;
 
   if (protocolCache.has(cacheKey)) {
     return protocolCache.get(cacheKey);
@@ -142,6 +144,12 @@ export function getScoreboardData(fopName = '', options = {}, locale = 'en') {
   const participants = buildParticipationData(databaseState);
 
   // Cache and return
+  console.warn('[getScoreboardData] allRecordsData:', {
+    hasRecords: allRecordsData.hasRecords,
+    newRecordsBroken: allRecordsData.newRecordsBroken,
+    recordsLength: allRecordsData.records?.length
+  });
+  
   const processedData = {
     competition,
     sessions,
@@ -590,10 +598,32 @@ function buildAllRecordsData(db) {
   const allRecords = db.records || [];
   console.warn('[buildAllRecordsData] Total records in DB:', allRecords.length);
   
-  if (allRecords.length === 0) {
+  // hasRecords = true if any records are loaded (even if none broken during competition)
+  const hasRecords = allRecords.length > 0;
+  
+  if (!hasRecords) {
     console.warn('[buildAllRecordsData] No records found, returning object with hasRecords=false');
     return { hasRecords: false, newRecordsBroken: false, records: [] };
   }
+
+  // Debug: Show sample records to understand the data structure
+  console.warn('[buildAllRecordsData] Sample records from DB:');
+  allRecords.slice(0, 5).forEach((r, i) => {
+    console.warn(`  [${i}] federation=${r.recordFederation}, gender=${r.gender}, ageGrp=${r.ageGrp}, groupNameString="${r.groupNameString}", athlete=${r.athleteName}`);
+  });
+  
+  // Count records by federation and groupNameString status
+  const fedCounts = {};
+  const newRecordsByFed = {};
+  allRecords.forEach(r => {
+    const fed = r.recordFederation || 'UNKNOWN';
+    fedCounts[fed] = (fedCounts[fed] || 0) + 1;
+    if (r.groupNameString && r.groupNameString !== '') {
+      newRecordsByFed[fed] = (newRecordsByFed[fed] || 0) + 1;
+    }
+  });
+  console.warn('[buildAllRecordsData] Records by federation:', fedCounts);
+  console.warn('[buildAllRecordsData] NEW records by federation:', newRecordsByFed);
 
   // Grouping: Federation -> Gender -> Age Group
   // 🎯 FILTER: Only include records with non-empty groupNameString (new records set during competition)
@@ -673,9 +703,13 @@ function buildAllRecordsData(db) {
       console.warn(`[buildAllRecordsData]   ${fed.federation} - ${gen.genderName}: ${totalRecords} records`);
     });
   });
+  
+  const newRecordsBroken = recordsWithGroup > 0;
+  console.warn('[buildAllRecordsData] hasRecords:', hasRecords, 'newRecordsBroken:', newRecordsBroken);
+  
   return {
-    hasRecords: true,
-    newRecordsBroken: recordsWithGroup > 0,
+    hasRecords,
+    newRecordsBroken,
     records: result
   };
 }
