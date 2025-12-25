@@ -24,8 +24,8 @@ In this other example, a customized attempt board was created by cloning.  owlcm
 ## Features
 
 - **Multiple Scoreboard Types** - Lifting order, results, team rankings, and more  
-- **Multi-FOP Support** - Display up to 6 FOPs simultaneously  
-- **Simple OWLCMS Setup** - One URL configuration, no code changes  
+- **Multi-FOP Support** - All fields of play from the competition are selectable
+- **Simple OWLCMS Setup** - One URL configuration, no code changes to OWLCMS
 - **AI-Assisted Development** - Create new scoreboards with AI help  
 - **URL-Based Options** - Configure each scoreboard via query parameters  
 - **Real-Time SSE Updates** - Instant display of decisions and timer events  
