@@ -1,6 +1,8 @@
 <script>
   export let allRecords = [];
   export let labels = {};
+  export let hasRecords = false;
+  export let newRecordsBroken = false;
 
   // Slugify strings for valid HTML IDs (no spaces, lowercase, URL-safe)
   function slugify(str) {
@@ -12,18 +14,17 @@
   }
 
   // Debug: log what we received
-  $: if (allRecords.length > 0) {
-    console.log('[Records] Received records:', allRecords);
-  } else {
-    console.log('[Records] No records to display');
-  }
+  $: console.log('[Records] hasRecords:', hasRecords, 'newRecordsBroken:', newRecordsBroken, 'allRecords.length:', allRecords?.length || 0);
 </script>
 
+{#if hasRecords}
 <div class="records-section-page" id="records">
   <h1 class="section-header">Records</h1>
   
-  {#if !allRecords || allRecords.length === 0}
-    <div class="no-records">No records found in the database. (allRecords.length = {allRecords.length})</div>
+  {#if !newRecordsBroken}
+    <div class="no-records">No records were broken.</div>
+  {:else if !allRecords || allRecords.length === 0}
+    <div class="no-records">No new records to display.</div>
   {:else}
     {#each allRecords as fed, fedIdx}
       <div class="federation-page" class:page-break={fedIdx > 0}>
@@ -65,6 +66,7 @@
     {/each}
   {/if}
 </div>
+{/if}
 
 <style>
   /* Column widths: holder column is 2x others */

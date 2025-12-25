@@ -21,7 +21,7 @@
   $: competitionName = competition.name || 'Competition';
   $: competitionDates = competition.dateRange || '';
   
-  // Format current date/time for footer (ISO 8601 with 24h time)
+  // Format current date/time for footer (local time with timezone)
   $: generationTime = (() => {
     if (data.productionTime) {
       const dt = new Date(data.productionTime);
@@ -30,24 +30,36 @@
       const day = String(dt.getDate()).padStart(2, '0');
       const hours = String(dt.getHours()).padStart(2, '0');
       const minutes = String(dt.getMinutes()).padStart(2, '0');
-      return `${year}-${month}-${day} ${hours}:${minutes}`;
+      
+      // Get timezone abbreviation (e.g., "EST", "CET", "PST")
+      const timezone = new Intl.DateTimeFormat('en', { timeZoneName: 'short' })
+        .formatToParts(dt)
+        .find(part => part.type === 'timeZoneName')?.value || '';
+      
+      return `${year}-${month}-${day} ${hours}:${minutes} ${timezone}`;
     }
     return '';
   })();
   
-  // Format exportDate and version for footer
+  // Format exportDate and version for footer (local time with timezone)
   $: footerInfo = (() => {
     const version = competition.owlcmsVersion || '';
     const exportDate = competition.exportDate || '';
     if (exportDate) {
-      // Parse ISO 8601 timestamp and format as YYYY-MM-DD HH:MM
+      // Parse ISO 8601 timestamp and format as local time with timezone
       const dt = new Date(exportDate);
-      const year = dt.getUTCFullYear();
-      const month = String(dt.getUTCMonth() + 1).padStart(2, '0');
-      const day = String(dt.getUTCDate()).padStart(2, '0');
-      const hours = String(dt.getUTCHours()).padStart(2, '0');
-      const minutes = String(dt.getUTCMinutes()).padStart(2, '0');
-      const formattedDate = `${year}-${month}-${day} ${hours}:${minutes}`;
+      const year = dt.getFullYear();
+      const month = String(dt.getMonth() + 1).padStart(2, '0');
+      const day = String(dt.getDate()).padStart(2, '0');
+      const hours = String(dt.getHours()).padStart(2, '0');
+      const minutes = String(dt.getMinutes()).padStart(2, '0');
+      
+      // Get timezone abbreviation (e.g., "EST", "CET", "PST")
+      const timezone = new Intl.DateTimeFormat('en', { timeZoneName: 'short' })
+        .formatToParts(dt)
+        .find(part => part.type === 'timeZoneName')?.value || '';
+      
+      const formattedDate = `${year}-${month}-${day} ${hours}:${minutes} ${timezone}`;
       return version ? `OWLCMS ${version} – ${formattedDate}` : `– ${formattedDate}`;
     }
     return version ? `OWLCMS ${version}` : '';

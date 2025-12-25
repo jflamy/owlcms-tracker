@@ -133,7 +133,7 @@ export function getScoreboardData(fopName = '', options = {}, locale = 'en') {
   const rankings = buildRankingsData(databaseState, transformAthlete);
 
   // Build all records data structure: Federation → Gender → Age Group
-  const allRecords = buildAllRecordsData(databaseState);
+  const allRecordsData = buildAllRecordsData(databaseState);
 
   // Build medals data
   const medals = buildMedalsData(databaseState, competition.snatchCJTotalMedals);
@@ -146,7 +146,9 @@ export function getScoreboardData(fopName = '', options = {}, locale = 'en') {
     competition,
     sessions,
     rankings,
-    allRecords,
+    allRecords: allRecordsData.records,
+    hasRecords: allRecordsData.hasRecords,
+    newRecordsBroken: allRecordsData.newRecordsBroken,
     medals,
     participants,
     allAthletes: databaseState.athletes || [],
@@ -424,7 +426,6 @@ function buildRankingsData(db, transformAthleteFn) {
     ag.categories?.forEach(cat => {
       // Map by category code (e.g., "SR_F48") which matches athlete.categoryCode
       ageGroupMap.set(cat.code, {
-        championshipType: ag.championshipType || 'DEFAULT',
         championshipName: ag.championshipName || ag.code || 'Open',
         ageGroupCode: ag.code,
         maxAge: ag.maxAge || 999,
@@ -449,7 +450,6 @@ function buildRankingsData(db, transformAthleteFn) {
       // Athlete has no participations - create a default entry from their categoryCode
       if (!athlete.categoryCode) return; // Skip athletes with no category at all
       participationsToProcess = [{
-        championshipType: 'DEFAULT',
         categoryCode: athlete.categoryCode,
         totalRank: athlete.totalRank,
         snatchRank: athlete.snatchRank,
@@ -464,15 +464,13 @@ function buildRankingsData(db, transformAthleteFn) {
       // Get category weight for sorting
       const catWeight = extractMaxWeight(catCode);
 
-      // Always resolve championship via category map - never use p.championshipType directly
+      // Always resolve championship via category map
       const info = catCode ? ageGroupMap.get(catCode) : null;
-      const champType = info?.championshipType || 'DEFAULT';
-      const champName = info?.championshipName || getChampionshipDisplayName(champType);
+      const champName = info?.championshipName || 'Open';
       
       // Use championshipName as the grouping key (e.g., "Senior", "Youth", "Masters")
       if (!championshipMap.has(champName)) {
         championshipMap.set(champName, {
-          type: champType,
           name: champName,
           genders: new Map()
         });
@@ -593,8 +591,8 @@ function buildAllRecordsData(db) {
   console.warn('[buildAllRecordsData] Total records in DB:', allRecords.length);
   
   if (allRecords.length === 0) {
-    console.warn('[buildAllRecordsData] No records found, returning empty array');
-    return [];
+    console.warn('[buildAllRecordsData] No records found, returning object with hasRecords=false');
+    return { hasRecords: false, newRecordsBroken: false, records: [] };
   }
 
   // Grouping: Federation -> Gender -> Age Group
@@ -675,7 +673,11 @@ function buildAllRecordsData(db) {
       console.warn(`[buildAllRecordsData]   ${fed.federation} - ${gen.genderName}: ${totalRecords} records`);
     });
   });
-  return result;
+  return {
+    hasRecords: true,
+    newRecordsBroken: recordsWithGroup > 0,
+    records: result
+  };
 }
 
 /**
@@ -704,21 +706,50 @@ function buildParticipationData(db) {
   const catToChampionship = new Map();
   const catToName = new Map();  // catCode -> categoryName for display
   const catToWeight = new Map();  // catCode -> maximumWeight for sorting
+  const catToGender = new Map();  // catCode -> 'M' or 'F'
   ageGroups.forEach(ag => {
     if (ag.active === false) return;
     ag.categories?.forEach(cat => {
       catToChampionship.set(cat.code, {
-        championshipType: ag.championshipType || 'DEFAULT',
         championshipName: ag.championshipName || ag.code || 'Open'
       });
       catToName.set(cat.code, cat.categoryName || cat.code);
       catToWeight.set(cat.code, cat.maximumWeight || 999);
+      // Extract gender from category code (e.g., "SR_M89" -> "M", "YTH_F58" -> "F")
+      const genderMatch = cat.code?.match(/[_\s]([MF])/);
+      catToGender.set(cat.code, genderMatch ? genderMatch[1] : 'M');
     });
   });
   console.log(`[Participation] Category-to-championship map size: ${catToChampionship.size}`);
 
   // Group by championship: { champName -> { teamCounts, womenCatSet, menCatSet } }
+  // Pre-populate ALL categories from age groups into each championship
   const championshipMap = new Map();
+  ageGroups.forEach(ag => {
+    if (ag.active === false) return;
+    const champName = ag.championshipName || ag.code || 'Open';
+    
+    if (!championshipMap.has(champName)) {
+      championshipMap.set(champName, {
+        name: champName,
+        teamCounts: new Map(),
+        womenCatSet: new Set(),
+        menCatSet: new Set()
+      });
+    }
+    
+    const champ = championshipMap.get(champName);
+    
+    // Add ALL categories from this age group to the appropriate gender set
+    ag.categories?.forEach(cat => {
+      const gender = catToGender.get(cat.code) || 'M';
+      if (gender === 'F') {
+        champ.womenCatSet.add(cat.code);
+      } else {
+        champ.menCatSet.add(cat.code);
+      }
+    });
+  });
 
   // Helper to resolve team name
   function resolveTeam(a) {
@@ -758,23 +789,11 @@ function buildParticipationData(db) {
       const info = catToChampionship.get(catCode);
       const champName = info?.championshipName || 'Open';
 
-      // Initialize championship entry
-      if (!championshipMap.has(champName)) {
-        championshipMap.set(champName, {
-          name: champName,
-          teamCounts: new Map(),
-          womenCatSet: new Set(),
-          menCatSet: new Set()
-        });
-      }
-
+      // Get championship entry (should already exist from pre-population)
       const champ = championshipMap.get(champName);
-
-      // Track categories by gender
-      if (gender === 'F') {
-        champ.womenCatSet.add(catCode);
-      } else {
-        champ.menCatSet.add(catCode);
+      if (!champ) {
+        console.warn(`[Participation] Warning: Championship "${champName}" not found for category ${catCode}`);
+        return;
       }
 
       // Initialize team entry for this championship
@@ -894,10 +913,9 @@ function buildMedalsData(db, includeSnCj = false) {
   ageGroups.forEach(ag => {
     // Skip inactive age groups — only active groups should contribute mappings
     if (ag.active === false) return;
-    const champType = ag.championshipType || ag.code || 'DEFAULT';
-    const champName = ag.championshipName || ag.code || champType;
-    if (!championships.has(champType)) {
-      championships.set(champType, { type: champType, name: champName, categories: new Set() });
+    const champName = ag.championshipName || ag.code || 'Open';
+    if (!championships.has(champName)) {
+      championships.set(champName, { type: champName, name: champName, categories: new Set() });
     }
     (ag.categories || []).forEach(cat => {
       // Use explicit category code fields from DB - do not parse names
@@ -908,41 +926,21 @@ function buildMedalsData(db, includeSnCj = false) {
       // Register all explicit keys to point to this championship
       codes.forEach(code => {
         if (code) {
-          catToChamp.set(code, champType);
-          championships.get(champType).categories.add(code);
+          const champName = ag.championshipName || ag.code || 'Open';
+          catToChamp.set(code, champName);
+          championships.get(champName).categories.add(code);
           // also map exact category code to the ageGroup object for direct lookup
           catToAgeGroup.set(code, ag);
           // map category code back to parent ageGroup key/code
-          const parentKey = ag.code || ag.key || ag.championshipName || ag.name || champType;
+          const parentKey = ag.code || ag.key || ag.championshipName || ag.name || champName;
           catToParent.set(code, parentKey);
         }
       });
     });
-    // Trace: list all explicit category keys for this age group
-    try {
-      const collected = Array.from((ag.categories || []).flatMap(c => {
-        const list = [];
-        if (c.code) list.push(String(c.code));
-        if (c.categoryCode) list.push(String(c.categoryCode));
-        if (c.id !== undefined && c.id !== null) list.push(String(c.id));
-        return list;
-      }));
-      console.warn(`[Medals Map] AgeGroup=${ag.code || ag.key || ag.championshipName || 'UNKNOWN'} -> categories=${collected.join(',')}`);
-      // Also print the reverse mapping for each explicit category key
-      collected.forEach(k => {
-        const parent = catToParent.get(k) || '(none)';
-        console.warn(`[Medals Map]   mapped ${k} -> parent=${parent}`);
-      });
-    } catch (e) {
-      console.warn('[Medals Map] Error collecting categories for ageGroup', ag, e);
-    }
   });
 
-  // Summary counts
-  console.warn(`[Medals Map] Built catToParent entries: ${catToParent.size}, catToChamp entries: ${catToChamp.size}`);
-
   // Ensure there is at least a DEFAULT championship (covers uncategorized participations)
-  if (!championships.has('DEFAULT')) championships.set('DEFAULT', { type: 'DEFAULT', name: 'Open' });
+  if (!championships.has('Open')) championships.set('Open', { type: 'Open', name: 'Open' });
 
   // helpers to create maps
   function ensureMap(map, team) {
@@ -967,18 +965,18 @@ function buildMedalsData(db, includeSnCj = false) {
     }
     parts.forEach(p => {
       const cat = p.categoryCode || a.categoryCode || '';
-      // Always resolve via category map - no championshipType searching
+      // Always resolve championship name via category map
       const matchedAG = catToAgeGroup.get(String(cat)) || null;
-      const champType = matchedAG ? (matchedAG.championshipType || matchedAG.code || 'DEFAULT') : 'DEFAULT';
-      usedChampTypes.add(champType);
+      const champName = matchedAG ? (matchedAG.championshipName || matchedAG.code || 'Open') : 'Open';
+      usedChampTypes.add(champName);
     });
   });
 
   // Initialize per-championship maps only for championships that are used
   const champData = {};
-  usedChampTypes.forEach(type => {
-    const info = championships.get(type) || { name: type };
-    champData[type] = { women: new Map(), men: new Map(), combined: new Map(), name: info.name };
+  usedChampTypes.forEach(name => {
+    const info = championships.get(name) || { name: name };
+    champData[name] = { women: new Map(), men: new Map(), combined: new Map(), name: info.name };
   });
 
   // Overall totals
@@ -998,26 +996,11 @@ function buildMedalsData(db, includeSnCj = false) {
 
     parts.forEach(p => {
       const cat = p.categoryCode || a.categoryCode || '';
-      // Always resolve age group and championship via category map - never search by championshipType
+      // Always resolve age group and championship via category map
       const matchedAgeGroup = catToAgeGroup.get(String(cat)) || null;
-      const champType = matchedAgeGroup ? (matchedAgeGroup.championshipType || matchedAgeGroup.code || 'DEFAULT') : 'DEFAULT';
-      const dataForChamp = champData[champType];
+      const champName = matchedAgeGroup ? (matchedAgeGroup.championshipName || matchedAgeGroup.code || 'Open') : 'Open';
+      const dataForChamp = champData[champName];
       if (!dataForChamp) return; // skip if unknown
-
-      // Simplified debug trace: show which ageGroup (code/name) contains this participation category
-      const agDisplay = matchedAgeGroup ? (matchedAgeGroup.code || matchedAgeGroup.championshipName || matchedAgeGroup.name) : 'UNKNOWN';
-      console.warn(`[Medals Debug] category=${cat} -> ageGroup=${agDisplay} (champType=${champType})`);
-
-      // If we found an age group and it doesn't look like a Senior group, stop and throw for investigation
-      if (matchedAgeGroup) {
-        const agName = String(matchedAgeGroup.championshipName || matchedAgeGroup.code || matchedAgeGroup.name || '').toLowerCase();
-        const isSenior = agName.includes('senior') || String(matchedAgeGroup.code || '').toUpperCase().includes('SR') || (matchedAgeGroup.minAge && matchedAgeGroup.minAge >= 18);
-        if (!isSenior) {
-          const msg = `[Medals Error] Non-senior ageGroup for category=${cat} -> ageGroup=${JSON.stringify({ code: matchedAgeGroup.code, championshipName: matchedAgeGroup.championshipName || matchedAgeGroup.name, minAge: matchedAgeGroup.minAge, maxAge: matchedAgeGroup.maxAge })} champType=${champType}`;
-          console.error(msg);
-          throw new Error(msg);
-        }
-      }
 
       const totalRank = parseInt(p.totalRank || a.totalRank || 0, 10) || 0;
       if (totalRank >= 1 && totalRank <= 3) {
@@ -1065,13 +1048,20 @@ function buildMedalsData(db, includeSnCj = false) {
   }
 
   // Build championships array from used championships (preserve ordering by insertion from usedChampTypes)
-  const championshipsArr = Array.from(usedChampTypes).map(type => ({
-    type,
-    name: champData[type] && champData[type].name ? champData[type].name : (championships.get(type)?.name || type),
-    women: mapToSortedArray(champData[type].women),
-    men: mapToSortedArray(champData[type].men),
-    combined: mapToSortedArray(champData[type].combined)
-  }));
+  console.warn(`[Medals] Used championship names: ${Array.from(usedChampTypes).join(', ')}`);
+  console.warn(`[Medals] champData keys: ${Object.keys(champData).join(', ')}`);
+  const championshipsArr = Array.from(usedChampTypes).map(name => {
+    const champ = {
+      type: name,
+      name: champData[name] && champData[name].name ? champData[name].name : (championships.get(name)?.name || name),
+      women: mapToSortedArray(champData[name].women),
+      men: mapToSortedArray(champData[name].men),
+      combined: mapToSortedArray(champData[name].combined)
+    };
+    console.warn(`[Medals] Championship ${name}: women=${champ.women.length}, men=${champ.men.length}, combined=${champ.combined.length}`);
+    return champ;
+  });
+  console.warn(`[Medals] Total championships in result: ${championshipsArr.length}`);
 
   return {
     championships: championshipsArr,

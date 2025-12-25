@@ -2,6 +2,7 @@
   export let sessions = [];
   export let rankings = [];
   export let allRecords = [];
+  export let hasRecords = false;
   
   // Slugify strings for valid HTML IDs (no spaces, lowercase, URL-safe)
   function slugify(str) {
@@ -66,6 +67,7 @@
     {/each}
     
     <!-- Records section -->
+    {#if hasRecords}
     <div class="toc-entry" style="font-weight: bold; margin-top: 8pt;">
       <span class="toc-title">Records</span>
       <span class="toc-leader"></span>
@@ -83,6 +85,7 @@
         {/each}
       {/each}
     {/each}
+    {/if}
   </div>
 </div>
 

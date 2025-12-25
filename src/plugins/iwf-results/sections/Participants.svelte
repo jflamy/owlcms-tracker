@@ -145,19 +145,13 @@
     margin: 10pt 0 8pt 0;
     border-bottom: 1pt solid #333;
     padding-bottom: 5pt;
+    /* Paged.js PDF bookmark properties (not standard CSS) */
     bookmark-level: 1;
     bookmark-label: "Participants";
   }
 
   .champ-block {
     margin-bottom: 15pt;
-  }
-
-  .champ-heading {
-    font-size: 12pt;
-    font-weight: bold;
-    margin: 10pt 0 5pt 0;
-    color: #333;
   }
 
   .participation-table {

@@ -17,6 +17,34 @@
     }
     return '';
   }
+
+  // Check if session has any technical officials
+  function hasOfficials(session) {
+    if (!session?.officials) return false;
+    const officials = session.officials;
+    return !!(
+      officials.centerReferee ||
+      officials.sideReferee1 ||
+      officials.sideReferee2 ||
+      officials.sideReferee3 ||
+      officials.reserveReferee ||
+      officials.marshal1 ||
+      officials.marshal2 ||
+      officials.timekeeper ||
+      officials.technicalController1 ||
+      officials.technicalController2 ||
+      officials.competitionSecretary ||
+      officials.competitionSecretary2 ||
+      officials.doctor1 ||
+      officials.doctor2 ||
+      officials.juryPresident ||
+      officials.juryMember1 ||
+      officials.juryMember2 ||
+      officials.juryMember3 ||
+      officials.juryMember4 ||
+      officials.juryMember5
+    );
+  }
 </script>
 
 <div class="protocols-section" id="protocols">
@@ -148,6 +176,7 @@
         </div>
       {/if}
 
+      {#if hasOfficials(session)}
       <div class="officials-section">
         <h4>Technical Officials</h4>
         <div class="officials-grid">
@@ -266,6 +295,7 @@
           </div>
         </div>
       </div>
+      {/if}
     </div>
   {/each}
 </div>

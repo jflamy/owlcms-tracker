@@ -91,6 +91,18 @@
   }
   
   function openOptionsModal(scoreboard, fop) {
+    // Ensure scoreboardOptions is initialized for this type and FOP
+    if (!scoreboardOptions[scoreboard.type]) {
+      scoreboardOptions[scoreboard.type] = {};
+    }
+    if (!scoreboardOptions[scoreboard.type][fop]) {
+      const optionDefaults = {};
+      scoreboard.options?.forEach((opt) => {
+        optionDefaults[opt.key] = opt.default;
+      });
+      scoreboardOptions[scoreboard.type][fop] = optionDefaults;
+    }
+    
     modalScoreboard = scoreboard;
     modalFop = fop;
     showModal = true;

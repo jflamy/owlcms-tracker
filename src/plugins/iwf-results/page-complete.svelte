@@ -92,7 +92,12 @@
 
     <!-- Table of Contents -->
     <div class="toc-break">
-      <TableOfContents {sessions} />
+      <TableOfContents 
+        {sessions} 
+        rankings={data.rankings}
+        allRecords={data.allRecords}
+        hasRecords={data.hasRecords}
+      />
     </div>
 
     <!-- Participants Section -->
@@ -112,7 +117,12 @@
     />
 
     <!-- Records Section -->
-    <Records allRecords={data.allRecords} labels={data.labels} />
+    <Records 
+      allRecords={data.allRecords} 
+      hasRecords={data.hasRecords}
+      newRecordsBroken={data.newRecordsBroken}
+      labels={data.labels} 
+    />
   {/if}
 </div>
 
