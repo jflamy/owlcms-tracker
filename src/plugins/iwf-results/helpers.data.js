@@ -1060,11 +1060,11 @@ function buildTeamPointsData(db, includeSnCj = false, tp1 = 28, tp2 = 25, tp3 = 
   const champData = {};
   usedChampTypes.forEach(name => {
     const info = championships.get(name) || { name: name };
-    champData[name] = { women: new Map(), men: new Map(), combined: new Map(), name: info.name };
+    champData[name] = { women: new Map(), men: new Map(), name: info.name };
   });
 
   // Overall totals
-  const overall = { women: new Map(), men: new Map(), combined: new Map() };
+  const overall = { women: new Map(), men: new Map() };
 
   // Process each athlete
   athletes.forEach(a => {
@@ -1086,11 +1086,9 @@ function buildTeamPointsData(db, includeSnCj = false, tp1 = 28, tp2 = 25, tp3 = 
       if (totalRank >= 1) {
         if (gender === 'F') addPoints(dataForChamp.women, team, totalRank, total, p.teamMember, a.id);
         else addPoints(dataForChamp.men, team, totalRank, total, p.teamMember, a.id);
-        addPoints(dataForChamp.combined, team, totalRank, total, p.teamMember, a.id);
 
         if (gender === 'F') addPoints(overall.women, team, totalRank, total, p.teamMember, a.id);
         else addPoints(overall.men, team, totalRank, total, p.teamMember, a.id);
-        addPoints(overall.combined, team, totalRank, total, p.teamMember, a.id);
       }
 
       if (includeSnCj) {
@@ -1100,11 +1098,9 @@ function buildTeamPointsData(db, includeSnCj = false, tp1 = 28, tp2 = 25, tp3 = 
         if (sRank >= 1) {
           if (gender === 'F') addPoints(dataForChamp.women, team, sRank, bestSnatch, p.teamMember, a.id);
           else addPoints(dataForChamp.men, team, sRank, bestSnatch, p.teamMember, a.id);
-          addPoints(dataForChamp.combined, team, sRank, bestSnatch, p.teamMember, a.id);
 
           if (gender === 'F') addPoints(overall.women, team, sRank, bestSnatch, p.teamMember, a.id);
           else addPoints(overall.men, team, sRank, bestSnatch, p.teamMember, a.id);
-          addPoints(overall.combined, team, sRank, bestSnatch, p.teamMember, a.id);
         }
 
         // Pass actual lift values to shared formula for validation
@@ -1113,11 +1109,9 @@ function buildTeamPointsData(db, includeSnCj = false, tp1 = 28, tp2 = 25, tp3 = 
         if (cjRank >= 1) {
           if (gender === 'F') addPoints(dataForChamp.women, team, cjRank, bestCleanJerk, p.teamMember, a.id);
           else addPoints(dataForChamp.men, team, cjRank, bestCleanJerk, p.teamMember, a.id);
-          addPoints(dataForChamp.combined, team, cjRank, bestCleanJerk, p.teamMember, a.id);
 
           if (gender === 'F') addPoints(overall.women, team, cjRank, bestCleanJerk, p.teamMember, a.id);
           else addPoints(overall.men, team, cjRank, bestCleanJerk, p.teamMember, a.id);
-          addPoints(overall.combined, team, cjRank, bestCleanJerk, p.teamMember, a.id);
         }
       }
     });
@@ -1194,10 +1188,9 @@ function buildTeamPointsData(db, includeSnCj = false, tp1 = 28, tp2 = 25, tp3 = 
       type: name,
       name: champData[name] && champData[name].name ? champData[name].name : (championships.get(name)?.name || name),
       women: mapToSortedArray(champData[name].women, topNFemale),
-      men: mapToSortedArray(champData[name].men, topNMale),
-      combined: mapToSortedArray(champData[name].combined, 0) // Combined uses all scores
+      men: mapToSortedArray(champData[name].men, topNMale)
     };
-    console.warn(`[TeamPoints] Championship ${name}: women=${champ.women.length}, men=${champ.men.length}, combined=${champ.combined.length}`);
+    console.warn(`[TeamPoints] Championship ${name}: women=${champ.women.length}, men=${champ.men.length}`);
     return champ;
   });
 
@@ -1205,7 +1198,6 @@ function buildTeamPointsData(db, includeSnCj = false, tp1 = 28, tp2 = 25, tp3 = 
     championships: championshipsArr,
     women: mapToSortedArray(overall.women, topNFemale),
     men: mapToSortedArray(overall.men, topNMale),
-    combined: mapToSortedArray(overall.combined, 0), // Combined uses all scores
     tp1,
     tp2
   };
