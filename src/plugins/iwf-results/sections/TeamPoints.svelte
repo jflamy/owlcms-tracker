@@ -7,15 +7,17 @@
     return n === 0 ? '-' : n;
   }
 
-  // Helper to sort teams by points with tiebreaker
+  // Helper to sort teams by points with tiebreaker and add rank
   function sortTeamsByPoints(teams) {
-    return (teams || []).slice().sort((a, b) => {
+    const sorted = (teams || []).slice().sort((a, b) => {
       if ((b.points || 0) !== (a.points || 0)) return (b.points || 0) - (a.points || 0);
       if ((b.count1st || 0) !== (a.count1st || 0)) return (b.count1st || 0) - (a.count1st || 0);
       if ((b.count2nd || 0) !== (a.count2nd || 0)) return (b.count2nd || 0) - (a.count2nd || 0);
       if ((b.count3rd || 0) !== (a.count3rd || 0)) return (b.count3rd || 0) - (a.count3rd || 0);
       return (b.count4th || 0) - (a.count4th || 0);
     });
+    // Add rank to each team
+    return sorted.map((team, index) => ({ ...team, rank: index + 1 }));
   }
 
   // Split array into chunks of max 25 items
@@ -50,11 +52,13 @@
             <table class="team-points-table">
               <thead>
                 <tr>
-                  <th style="width: 40%;">Team</th>
-                  <th style="width: 12%;">Points</th>
-                  <th style="width: 9.6%;">1st</th>
-                  <th style="width: 9.6%;">2nd</th>
-                  <th style="width: 9.6%;">3rd</th>
+                  <th style="width: 5%;">Rank</th>
+                  <th style="width: 27%;">Team</th>
+                  <th style="width: 10%;">Points</th>
+                  <th style="width: 9.6%;">Members</th>
+                  <th style="width: 9.6%;">Gold</th>
+                  <th style="width: 9.6%;">Silver</th>
+                  <th style="width: 9.6%;">Bronze</th>
                   <th style="width: 9.6%;">4th</th>
                   <th style="width: 9.6%;">5th</th>
                 </tr>
@@ -62,8 +66,10 @@
               <tbody>
                 {#each womenChunk as row}
                   <tr>
+                    <td class="rank-cell">{row.rank}</td>
                     <td class="team-cell">{row.team}</td>
                     <td>{Math.floor(row.points || 0)}</td>
+                    <td>{row.memberCount || 0}</td>
                     <td>{fmt(row.count1st)}</td>
                     <td>{fmt(row.count2nd)}</td>
                     <td>{fmt(row.count3rd)}</td>
@@ -89,11 +95,13 @@
             <table class="team-points-table">
               <thead>
                 <tr>
-                  <th style="width: 40%;">Team</th>
-                  <th style="width: 12%;">Points</th>
-                  <th style="width: 9.6%;">1st</th>
-                  <th style="width: 9.6%;">2nd</th>
-                  <th style="width: 9.6%;">3rd</th>
+                  <th style="width: 5%;">Rank</th>
+                  <th style="width: 27%;">Team</th>
+                  <th style="width: 10%;">Points</th>
+                  <th style="width: 9.6%;">Members</th>
+                  <th style="width: 9.6%;">Gold</th>
+                  <th style="width: 9.6%;">Silver</th>
+                  <th style="width: 9.6%;">Bronze</th>
                   <th style="width: 9.6%;">4th</th>
                   <th style="width: 9.6%;">5th</th>
                 </tr>
@@ -101,8 +109,10 @@
               <tbody>
                 {#each menChunk as row}
                   <tr>
+                    <td class="rank-cell">{row.rank}</td>
                     <td class="team-cell">{row.team}</td>
                     <td>{Math.floor(row.points || 0)}</td>
+                    <td>{row.memberCount || 0}</td>
                     <td>{fmt(row.count1st)}</td>
                     <td>{fmt(row.count2nd)}</td>
                     <td>{fmt(row.count3rd)}</td>
@@ -128,11 +138,13 @@
             <table class="team-points-table">
               <thead>
                 <tr>
-                  <th style="width: 40%;">Team</th>
-                  <th style="width: 12%;">Points</th>
-                  <th style="width: 9.6%;">1st</th>
-                  <th style="width: 9.6%;">2nd</th>
-                  <th style="width: 9.6%;">3rd</th>
+                  <th style="width: 5%;">Rank</th>
+                  <th style="width: 27%;">Team</th>
+                  <th style="width: 10%;">Points</th>
+                  <th style="width: 9.6%;">Members</th>
+                  <th style="width: 9.6%;">Gold</th>
+                  <th style="width: 9.6%;">Silver</th>
+                  <th style="width: 9.6%;">Bronze</th>
                   <th style="width: 9.6%;">4th</th>
                   <th style="width: 9.6%;">5th</th>
                 </tr>
@@ -140,8 +152,10 @@
               <tbody>
                 {#each combinedChunk as row}
                   <tr>
+                    <td class="rank-cell">{row.rank}</td>
                     <td class="team-cell">{row.team}</td>
                     <td>{Math.floor(row.points || 0)}</td>
+                    <td>{row.memberCount || 0}</td>
                     <td>{fmt(row.count1st)}</td>
                     <td>{fmt(row.count2nd)}</td>
                     <td>{fmt(row.count3rd)}</td>
@@ -235,6 +249,11 @@
 .team-cell {
   font-weight: bold;
   text-align: left;
+}
+
+.rank-cell {
+  font-weight: bold;
+  text-align: center;
 }
 
 .no-data {

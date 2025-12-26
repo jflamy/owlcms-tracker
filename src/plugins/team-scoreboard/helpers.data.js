@@ -1328,6 +1328,8 @@ function groupByTeams(teamAthletes, gender, headers, topCounts = {}, includeAllA
  * @returns {Object} Formatted data ready for browser consumption
  */
 export function getScoreboardData(fopName = 'A', options = {}) {
+	console.log(`[TeamScoreboard] ===== START getScoreboardData fop=${fopName}, scoringSystem=${options.scoringSystem} =====`);
+	
 	const fopUpdate = getFopUpdate(fopName);
 	const databaseState = getDatabaseState();
 	
@@ -1349,13 +1351,24 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	const hasTopNOptions = options.topM !== undefined || options.topF !== undefined || 
 	                       options.topMFm !== undefined || options.topMFf !== undefined;
 	
+	// Check if database has topN settings (for TeamPoints mode only)
+	// Note: OWLCMS uses mensTeamSize/womensTeamSize for "best N results" (backward compatibility)
+	const dbTopNMale = databaseState.competition?.mensTeamSize || 0;
+	const dbTopNFemale = databaseState.competition?.womensTeamSize || 0;
+	const hasDbTopN = scoringSystem === 'TeamPoints' && (dbTopNMale > 0 || dbTopNFemale > 0);
+	
+	console.log(`[TeamScoreboard] TopN settings from DB: mensTeamSize=${dbTopNMale}, womensTeamSize=${dbTopNFemale}, hasDbTopN=${hasDbTopN}`);
+	
 	// Check if "include all athletes" mode is enabled
 	// Logic:
-	// 1. If allAthletes is explicitly set (true/false), use that value
-	// 2. If topN options are provided, default to false (use clamping)
-	// 3. Otherwise, default to true (include all athletes)
+	// 1. If database has topN settings (TeamPoints mode), use those (set includeAllAthletes=false)
+	// 2. If allAthletes is explicitly set (true/false), use that value
+	// 3. If topN options are provided in URL, default to false (use clamping)
+	// 4. Otherwise, default to true (include all athletes)
 	let includeAllAthletes;
-	if (options.allAthletes === true || options.allAthletes === 'true') {
+	if (hasDbTopN) {
+		includeAllAthletes = false;
+	} else if (options.allAthletes === true || options.allAthletes === 'true') {
 		includeAllAthletes = true;
 	} else if (options.allAthletes === false || options.allAthletes === 'false') {
 		includeAllAthletes = false;
@@ -1365,13 +1378,20 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		includeAllAthletes = true;
 	}
 	
+	console.log(`[TeamScoreboard] includeAllAthletes=${includeAllAthletes}`);
 	// Top score counts for team scoring (configurable per federation)
 	// When includeAllAthletes is true, use 10 for all counts (effectively includes everyone)
+	// When database has topN settings (TeamPoints mode), use those values
 	const topCounts = includeAllAthletes ? {
 		topM: 10,
 		topF: 10,
 		topMFm: 10,
 		topMFf: 10
+	} : hasDbTopN ? {
+		topM: dbTopNMale,
+		topF: dbTopNFemale,
+		topMFm: dbTopNMale,  // Use male count for mixed mode male athletes
+		topMFf: dbTopNFemale  // Use female count for mixed mode female athletes
 	} : {
 		topM: parseInt(options.topM, 10) || 4,      // M mode: top N men
 		topF: parseInt(options.topF, 10) || 4,      // F mode: top N women

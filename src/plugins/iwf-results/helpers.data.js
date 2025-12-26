@@ -10,8 +10,9 @@ export function getScoreboardData(fopName = '', options = {}, locale = 'en') {
   const databaseState = competitionHub.getDatabaseState();
   const translations = competitionHub.getTranslations(locale) || {};
 
-  if (!databaseState || !databaseState.athletes || databaseState.athletes.length === 0) {
-    return { status: 'waiting', message: 'Waiting for database...' };
+  // Check if hub is ready (has database + translations)
+  if (!competitionHub.isReady()) {
+    return { status: 'waiting', message: 'Waiting for competition data...' };
   }
 
   // 🎯 FILTERING: If no session specified, use all sessions combined
@@ -44,6 +45,11 @@ export function getScoreboardData(fopName = '', options = {}, locale = 'en') {
   const teamPoints1st = databaseState.competition?.teamPoints1st || options.tp1 || 28;
   const teamPoints2nd = databaseState.competition?.teamPoints2nd || options.tp2 || 25;
   const teamPoints3rd = databaseState.competition?.teamPoints3rd || options.tp3 || 23;
+  
+  // Extract topN settings from competition (if present)
+  // Note: OWLCMS uses mensTeamSize/womensTeamSize for "best N results" (backward compatibility)
+  const topNMale = databaseState.competition?.mensTeamSize || 0;
+  const topNFemale = databaseState.competition?.womensTeamSize || 0;
 
   const competition = {
     name: databaseState.competition?.name || 'Competition',
@@ -57,7 +63,9 @@ export function getScoreboardData(fopName = '', options = {}, locale = 'en') {
     exportDate: databaseState.exportDate || '',
     teamPoints1st,
     teamPoints2nd,
-    teamPoints3rd
+    teamPoints3rd,
+    topNMale,
+    topNFemale
   };
 
   // 1. Determine which sessions to include
@@ -150,7 +158,7 @@ export function getScoreboardData(fopName = '', options = {}, locale = 'en') {
   const medals = buildMedalsData(databaseState, competition.snatchCJTotalMedals);
 
   // Build team points data
-  const teamPoints = buildTeamPointsData(databaseState, competition.snatchCJTotalMedals, teamPoints1st, teamPoints2nd, teamPoints3rd);
+  const teamPoints = buildTeamPointsData(databaseState, competition.snatchCJTotalMedals, teamPoints1st, teamPoints2nd, teamPoints3rd, topNMale, topNFemale);
 
   // Build participants matrix (Teams × Categories)
   const participants = buildParticipationData(databaseState);
@@ -959,11 +967,12 @@ function buildParticipationData(db) {
 
 /**
  * Build team points by scanning all athletes and their ranks.
- * Formula: 1st=tp1, 2nd=tp2, 3rd=tp2-1, 4th=tp2-2, etc. down to 0
+ * Formula: 1st=tp1, 2nd=tp2, 3rd=tp3, 4th=tp3-1, 5th=tp3-2, etc. down to 0
  * If includeSnCj is true, include snatch and clean&jerk ranks in addition to total ranks.
+ * If topNMale or topNFemale are set (>0), only count the top N scores per team+gender.
  * Returns { championships:[], women:[], men:[], combined:[] } with team points per team.
  */
-function buildTeamPointsData(db, includeSnCj = false, tp1 = 28, tp2 = 25, tp3 = 23) {
+function buildTeamPointsData(db, includeSnCj = false, tp1 = 28, tp2 = 25, tp3 = 23, topNMale = 0, topNFemale = 0) {
   const athletes = db.athletes || [];
   const ageGroups = db.ageGroups || [];
 
@@ -1007,6 +1016,9 @@ function buildTeamPointsData(db, includeSnCj = false, tp1 = 28, tp2 = 25, tp3 = 
     if (!map.has(key)) map.set(key, { 
       team: key, 
       points: 0, 
+      memberCount: 0,
+      memberIds: new Set(),
+      scores: [], // Array of individual scores for topN filtering
       count1st: 0, 
       count2nd: 0, 
       count3rd: 0, 
@@ -1015,19 +1027,19 @@ function buildTeamPointsData(db, includeSnCj = false, tp1 = 28, tp2 = 25, tp3 = 
     });
     return map.get(key);
   }
-  function addPoints(map, team, rank, liftValue, teamMember) {
+  function addPoints(map, team, rank, liftValue, teamMember, athleteId) {
     const row = ensureMap(map, team);
     const pts = calculateTeamPoints(rank, liftValue, teamMember, tp1, tp2, tp3);
-    row.points += pts;
-    // Only count placements that earn points (pts > 0)
-    if (pts > 0) {
-      if (rank === 1) row.count1st += 1;
-      else if (rank === 2) row.count2nd += 1;
-      else if (rank === 3) row.count3rd += 1;
-      else if (rank === 4) row.count4th += 1;
-      else if (rank === 5) row.count5th += 1;
-      // Note: Ranks 6+ that earn points are included in total points but not tracked separately
-      // The count1st-count5th fields are for validation display and may be removed later
+    
+    // If this is a team member score and it earns points, add to scores array for topN processing
+    if (pts > 0 && teamMember) {
+      row.scores.push({ points: pts, rank, athleteId });
+    }
+    
+    // Count unique team members (track by athlete ID)
+    if (pts > 0 && teamMember && athleteId) {
+      row.memberIds.add(athleteId);
+      row.memberCount = row.memberIds.size;
     }
   }
 
@@ -1072,13 +1084,13 @@ function buildTeamPointsData(db, includeSnCj = false, tp1 = 28, tp2 = 25, tp3 = 
       const totalRank = parseInt(p.totalRank || a.totalRank || 0, 10) || 0;
       const total = parseInt(a.total || 0, 10) || 0;
       if (totalRank >= 1) {
-        if (gender === 'F') addPoints(dataForChamp.women, team, totalRank, total, p.teamMember);
-        else addPoints(dataForChamp.men, team, totalRank, total, p.teamMember);
-        addPoints(dataForChamp.combined, team, totalRank, total, p.teamMember);
+        if (gender === 'F') addPoints(dataForChamp.women, team, totalRank, total, p.teamMember, a.id);
+        else addPoints(dataForChamp.men, team, totalRank, total, p.teamMember, a.id);
+        addPoints(dataForChamp.combined, team, totalRank, total, p.teamMember, a.id);
 
-        if (gender === 'F') addPoints(overall.women, team, totalRank, total, p.teamMember);
-        else addPoints(overall.men, team, totalRank, total, p.teamMember);
-        addPoints(overall.combined, team, totalRank, total, p.teamMember);
+        if (gender === 'F') addPoints(overall.women, team, totalRank, total, p.teamMember, a.id);
+        else addPoints(overall.men, team, totalRank, total, p.teamMember, a.id);
+        addPoints(overall.combined, team, totalRank, total, p.teamMember, a.id);
       }
 
       if (includeSnCj) {
@@ -1086,33 +1098,84 @@ function buildTeamPointsData(db, includeSnCj = false, tp1 = 28, tp2 = 25, tp3 = 
         const bestSnatch = parseInt(a.bestSnatch || 0, 10) || 0;
         const sRank = parseInt(p.snatchRank || a.snatchRank || 0, 10) || 0;
         if (sRank >= 1) {
-          if (gender === 'F') addPoints(dataForChamp.women, team, sRank, bestSnatch, p.teamMember);
-          else addPoints(dataForChamp.men, team, sRank, bestSnatch, p.teamMember);
-          addPoints(dataForChamp.combined, team, sRank, bestSnatch, p.teamMember);
+          if (gender === 'F') addPoints(dataForChamp.women, team, sRank, bestSnatch, p.teamMember, a.id);
+          else addPoints(dataForChamp.men, team, sRank, bestSnatch, p.teamMember, a.id);
+          addPoints(dataForChamp.combined, team, sRank, bestSnatch, p.teamMember, a.id);
 
-          if (gender === 'F') addPoints(overall.women, team, sRank, bestSnatch, p.teamMember);
-          else addPoints(overall.men, team, sRank, bestSnatch, p.teamMember);
-          addPoints(overall.combined, team, sRank, bestSnatch, p.teamMember);
+          if (gender === 'F') addPoints(overall.women, team, sRank, bestSnatch, p.teamMember, a.id);
+          else addPoints(overall.men, team, sRank, bestSnatch, p.teamMember, a.id);
+          addPoints(overall.combined, team, sRank, bestSnatch, p.teamMember, a.id);
         }
 
         // Pass actual lift values to shared formula for validation
         const bestCleanJerk = parseInt(a.bestCleanJerk || 0, 10) || 0;
         const cjRank = parseInt(p.cleanJerkRank || a.cleanJerkRank || 0, 10) || 0;
         if (cjRank >= 1) {
-          if (gender === 'F') addPoints(dataForChamp.women, team, cjRank, bestCleanJerk, p.teamMember);
-          else addPoints(dataForChamp.men, team, cjRank, bestCleanJerk, p.teamMember);
-          addPoints(dataForChamp.combined, team, cjRank, bestCleanJerk, p.teamMember);
+          if (gender === 'F') addPoints(dataForChamp.women, team, cjRank, bestCleanJerk, p.teamMember, a.id);
+          else addPoints(dataForChamp.men, team, cjRank, bestCleanJerk, p.teamMember, a.id);
+          addPoints(dataForChamp.combined, team, cjRank, bestCleanJerk, p.teamMember, a.id);
 
-          if (gender === 'F') addPoints(overall.women, team, cjRank, bestCleanJerk, p.teamMember);
-          else addPoints(overall.men, team, cjRank, bestCleanJerk, p.teamMember);
-          addPoints(overall.combined, team, cjRank, bestCleanJerk, p.teamMember);
+          if (gender === 'F') addPoints(overall.women, team, cjRank, bestCleanJerk, p.teamMember, a.id);
+          else addPoints(overall.men, team, cjRank, bestCleanJerk, p.teamMember, a.id);
+          addPoints(overall.combined, team, cjRank, bestCleanJerk, p.teamMember, a.id);
         }
       }
     });
   });
 
   // Sort by points with tiebreaker (more 1st places, then 2nd, then 3rd, then 4th, then 5th)
-  function mapToSortedArray(map) {
+  function mapToSortedArray(map, topN = 0) {
+    // First, apply topN filtering if enabled (topN > 0)
+    if (topN > 0) {
+      map.forEach(row => {
+        // Group scores by athleteId and sum each athlete's total contribution
+        const athleteTotals = new Map();
+        row.scores.forEach(score => {
+          const id = score.athleteId;
+          if (!athleteTotals.has(id)) {
+            athleteTotals.set(id, { athleteId: id, totalPoints: 0, scores: [] });
+          }
+          const athlete = athleteTotals.get(id);
+          athlete.totalPoints += score.points;
+          athlete.scores.push(score);
+        });
+        
+        // Sort athletes by total points descending and keep top N
+        const sortedAthletes = Array.from(athleteTotals.values())
+          .sort((a, b) => b.totalPoints - a.totalPoints)
+          .slice(0, topN);
+        
+        // Collect all scores from top N athletes
+        const topScores = sortedAthletes.flatMap(a => a.scores);
+        
+        // Compute total points from top N athletes
+        row.points = topScores.reduce((sum, s) => sum + s.points, 0);
+        
+        // Count ranks in top N athletes' scores
+        row.count1st = topScores.filter(s => s.rank === 1).length;
+        row.count2nd = topScores.filter(s => s.rank === 2).length;
+        row.count3rd = topScores.filter(s => s.rank === 3).length;
+        row.count4th = topScores.filter(s => s.rank === 4).length;
+        row.count5th = topScores.filter(s => s.rank === 5).length;
+        
+        // memberCount = number of top N athletes
+        row.memberCount = sortedAthletes.length;
+      });
+    } else {
+      // No topN filtering - use all scores
+      map.forEach(row => {
+        row.points = row.scores.reduce((sum, s) => sum + s.points, 0);
+        
+        // Count all ranks
+        row.count1st = row.scores.filter(s => s.rank === 1).length;
+        row.count2nd = row.scores.filter(s => s.rank === 2).length;
+        row.count3rd = row.scores.filter(s => s.rank === 3).length;
+        row.count4th = row.scores.filter(s => s.rank === 4).length;
+        row.count5th = row.scores.filter(s => s.rank === 5).length;
+      });
+    }
+    
+    // Sort teams by total points with tiebreaker
     return Array.from(map.values()).sort((a, b) => {
       if (b.points !== a.points) return b.points - a.points;
       if (b.count1st !== a.count1st) return b.count1st - a.count1st;
@@ -1125,13 +1188,14 @@ function buildTeamPointsData(db, includeSnCj = false, tp1 = 28, tp2 = 25, tp3 = 
 
   // Build championships array
   console.warn(`[TeamPoints] Used championship names: ${Array.from(usedChampTypes).join(', ')}`);
+  console.warn(`[TeamPoints] topN settings: Male=${topNMale}, Female=${topNFemale}`);
   const championshipsArr = Array.from(usedChampTypes).map(name => {
     const champ = {
       type: name,
       name: champData[name] && champData[name].name ? champData[name].name : (championships.get(name)?.name || name),
-      women: mapToSortedArray(champData[name].women),
-      men: mapToSortedArray(champData[name].men),
-      combined: mapToSortedArray(champData[name].combined)
+      women: mapToSortedArray(champData[name].women, topNFemale),
+      men: mapToSortedArray(champData[name].men, topNMale),
+      combined: mapToSortedArray(champData[name].combined, 0) // Combined uses all scores
     };
     console.warn(`[TeamPoints] Championship ${name}: women=${champ.women.length}, men=${champ.men.length}, combined=${champ.combined.length}`);
     return champ;
@@ -1139,9 +1203,9 @@ function buildTeamPointsData(db, includeSnCj = false, tp1 = 28, tp2 = 25, tp3 = 
 
   return {
     championships: championshipsArr,
-    women: mapToSortedArray(overall.women),
-    men: mapToSortedArray(overall.men),
-    combined: mapToSortedArray(overall.combined),
+    women: mapToSortedArray(overall.women, topNFemale),
+    men: mapToSortedArray(overall.men, topNMale),
+    combined: mapToSortedArray(overall.combined, 0), // Combined uses all scores
     tp1,
     tp2
   };

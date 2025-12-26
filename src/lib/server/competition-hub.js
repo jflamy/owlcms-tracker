@@ -301,6 +301,7 @@ class CompetitionHub extends EventEmitter {
 
       console.log(`[Hub] Full competition data loaded: ${this.databaseState.competition?.name || 'unknown competition'}`);
       console.log(`[Hub] Athletes loaded: ${this.databaseState.athletes?.length || 0}`);
+      console.log(`[Hub] TopN settings: mensTeamSize=${this.databaseState.competition?.mensTeamSize}, womensTeamSize=${this.databaseState.competition?.womensTeamSize}`);
       
       // Log when database is received for the first time vs updated
       if (!hadDatabase) {
@@ -317,6 +318,19 @@ class CompetitionHub extends EventEmitter {
       
       // ✅ Signal all waiters that database is ready (handles JSON, binary, and empty+binary paths)
       this.emit('database:ready');
+      
+      // Check if hub is now fully ready (database + translations)
+      if (this.isReady()) {
+        console.log('[Hub] ✅ HUB READY - Database and translations loaded');
+        this.emit('hub:ready');
+        
+        // Broadcast to all connected browsers via SSE
+        this.broadcast({
+          type: 'hub_ready',
+          message: 'Hub ready - database and translations loaded',
+          timestamp: Date.now()
+        });
+      }
 
       this.isLoadingDatabase = false;
       
@@ -546,6 +560,17 @@ class CompetitionHub extends EventEmitter {
     return this.state;
   }
   
+  /**
+   * Check if hub is fully ready for basic operations
+   * Returns true when database and translations are loaded
+   * This is the minimum required state for scoreboards to function
+   */
+  isReady() {
+    const hasDatabase = !!(this.databaseState && this.databaseState.athletes && this.databaseState.athletes.length > 0);
+    const hasTranslations = this.translationsReady;
+    return hasDatabase && hasTranslations;
+  }
+
   /**
    * Get the full database state (raw athlete data)
    */
@@ -1858,6 +1883,20 @@ class CompetitionHub extends EventEmitter {
 
     if (Object.keys(this.translations).length > 0) {
       this.translationsReady = true;
+      console.log(`[Hub] ✅ Translations loaded: ${Object.keys(this.translations).length} locales`);
+      
+      // Check if hub is now fully ready (database + translations)
+      if (this.isReady()) {
+        console.log('[Hub] ✅ HUB READY - Database and translations loaded');
+        this.emit('hub:ready');
+        
+        // Broadcast to all connected browsers via SSE
+        this.broadcast({
+          type: 'hub_ready',
+          message: 'Hub ready - database and translations loaded',
+          timestamp: Date.now()
+        });
+      }
     }
   }
 

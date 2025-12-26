@@ -51,8 +51,8 @@
 					translations.setLocale(message.locale, message.data);
 				}
 				
-				// Refresh data on any competition update
-				if (message.type === 'fop_update' || message.type === 'state_update' || message.type === 'competition_update') {
+				// Refresh data on any competition update or hub ready
+				if (message.type === 'fop_update' || message.type === 'state_update' || message.type === 'competition_update' || message.type === 'hub_ready') {
 					console.log('[Scoreboard] Triggering fetchData() for', message.type);
 					fetchData();
 				}
