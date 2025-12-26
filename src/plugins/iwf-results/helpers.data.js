@@ -39,6 +39,10 @@ export function getScoreboardData(fopName = '', options = {}, locale = 'en') {
   const endDate = formatISODate(databaseState.competition?.competitionEndDate);
   const dateRange = startDate && endDate ? `${startDate} - ${endDate}` : (startDate || '');
 
+  // Extract team points values from competition or use options as fallback
+  const teamPoints1st = databaseState.competition?.teamPoints1st || options.tp1 || 28;
+  const teamPoints2nd = databaseState.competition?.teamPoints2nd || options.tp2 || 26;
+
   const competition = {
     name: databaseState.competition?.name || 'Competition',
     city: databaseState.competition?.competitionCity || '',
@@ -48,7 +52,9 @@ export function getScoreboardData(fopName = '', options = {}, locale = 'en') {
     federation: databaseState.competition?.federation || '',
     snatchCJTotalMedals: databaseState.competition?.snatchCJTotalMedals || false,
     owlcmsVersion: databaseState.config?.appVersion || databaseState.config?.version || '',
-    exportDate: databaseState.exportDate || ''
+    exportDate: databaseState.exportDate || '',
+    teamPoints1st,
+    teamPoints2nd
   };
 
   // 1. Determine which sessions to include
@@ -313,6 +319,17 @@ function transformAthlete(a, db) {
     computedTotal = (bestSnatchValue > 0 && bestCleanJerkValue > 0) ? (bestSnatchValue + bestCleanJerkValue) : 0;
   }
 
+  // Calculate TeamPoints based on totalRank (1st=tp1, 2nd=tp2, 3rd=tp2-1, 4th=tp2-2, etc. until 0)
+  let teamPoints = 0;
+  if (totalRank === 1) {
+    teamPoints = db.competition?.teamPoints1st || 28;
+  } else if (totalRank === 2) {
+    teamPoints = db.competition?.teamPoints2nd || 26;
+  } else if (totalRank > 2) {
+    const tp2 = db.competition?.teamPoints2nd || 26;
+    teamPoints = Math.max(0, tp2 - (totalRank - 2));
+  }
+
   return {
     lastName: (a.lastName || '').toUpperCase(),
     firstName: a.firstName || '',
@@ -341,7 +358,10 @@ function transformAthlete(a, db) {
 
     // Use computed total (not the database field which may be 0) or fall back to database total
     total: computedTotal > 0 ? String(computedTotal) : (a.total ? String(a.total) : ''),
-    totalRank: totalRank === 0 ? '' : totalRank
+    totalRank: totalRank === 0 ? '' : totalRank,
+    
+    // Team points for 1st/2nd place
+    teamPoints
   };
 }
 

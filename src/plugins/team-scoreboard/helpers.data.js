@@ -431,6 +431,17 @@ function teamAthleteFromSession(sessionAthlete, context = {}) {
 	const predictedTotal = calculatePredictedTotal(sessionAthlete, includeCjDeclaration);
 	const predictedScore = calculateScore(predictedTotal, athleteBodyWeight, normalizedGender, age, scoringSystem);
 	
+	// Extract rank fields from displayInfo (OWLCMS V2 format)
+	const snatchRank = parseInt(sessionAthlete.snatchRank || 0);
+	const cleanJerkRank = parseInt(sessionAthlete.cleanJerkRank || 0);
+	const totalRank = parseInt(sessionAthlete.totalRank || 0);
+	
+	// Calculate team points (used when scoringSystem === 'TeamPoints')
+	const athleteTeamPoints = calculateAthleteTeamPoints(
+		{ snatchRank, cleanJerkRank, totalRank },
+		{ teamPoints1st: 28, teamPoints2nd: 26, snatchCJTotalMedals: false } // Defaults, will be overridden in groupByTeams
+	);
+	
 	// Determine if total is definitively zero
 	const definitiveZero = isDefinitiveTotalZero(sessionAthlete);
 	
@@ -438,6 +449,7 @@ function teamAthleteFromSession(sessionAthlete, context = {}) {
 	const displayTotal = hasResults ? actualTotal : '-';
 	const displayScore = actualScore > 0 ? actualScore.toFixed(2) : (definitiveZero ? '0.00' : '-');
 	const displayPredictedScore = predictedScore > 0 ? predictedScore.toFixed(2) : (definitiveZero ? '0.00' : '-');
+	const displayTeamPoints = athleteTeamPoints > 0 ? String(athleteTeamPoints) : '-';
 	
 	// Return wrapped athlete - original DTO is preserved, enrichments are added
 	const athleteKey = normalizeKey(sessionAthlete.key ?? sessionAthlete.athleteKey);
@@ -467,7 +479,14 @@ function teamAthleteFromSession(sessionAthlete, context = {}) {
 		displayTotal,
 		displayScore,
 		displayNextScore: displayPredictedScore,
+		displayTeamPoints,
 		isDefinitiveZero: definitiveZero,
+		
+		// Enrichment: rank fields (for team points)
+		snatchRank,
+		cleanJerkRank,
+		totalRank,
+		teamPoints: athleteTeamPoints,
 		
 		// Enrichment: ordering
 		liftingOrder,
@@ -687,6 +706,15 @@ function teamAthleteFromDatabase(dbAthlete, context = {}) {
 	// Use teamName from V2 parser (already resolved) or fall back to resolving from team ID
 	const teamName = dbAthlete.teamName || competitionHub.getTeamNameById(dbAthlete.team) || '';
 	
+	// Extract ranks from participations array (OWLCMS stores per-championship ranks here)
+	// Use first participation for now (team scoreboard uses first championship)
+	const participations = dbAthlete.participations || [];
+	const firstParticipation = participations[0] || {};
+	const snatchRank = parseInt(firstParticipation.snatchRank, 10) || 0;
+	const cleanJerkRank = parseInt(firstParticipation.cleanJerkRank, 10) || 0;
+	const totalRank = parseInt(firstParticipation.totalRank, 10) || 0;
+	const championshipType = firstParticipation.championshipType || '';
+	
 	// Build sattempts array from raw database fields
 	// Uses 'request' for pending weights (not 'current' - that's session-specific)
 	const snatchAttempts = [
@@ -829,6 +857,12 @@ function teamAthleteFromDatabase(dbAthlete, context = {}) {
 		displayNextScore: displayPredictedScore,
 		isDefinitiveZero: definitiveZero,
 		
+		// Enrichment: rank fields (from first participation - for team points)
+		snatchRank,
+		cleanJerkRank,
+		totalRank,
+		championshipType,
+		
 		// Enrichment: ordering
 		liftingOrder,
 		
@@ -846,12 +880,15 @@ export { calculatePredictedIfNext, calculatePredictedTotal, teamAthleteFromSessi
 
 /**
  * Get score from TeamAthlete for team scoring
- * Uses actualScore (computed Sinclair)
+ * Uses actualScore (computed Sinclair) or teamPoints (when scoringSystem is TeamPoints)
+ * Note: scoringSystem check happens in groupByTeams via scoringFunction
  * @param {Object} athlete - TeamAthlete
  * @returns {number}
  */
 function getAthleteScore(athlete) {
 	if (!athlete) return 0;
+	// This function returns the regular score (Sinclair, etc.)
+	// For TeamPoints mode, calculateAthleteTeamPoints is called directly
 	if (typeof athlete.actualScore === 'number' && Number.isFinite(athlete.actualScore)) {
 		return athlete.actualScore;
 	}
@@ -897,6 +934,65 @@ function getAthletePredictedScore(athlete) {
 		return athlete.nextScore;
 	}
 	return parseFormattedNumber(athlete.nextScore) || 0;
+}
+
+/**
+ * Calculate team points for an athlete based on their ranks
+ * @param {Object} athlete - TeamAthlete with rank fields
+ * @param {Object} competition - Competition settings
+ * @returns {number} Team points earned
+ */
+function calculateAthleteTeamPoints(athlete, competition) {
+	const tp1 = competition?.teamPoints1st || 28;
+	const tp2 = competition?.teamPoints2nd || 26;
+	const snatchCJTotal = competition?.snatchCJTotalMedals || false;
+
+	// Normalize rank fields — OWLCMS may send strings or alternate keys
+	const parseRank = (value) => {
+		const n = parseInt(value, 10);
+		return Number.isFinite(n) && n > 0 ? n : 0;
+	};
+
+	const snatchRank = parseRank(
+		athlete.snatchRank ?? athlete.snatchRankSession ?? athlete.snatchRankInGroup ?? athlete.snatchSessionRank
+	);
+	const cleanJerkRank = parseRank(
+		athlete.cleanJerkRank ?? athlete.cjRank ?? athlete.cleanJerkRankSession ?? athlete.cleanJerkRankInGroup
+	);
+	const totalRank = parseRank(
+		athlete.totalRank ?? athlete.totalRankSession ?? athlete.totalRankInGroup ?? athlete.rankTotal ?? athlete.rank
+	);
+
+	// Debug: log first athlete's rank fields to understand data structure
+	if (!calculateAthleteTeamPoints._debugLogged) {
+		console.log(`[TeamPoints DEBUG] Sample athlete keys with 'rank':`, Object.keys(athlete).filter(k => k.toLowerCase().includes('rank')));
+		console.log(`[TeamPoints DEBUG] snatchRank=${snatchRank}, cleanJerkRank=${cleanJerkRank}, totalRank=${totalRank}`);
+		console.log(`[TeamPoints DEBUG] Raw values: athlete.snatchRank=${athlete.snatchRank}, athlete.totalRank=${athlete.totalRank}, athlete.championshipType=${athlete.championshipType}`);
+		console.log(`[TeamPoints DEBUG] tp1=${tp1}, tp2=${tp2}, snatchCJTotal=${snatchCJTotal}`);
+		calculateAthleteTeamPoints._debugLogged = true;
+	}
+
+	let points = 0;
+
+	// Helper to calculate points from rank (1st=tp1, 2nd=tp2, 3rd=tp2-1, etc. until 0)
+	const pointsForRank = (rank) => {
+		if (!rank || rank === 0) return 0;
+		if (rank === 1) return tp1;
+		if (rank === 2) return tp2;
+		return Math.max(0, tp2 - (rank - 2));
+	};
+
+	if (snatchCJTotal) {
+		// Award points for snatch, clean & jerk, and total
+		points += pointsForRank(snatchRank);
+		points += pointsForRank(cleanJerkRank);
+		points += pointsForRank(totalRank);
+	} else {
+		// Award points only for total
+		points += pointsForRank(totalRank);
+	}
+
+	return points;
 }
 
 /**
@@ -985,9 +1081,12 @@ function findTopContributors(athletes, gender, scoreFn, topCounts = {}) {
  * @param {string} gender - Gender filter ('M', 'F', or 'MF')
  * @param {Object} headers - Translated headers
  * @param {Object} topCounts - Top score counts { topM, topF, topMFm, topMFf }
+ * @param {boolean} includeAllAthletes - Whether to include all athletes in team score
+ * @param {Object} competition - Competition settings (for team points calculation)
+ * @param {Object} options - Plugin options (e.g., teamPoints flag)
  * @returns {Array} Array of team objects ready for frontend display
  */
-function groupByTeams(teamAthletes, gender, headers, topCounts = {}, includeAllAthletes = false) {
+function groupByTeams(teamAthletes, gender, headers, topCounts = {}, includeAllAthletes = false, competition = {}, options = {}) {
 	const { topM = 4, topF = 4, topMFm = 2, topMFf = 2 } = topCounts;
 	console.log(`[Team groupByTeams] Input: ${teamAthletes.length} athletes, gender filter: ${gender}, topCounts: M=${topM}, F=${topF}, MFm=${topMFm}, MFf=${topMFf}, includeAll=${includeAllAthletes}`);
 	
@@ -1021,25 +1120,60 @@ function groupByTeams(teamAthletes, gender, headers, topCounts = {}, includeAllA
 		// Filter out spacers
 		const athletes = allTeamAthletes.filter(a => !a.isSpacer);
 		
+		// Determine scoring function based on scoringSystem
+		const useTeamPoints = options.scoringSystem === 'TeamPoints';
+		const scoringFunction = useTeamPoints 
+			? (athlete) => calculateAthleteTeamPoints(athlete, competition)
+			: getAthleteScore;
+		
 		// Find top contributors for ACTUAL score
-		const actualTopContributors = findTopContributors(athletes, gender, getAthleteScore, topCounts);
+		const actualTopContributors = findTopContributors(athletes, gender, scoringFunction, topCounts);
 		
 		// Find top contributors for PREDICTED score (may differ from actual!)
-		const predictedTopContributors = findTopContributors(athletes, gender, getAthletePredictedScore, topCounts);
+		// When using team points, predicted score is disabled (same as actual)
+		const predictedTopContributors = useTeamPoints 
+			? actualTopContributors
+			: findTopContributors(athletes, gender, getAthletePredictedScore, topCounts);
 		
 		// Calculate team scores
 		let teamScore = 0;
 		let teamNextScore = 0;
 		
+		// For TeamPoints tiebreaker: count placements (1st, 2nd, 3rd, 4th places)
+		let count1st = 0, count2nd = 0, count3rd = 0, count4th = 0;
+		
 		athletes.forEach(a => {
 			const athleteKey = normalizeKey(a.athleteKey ?? a.key);
 			if (actualTopContributors.has(athleteKey)) {
-				teamScore += getAthleteScore(a);
+				const athletePoints = useTeamPoints ? calculateAthleteTeamPoints(a, competition) : getAthleteScore(a);
+				teamScore += athletePoints;
+				
+				// Count placements for tiebreaker (only when using TeamPoints)
+				if (useTeamPoints) {
+					const snatchCJTotal = competition?.snatchCJTotalMedals || false;
+					// Count 1st/2nd/3rd/4th places across all ranked lifts
+					const ranksToCount = snatchCJTotal 
+						? [a.snatchRank, a.cleanJerkRank, a.totalRank]
+						: [a.totalRank];
+					ranksToCount.forEach(rank => {
+						const r = parseInt(rank, 10) || 0;
+						if (r === 1) count1st++;
+						else if (r === 2) count2nd++;
+						else if (r === 3) count3rd++;
+						else if (r === 4) count4th++;
+					});
+				}
 			}
 			if (predictedTopContributors.has(athleteKey)) {
-				teamNextScore += getAthletePredictedScore(a);
+				teamNextScore += useTeamPoints ? calculateAthleteTeamPoints(a, competition) : getAthletePredictedScore(a);
 			}
 		});
+		
+		// Add tiebreaker decimals to team score (not displayed, only used for sorting)
+		// 0.1 per 1st place, 0.01 per 2nd, 0.001 per 3rd, 0.0001 per 4th
+		if (useTeamPoints) {
+			teamScore += count1st * 0.1 + count2nd * 0.01 + count3rd * 0.001 + count4th * 0.0001;
+		}
 		
 		// Precompute highlight class names for each athlete
 		const athletesWithHighlighting = athletes.map(a => {
@@ -1047,6 +1181,10 @@ function groupByTeams(teamAthletes, gender, headers, topCounts = {}, includeAllA
 			const isActualContributor = actualTopContributors.has(athleteKey);
 			const isPredictedContributor = predictedTopContributors.has(athleteKey);
 			const athleteGender = normalizeGender(a.gender);
+			
+			// Recalculate team points with actual competition settings (if using TeamPoints)
+			const athleteTeamPoints = useTeamPoints ? calculateAthleteTeamPoints(a, competition) : a.teamPoints;
+			const displayTeamPoints = athleteTeamPoints > 0 ? String(athleteTeamPoints) : '-';
 			
 			// Determine CSS class for actual score highlight
 			let scoreHighlightClass = '';
@@ -1071,6 +1209,8 @@ function groupByTeams(teamAthletes, gender, headers, topCounts = {}, includeAllA
 			
 			return {
 				...a,
+				teamPoints: athleteTeamPoints,
+				displayTeamPoints,
 				scoreHighlightClass,
 				nextScoreHighlightClass
 			};
@@ -1151,11 +1291,12 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	const showRecords = options.showRecords ?? false;
 	const sortBy = 'score';
 	const currentAttemptInfo = options.currentAttemptInfo ?? true;
-	// showPredicted defaults to false (config.js default: false)
-	const showPredicted = options.showPredicted === 'true' || options.showPredicted === true;
-	const topN = options.topN ?? 0;
-	const includeCjDeclaration = Boolean(options.cjDecl ?? true);
 	const scoringSystem = options.scoringSystem || 'Sinclair';
+	const includeCjDeclaration = Boolean(options.cjDecl ?? true);
+	// showPredicted defaults to false (config.js default: false)
+	// When TeamPoints is selected, force showPredicted to false (team points don't have predicted values)
+	const showPredicted = scoringSystem === 'TeamPoints' ? false : (options.showPredicted === 'true' || options.showPredicted === true);
+	const topN = options.topN ?? 0;
 	const language = options.lang || options.language || 'no';
 	const translations = competitionHub.getTranslations(language);
 	const learningMode = process.env.LEARNING_MODE === 'true' ? 'enabled' : 'disabled';
@@ -1518,10 +1659,17 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		flagUrl: getFlagUrl(athlete.teamName || athlete.team, true)
 	}));
 	
+	// Extract competition settings (needed for team points calculation)
+	const competitionSettings = {
+		teamPoints1st: databaseState?.competition?.teamPoints1st || 28,
+		teamPoints2nd: databaseState?.competition?.teamPoints2nd || 26,
+		snatchCJTotalMedals: databaseState?.competition?.snatchCJTotalMedals || false
+	};
+	
 	// =========================================================================
 	// LAYER 3: Group by teams
 	// =========================================================================
-	const teams = groupByTeams(athletesWithFlags, gender, headers, topCounts, includeAllAthletes);
+	const teams = groupByTeams(athletesWithFlags, gender, headers, topCounts, includeAllAthletes, competitionSettings, options);
 	
 	console.log(`[Team helpers] Grouped ${allTeamAthletes.length} athletes into ${teams.length} teams (gender=${gender})`);
 	if (teams.length > 0) {
@@ -1614,7 +1762,9 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		currentAttemptInfo,
 		showPredicted,
 		topN,
-		cjDecl: includeCjDeclaration
+		cjDecl: includeCjDeclaration,
+		scoringSystem,
+		allAthletes: includeAllAthletes
 	};
 
 	// Show attempt bar unless inactive with no currentAthleteKey (covers breaks)

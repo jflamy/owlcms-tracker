@@ -26,6 +26,20 @@ export default {
       type: 'boolean',
       default: false,
       description: 'Hide the signature section at the bottom.'
+    },
+    {
+      key: 'tp1',
+      label: 'Team Points for 1st place',
+      type: 'number',
+      default: 28,
+      description: 'Points awarded for 1st place in team ranking'
+    },
+    {
+      key: 'tp2',
+      label: 'Team Points for 2nd place',
+      type: 'number',
+      default: 26,
+      description: 'Points awarded for 2nd place in team ranking'
     }
   ]
 };

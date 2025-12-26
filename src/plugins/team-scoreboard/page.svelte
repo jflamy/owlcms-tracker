@@ -30,6 +30,7 @@
 	$: currentAttempt = data.currentAttempt;
 	$: teams = data.teams || [];
 	$: showPredicted = data.options?.showPredicted ?? true;
+	$: scoringSystem = data.options?.scoringSystem || 'Sinclair';
 	// Default to hidden until data arrives (prevents flash of attempt bar on page load)
 	$: attemptBarClass = data.attemptBarClass ?? 'hide-because-null-session';
 
@@ -73,12 +74,26 @@
 
 	function formatScore(value) {
 		const num = parseFormattedNumber(value);
+		// For TeamPoints scoring, display as integer (no decimals)
+		// Use floor to truncate tiebreaker decimals (0.1 per 1st, 0.01 per 2nd, etc.)
+		if (scoringSystem === 'TeamPoints') {
+			return num > 0 ? String(Math.floor(num)) : '-';
+		}
+		// For other scoring systems, display with 2 decimals
 		return num > 0 ? num.toFixed(2) : '-';
 	}
 
 	// Format score for display - uses precomputed isDefinitiveZero flag from backend
 	function formatScoreDisplay(value, isDefinitiveZero = false) {
 		const num = parseFormattedNumber(value);
+		// For TeamPoints scoring, display as integer (no decimals)
+		// Use floor to truncate tiebreaker decimals
+		if (scoringSystem === 'TeamPoints') {
+			if (num > 0) return String(Math.floor(num));
+			if (isDefinitiveZero && num === 0) return '0';
+			return '-';
+		}
+		// For other scoring systems, display with 2 decimals
 		if (num > 0) return num.toFixed(2);
 		if (isDefinitiveZero && num === 0) return '0.00';
 		return '-';
@@ -214,10 +229,14 @@ export function shouldRenderFlag(url) {
 							<div class="cell best" role="gridcell">{athlete.bestCleanJerk || '-'}</div>
 						<div class="cell v-spacer" aria-hidden="true"></div>
 						<div class="cell total" role="gridcell">{athlete.displayTotal ?? '-'}</div>
-						<div class="cell score {athlete.scoreHighlightClass || ''}" role="gridcell">{athlete.displayScore}</div>
+						<div class="cell score {athlete.scoreHighlightClass || ''}" role="gridcell">
+							{scoringSystem === 'TeamPoints' ? athlete.displayTeamPoints : athlete.displayScore}
+						</div>
 					<div class="cell v-spacer" aria-hidden="true"></div>
 					<div class="cell next-total" role="gridcell">{athlete.nextTotal ? athlete.nextTotal : '-'}</div>
-					<div class="cell next-score {athlete.nextScoreHighlightClass || ''}" role="gridcell">{athlete.displayNextScore}</div>
+					<div class="cell next-score {athlete.nextScoreHighlightClass || ''}" role="gridcell">
+						{scoringSystem === 'TeamPoints' ? athlete.displayTeamPoints : athlete.displayNextScore}
+					</div>
 					</div>
 					{/each}
 

@@ -30,10 +30,10 @@ export default {
 			key: 'scoringSystem',
 			label: 'Scoring System',
 			type: 'select',
-			options: ['Sinclair', 'SMHF', 'Q-Points', 'Q-Masters', 'GAMX', 'GAMX-M', 'GAMX-A', 'GAMX-U'],
+			options: ['Sinclair', 'SMHF', 'Q-Points', 'Q-Masters', 'GAMX', 'GAMX-M', 'GAMX-A', 'GAMX-U', 'TeamPoints'],
 			default: 'Sinclair',
 			group: 'display',
-			description: 'Select the scoring system to use for individual and team scores.'
+			description: 'Select the scoring system. TeamPoints uses placement rankings (1st=tp1, 2nd=tp2, etc.) and respects snatch/C&J/total medals setting. Disables predicted scores.'
 		},
 		{
 			key: 'gender',
