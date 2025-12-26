@@ -5,6 +5,7 @@
   import TableOfContents from './sections/TableOfContents.svelte';
   import Participants from './sections/Participants.svelte';
   import Medals from './sections/Medals.svelte';
+  import TeamPoints from './sections/TeamPoints.svelte';
   import Rankings from './sections/Rankings.svelte';
   import Records from './sections/Records.svelte';
 
@@ -117,6 +118,7 @@
     </div>
     <Participants {data} />
     <Medals {data} />
+    <TeamPoints {data} />
     <Rankings {rankings} {competition} />
     <SessionProtocols {sessions} {competition} productionTime={data.productionTime} />
     <Records {allRecords} {hasRecords} {newRecordsBroken} {labels} />

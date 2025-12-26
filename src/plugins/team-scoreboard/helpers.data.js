@@ -18,6 +18,7 @@
 
 import { competitionHub } from '$lib/server/competition-hub.js';
 import { getFlagUrl } from '$lib/server/flag-resolver.js';
+import { calculateTeamPoints } from '$lib/server/team-points-formula.js';
 import { CalculateSinclair2024, CalculateSinclair2020, getMastersAgeFactor } from '$lib/sinclair-coefficients.js';
 import { CalculateQPoints } from '$lib/qpoints-coefficients.js';
 import { computeGamx, Variant } from '$lib/gamx2.js';
@@ -944,7 +945,8 @@ function getAthletePredictedScore(athlete) {
  */
 function calculateAthleteTeamPoints(athlete, competition) {
 	const tp1 = competition?.teamPoints1st || 28;
-	const tp2 = competition?.teamPoints2nd || 26;
+	const tp2 = competition?.teamPoints2nd || 25;
+	const tp3 = competition?.teamPoints3rd || 23;
 	const snatchCJTotal = competition?.snatchCJTotalMedals || false;
 
 	// Normalize rank fields — OWLCMS may send strings or alternate keys
@@ -968,28 +970,70 @@ function calculateAthleteTeamPoints(athlete, competition) {
 		console.log(`[TeamPoints DEBUG] Sample athlete keys with 'rank':`, Object.keys(athlete).filter(k => k.toLowerCase().includes('rank')));
 		console.log(`[TeamPoints DEBUG] snatchRank=${snatchRank}, cleanJerkRank=${cleanJerkRank}, totalRank=${totalRank}`);
 		console.log(`[TeamPoints DEBUG] Raw values: athlete.snatchRank=${athlete.snatchRank}, athlete.totalRank=${athlete.totalRank}, athlete.championshipType=${athlete.championshipType}`);
-		console.log(`[TeamPoints DEBUG] tp1=${tp1}, tp2=${tp2}, snatchCJTotal=${snatchCJTotal}`);
+		console.log(`[TeamPoints DEBUG] tp1=${tp1}, tp2=${tp2}, tp3=${tp3}, snatchCJTotal=${snatchCJTotal}`);
 		calculateAthleteTeamPoints._debugLogged = true;
 	}
 
 	let points = 0;
 
-	// Helper to calculate points from rank (1st=tp1, 2nd=tp2, 3rd=tp2-1, etc. until 0)
-	const pointsForRank = (rank) => {
-		if (!rank || rank === 0) return 0;
-		if (rank === 1) return tp1;
-		if (rank === 2) return tp2;
-		return Math.max(0, tp2 - (rank - 2));
-	};
+	// Get athlete's actual lift values
+	const bestSnatch = parseInt(athlete.bestSnatch) || 0;
+	const bestCleanJerk = parseInt(athlete.bestCleanJerk) || 0;
+	const total = parseInt(athlete.total) || 0;
+
+	// For live session, all athletes are considered team members
+	const teamMember = true;
+
+	// Debug: log first athlete and ALJASIM
+	if (!calculateAthleteTeamPoints._loggedOnce) {
+		console.log(`[TeamPoints] First athlete:`, {
+			fullName: athlete.fullName,
+			lastName: athlete.lastName,
+			bestSnatch,
+			bestCleanJerk,
+			total,
+			snatchRank,
+			cleanJerkRank,
+			totalRank
+		});
+		calculateAthleteTeamPoints._loggedOnce = true;
+	}
+
+	if (athlete.lastName?.includes('ALJASIM') || athlete.fullName?.includes('ALJASIM') || athlete.fullName?.includes('aljasim')) {
+		console.log(`[TeamPoints ALJASIM]`, {
+			fullName: athlete.fullName,
+			lastName: athlete.lastName,
+			snatchRank,
+			cleanJerkRank,
+			totalRank,
+			bestSnatch,
+			bestCleanJerk,
+			total,
+			tp1,
+			tp2,
+			tp3,
+			snatchCJTotal
+		});
+	}
 
 	if (snatchCJTotal) {
 		// Award points for snatch, clean & jerk, and total
-		points += pointsForRank(snatchRank);
-		points += pointsForRank(cleanJerkRank);
-		points += pointsForRank(totalRank);
+		// Shared formula validates liftValue > 0 and teamMember before awarding points
+		const snatchPoints = calculateTeamPoints(snatchRank, bestSnatch, teamMember, tp1, tp2, tp3);
+		const cjPoints = calculateTeamPoints(cleanJerkRank, bestCleanJerk, teamMember, tp1, tp2, tp3);
+		const totalPoints = calculateTeamPoints(totalRank, total, teamMember, tp1, tp2, tp3);
+		
+		if (athlete.lastName?.includes('ALJASIM') || athlete.fullName?.includes('ALJASIM') || athlete.fullName?.includes('aljasim')) {
+			console.log(`[TeamPoints ALJASIM CALC]`, { snatchPoints, cjPoints, totalPoints, sum: snatchPoints + cjPoints + totalPoints });
+		}
+		
+		points += snatchPoints;
+		points += cjPoints;
+		points += totalPoints;
 	} else {
 		// Award points only for total
-		points += pointsForRank(totalRank);
+		// Shared formula validates liftValue > 0 and teamMember before awarding points
+		points += calculateTeamPoints(totalRank, total, teamMember, tp1, tp2, tp3);
 	}
 
 	return points;
@@ -1680,6 +1724,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	const competitionSettings = {
 		teamPoints1st: databaseState?.competition?.teamPoints1st || 28,
 		teamPoints2nd: databaseState?.competition?.teamPoints2nd || 26,
+		teamPoints3rd: databaseState?.competition?.teamPoints3rd || 23,
 		snatchCJTotalMedals: databaseState?.competition?.snatchCJTotalMedals || false
 	};
 	

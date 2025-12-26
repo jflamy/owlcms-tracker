@@ -32,6 +32,13 @@
       <span class="toc-page-number" data-ref="#medals"></span>
     </div>
     
+    <!-- Team Points -->
+    <div class="toc-entry" style="font-weight: bold; margin-top: 8pt;">
+      <span class="toc-title">Team Points</span>
+      <span class="toc-leader"></span>
+      <span class="toc-page-number" data-ref="#team-points"></span>
+    </div>
+    
     <!-- Rankings section -->
     <div class="toc-entry" style="font-weight: bold; margin-top: 8pt;">
       <span class="toc-title">Rankings</span>

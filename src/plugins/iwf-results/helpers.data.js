@@ -1,4 +1,5 @@
 import { competitionHub } from '$lib/server/competition-hub.js';
+import { calculateTeamPoints } from '$lib/server/team-points-formula.js';
 
 /**
  * Plugin-specific cache to avoid recomputing on every browser request
@@ -41,7 +42,8 @@ export function getScoreboardData(fopName = '', options = {}, locale = 'en') {
 
   // Extract team points values from competition or use options as fallback
   const teamPoints1st = databaseState.competition?.teamPoints1st || options.tp1 || 28;
-  const teamPoints2nd = databaseState.competition?.teamPoints2nd || options.tp2 || 26;
+  const teamPoints2nd = databaseState.competition?.teamPoints2nd || options.tp2 || 25;
+  const teamPoints3rd = databaseState.competition?.teamPoints3rd || options.tp3 || 23;
 
   const competition = {
     name: databaseState.competition?.name || 'Competition',
@@ -54,7 +56,8 @@ export function getScoreboardData(fopName = '', options = {}, locale = 'en') {
     owlcmsVersion: databaseState.config?.appVersion || databaseState.config?.version || '',
     exportDate: databaseState.exportDate || '',
     teamPoints1st,
-    teamPoints2nd
+    teamPoints2nd,
+    teamPoints3rd
   };
 
   // 1. Determine which sessions to include
@@ -146,6 +149,9 @@ export function getScoreboardData(fopName = '', options = {}, locale = 'en') {
   // Build medals data
   const medals = buildMedalsData(databaseState, competition.snatchCJTotalMedals);
 
+  // Build team points data
+  const teamPoints = buildTeamPointsData(databaseState, competition.snatchCJTotalMedals, teamPoints1st, teamPoints2nd, teamPoints3rd);
+
   // Build participants matrix (Teams × Categories)
   const participants = buildParticipationData(databaseState);
 
@@ -164,6 +170,7 @@ export function getScoreboardData(fopName = '', options = {}, locale = 'en') {
     hasRecords: allRecordsData.hasRecords,
     newRecordsBroken: allRecordsData.newRecordsBroken,
     medals,
+    teamPoints,
     participants,
     allAthletes: databaseState.athletes || [],
     productionTime: new Date().toLocaleString(locale, { 
@@ -956,7 +963,7 @@ function buildParticipationData(db) {
  * If includeSnCj is true, include snatch and clean&jerk ranks in addition to total ranks.
  * Returns { championships:[], women:[], men:[], combined:[] } with team points per team.
  */
-function buildTeamPointsData(db, includeSnCj = false, tp1 = 28, tp2 = 26) {
+function buildTeamPointsData(db, includeSnCj = false, tp1 = 28, tp2 = 25, tp3 = 23) {
   const athletes = db.athletes || [];
   const ageGroups = db.ageGroups || [];
 
@@ -991,15 +998,8 @@ function buildTeamPointsData(db, includeSnCj = false, tp1 = 28, tp2 = 26) {
 
   if (!championships.has('Open')) championships.set('Open', { type: 'Open', name: 'Open' });
 
-  // Calculate points for a given rank
-  function calculatePoints(rank) {
-    if (!rank || rank <= 0) return 0;
-    if (rank === 1) return tp1;
-    if (rank === 2) return tp2;
-    // 3rd place = tp2-1, 4th = tp2-2, etc.
-    const points = tp2 - (rank - 2);
-    return points > 0 ? points : 0;
-  }
+  // Use shared team points formula
+  const calculatePoints = (rank) => calculateTeamPoints(rank, tp1, tp2, tp3);
 
   // Helpers to manage team point maps
   function ensureMap(map, team) {
@@ -1010,18 +1010,25 @@ function buildTeamPointsData(db, includeSnCj = false, tp1 = 28, tp2 = 26) {
       count1st: 0, 
       count2nd: 0, 
       count3rd: 0, 
-      count4th: 0 
+      count4th: 0,
+      count5th: 0
     });
     return map.get(key);
   }
-  function addPoints(map, team, rank) {
+  function addPoints(map, team, rank, liftValue, teamMember) {
     const row = ensureMap(map, team);
-    const pts = calculatePoints(rank);
+    const pts = calculateTeamPoints(rank, liftValue, teamMember, tp1, tp2, tp3);
     row.points += pts;
-    if (rank === 1) row.count1st += 1;
-    else if (rank === 2) row.count2nd += 1;
-    else if (rank === 3) row.count3rd += 1;
-    else if (rank === 4) row.count4th += 1;
+    // Only count placements that earn points (pts > 0)
+    if (pts > 0) {
+      if (rank === 1) row.count1st += 1;
+      else if (rank === 2) row.count2nd += 1;
+      else if (rank === 3) row.count3rd += 1;
+      else if (rank === 4) row.count4th += 1;
+      else if (rank === 5) row.count5th += 1;
+      // Note: Ranks 6+ that earn points are included in total points but not tracked separately
+      // The count1st-count5th fields are for validation display and may be removed later
+    }
   }
 
   // Determine which championships are used
@@ -1063,50 +1070,56 @@ function buildTeamPointsData(db, includeSnCj = false, tp1 = 28, tp2 = 26) {
       if (!dataForChamp) return;
 
       const totalRank = parseInt(p.totalRank || a.totalRank || 0, 10) || 0;
+      const total = parseInt(a.total || 0, 10) || 0;
       if (totalRank >= 1) {
-        if (gender === 'F') addPoints(dataForChamp.women, team, totalRank);
-        else addPoints(dataForChamp.men, team, totalRank);
-        addPoints(dataForChamp.combined, team, totalRank);
+        if (gender === 'F') addPoints(dataForChamp.women, team, totalRank, total, p.teamMember);
+        else addPoints(dataForChamp.men, team, totalRank, total, p.teamMember);
+        addPoints(dataForChamp.combined, team, totalRank, total, p.teamMember);
 
-        if (gender === 'F') addPoints(overall.women, team, totalRank);
-        else addPoints(overall.men, team, totalRank);
-        addPoints(overall.combined, team, totalRank);
+        if (gender === 'F') addPoints(overall.women, team, totalRank, total, p.teamMember);
+        else addPoints(overall.men, team, totalRank, total, p.teamMember);
+        addPoints(overall.combined, team, totalRank, total, p.teamMember);
       }
 
       if (includeSnCj) {
+        // Pass actual lift values to shared formula for validation
+        const bestSnatch = parseInt(a.bestSnatch || 0, 10) || 0;
         const sRank = parseInt(p.snatchRank || a.snatchRank || 0, 10) || 0;
         if (sRank >= 1) {
-          if (gender === 'F') addPoints(dataForChamp.women, team, sRank);
-          else addPoints(dataForChamp.men, team, sRank);
-          addPoints(dataForChamp.combined, team, sRank);
+          if (gender === 'F') addPoints(dataForChamp.women, team, sRank, bestSnatch, p.teamMember);
+          else addPoints(dataForChamp.men, team, sRank, bestSnatch, p.teamMember);
+          addPoints(dataForChamp.combined, team, sRank, bestSnatch, p.teamMember);
 
-          if (gender === 'F') addPoints(overall.women, team, sRank);
-          else addPoints(overall.men, team, sRank);
-          addPoints(overall.combined, team, sRank);
+          if (gender === 'F') addPoints(overall.women, team, sRank, bestSnatch, p.teamMember);
+          else addPoints(overall.men, team, sRank, bestSnatch, p.teamMember);
+          addPoints(overall.combined, team, sRank, bestSnatch, p.teamMember);
         }
 
+        // Pass actual lift values to shared formula for validation
+        const bestCleanJerk = parseInt(a.bestCleanJerk || 0, 10) || 0;
         const cjRank = parseInt(p.cleanJerkRank || a.cleanJerkRank || 0, 10) || 0;
         if (cjRank >= 1) {
-          if (gender === 'F') addPoints(dataForChamp.women, team, cjRank);
-          else addPoints(dataForChamp.men, team, cjRank);
-          addPoints(dataForChamp.combined, team, cjRank);
+          if (gender === 'F') addPoints(dataForChamp.women, team, cjRank, bestCleanJerk, p.teamMember);
+          else addPoints(dataForChamp.men, team, cjRank, bestCleanJerk, p.teamMember);
+          addPoints(dataForChamp.combined, team, cjRank, bestCleanJerk, p.teamMember);
 
-          if (gender === 'F') addPoints(overall.women, team, cjRank);
-          else addPoints(overall.men, team, cjRank);
-          addPoints(overall.combined, team, cjRank);
+          if (gender === 'F') addPoints(overall.women, team, cjRank, bestCleanJerk, p.teamMember);
+          else addPoints(overall.men, team, cjRank, bestCleanJerk, p.teamMember);
+          addPoints(overall.combined, team, cjRank, bestCleanJerk, p.teamMember);
         }
       }
     });
   });
 
-  // Sort by points with tiebreaker (more 1st places, then 2nd, then 3rd, then 4th)
+  // Sort by points with tiebreaker (more 1st places, then 2nd, then 3rd, then 4th, then 5th)
   function mapToSortedArray(map) {
     return Array.from(map.values()).sort((a, b) => {
       if (b.points !== a.points) return b.points - a.points;
       if (b.count1st !== a.count1st) return b.count1st - a.count1st;
       if (b.count2nd !== a.count2nd) return b.count2nd - a.count2nd;
       if (b.count3rd !== a.count3rd) return b.count3rd - a.count3rd;
-      return b.count4th - a.count4th;
+      if (b.count4th !== a.count4th) return b.count4th - a.count4th;
+      return b.count5th - a.count5th;
     });
   }
 
