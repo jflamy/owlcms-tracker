@@ -15,5 +15,16 @@
   "debug.toolBarLocation": "commandCenter",
   
   // Disable markdown link validation to prevent false positives
-  "markdown.validate.enabled": false
+  "markdown.validate.enabled": false,
+  // Let Stylelint handle CSS validation instead of the built-in VS Code validator
+  "css.validate": false,
+  "scss.validate": false,
+  "less.validate": false
+  ,
+  // Route linting to Stylelint (includes Svelte <style> blocks)
+  "stylelint.validate": ["css", "scss", "less", "svelte"],
+  // Disable Svelte's built-in CSS diagnostics so Stylelint is the single source
+  "svelte.plugin.css.diagnostics.enable": false,
+  // Fallback: silence unknown property warnings from CSS LS if it still runs
+  "css.lint.unknownProperties": "ignore"
 }

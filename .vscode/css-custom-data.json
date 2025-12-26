@@ -1,0 +1,27 @@
+{
+  "version": 1.1,
+  "properties": [
+    {
+      "name": "bookmark-level",
+      "description": "PDF bookmark level (Paged Media / Prince XML extension)",
+      "syntax": "<integer>",
+      "references": [
+        {
+          "name": "Prince XML Documentation",
+          "url": "https://www.princexml.com/doc/properties/bookmark-level/"
+        }
+      ]
+    },
+    {
+      "name": "bookmark-label",
+      "description": "PDF bookmark label text (Paged Media / Prince XML extension)",
+      "syntax": "<string>",
+      "references": [
+        {
+          "name": "Prince XML Documentation", 
+          "url": "https://www.princexml.com/doc/properties/bookmark-label/"
+        }
+      ]
+    }
+  ]
+}
