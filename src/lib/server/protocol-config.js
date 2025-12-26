@@ -18,21 +18,13 @@
  * Current protocol version supported by this tracker
  * Matches PROTOCOL_VERSION in Java backend WebSocketEventSender.java
  */
-export const PROTOCOL_VERSION = '2.2.0';
+export const PROTOCOL_VERSION = '2.3.0';
 
 /**
  * Minimum protocol version accepted from OWLCMS
  * 
- * Acceptable range: [MINIMUM_PROTOCOL_VERSION, ∞)
- * 
- * Set this to enforce compatibility. For example:
- * - '2.0.0' = Accept exactly 2.x versions (reject 1.x, accept 3.0+ if needed)
- * - '2.1.0' = Accept 2.1.0 and later 2.x, reject 2.0.x (requires new fields)
- * 
- * Update this when:
- * - You need to require a bugfix: increment to '2.0.1'
- * - You need a new feature: increment to '2.1.0'
- * - You're dropping support for old versions: increment to '3.0.0'
+ * Version 2.2.0 provides all core functionality. Later versions add additional features:
+ * - 2.3.0: Team points settings (IWF defaults will be used for older versions)
  */
 export const MINIMUM_PROTOCOL_VERSION = '2.2.0';
 

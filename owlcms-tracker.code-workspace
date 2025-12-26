@@ -8,6 +8,15 @@
 		}
 	],
 	"settings": {
-		"java.compile.nullAnalysis.mode": "disabled"
+		"java.compile.nullAnalysis.mode": "disabled",
+		// Disable Svelte's built-in CSS diagnostics (source of unknown property warnings)
+		"svelte.plugin.css.diagnostics.enable": false,
+		// Disable built-in VS Code CSS validators
+		"css.validate": false,
+		"scss.validate": false,
+		"less.validate": false,
+		"css.lint.unknownProperties": "ignore",
+		// Register custom CSS properties (bookmark-level, bookmark-label) so they're recognized
+		"css.customData": [".vscode/css-custom-data.json"]
 	}
 }
