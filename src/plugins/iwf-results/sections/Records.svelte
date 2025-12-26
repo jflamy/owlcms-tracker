@@ -85,7 +85,9 @@
     /* page-break-before removed to avoid double page break after SessionProtocols */
     border-bottom: 2pt solid #333;
     padding-bottom: 10pt;
+    /* stylelint-disable-next-line property-no-unknown */
     bookmark-level: 1;
+    /* stylelint-disable-next-line property-no-unknown */
     bookmark-label: "Records";
   }
   .record-block {
@@ -93,6 +95,7 @@
     margin-bottom: 25pt;
     border-radius: 0;
     background: none;
+    /* stylelint-disable-next-line property-no-unknown */
     bookmark-level: 2;
   }
   .record-title {

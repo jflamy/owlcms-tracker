@@ -125,49 +125,6 @@
           </div>
         {/each}
       {/if}
-
-      <!-- Combined Tables -->
-      {#if champ.combined && champ.combined.length > 0}
-        {@const sortedCombined = sortTeamsByPoints(champ.combined)}
-        {@const combinedChunks = chunk(sortedCombined, 25)}
-        {#each combinedChunks as combinedChunk, chunkIndex}
-          <div class="champ-gender-block" class:page-break={chunkIndex === 0} class:avoid-break={chunkIndex > 0}>
-            {#if chunkIndex === 0}
-              <h3 class="champ-heading">{champ.name} - Combined</h3>
-            {/if}
-            <table class="team-points-table">
-              <thead>
-                <tr>
-                  <th style="width: 5%;">Rank</th>
-                  <th style="width: 27%;">Team</th>
-                  <th style="width: 10%;">Points</th>
-                  <th style="width: 9.6%;">Members</th>
-                  <th style="width: 9.6%;">Gold</th>
-                  <th style="width: 9.6%;">Silver</th>
-                  <th style="width: 9.6%;">Bronze</th>
-                  <th style="width: 9.6%;">4th</th>
-                  <th style="width: 9.6%;">5th</th>
-                </tr>
-              </thead>
-              <tbody>
-                {#each combinedChunk as row}
-                  <tr>
-                    <td class="rank-cell">{row.rank}</td>
-                    <td class="team-cell">{row.team}</td>
-                    <td>{Math.floor(row.points || 0)}</td>
-                    <td>{row.memberCount || 0}</td>
-                    <td>{fmt(row.count1st)}</td>
-                    <td>{fmt(row.count2nd)}</td>
-                    <td>{fmt(row.count3rd)}</td>
-                    <td>{fmt(row.count4th)}</td>
-                    <td>{fmt(row.count5th)}</td>
-                  </tr>
-                {/each}
-              </tbody>
-            </table>
-          </div>
-        {/each}
-      {/if}
     {/each}
   {:else}
     <div class="no-data">No team points data available.</div>
@@ -187,8 +144,10 @@
   margin: 10pt 0 8pt 0;
   border-bottom: 1pt solid #333;
   padding-bottom: 5pt;
-  bookmark-level: 1;
-  bookmark-label: "Team Points";
+  /* stylelint-disable-next-line property-no-unknown */
+  bookmark-level: 1; /* non-standard property for PDF bookmarks */
+  /* stylelint-disable-next-line property-no-unknown */
+  bookmark-label: "Team Points"; /* non-standard property for PDF bookmarks */
 }
 
 .champ-gender-block {

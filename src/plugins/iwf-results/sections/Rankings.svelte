@@ -111,8 +111,10 @@
     border-bottom: 2pt solid #333;
     padding-bottom: 10pt;
     width: 100%;
-    bookmark-level: 1;
-    bookmark-label: "Rankings";
+    /* stylelint-disable-next-line property-no-unknown */
+    bookmark-level: 1; /* non-standard property for PDF bookmarks */
+    /* stylelint-disable-next-line property-no-unknown */
+    bookmark-label: "Rankings"; /* non-standard property for PDF bookmarks */
   }
 
   .ranking-block {
@@ -121,7 +123,8 @@
   }
 
   .category-block {
-    bookmark-level: 2;
+    /* stylelint-disable-next-line property-no-unknown */
+    bookmark-level: 2; /* non-standard property for PDF bookmarks */
   }
   
   .page-break {

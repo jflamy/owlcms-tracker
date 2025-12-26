@@ -222,7 +222,9 @@
   margin: 10pt 0 8pt 0;
   border-bottom: 1pt solid #333;
   padding-bottom: 5pt;
+  /* stylelint-disable-next-line property-no-unknown */
   bookmark-level: 1;
+  /* stylelint-disable-next-line property-no-unknown */
   bookmark-label: "Medals";
 }
 .sub {

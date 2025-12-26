@@ -53,7 +53,7 @@
   {#each sessions as session}
     <div class="session-page" id="session-{session.name}">
       <div class="session-title">
-        <p><strong>Session{session.name} : {session.description}</strong>     {session.startTime}</p>
+        <p><strong>Session {session.name} : {session.description}</strong>     {session.startTime}</p>
       </div>
 
       <table class="protocol-table">
@@ -309,8 +309,10 @@
     page-break-before: always;
     border-bottom: 2pt solid #333;
     padding-bottom: 10pt;
-    bookmark-level: 1;
-    bookmark-label: "Session Protocols";
+    /* stylelint-disable-next-line property-no-unknown */
+    bookmark-level: 1; /* non-standard property for PDF bookmarks */
+    /* stylelint-disable-next-line property-no-unknown */
+    bookmark-label: "Session Protocols"; /* non-standard property for PDF bookmarks */
   }
 
   .session-page {
@@ -318,7 +320,8 @@
     padding: 20px;
     position: relative;
     background: white;
-    bookmark-level: 2;
+    /* stylelint-disable-next-line property-no-unknown */
+    bookmark-level: 2; /* non-standard property for PDF bookmarks */
   }
 
   .session-title {
