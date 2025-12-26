@@ -1,8 +1,10 @@
 # OWLCMS Tracker Release Notes
 
-## Maintenance Log
-- 2.1.0-rc01: attempt-board plugin now correctly shows the athlete picture
-- 2.1.0-rc01: attempt-board plugin fixes the vertical positioning of the down and decision lights
+## New in Release 2.2.0
+
+- Requires owlcms pre-release version 64.0.0-rc04 or newer
+- Initial handshake improved so owlcms-tracker can process plugins that don't require a running session
+- IWF-style result book available when running from source (protocol updated to 2.2.0)
 
 ## New in Release 2.1.0
 

@@ -7,7 +7,7 @@ on:
       revision:
         description: 'semver number for the release'
         required: true
-        default: '2.1.0-rc01'
+        default: '2.2.0'
 
 jobs:
   build:
