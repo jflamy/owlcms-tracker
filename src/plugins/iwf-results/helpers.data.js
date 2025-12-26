@@ -951,6 +951,190 @@ function buildParticipationData(db) {
 }
 
 /**
+ * Build team points by scanning all athletes and their ranks.
+ * Formula: 1st=tp1, 2nd=tp2, 3rd=tp2-1, 4th=tp2-2, etc. down to 0
+ * If includeSnCj is true, include snatch and clean&jerk ranks in addition to total ranks.
+ * Returns { championships:[], women:[], men:[], combined:[] } with team points per team.
+ */
+function buildTeamPointsData(db, includeSnCj = false, tp1 = 28, tp2 = 26) {
+  const athletes = db.athletes || [];
+  const ageGroups = db.ageGroups || [];
+
+  // Build category -> championship mapping
+  const catToChamp = new Map();
+  const catToAgeGroup = new Map();
+  const catToParent = new Map();
+  const championships = new Map();
+  ageGroups.forEach(ag => {
+    if (ag.active === false) return;
+    const champName = ag.championshipName || ag.code || 'Open';
+    if (!championships.has(champName)) {
+      championships.set(champName, { type: champName, name: champName, categories: new Set() });
+    }
+    (ag.categories || []).forEach(cat => {
+      const codes = [];
+      if (cat.code) codes.push(String(cat.code));
+      if (cat.categoryCode) codes.push(String(cat.categoryCode));
+      if (cat.id !== undefined && cat.id !== null) codes.push(String(cat.id));
+      codes.forEach(code => {
+        if (code) {
+          const champName = ag.championshipName || ag.code || 'Open';
+          catToChamp.set(code, champName);
+          championships.get(champName).categories.add(code);
+          catToAgeGroup.set(code, ag);
+          const parentKey = ag.code || ag.key || ag.championshipName || ag.name || champName;
+          catToParent.set(code, parentKey);
+        }
+      });
+    });
+  });
+
+  if (!championships.has('Open')) championships.set('Open', { type: 'Open', name: 'Open' });
+
+  // Calculate points for a given rank
+  function calculatePoints(rank) {
+    if (!rank || rank <= 0) return 0;
+    if (rank === 1) return tp1;
+    if (rank === 2) return tp2;
+    // 3rd place = tp2-1, 4th = tp2-2, etc.
+    const points = tp2 - (rank - 2);
+    return points > 0 ? points : 0;
+  }
+
+  // Helpers to manage team point maps
+  function ensureMap(map, team) {
+    const key = team || 'No Team';
+    if (!map.has(key)) map.set(key, { 
+      team: key, 
+      points: 0, 
+      count1st: 0, 
+      count2nd: 0, 
+      count3rd: 0, 
+      count4th: 0 
+    });
+    return map.get(key);
+  }
+  function addPoints(map, team, rank) {
+    const row = ensureMap(map, team);
+    const pts = calculatePoints(rank);
+    row.points += pts;
+    if (rank === 1) row.count1st += 1;
+    else if (rank === 2) row.count2nd += 1;
+    else if (rank === 3) row.count3rd += 1;
+    else if (rank === 4) row.count4th += 1;
+  }
+
+  // Determine which championships are used
+  const usedChampTypes = new Set();
+  athletes.forEach(a => {
+    const parts = a.participations && a.participations.length > 0 ? a.participations : [];
+    if (!parts || parts.length === 0) return;
+    parts.forEach(p => {
+      const cat = p.categoryCode || a.categoryCode || '';
+      const matchedAG = catToAgeGroup.get(String(cat)) || null;
+      const champName = matchedAG ? (matchedAG.championshipName || matchedAG.code || 'Open') : 'Open';
+      usedChampTypes.add(champName);
+    });
+  });
+
+  // Initialize per-championship maps
+  const champData = {};
+  usedChampTypes.forEach(name => {
+    const info = championships.get(name) || { name: name };
+    champData[name] = { women: new Map(), men: new Map(), combined: new Map(), name: info.name };
+  });
+
+  // Overall totals
+  const overall = { women: new Map(), men: new Map(), combined: new Map() };
+
+  // Process each athlete
+  athletes.forEach(a => {
+    const team = a.teamName || (a.team ? (db.teams?.find(t => t.id === a.team)?.name) : '') || 'No Team';
+    const gender = (a.gender || 'M').toUpperCase() === 'F' ? 'F' : 'M';
+
+    const parts = a.participations && a.participations.length > 0 ? a.participations : [];
+    if (!parts || parts.length === 0) return;
+
+    parts.forEach(p => {
+      const cat = p.categoryCode || a.categoryCode || '';
+      const matchedAgeGroup = catToAgeGroup.get(String(cat)) || null;
+      const champName = matchedAgeGroup ? (matchedAgeGroup.championshipName || matchedAgeGroup.code || 'Open') : 'Open';
+      const dataForChamp = champData[champName];
+      if (!dataForChamp) return;
+
+      const totalRank = parseInt(p.totalRank || a.totalRank || 0, 10) || 0;
+      if (totalRank >= 1) {
+        if (gender === 'F') addPoints(dataForChamp.women, team, totalRank);
+        else addPoints(dataForChamp.men, team, totalRank);
+        addPoints(dataForChamp.combined, team, totalRank);
+
+        if (gender === 'F') addPoints(overall.women, team, totalRank);
+        else addPoints(overall.men, team, totalRank);
+        addPoints(overall.combined, team, totalRank);
+      }
+
+      if (includeSnCj) {
+        const sRank = parseInt(p.snatchRank || a.snatchRank || 0, 10) || 0;
+        if (sRank >= 1) {
+          if (gender === 'F') addPoints(dataForChamp.women, team, sRank);
+          else addPoints(dataForChamp.men, team, sRank);
+          addPoints(dataForChamp.combined, team, sRank);
+
+          if (gender === 'F') addPoints(overall.women, team, sRank);
+          else addPoints(overall.men, team, sRank);
+          addPoints(overall.combined, team, sRank);
+        }
+
+        const cjRank = parseInt(p.cleanJerkRank || a.cleanJerkRank || 0, 10) || 0;
+        if (cjRank >= 1) {
+          if (gender === 'F') addPoints(dataForChamp.women, team, cjRank);
+          else addPoints(dataForChamp.men, team, cjRank);
+          addPoints(dataForChamp.combined, team, cjRank);
+
+          if (gender === 'F') addPoints(overall.women, team, cjRank);
+          else addPoints(overall.men, team, cjRank);
+          addPoints(overall.combined, team, cjRank);
+        }
+      }
+    });
+  });
+
+  // Sort by points with tiebreaker (more 1st places, then 2nd, then 3rd, then 4th)
+  function mapToSortedArray(map) {
+    return Array.from(map.values()).sort((a, b) => {
+      if (b.points !== a.points) return b.points - a.points;
+      if (b.count1st !== a.count1st) return b.count1st - a.count1st;
+      if (b.count2nd !== a.count2nd) return b.count2nd - a.count2nd;
+      if (b.count3rd !== a.count3rd) return b.count3rd - a.count3rd;
+      return b.count4th - a.count4th;
+    });
+  }
+
+  // Build championships array
+  console.warn(`[TeamPoints] Used championship names: ${Array.from(usedChampTypes).join(', ')}`);
+  const championshipsArr = Array.from(usedChampTypes).map(name => {
+    const champ = {
+      type: name,
+      name: champData[name] && champData[name].name ? champData[name].name : (championships.get(name)?.name || name),
+      women: mapToSortedArray(champData[name].women),
+      men: mapToSortedArray(champData[name].men),
+      combined: mapToSortedArray(champData[name].combined)
+    };
+    console.warn(`[TeamPoints] Championship ${name}: women=${champ.women.length}, men=${champ.men.length}, combined=${champ.combined.length}`);
+    return champ;
+  });
+
+  return {
+    championships: championshipsArr,
+    women: mapToSortedArray(overall.women),
+    men: mapToSortedArray(overall.men),
+    combined: mapToSortedArray(overall.combined),
+    tp1,
+    tp2
+  };
+}
+
+/**
  * Build medals counts by scanning all athletes and their ranks.
  * If includeSnCj is true, include snatch and clean&jerk ranks in the counts
  * in addition to total ranks. Returns { women:[], men:[], combined:[] } arrays.

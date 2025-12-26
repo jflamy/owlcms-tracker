@@ -1301,8 +1301,25 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	const translations = competitionHub.getTranslations(language);
 	const learningMode = process.env.LEARNING_MODE === 'true' ? 'enabled' : 'disabled';
 	
+	// Check if any topN options are explicitly provided in the URL
+	const hasTopNOptions = options.topM !== undefined || options.topF !== undefined || 
+	                       options.topMFm !== undefined || options.topMFf !== undefined;
+	
 	// Check if "include all athletes" mode is enabled
-	const includeAllAthletes = options.allAthletes === true || options.allAthletes === 'true';
+	// Logic:
+	// 1. If allAthletes is explicitly set (true/false), use that value
+	// 2. If topN options are provided, default to false (use clamping)
+	// 3. Otherwise, default to true (include all athletes)
+	let includeAllAthletes;
+	if (options.allAthletes === true || options.allAthletes === 'true') {
+		includeAllAthletes = true;
+	} else if (options.allAthletes === false || options.allAthletes === 'false') {
+		includeAllAthletes = false;
+	} else if (hasTopNOptions) {
+		includeAllAthletes = false;
+	} else {
+		includeAllAthletes = true;
+	}
 	
 	// Top score counts for team scoring (configurable per federation)
 	// When includeAllAthletes is true, use 10 for all counts (effectively includes everyone)
