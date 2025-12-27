@@ -1,5 +1,8 @@
 # OWLCMS Tracker Release Notes
 
+## New in Release 2.3.0
+- Team Points support in iwf-results plugin
+
 ## New in Release 2.2.0
 
 - Requires owlcms pre-release version 64.0.0-rc04 or newer
