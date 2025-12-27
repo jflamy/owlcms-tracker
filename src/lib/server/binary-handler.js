@@ -43,7 +43,9 @@ function verifySanityAfterFlags() {
 			return 0;
 		}
 
-		console.log(`[Sanity] ✅ Flags: ${flagCount} total files in /local/flags (since server startup)`);
+		if (process.env.SANITY_DEBUG === 'true') {
+			console.log(`[Sanity] ✅ Flags: ${flagCount} total files in /local/flags (since server startup)`);
+		}
 		return flagCount;
 	} catch (error) {
 		console.error(`[Sanity] ❌ Flags verification failed:`, error.message);
@@ -94,7 +96,9 @@ export async function handleBinaryMessage(buffer) {
 	const startTime = Date.now();
 	const operationId = Math.random().toString(36).substr(2, 9);
 	
-	console.log(`[BINARY] Starting operation ${operationId}`);
+	if (process.env.BINARY_DEBUG === 'true') {
+		console.log(`[BINARY] Starting operation ${operationId}`);
+	}
 	
 	try {
 		// Validate minimum frame size
@@ -106,10 +110,11 @@ export async function handleBinaryMessage(buffer) {
 		// Read first 4-byte integer
 		const firstLength = buffer.readUInt32BE(0);
 
-		// Log first 20 bytes for debugging
-		const preview = buffer.slice(0, Math.min(20, buffer.length)).toString('hex');
-		console.log(`[BINARY] Frame start (hex): ${preview}`);
-		console.log(`[BINARY] First 4-byte value: ${firstLength} (0x${firstLength.toString(16)}), total frame: ${buffer.length} bytes`);
+		if (process.env.BINARY_DEBUG === 'true') {
+			const preview = buffer.slice(0, Math.min(20, buffer.length)).toString('hex');
+			console.log(`[BINARY] Frame start (hex): ${preview}`);
+			console.log(`[BINARY] First 4-byte value: ${firstLength} (0x${firstLength.toString(16)}), total frame: ${buffer.length} bytes`);
+		}
 
 		let offset = 0;
 		let protocolVersion = null;
@@ -130,9 +135,9 @@ export async function handleBinaryMessage(buffer) {
 				
 				if (parsedVer) {
 					// Looks like a valid version string (e.g., "2.0.0")
+				if (process.env.BINARY_DEBUG === 'true') {
 					console.log(`[BINARY] ✅ Detected version 2.0.0+ format with protocol version: ${potentialVersion}`);
-					
-					// Validate protocol version
+				}
 					const versionCheck = isVersionAcceptable(potentialVersion);
 					if (!versionCheck.valid) {
 						console.error(`[BINARY] ❌ Protocol version validation failed: ${versionCheck.error}`);
@@ -164,7 +169,9 @@ export async function handleBinaryMessage(buffer) {
 					
 				} else {
 					// Not a version string, treat as legacy format
+				if (process.env.BINARY_DEBUG === 'true') {
 					console.log(`[BINARY] Detected legacy format (no version header)`);
+				}
 					messageType = buffer.slice(4, 4 + firstLength).toString('utf8');
 					payload = buffer.slice(4 + firstLength);
 				}
@@ -225,7 +232,9 @@ export async function handleBinaryMessage(buffer) {
 		}
 
 		const elapsed = Date.now() - startTime;
-		console.log(`[BINARY] ✅ Operation ${operationId} completed in ${elapsed}ms (type: ${messageType})`);
+		if (process.env.BINARY_DEBUG === 'true') {
+			console.log(`[BINARY] ✅ Operation ${operationId} completed in ${elapsed}ms (type: ${messageType})`);
+		}
 	} catch (error) {
 		const elapsed = Date.now() - startTime;
 		console.error(`[BINARY] ❌ Operation ${operationId} FAILED after ${elapsed}ms:`, error.message);
@@ -277,14 +286,15 @@ async function handleFlagsMessage(zipBuffer) {
 		});
 
 		const elapsed = Date.now() - startTime;
-		console.log(`[FLAGS] ✓ Extracted ${extractedCount} flag files in ${elapsed}ms (this message)`);
-		
-		// Log first 10 flags from this extraction
-		if (flagFileNames.length > 0) {
-			console.log(`[FLAGS] First ${Math.min(10, extractedCount)} flags from this message:`);
-			flagFileNames.forEach((name, index) => {
-				console.log(`  ${index + 1}. ${name}`);
-			});
+		console.log(`[FLAGS] ✅ Extracted ${extractedCount} flag files in ${elapsed}ms`);
+		if (process.env.SANITY_DEBUG === 'true') {
+			// Log first 10 flags from this extraction
+			if (flagFileNames.length > 0) {
+				console.log(`[FLAGS] First ${Math.min(10, extractedCount)} flags from this message:`);
+				flagFileNames.forEach((name, index) => {
+					console.log(`  ${index + 1}. ${name}`);
+				});
+			}
 		}
 		
 		// Run sanity check after successful extraction (shows cumulative count)
@@ -480,7 +490,9 @@ async function handleTranslationsZipMessage(zipBuffer) {
 	const startTime = Date.now();
 	
 	try {
-		console.log(`[TRANSLATIONS_ZIP] 📦 Received ZIP: ${zipBuffer.length} bytes`);
+		if (process.env.TRANSLATIONS_DEBUG === 'true') {
+			console.log(`[TRANSLATIONS_ZIP] 📦 Received ZIP: ${zipBuffer.length} bytes`);
+		}
 		
 		// Parse ZIP from buffer
 		const zip = new AdmZip(zipBuffer);
@@ -497,7 +509,9 @@ async function handleTranslationsZipMessage(zipBuffer) {
 		
 		// Extract and parse translations.json
 		const jsonData = translationsEntry.getData().toString('utf8');
-		console.log(`[TRANSLATIONS_ZIP] 📄 Extracted translations.json: ${jsonData.length} bytes`);
+		if (process.env.TRANSLATIONS_DEBUG === 'true') {
+			console.log(`[TRANSLATIONS_ZIP] 📄 Extracted translations.json: ${jsonData.length} bytes`);
+		}
 		
 		const payload = JSON.parse(jsonData);
 		
@@ -526,7 +540,9 @@ async function handleTranslationsZipMessage(zipBuffer) {
 		let localesCount = 0;
 		let totalKeys = 0;
 		let skippedLocales = [];
-		console.log(`[TRANSLATIONS_ZIP] 🔄 Caching locales...`);
+		if (process.env.TRANSLATIONS_DEBUG === 'true') {
+			console.log(`[TRANSLATIONS_ZIP] 🔄 Caching locales...`);
+		}
 		
 		// Pattern for valid locale codes: must start with letter, can contain letters, numbers, underscores, hyphens
 		// Rejects: empty, numeric-only, contains spaces, starts with number
@@ -579,6 +595,9 @@ async function handleTranslationsZipMessage(zipBuffer) {
 				console.log(`[TRANSLATIONS_ZIP] ✅ TRANSLATIONS UPDATED (${localesCount} locales, ${totalKeys} keys)`);
 			}
 		}
+		
+		// Mark translations as complete (triggers hub-ready check)
+		competitionHub.markTranslationsComplete(localesCount);
 		
 		// Run sanity check after successful translations load
 		await verifySanityAfterTranslations();

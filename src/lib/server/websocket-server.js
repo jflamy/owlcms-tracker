@@ -63,8 +63,13 @@ export function initWebSocketServer(httpServer) {
 			async function flushAndResetOnce() {
 				if (!firstConnectionHandled) {
 					try {
-						const { scoreboardRegistry } = await import('./scoreboard-registry.js');
-						scoreboardRegistry.flushCaches();
+						// Try to flush scoreboard caches (may fail during HMR, that's OK)
+						try {
+							const { scoreboardRegistry } = await import('./scoreboard-registry.js');
+							scoreboardRegistry.flushCaches();
+						} catch (e) {
+							// Silently ignore - scoreboard caches will be invalidated by hub state version anyway
+						}
 						// Reset the database and translations in the hub
 						competitionHub.databaseState = null;
 						competitionHub.lastDatabaseChecksum = null;
@@ -106,7 +111,9 @@ export function initWebSocketServer(httpServer) {
 			if (isBinary) {
 				// Binary frame: [4-byte big-endian typeLength][type UTF-8][binary payload]
 				try {
-					console.log('[WebSocket] Binary frame received, routing to binary handler');
+					if (process.env.BINARY_DEBUG === 'true') {
+						console.log('[WebSocket] Binary frame received, routing to binary handler');
+					}
 					// Detect if this is a database_zip or database binary and flush/reset only on first connection
 					let typeString = null;
 					try {
@@ -258,8 +265,12 @@ export function initWebSocketServer(httpServer) {
 	// Handle upgrade requests
 	httpServer.on('upgrade', (request, socket, head) => {
 		const { pathname } = new URL(request.url, `http://${request.headers.host}`);
+		
+		const localPort = request.socket.localPort;
+		console.log(`[WebSocket] Upgrade request received for: ${pathname} from ${request.socket.remoteAddress} on local port ${localPort}`);
 
 		if (pathname !== '/ws') {
+			console.log(`[WebSocket] Ignoring upgrade for ${pathname} (not /ws)`);
 			return; // Allow other upgrade listeners (e.g., Vite HMR) to handle
 		}
 

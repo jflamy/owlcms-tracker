@@ -97,18 +97,20 @@ export function captureMessage(formData, rawBody, endpoint = '', overrideType = 
 		// Save only the parsed form data - pure OWLCMS payload
 		writeFileSync(filepath, JSON.stringify(formData, null, 2));
 		
-		console.log(`📝 Captured ${endpointPrefix}${messageType}: ${filename} (${rawBody.length} bytes)`);
-		
-		// Enhanced logging with message type (but not the actual data content)
-		console.log(`📊 Message type: ${endpointPrefix}${messageType}`);
-		// Only show field names, never the content (especially for huge database dumps)
-		// Filter out malformed field names to prevent logging massive JSON strings
-		const fieldNames = Object.keys(formData)
-			.filter(k => k !== 'fullCompetitionData')
-			.filter(k => k.length < 100 && !k.includes('\r\n') && !k.includes('{"'))
-			.slice(0, 15);
-		if (fieldNames.length > 0) {
-			console.log(`📊 Message fields: ${fieldNames.join(', ')}${Object.keys(formData).length > 15 ? '...' : ''}`);
+		if (process.env.LEARNING_MODE_DEBUG === 'true') {
+			console.log(`📝 Captured ${endpointPrefix}${messageType}: ${filename} (${rawBody.length} bytes)`);
+			
+			// Enhanced logging with message type (but not the actual data content)
+			console.log(`📊 Message type: ${endpointPrefix}${messageType}`);
+			// Only show field names, never the content (especially for huge database dumps)
+			// Filter out malformed field names to prevent logging massive JSON strings
+			const fieldNames = Object.keys(formData)
+				.filter(k => k !== 'fullCompetitionData')
+				.filter(k => k.length < 100 && !k.includes('\r\n') && !k.includes('{"'))
+				.slice(0, 15);
+			if (fieldNames.length > 0) {
+				console.log(`📊 Message fields: ${fieldNames.join(', ')}${Object.keys(formData).length > 15 ? '...' : ''}`);
+			}
 		}
 		if (formData.fop) console.log(`🏋️  FOP: ${formData.fop}`);
 		if (formData.uiEvent) console.log(`🎯 UI Event: ${formData.uiEvent}`);

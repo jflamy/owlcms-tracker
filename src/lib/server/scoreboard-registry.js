@@ -13,6 +13,8 @@
  */
 
 // Eager imports so Vite includes all plugins at build time
+// Note: import.meta.glob is a Vite COMPILE-TIME feature - it gets transformed
+// into actual imports during build. It does NOT exist as a function at runtime.
 const configModules = import.meta.glob('../../plugins/*/config.js', { eager: true });
 const helperModules = import.meta.glob('../../plugins/*/helpers.data.js', { eager: true });
 

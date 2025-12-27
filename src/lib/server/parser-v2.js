@@ -15,7 +15,9 @@
  * @returns {Object} Normalized competition state
  */
 export function parseV2Database(params) {
-  console.log('[V2 Parser] Parsing V2 format database');
+  if (process.env.V2_PARSER_DEBUG === 'true') {
+    console.log('[V2 Parser] Parsing V2 format database');
+  }
   
   // Handle nested database structure: { databaseChecksum, database: { ... } }
   const db = params.database || params;
@@ -26,11 +28,13 @@ export function parseV2Database(params) {
     return null;
   }
   
-  console.log(`[V2 Parser] Processing ${db.athletes.length} athletes`);
-  console.log(`[V2 Parser] Has ageGroups:`, !!db.ageGroups, 'count:', db.ageGroups?.length || 0);
-  console.log(`[V2 Parser] Has competition:`, !!db.competition);
-  console.log(`[V2 Parser] Has platforms:`, !!db.platforms, 'count:', db.platforms?.length || 0);
-  console.log(`[V2 Parser] Has teams:`, !!db.teams, 'count:', db.teams?.length || 0);
+  if (process.env.V2_PARSER_DEBUG === 'true') {
+    console.log(`[V2 Parser] Processing ${db.athletes.length} athletes`);
+    console.log(`[V2 Parser] Has ageGroups:`, !!db.ageGroups, 'count:', db.ageGroups?.length || 0);
+    console.log(`[V2 Parser] Has competition:`, !!db.competition);
+    console.log(`[V2 Parser] Has platforms:`, !!db.platforms, 'count:', db.platforms?.length || 0);
+    console.log(`[V2 Parser] Has teams:`, !!db.teams, 'count:', db.teams?.length || 0);
+  }
   
   // Build team lookup map (V2 uses numeric team IDs)
   const teamMap = buildTeamMap(db.teams || []);
@@ -38,7 +42,9 @@ export function parseV2Database(params) {
   // Build category code → categoryName map from ageGroups
   // Categories in ageGroups include categoryName (translated display name)
   const categoryMap = buildCategoryMap(db.ageGroups || []);
-  console.log(`[V2 Parser] Built category map with ${categoryMap.size} entries`);
+  if (process.env.V2_PARSER_DEBUG === 'true') {
+    console.log(`[V2 Parser] Built category map with ${categoryMap.size} entries`);
+  }
   
   // Parse athletes from V2 format
   const athletes = db.athletes.map(athlete => normalizeV2Athlete(athlete, teamMap, categoryMap));

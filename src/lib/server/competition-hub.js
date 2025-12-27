@@ -1881,6 +1881,17 @@ class CompetitionHub extends EventEmitter {
       }
     }
 
+    // Note: translationsReady is set by markTranslationsComplete() after ALL locales are processed
+  }
+
+  /**
+   * Mark translations as complete after all locales have been processed.
+   * This is called by binary-handler.js after the entire translations.json is processed.
+   * Only this method should trigger the HUB READY event for translations.
+   * 
+   * @param {number} localesCount - Number of locales that were processed
+   */
+  markTranslationsComplete(localesCount) {
     if (Object.keys(this.translations).length > 0) {
       this.translationsReady = true;
       console.log(`[Hub] ✅ Translations loaded: ${Object.keys(this.translations).length} locales`);
