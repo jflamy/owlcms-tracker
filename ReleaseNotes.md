@@ -1,7 +1,8 @@
 # OWLCMS Tracker Release Notes
 
-## New in Release 2.3.0
+## New in Release 2.3.1
 - Team Points support in iwf-results plugin
+- Database is always sent in compressed format. Learning mode uncompresses the samples.
 
 ## New in Release 2.2.0
 
@@ -11,12 +12,10 @@
 
 ## New in Release 2.1.0
 
-- Version 2.1.0 of the protocol. The database is sent in compressed format.
 - The team scoreboard now supports Sinclair, SMHF, Q-Points, Q-Masters, GAMX, GAMX-M, GAMX-A and GAMX-U
 - There is now an attempt-board screen emulating the OWLCMS one.
 - The local packaging (zip distributions) will open the default browser when started.
 - Responsive versions of the scoreboards.  The standard scoreboards also work in portrait mode.
-
 
 ## Installing Locally
 
