@@ -1,8 +1,9 @@
 # OWLCMS Tracker Release Notes
 
-## New in Release 2.3.1
+## New in Release 2.3.2
 - Team Points support in iwf-results plugin
 - Database is always sent in compressed format. Learning mode uncompresses the samples.
+- Fixed Raspberry Pi build to use 64-bit version of Node.js
 
 ## New in Release 2.2.0
 

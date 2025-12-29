@@ -6,8 +6,11 @@ import { createReadStream, createWriteStream } from 'fs';
 
 const NODE_VERSION = '22.12.0';
 const DIST_DIR = 'dist/rpi';
-const NODE_URL = `https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-armv7l.tar.gz`;
-const NODE_FILENAME = `node-v${NODE_VERSION}-linux-armv7l.tar.gz`;
+const DIST_ARCH = 'linux-arm64';
+const NODE_ARCH_LABEL = 'ARM64 (aarch64)';
+const NODE_PREFIX = `node-v${NODE_VERSION}-${DIST_ARCH}`;
+const NODE_URL = `https://nodejs.org/dist/v${NODE_VERSION}/${NODE_PREFIX}.tar.gz`;
+const NODE_FILENAME = `${NODE_PREFIX}.tar.gz`;
 
 console.log('📦 Building Raspberry Pi portable package...\n');
 
@@ -33,7 +36,7 @@ function extractTarGz(tarPath, dest) {
   execSync(`tar -xzf "${tarPath}" -C "${dest}"`, { stdio: 'pipe' });
   
   // Move node binary from extracted directory to root
-  const extractedDir = path.join(dest, `node-v${NODE_VERSION}-linux-armv7l`);
+  const extractedDir = path.join(dest, `node-v${NODE_VERSION}-${DIST_ARCH}`);
   const binSrc = path.join(extractedDir, 'bin', 'node');
   const binDest = path.join(dest, 'node');
   
@@ -95,8 +98,8 @@ function extractTarGz(tarPath, dest) {
     console.log('\n📥 Installing production dependencies...');
     execSync(`npm install --omit=dev --prefix ${DIST_DIR}`, { stdio: 'inherit' });
 
-    // 5. Download Node.js for ARMv7 (32-bit Raspberry Pi)
-    console.log('\n⬇️  Downloading Node.js for ARMv7...');
+    // 5. Download Node.js for ARM64 (RPi 3/4/5/Zero 2)
+    console.log(`\n⬇️  Downloading Node.js for ${NODE_ARCH_LABEL}...`);
     const nodeGzPath = path.join(DIST_DIR, NODE_FILENAME);
     await downloadFile(NODE_URL, nodeGzPath);
 
@@ -110,10 +113,10 @@ function extractTarGz(tarPath, dest) {
 
     // 8. Create README
     const readme = `OWLCMS Competition Tracker - Raspberry Pi
-==========================================
+  ==========================================
 
-This package includes everything needed to run the tracker!
-Includes Node.js 22.12.0 pre-bundled for ARMv7 (32-bit RPi).
+  This package includes everything needed to run the tracker!
+  Includes Node.js ${NODE_VERSION} pre-bundled for ${NODE_ARCH_LABEL}.
 
 QUICK START:
 ============
@@ -124,8 +127,9 @@ QUICK START:
 
 REQUIREMENTS:
 =============
-- Raspberry Pi with ARMv7 processor (RPi 2, 3, 4, 5)
-- Linux-based OS (Raspberry Pi OS, Ubuntu, etc.)
+- Raspberry Pi with an ARM64 processor (RPi 3, 4, 5, Zero 2)
+- Linux-based OS (Raspberry Pi OS 64-bit, Ubuntu, etc.)
+NOTE: Use a 64-bit OS image so the bundled Node.js can run.
 
 OWLCMS CONFIGURATION:
 ====================
@@ -210,14 +214,12 @@ Ready to distribute! Users just need to:
   3. Open http://localhost:8096 (or their RPi's IP:8096)
 
 HARDWARE COMPATIBILITY:
-  - Raspberry Pi 2 (ARMv7) ✅
-  - Raspberry Pi 3 (ARMv7) ✅
-  - Raspberry Pi 4 (ARMv7) ✅
-  - Raspberry Pi 5 (ARMv7) ✅
-  - Raspberry Pi Zero 2 (ARMv7) ✅
+  - Raspberry Pi 3 (ARM64) ✅
+  - Raspberry Pi 4 (ARM64) ✅
+  - Raspberry Pi 5 (ARM64) ✅
+  - Raspberry Pi Zero 2 (ARM64) ✅
 
-NOTE: 64-bit Raspberry Pi OS users may need to install Node.js differently.
-      For best compatibility, use 32-bit Raspberry Pi OS.
+NOTE: This package ships Node.js ${NODE_VERSION} for ARM64 builds; run a 64-bit OS image so the binary works.
 `);
 
   } catch (err) {
