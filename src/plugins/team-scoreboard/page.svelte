@@ -115,7 +115,7 @@ export function shouldRenderFlag(url) {
 </svelte:head>
 
 <div class="scoreboard">
-	<div class="session-header-wrapper {attemptBarClass}" role="button" aria-label="Open gender menu" tabindex="0">
+	<div class="session-header-wrapper {attemptBarClass}">
 		<CurrentAttemptBar 
 			currentAttempt={data.currentAttempt}
 				timerData={data.timer}
@@ -147,7 +147,7 @@ export function shouldRenderFlag(url) {
 			<div class="waiting-for-session"></div>
 		{:else}
 			<div class="scoreboard-grid" class:compact-team-column={data.compactTeamColumn} class:hide-predicted={!showPredicted} role="grid" tabindex="0">
-				<div class="grid-row header header-primary" role="row" tabindex="0" on:contextmenu={openGenderMenu} on:click|preventDefault|stopPropagation={openGenderMenu} on:keydown={handleSessionKeydown}>
+				<div class="grid-row header header-primary" role="row" tabindex="0">
 					<div class="cell header col-start span-two" role="columnheader">{data.headers?.order || 'Order'}</div>
 					<div class="cell header col-name span-two" role="columnheader">{data.headers?.name || 'Name'}</div>
 					<div class="cell header col-cat span-two" role="columnheader">{data.headers?.category || 'Cat.'}</div>
@@ -164,7 +164,7 @@ export function shouldRenderFlag(url) {
 					<div class="cell header col-next-total span-two" role="columnheader">{data.headers?.totalNextS || 'Total Next S'}</div>
 					<div class="cell header col-next-score span-two" role="columnheader">{data.headers?.scoreNextS || 'Score Next S'}</div>
 				</div>
-				<div class="grid-row header header-secondary" role="row" tabindex="0" on:contextmenu={openGenderMenu} on:click|preventDefault|stopPropagation={openGenderMenu} on:keydown={handleSessionKeydown}>
+				<div class="grid-row header header-secondary" role="row" tabindex="0">
 					<div class="cell header col-name-portrait" role="columnheader">{data.headers?.name || 'Name'}</div>
 					<div class="cell header v-spacer v-spacer-snatch" aria-hidden="true"></div>
 					<div class="cell header col-attempt snatch-1" role="columnheader">1</div>
