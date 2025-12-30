@@ -23,7 +23,7 @@ In this other example, a customized attempt board was created by cloning.  owlcm
 
 Because owlcms-tracker can generate arbitrarily sophisticated HTML and CSS, it is even possible to generate printable documents that
 are printed as PDF.  A full IWF-style results book with participants, medals, team points, category rankings, session protocols and records was built this
-way.
+way.  A sample page follows:
 
 <img width="1284" height="906" alt="image" src="https://github.com/user-attachments/assets/266fda07-a758-4ecf-a6fd-d1926ce84335" />
 
