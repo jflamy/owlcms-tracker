@@ -208,6 +208,8 @@ npm install @owlcms/tracker-core@^1.0.0
 
 **When to use:** CI/CD pipelines, production deployments, don't need source
 
+**Not recommended for day-to-day team development:** if you want to avoid GitHub Packages auth during development, use Option A or Option B (`npm link`).
+
 ---
 
 ## Quick Start Examples
@@ -482,7 +484,7 @@ The Tracker Core and Tracker system uses **separate repositories** for clean sep
 **Purpose:** Core data hub package for external developers
 
 **Contents:**
-- Hub API (`tracker-core.js`)
+- Hub API (`competition-hub.js`)
 - WebSocket server (`websocket-server.js`)
 - Utility modules (scoring, translations, embedded database)
 - API documentation (`docs/npm/`)
@@ -573,6 +575,8 @@ Changes to hub are immediately reflected in tracker during development.
 
 ### Authentication Issues (GitHub Packages)
 
+This section only applies if you chose Option C (install from GitHub Packages). If you use `npm link` (Option A/B), you do not need any `.npmrc` registry configuration.
+
 ```bash
 # Create or update ~/.npmrc with your GitHub PAT
 echo "@owlcms:registry=https://npm.pkg.github.com" >> ~/.npmrc
@@ -614,5 +618,6 @@ competitionHub.on(EVENT_TYPES.UPDATE, (fopName, payload) => {
 
 - **Complete API Documentation:** [API_REFERENCE.md](./API_REFERENCE.md) - All hub methods, events, data structures
 - **Implementation Details:** [IMPLEMENTATION_PLAN.md](./IMPLEMENTATION_PLAN.md) - For contributors modifying hub internals
-- **Package Analysis:** [HUB_NPM_PACKAGE_ANALYSIS.md](./HUB_NPM_PACKAGE_ANALYSIS.md) - Distribution strategy and technical decisions
+- **Core Repo Extraction:** [CORE_MIGRATION.md](./CORE_MIGRATION.md) - What changes to make in the new `tracker-core` repository
+- **Tracker Update Guide:** [TRACKER_MIGRATION.md](./TRACKER_MIGRATION.md) - What to change in `owlcms-tracker` to consume the package
 - **Build Custom Scoreboards:** See [CREATE_YOUR_OWN.md](../../CREATE_YOUR_OWN.md) in the tracker repo for plugin development guide

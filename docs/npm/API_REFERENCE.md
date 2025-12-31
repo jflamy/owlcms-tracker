@@ -695,6 +695,16 @@ Both `createWebSocketServer` and `attachWebSocketToServer` accept these options:
 {
   // Required
   hub: competitionHub,           // Hub instance to forward messages to
+
+  // Local files output (recommended for production)
+  // Where OWLCMS-delivered ZIP resources are written:
+  //   - flags_zip  -> <localFilesDir>/flags
+  //   - logos_zip  -> <localFilesDir>/logos
+  //   - pictures_zip -> <localFilesDir>/pictures
+  //   - styles     -> <localFilesDir>/styles
+  // The consumer must serve these files at URL path: /local/*
+  // Default (if omitted): path.join(process.cwd(), 'local')
+  localFilesDir: '/var/lib/owlcms-tracker/local',
   
   // Optional
   port: 8095,                    // Port (standalone mode only)
@@ -711,6 +721,17 @@ Both `createWebSocketServer` and `attachWebSocketToServer` accept these options:
   verifyClient: (info, cb) => {} // Custom connection verification
 }
 ```
+
+---
+
+## Local Files (flags/logos/pictures/styles)
+
+OWLCMS can send ZIP resources (e.g., `flags_zip`, `logos_zip`, `translations_zip`) over the same WebSocket connection.
+
+- The **URL paths** used by clients remain stable (e.g., `/local/flags/<name>.svg`, `/local/logos/<name>.png`).
+- The **filesystem output directory** for extracted files must be configurable via the WebSocket integration option `localFilesDir`.
+
+This is required so deployments can write to a durable, configurable location (container volume, system service directory, etc.).
 
 ---
 
