@@ -31,57 +31,11 @@ Choose your scenario to see the recommended setup:
 - WebSocket connection to OWLCMS
 - No tracker source code needed
 
-**Recommended approach:** **Source checkout + npm link** (Option A below)
+**Recommended approach:** **Source checkout + npm link**
 
 **Why:** Browse hub source code when debugging, understand data structures, see implementation examples
 
----
-
-#### Scenario 2: Tracker Plugin Developer  
-
-**You want to:** Create custom scoreboards for the owlcms-tracker app
-
-**You need:**
-- Tracker source code to add plugins to `src/plugins/`
-- Hub as a black-box dependency
-- No need to modify hub internals
-
-**Recommended approach:** **Clone tracker repo** (hub comes as dependency)
-
-**Why:** Clean focused checkout, hub is automatically linked, standard workflow
-
----
-
-#### Scenario 3: Core Hub/Tracker Developer
-
-**You want to:** Enhance hub API while developing tracker features simultaneously
-
-**You need:**
-- Both hub and tracker source code
-- Ability to modify hub and test in tracker immediately
-- Atomic commits across both codebases
-
-**Recommended approach:** **Linked development setup** (Option B below)
-
-**Why:** Simple atomic workflow, automatic workspace linking, easier to keep in sync
-
----
-
-## Installation & Setup
-
-### Prerequisites
-
-- Node.js 18+ installed
-- Basic JavaScript/TypeScript knowledge  
-- OWLCMS running and accessible via WebSocket
-
----
-
-### Option A: Source Checkout (Recommended for Scenarios 1 & 2)
-
-Clone hub source for reference while building your app.
-
-**For Scenario 1 (REST API Developer):**
+**Setup (do this):**
 
 ```bash
 # Clone hub repo (read-only reference)
@@ -105,36 +59,63 @@ npm link @owlcms/tracker-core
 npm install express
 ```
 
-**For Scenario 2 (Plugin Developer):**
+---
+
+#### Scenario 2: Tracker Plugin Developer  
+
+**You want to:** Create custom scoreboards for the owlcms-tracker app
+
+**You need:**
+- Tracker source code to add plugins to `src/plugins/`
+- Hub as a black-box dependency
+- No need to modify hub internals
+
+**Recommended approach (post-migration):** **Clone owlcms-tracker + link tracker-core**
+
+**Why:** Plugin development stays the same (you only edit `src/plugins/`), but `owlcms-tracker` now requires the `@owlcms/tracker-core` dependency in order to run.
+
+**Setup (required to run `npm run dev`):**
 
 ```bash
-# Clone tracker repo only
+# 1) Get tracker-core and link it (you don't need to edit it)
+git clone https://github.com/owlcms/tracker-core.git
+cd tracker-core
+npm install
+npm link
+
+# 2) Get owlcms-tracker and link it to your local tracker-core
+cd ..
 git clone https://github.com/owlcms/owlcms-tracker.git
 cd owlcms-tracker
-
-# Install dependencies (hub comes as dependency)
 npm install
+npm link @owlcms/tracker-core
 
-# Start dev server
+# 3) Run the tracker
 npm run dev
-
-# Create your plugin in src/plugins/
 ```
 
-**Benefits:**
-- ✅ Browse hub source code when debugging
-- ✅ Understand data structures by reading comments
-- ✅ See implementation of helper functions
-- ✅ Learn patterns from existing code
-- ✅ No need to guess field names - just look at source
+**Create your plugin (same workflow as today):**
+- Use an LLM to create a new folder under `src/plugins/<your-plugin>/` following the existing plugin patterns.
+- Restart the dev server if the plugin registry requires it.
+
+If you prefer installing `@owlcms/tracker-core` from a registry instead of linking, use **Scenario 4**.
 
 ---
 
-### Option B: Linked Development (Scenario 3 - Core Developers)
+#### Scenario 3: Core Hub/Tracker Developer
 
-Clone both repos and link them so tracker uses your local hub source.
+**You want to:** Enhance hub API while developing tracker features simultaneously
 
-**Setup:**
+**You need:**
+- Both hub and tracker source code
+- Ability to modify hub and test in tracker immediately
+- Synchronized commits across both codebases
+
+**Recommended approach:** **Linked development setup**
+
+**Why:** Simple atomic workflow, automatic workspace linking, easier to keep in sync
+
+**Setup (do this):**
 
 ```bash
 # Clone both repos
@@ -178,37 +159,60 @@ npm run setup:linked
 
 ---
 
-### Option C: GitHub Packages (Production Deployments)
+#### Scenario 4: Use tracker-core without a checkout
 
-Install from GitHub Packages registry without source visibility.
+**You want to:** Use `@owlcms/tracker-core` without cloning the `tracker-core` repository
 
-**Setup:**
+**Recommended approach:** Install the published `@owlcms/tracker-core` package (public)
+
+**Setup (do this):**
 
 ```bash
-# Configure GitHub Packages registry
+# If @owlcms is published on GitHub Packages, you typically need the registry mapping
+# but NOT an auth token when the package is public.
 echo "@owlcms:registry=https://npm.pkg.github.com" >> .npmrc
-echo "//npm.pkg.github.com/:_authToken=YOUR_GITHUB_PAT" >> .npmrc
 
 # Install package
 npm install @owlcms/tracker-core@^1.0.0
 ```
 
-**package.json:**
-```json
-{
-  "name": "my-production-app",
-  "version": "1.0.0",
-  "type": "module",
-  "dependencies": {
-    "@owlcms/tracker-core": "^1.0.0",
-    "express": "^4.18.0"
-  }
-}
-```
+**When to use:** Consumers who just want the stable package without a source checkout
 
-**When to use:** CI/CD pipelines, production deployments, don't need source
+---
 
-**Not recommended for day-to-day team development:** if you want to avoid GitHub Packages auth during development, use Option A or Option B (`npm link`).
+#### Scenario 5: Publish tracker-core as a public package (maintainers)
+
+**You want to:** Publish `@owlcms/tracker-core` as a public package on GitHub, using GitHub Actions
+
+**Recommended approach:** Release-driven publish from `tracker-core` repo
+
+**High-level steps:**
+
+1. In `tracker-core/package.json`, ensure publish settings are correct for a public package:
+  - `name: "@owlcms/tracker-core"`
+  - `type: "module"`
+  - `publishConfig.access: "public"`
+  - `publishConfig.registry: "https://npm.pkg.github.com"`
+2. Add a GitHub Actions workflow that:
+  - runs `npm ci`
+  - runs any lightweight checks
+  - publishes on tagged releases (for example: `v1.2.3`) using `GITHUB_TOKEN`
+3. Create a release/tag to trigger the workflow.
+4. Verify install works without authentication for consumers (Scenario 4).
+
+---
+
+## Installation & Setup
+
+### Prerequisites
+
+- Node.js 18+ installed
+- Basic JavaScript/TypeScript knowledge  
+- OWLCMS running and accessible via WebSocket
+
+---
+
+Follow the setup steps in your Scenario above. This section intentionally avoids duplicating those instructions.
 
 ---
 
@@ -490,7 +494,7 @@ The Tracker Core and Tracker system uses **separate repositories** for clean sep
 - API documentation (`docs/npm/`)
 - Package build configuration
 
-**Published as:** `@owlcms/tracker-core` on GitHub Packages
+**Published as:** `@owlcms/tracker-core` (public package on GitHub Packages)
 
 **Target users:**
 - External developers building custom applications
@@ -529,7 +533,7 @@ The Tracker Core and Tracker system uses **separate repositories** for clean sep
 
 **Workflow for Core Developers:**
 
-Use Option B (Linked Development) to work on both simultaneously:
+Use the linked development setup from **Scenario 3** to work on both simultaneously:
 
 ```bash
 # Clone both repos
@@ -541,8 +545,8 @@ cd tracker-core && npm install && npm link
 cd ../owlcms-tracker && npm install && npm link @owlcms/tracker-core
 
 # Develop in parallel
-# Terminal 1: cd tracker-core && npm run dev
-# Terminal 2: cd owlcms-tracker && npm run dev
+# Run the tracker; it will load tracker-core from your linked checkout
+# Terminal: cd owlcms-tracker && npm run dev
 ```
 
 Changes to hub are immediately reflected in tracker during development.
@@ -555,7 +559,7 @@ Changes to hub are immediately reflected in tracker during development.
 1. Make changes in `tracker-core` repo
 2. Update version in `package.json`
 3. Create GitHub release
-4. GitHub Actions automatically publishes to GitHub Packages
+4. GitHub Actions publishes the public package (see Scenario 5)
 5. External developers get update with `npm update @owlcms/tracker-core`
 
 **Tracker App:**
@@ -573,15 +577,15 @@ Changes to hub are immediately reflected in tracker during development.
 
 ## Troubleshooting
 
-### Authentication Issues (GitHub Packages)
+### Registry Configuration (published package)
 
-This section only applies if you chose Option C (install from GitHub Packages). If you use `npm link` (Option A/B), you do not need any `.npmrc` registry configuration.
+If you install `@owlcms/tracker-core` as a published package (Scenario 4) and it is hosted on GitHub Packages, you may need the scoped registry mapping:
 
 ```bash
-# Create or update ~/.npmrc with your GitHub PAT
 echo "@owlcms:registry=https://npm.pkg.github.com" >> ~/.npmrc
-echo "//npm.pkg.github.com/:_authToken=YOUR_GITHUB_PAT" >> ~/.npmrc
 ```
+
+If you use `npm link` (Scenario 1, 2, or 3), you do not need any registry configuration.
 
 ### Import Errors
 
