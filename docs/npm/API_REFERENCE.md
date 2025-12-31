@@ -35,15 +35,26 @@ import { competitionHub } from '@owlcms/tracker-core';
 | `getCurrentAthlete(fopName)` | Current lifter (no array scanning) ⭐ |
 | `getNextAthlete(fopName)` | Next lifter (no array scanning) ⭐ |
 | `getPreviousAthlete(fopName)` | Previous lifter (no array scanning) ⭐ |
-| `getSessionAthletes(fopName, opts)` | All session athletes |
-| `getStartOrderEntries(fopName, opts)` | Registration order |
-| `getLiftingOrderEntries(fopName, opts)` | Lifting queue |
+| `getSessionAthletes({ fopName, includeSpacer })` | All session athletes |
+| `getStartOrderEntries({ fopName, includeSpacer })` | Registration order |
+| `getLiftingOrderEntries({ fopName, includeSpacer })` | Lifting queue |
 | `getTranslations(locale)` | Localized strings |
 | `getSessionStatus(fopName)` | Session complete/active |
 | `getTeamNameById(teamId)` | Resolve team names |
 | `isReady()` | Hub initialization check |
 | `getFopStateVersion(fopName)` | Cache invalidation version |
 | `getCategoryToAgeGroupMap()` | Category grouping |
+| `getLocalUrlPrefix()` | Current local assets URL prefix |
+| `setLocalUrlPrefix(prefix)` | Configure local assets URL prefix |
+
+**Local assets URL prefix (`localUrlPrefix`)**
+
+The tracker serves OWLCMS-delivered local assets (flags, logos, pictures, styles) under a URL prefix.
+
+- Default: `/local`
+- Configurable: e.g. `/assets`, `/media`, `/tracker-local`
+
+All URL-producing helpers (e.g., `getFlagUrl`, `getLogoUrl`, `getFlagUrl()` utility) must honor this prefix.
 
 ### Core Data Access
 
@@ -117,19 +128,18 @@ Use `getStartOrderEntries()` / `getLiftingOrderEntries()` to get resolved arrays
 
 ---
 
-#### `getSessionAthletes(fopName, options)`
+#### `getSessionAthletes({ fopName, includeSpacer })`
 
 Returns flattened array of athletes in current session with display-ready fields.
 
 **Parameters:**
 - `fopName` (string) - FOP identifier
-- `options` (Object, optional)
-  - `includeSpacer` (boolean) - Include category spacer rows (default: false)
+- `includeSpacer` (boolean, optional) - Include category spacer rows (default: false)
 
 **Returns:** `Array<Object>`
 
 ```javascript
-const athletes = competitionHub.getSessionAthletes('Platform A');
+const athletes = competitionHub.getSessionAthletes({ fopName: 'Platform A' });
 // [
 //   {
 //     key: "123",
@@ -142,7 +152,7 @@ const athletes = competitionHub.getSessionAthletes('Platform A');
 //     bestCleanJerk: "120",
 //     total: "220",
 //     classname: "current blink",
-//     flagURL: "/local/flags/USA.svg",
+//     flagURL: "/local/flags/USA.svg", // URL path (default localUrlPrefix="/local")
 //     ...
 //   }
 // ]
@@ -242,19 +252,19 @@ const previous = competitionHub.getPreviousAthlete('Platform A');
 
 ---
 
-#### `getStartOrderEntries(fopName, options)`
+#### `getStartOrderEntries({ fopName, includeSpacer })`
 
 Returns athletes in registration/start order (sorted by lot number).
 
 **Parameters:**
 - `fopName` (string) - FOP identifier
-- `options` (Object, optional)
-  - `includeSpacer` (boolean) - Include category spacer rows (default: false)
+- `includeSpacer` (boolean, optional) - Include category spacer rows (default: false)
 
 **Returns:** `Array<Object>`
 
 ```javascript
-const startOrder = competitionHub.getStartOrderEntries('Platform A', {
+const startOrder = competitionHub.getStartOrderEntries({
+  fopName: 'Platform A',
   includeSpacer: true
 });
 // [
@@ -270,19 +280,19 @@ const startOrder = competitionHub.getStartOrderEntries('Platform A', {
 
 ---
 
-#### `getLiftingOrderEntries(fopName, options)`
+#### `getLiftingOrderEntries({ fopName, includeSpacer })`
 
 Returns athletes in lifting order (sorted by next attempt weight).
 
 **Parameters:**
 - `fopName` (string) - FOP identifier
-- `options` (Object, optional)
-  - `includeSpacer` (boolean) - Include lift type spacer rows (default: false)
+- `includeSpacer` (boolean, optional) - Include lift type spacer rows (default: false)
 
 **Returns:** `Array<Object>`
 
 ```javascript
-const liftingOrder = competitionHub.getLiftingOrderEntries('Platform A', {
+const liftingOrder = competitionHub.getLiftingOrderEntries({
+  fopName: 'Platform A',
   includeSpacer: true
 });
 // [
@@ -448,9 +458,15 @@ const fops = competitionHub.getAvailableFOPs();
 
 ---
 
-#### `getFlagPath(teamName)`
+#### `getFlagUrl(teamName)`
 
-Returns local filesystem path to team flag image (if available).
+Returns a browser-consumable **URL path** to the team flag image (if available).
+
+Notes:
+- This is a URL path you can put directly in an `<img src>`.
+- It is **not** a local filesystem path.
+- The returned URL is rooted at the configured `localUrlPrefix` (default: `/local`).
+- For backward compatibility, `getFlagPath(teamName)` is an alias of `getFlagUrl(teamName)`.
 
 **Parameters:**
 - `teamName` (string) - Team/country name
@@ -458,7 +474,7 @@ Returns local filesystem path to team flag image (if available).
 **Returns:** `string | null`
 
 ```javascript
-const flagPath = competitionHub.getFlagPath('USA Weightlifting');
+const flagUrl = competitionHub.getFlagUrl('USA Weightlifting');
 // "/local/flags/USA Weightlifting.svg"
 ```
 
@@ -466,9 +482,45 @@ const flagPath = competitionHub.getFlagPath('USA Weightlifting');
 
 ---
 
-#### `getLogoPath(teamName)`
+#### `getLogoUrl(teamName)`
 
-Returns local filesystem path to team logo image (if available).
+Returns a browser-consumable **URL path** to the team logo image (if available).
+
+Notes:
+- This is a URL path you can put directly in an `<img src>`.
+- It is **not** a local filesystem path.
+- The returned URL is rooted at the configured `localUrlPrefix` (default: `/local`).
+- For backward compatibility, `getLogoPath(teamName)` is an alias of `getLogoUrl(teamName)`.
+
+---
+
+#### `getLocalUrlPrefix()`
+
+Returns the currently configured URL prefix under which local assets are served.
+
+**Returns:** `string`
+
+```javascript
+const prefix = competitionHub.getLocalUrlPrefix();
+// "/local" (default)
+```
+
+---
+
+#### `setLocalUrlPrefix(prefix)`
+
+Configures the URL prefix under which local assets are served.
+
+**Parameters:**
+- `prefix` (string) - Must start with `/` (e.g., `/local`, `/assets`)
+
+```javascript
+competitionHub.setLocalUrlPrefix('/assets');
+
+// Now URL helpers return:
+competitionHub.getFlagUrl('USA Weightlifting');
+// "/assets/flags/USA Weightlifting.svg"
+```
 
 **Parameters:**
 - `teamName` (string) - Team/organization name
@@ -476,7 +528,7 @@ Returns local filesystem path to team logo image (if available).
 **Returns:** `string | null`
 
 ```javascript
-const logoPath = competitionHub.getLogoPath('USA Weightlifting');
+const logoUrl = competitionHub.getLogoUrl('USA Weightlifting');
 // "/local/logos/USA Weightlifting.png"
 ```
 
@@ -497,16 +549,16 @@ import { EVENT_TYPES } from '@owlcms/tracker-core';
 | Event Type | When Emitted | Payload |
 |------------|--------------|---------|
 | `EVENT_TYPES.DATABASE` | Full database received | `(databaseState)` |
-| `EVENT_TYPES.UPDATE` | Lifting order/athlete change | `(fopName, updatePayload)` |
-| `EVENT_TYPES.TIMER` | Timer start/stop/set | `(fopName, timerPayload)` |
-| `EVENT_TYPES.DECISION` | Referee decision | `(fopName, decisionPayload)` |
+| `EVENT_TYPES.UPDATE` | Lifting order/athlete change | `({ fopName, payload })` |
+| `EVENT_TYPES.TIMER` | Timer start/stop/set | `({ fopName, payload })` |
+| `EVENT_TYPES.DECISION` | Referee decision | `({ fopName, payload })` |
 | `EVENT_TYPES.FLAGS_LOADED` | Flag images extracted | `(flagCount)` |
 | `EVENT_TYPES.LOGOS_LOADED` | Logo images extracted | `(logoCount)` |
 | `EVENT_TYPES.TRANSLATIONS_LOADED` | Translations loaded | `(localeCount)` |
 | `EVENT_TYPES.DATABASE_READY` | Database initialized | `()` |
 | `EVENT_TYPES.HUB_READY` | Hub fully initialized (database + translations) | `()` |
-| `EVENT_TYPES.SESSION_DONE` | Session completed | `(fopName, sessionName)` |
-| `EVENT_TYPES.SESSION_REOPENED` | Session resumed after completion | `(fopName, sessionName)` |
+| `EVENT_TYPES.SESSION_DONE` | Session completed | `({ fopName, sessionName })` |
+| `EVENT_TYPES.SESSION_REOPENED` | Session resumed after completion | `({ fopName, sessionName })` |
 
 ### Event Subscription
 
@@ -519,7 +571,7 @@ competitionHub.once(EVENT_TYPES.HUB_READY, () => {
 });
 
 // Recurring events
-competitionHub.on(EVENT_TYPES.DECISION, (fopName, payload) => {
+competitionHub.on(EVENT_TYPES.DECISION, ({ fopName, payload }) => {
   console.log(`Decision on ${fopName}: ${payload.decisionEventType}`);
   
   if (payload.decisionEventType === 'FULL_DECISION') {
@@ -532,7 +584,7 @@ competitionHub.on(EVENT_TYPES.DECISION, (fopName, payload) => {
   }
 });
 
-competitionHub.on(EVENT_TYPES.UPDATE, (fopName, payload) => {
+competitionHub.on(EVENT_TYPES.UPDATE, ({ fopName, payload }) => {
   if (payload.uiEvent === 'LiftingOrderUpdated') {
     console.log(`New current athlete: ${payload.fullName}`);
   }
@@ -661,7 +713,7 @@ app.get('/api/athletes', (req, res) => {
 
 app.get('/api/lifting-order/:fop', (req, res) => {
   const fopData = competitionHub.getFopUpdate(req.params.fop);
-  const liftingOrder = competitionHub.getLiftingOrderEntries(req.params.fop);
+  const liftingOrder = competitionHub.getLiftingOrderEntries({ fopName: req.params.fop });
   res.json({
     currentAthlete: fopData?.fullName,
     athletes: liftingOrder
@@ -702,9 +754,14 @@ Both `createWebSocketServer` and `attachWebSocketToServer` accept these options:
   //   - logos_zip  -> <localFilesDir>/logos
   //   - pictures_zip -> <localFilesDir>/pictures
   //   - styles     -> <localFilesDir>/styles
-  // The consumer must serve these files at URL path: /local/*
+  // The consumer must serve these files at URL path: <localUrlPrefix>/*
   // Default (if omitted): path.join(process.cwd(), 'local')
   localFilesDir: '/var/lib/owlcms-tracker/local',
+
+  // The URL prefix under which the extracted local files are served.
+  // Default: '/local'
+  // Example: '/assets' -> clients use '/assets/flags/...', '/assets/logos/...'
+  localUrlPrefix: '/local',
   
   // Optional
   port: 8095,                    // Port (standalone mode only)
@@ -728,7 +785,9 @@ Both `createWebSocketServer` and `attachWebSocketToServer` accept these options:
 
 OWLCMS can send ZIP resources (e.g., `flags_zip`, `logos_zip`, `translations_zip`) over the same WebSocket connection.
 
-- The **URL paths** used by clients remain stable (e.g., `/local/flags/<name>.svg`, `/local/logos/<name>.png`).
+- The **URL paths** used by clients remain stable under the configured `localUrlPrefix` (default: `/local`).
+  - Examples (default): `/local/flags/<name>.svg`, `/local/logos/<name>.png`
+  - Examples (custom prefix): `/assets/flags/<name>.svg`, `/assets/logos/<name>.png`
 - The **filesystem output directory** for extracted files must be configurable via the WebSocket integration option `localFilesDir`.
 
 This is required so deployments can write to a durable, configurable location (container volume, system service directory, etc.).
@@ -757,7 +816,7 @@ const flagUrl = getFlagUrl('USA Weightlifting');
 // "/local/flags/USA Weightlifting.svg"
 
 // Get flag as HTML img tag
-const flagHtml = getFlagHtml('USA Weightlifting', { width: 32, height: 24 });
+const flagHtml = getFlagHtml({ teamName: 'USA Weightlifting', width: 32, height: 24 });
 // '<img src="/local/flags/USA Weightlifting.svg" width="32" height="24" alt="USA Weightlifting" />'
 ```
 
@@ -765,24 +824,30 @@ const flagHtml = getFlagHtml('USA Weightlifting', { width: 32, height: 24 });
 
 ### Scoring Formulas
 
+**Parameter style (future spec):**
+
+All public scoring functions accept a single object parameter (no positional arguments).
+
 #### Sinclair
 
 ```javascript
 import { 
-  CalculateSinclair2024, 
-  CalculateSinclair2020,
+  calculateSinclair2024,
+  calculateSinclair2020,
   getMastersAgeFactor
 } from '@owlcms/tracker-core/scoring';
 
-const sinclair2024 = CalculateSinclair2024(220, 88.5, 'M');
+// Preferred object form
+const sinclair2024 = calculateSinclair2024({ total: 220, bodyWeight: 88.5, gender: 'M' });
 // 285.432
 
-const sinclair2020 = CalculateSinclair2020(220, 88.5, 'M');
+const sinclair2020 = calculateSinclair2020({ total: 220, bodyWeight: 88.5, gender: 'M' });
 // 283.156
 
 // Masters age adjustment
-const ageFactor = getMastersAgeFactor(45, 'M');
+const ageFactor = getMastersAgeFactor({ age: 45, gender: 'M' });
 const adjustedSinclair = sinclair2024 * ageFactor;
+
 ```
 
 ---
@@ -790,10 +855,12 @@ const adjustedSinclair = sinclair2024 * ageFactor;
 #### QPoints
 
 ```javascript
-import { CalculateQPoints } from '@owlcms/tracker-core/scoring';
+import { calculateQPoints } from '@owlcms/tracker-core/scoring';
 
-const qpoints = CalculateQPoints(220, 88.5, 'M');
+// Preferred object form
+const qpoints = calculateQPoints({ total: 220, bodyWeight: 88.5, gender: 'M' });
 // 95.234
+
 ```
 
 ---
@@ -801,13 +868,15 @@ const qpoints = CalculateQPoints(220, 88.5, 'M');
 #### GAMX
 
 ```javascript
-import { computeGamx, Variant } from '@owlcms/tracker-core/scoring';
+import { calculateGamx, Variant } from '@owlcms/tracker-core/scoring';
 
-const gamx = computeGamx(220, 88.5, 'M', Variant.GAMX);
+// Preferred object form
+const gamx = calculateGamx({ total: 220, bodyWeight: 88.5, gender: 'M', variant: Variant.GAMX });
 // 512.34
 
-const gamx2 = computeGamx(220, 88.5, 'M', Variant.GAMX2);
+const gamx2 = calculateGamx({ total: 220, bodyWeight: 88.5, gender: 'M', variant: Variant.GAMX2 });
 // 523.45
+
 ```
 
 ---
@@ -820,8 +889,9 @@ import { calculateTeamPoints } from '@owlcms/tracker-core/team';
 const teamPoints = calculateTeamPoints({
   mensTeamSize: 5,      // Top 5 men count
   womensTeamSize: 5,    // Top 5 women count
-  scoringMethod: 'sinclair'  // 'sinclair' | 'qpoints' | 'gamx'
-}, athletes);
+  scoringMethod: 'sinclair',  // 'sinclair' | 'qpoints' | 'gamx'
+  athletes
+});
 
 // Returns: { teamName: totalPoints, ... }
 ```
@@ -1189,7 +1259,8 @@ competitionHub.on(EVENT_TYPES.DECISION, (fopName, payload) => {
 
 // REST API endpoints
 app.get('/api/lifting-order/:fop', (req, res) => {
-  const liftingOrder = competitionHub.getLiftingOrderEntries(req.params.fop, {
+  const liftingOrder = competitionHub.getLiftingOrderEntries({
+    fopName: req.params.fop,
     includeSpacer: true
   });
   

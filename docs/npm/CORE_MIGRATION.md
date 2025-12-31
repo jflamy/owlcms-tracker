@@ -27,7 +27,7 @@ You are an automated coding agent working primarily in the **tracker-core** repo
    - `import { competitionHub } from '@owlcms/tracker-core';`
    - `import { createWebSocketServer, attachWebSocketToServer } from '@owlcms/tracker-core/websocket';`
    - `import { getFlagUrl, getFlagHtml } from '@owlcms/tracker-core/utils';`
-   - `import { CalculateSinclair2024 } from '@owlcms/tracker-core/scoring';`
+  - `import { calculateSinclair2024 } from '@owlcms/tracker-core/scoring';`
 
 3. Remove tracker-only coupling from extracted code (no SvelteKit route/plugin registry dependencies).
 
@@ -42,6 +42,7 @@ You are an automated coding agent working primarily in the **tracker-core** repo
 - Keep “tracker-specific behavior” optional via callbacks (no hard dependencies on tracker modules).
 - Maintain hub ↔ websocket cooperation for **resource requests / preconditions** within the package.
 - The core API must allow configuring **where local files are written** when OWLCMS sends ZIP resources (flags/logos/pictures/styles).
+- The core API must allow configuring **where those files are served** in URLs (the local assets URL prefix, default `/local`).
 
 ---
 
@@ -161,9 +162,9 @@ export { extractRecordsFromUpdate } from './records-extractor.js';
 4. `src/scoring/index.js`
 
 ```js
-export { CalculateSinclair2024, CalculateSinclair2020, getMastersAgeFactor } from './sinclair-coefficients.js';
-export { CalculateQPoints } from './qpoints-coefficients.js';
-export { computeGamx, Variant } from './gamx2.js';
+export { calculateSinclair2024, calculateSinclair2020, getMastersAgeFactor } from './sinclair-coefficients.js';
+export { calculateQPoints } from './qpoints-coefficients.js';
+export { calculateGamx, Variant } from './gamx2.js';
 export { calculateTeamPoints } from './team-points-formula.js';
 ```
 
@@ -208,6 +209,16 @@ Requirements:
   - `pictures_zip` → `${localFilesDir}/pictures`
   - `styles` → `${localFilesDir}/styles`
 
+### Step 6.2 — Add configurable local assets URL prefix (required)
+
+Consumers should not hard-code `/local`.
+
+Requirements:
+
+- The WebSocket integration APIs accept `localUrlPrefix` (string, URL path prefix).
+- Default: `/local`.
+- All URL-producing helpers must honor it (e.g., `getFlagUrl`, `getLogoUrl`, `getFlagHtml`).
+
 Document this option in [API_REFERENCE.md](./API_REFERENCE.md) and keep it consistent with implementation.
 
 ### Step 7 — Define package entrypoints (`package.json` exports)
@@ -238,7 +249,7 @@ If you do not build to `dist/`, point exports at `src/` (acceptable for local li
 - `import { competitionHub } from '@owlcms/tracker-core'`
 - `import { attachWebSocketToServer } from '@owlcms/tracker-core/websocket'`
 - `import { getFlagUrl } from '@owlcms/tracker-core/utils'`
-- `import { CalculateSinclair2024 } from '@owlcms/tracker-core/scoring'`
+- `import { calculateSinclair2024 } from '@owlcms/tracker-core/scoring'`
 
 2. Both WebSocket integration modes exist and match [API_REFERENCE.md](./API_REFERENCE.md#websocket-server-integration), especially attach/inject.
 

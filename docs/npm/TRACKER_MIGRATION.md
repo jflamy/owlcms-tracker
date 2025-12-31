@@ -96,9 +96,12 @@ import { attachWebSocketToServer } from '@owlcms/tracker-core/websocket';
 Also ensure the tracker sets where OWLCMS-delivered ZIP resources are written:
 
 - Pass `localFilesDir` when starting the WebSocket integration.
-- Update tracker’s `/local/*` serving logic (production hook or Express static) to read files from the same directory.
+- Pass `localUrlPrefix` when starting the WebSocket integration (default: `/local`).
+- Update tracker’s `<localUrlPrefix>/*` serving logic (production hook or Express static) to read files from the same directory.
 
 This is required so deployments can place flags/logos/pictures/styles on durable storage (not tied to `process.cwd()`).
+
+It also ensures scoreboards and downstream consumers can change the URL base (not hard-coded `/local`).
 
 Tracker-specific behavior stays in tracker:
 

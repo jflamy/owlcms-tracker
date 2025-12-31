@@ -176,6 +176,7 @@ Cutover criteria (all must be true):
 - At least one representative scoreboard plugin renders using `competitionHub.getFopUpdate()`
 - Resource preconditions flow works (flags/logos/translations)
 - Local ZIP resources can be written to a configured output directory (not only `process.cwd()/local`)
+- Local assets URL prefix is configurable (`localUrlPrefix`, default `/local`) and tracker serves files under `<localUrlPrefix>/*`
 - No “double singleton” issues observed
 
 When ready:

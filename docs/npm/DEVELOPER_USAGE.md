@@ -304,7 +304,7 @@ wss.on('connection', (ws) => {
 });
 
 // Subscribe to competition events
-competitionHub.on(EVENT_TYPES.DECISION, async (fopName, payload) => {
+competitionHub.on(EVENT_TYPES.DECISION, async ({ fopName, payload }) => {
   console.log(`[Decision] FOP ${fopName}: ${payload.decisionEventType}`);
   
   if (payload.decisionEventType === 'FULL_DECISION') {
@@ -325,7 +325,7 @@ competitionHub.on(EVENT_TYPES.DECISION, async (fopName, payload) => {
   }
 });
 
-competitionHub.on(EVENT_TYPES.UPDATE, async (fopName, payload) => {
+competitionHub.on(EVENT_TYPES.UPDATE, async ({ fopName, payload }) => {
   console.log(`[Update] FOP ${fopName}: ${payload.uiEvent}`);
   
   if (payload.uiEvent === 'LiftingOrderUpdated') {
@@ -334,7 +334,7 @@ competitionHub.on(EVENT_TYPES.UPDATE, async (fopName, payload) => {
   }
 });
 
-competitionHub.on(EVENT_TYPES.TIMER, (fopName, payload) => {
+competitionHub.on(EVENT_TYPES.TIMER, ({ fopName, payload }) => {
   if (payload.athleteTimerEventType === 'StartTime') {
     console.log(`[Timer] FOP ${fopName}: Timer started (${payload.athleteMillisRemaining}ms)`);
   }
@@ -389,7 +389,7 @@ const app = express();
 // Get current lifting order for a FOP
 app.get('/api/lifting-order/:fop', (req, res) => {
   const fopUpdate = competitionHub.getFopUpdate(req.params.fop);
-  const sessionAthletes = competitionHub.getSessionAthletes(req.params.fop);
+  const sessionAthletes = competitionHub.getSessionAthletes({ fopName: req.params.fop });
   
   res.json({
     currentAthlete: fopUpdate?.fullName || null,
@@ -422,7 +422,7 @@ export default function handler(req, res) {
   const { fop } = req.query;
   
   const fopUpdate = competitionHub.getFopUpdate(fop);
-  const sessionAthletes = competitionHub.getSessionAthletes(fop);
+  const sessionAthletes = competitionHub.getSessionAthletes({ fopName: fop });
   
   res.status(200).json({
     fop,
@@ -611,9 +611,10 @@ competitionHub.on(EVENT_TYPES.DATABASE, () => {
   console.log('[Debug] Database received');
 });
 
-competitionHub.on(EVENT_TYPES.UPDATE, (fopName, payload) => {
-  console.log('[Debug] Update received:', payload.uiEvent);
+competitionHub.on(EVENT_TYPES.UPDATE, ({ fopName, payload }) => {
+  console.log(`[Debug] Update received for ${fopName}:`, payload.uiEvent);
 });
+
 ```
 
 ---
