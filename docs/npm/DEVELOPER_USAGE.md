@@ -388,7 +388,7 @@ const app = express();
 
 // Get current lifting order for a FOP
 app.get('/api/lifting-order/:fop', (req, res) => {
-  const fopUpdate = competitionHub.getFopUpdate(req.params.fop);
+  const fopUpdate = competitionHub.getFopUpdate({ fopName: req.params.fop });
   const sessionAthletes = competitionHub.getSessionAthletes({ fopName: req.params.fop });
   
   res.json({
@@ -421,7 +421,7 @@ import { competitionHub } from '@owlcms/tracker-core';
 export default function handler(req, res) {
   const { fop } = req.query;
   
-  const fopUpdate = competitionHub.getFopUpdate(fop);
+  const fopUpdate = competitionHub.getFopUpdate({ fopName: fop });
   const sessionAthletes = competitionHub.getSessionAthletes({ fopName: fop });
   
   res.status(200).json({

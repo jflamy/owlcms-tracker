@@ -31,21 +31,21 @@ import { competitionHub } from '@owlcms/tracker-core';
 | Method | Purpose |
 |--------|---------|
 | `getDatabaseState()` | Full competition data |
-| `getFopUpdate(fopName)` | Latest FOP state (includes athlete keys) |
-| `getCurrentAthlete(fopName)` | Current lifter (no array scanning) ⭐ |
-| `getNextAthlete(fopName)` | Next lifter (no array scanning) ⭐ |
-| `getPreviousAthlete(fopName)` | Previous lifter (no array scanning) ⭐ |
+| `getFopUpdate({ fopName })` | Latest FOP state (includes athlete keys) |
+| `getCurrentAthlete({ fopName })` | Current lifter (no array scanning) ⭐ |
+| `getNextAthlete({ fopName })` | Next lifter (no array scanning) ⭐ |
+| `getPreviousAthlete({ fopName })` | Previous lifter (no array scanning) ⭐ |
 | `getSessionAthletes({ fopName, includeSpacer })` | All session athletes |
 | `getStartOrderEntries({ fopName, includeSpacer })` | Registration order |
 | `getLiftingOrderEntries({ fopName, includeSpacer })` | Lifting queue |
-| `getTranslations(locale)` | Localized strings |
-| `getSessionStatus(fopName)` | Session complete/active |
-| `getTeamNameById(teamId)` | Resolve team names |
+| `getTranslations({ locale })` | Localized strings |
+| `getSessionStatus({ fopName })` | Session complete/active |
+| `getTeamNameById({ teamId })` | Resolve team names |
 | `isReady()` | Hub initialization check |
-| `getFopStateVersion(fopName)` | Cache invalidation version |
+| `getFopStateVersion({ fopName })` | Cache invalidation version |
 | `getCategoryToAgeGroupMap()` | Category grouping |
 | `getLocalUrlPrefix()` | Current local assets URL prefix |
-| `setLocalUrlPrefix(prefix)` | Configure local assets URL prefix |
+| `setLocalUrlPrefix({ prefix })` | Configure local assets URL prefix |
 
 **Local assets URL prefix (`localUrlPrefix`)**
 
@@ -81,7 +81,7 @@ const db = competitionHub.getDatabaseState();
 
 ---
 
-#### `getFopUpdate(fopName)`
+#### `getFopUpdate({ fopName })`
 
 Returns the latest update payload for a specific FOP (Field of Play).
 
@@ -91,7 +91,7 @@ Returns the latest update payload for a specific FOP (Field of Play).
 **Returns:** `Object | null`
 
 ```javascript
-const fopData = competitionHub.getFopUpdate('Platform A');
+const fopData = competitionHub.getFopUpdate({ fopName: 'Platform A' });
 // {
 //   competitionName: "2025 Nationals",
 //   fopName: "Platform A",
@@ -162,7 +162,7 @@ const athletes = competitionHub.getSessionAthletes({ fopName: 'Platform A' });
 
 ---
 
-#### `getCurrentAthlete(fopName)`
+#### `getCurrentAthlete({ fopName })`
 
 Returns the current athlete on the platform with enriched data (no array scanning needed).
 
@@ -172,7 +172,7 @@ Returns the current athlete on the platform with enriched data (no array scannin
 **Returns:** `Object | null`
 
 ```javascript
-const current = competitionHub.getCurrentAthlete('Platform A');
+const current = competitionHub.getCurrentAthlete({ fopName: 'Platform A' });
 // {
 //   key: "123",
 //   fullName: "DOE, John",
@@ -194,7 +194,7 @@ const current = competitionHub.getCurrentAthlete('Platform A');
 
 ---
 
-#### `getNextAthlete(fopName)`
+#### `getNextAthlete({ fopName })`
 
 Returns the next athlete in lifting order (no array scanning needed).
 
@@ -204,7 +204,7 @@ Returns the next athlete in lifting order (no array scanning needed).
 **Returns:** `Object | null`
 
 ```javascript
-const next = competitionHub.getNextAthlete('Platform A');
+const next = competitionHub.getNextAthlete({ fopName: 'Platform A' });
 // {
 //   key: "124",
 //   fullName: "SMITH, Jane",
@@ -220,7 +220,7 @@ const next = competitionHub.getNextAthlete('Platform A');
 
 ---
 
-#### `getPreviousAthlete(fopName)`
+#### `getPreviousAthlete({ fopName })`
 
 Returns the previous athlete who lifted (no array scanning needed).
 
@@ -230,7 +230,7 @@ Returns the previous athlete who lifted (no array scanning needed).
 **Returns:** `Object | null`
 
 ```javascript
-const previous = competitionHub.getPreviousAthlete('Platform A');
+const previous = competitionHub.getPreviousAthlete({ fopName: 'Platform A' });
 // {
 //   key: "122",
 //   fullName: "JONES, Bob",
@@ -308,7 +308,7 @@ const liftingOrder = competitionHub.getLiftingOrderEntries({
 
 ---
 
-#### `getTranslations(locale)`
+#### `getTranslations({ locale })`
 
 Returns translation map for specified locale with fallback chain.
 
@@ -318,7 +318,7 @@ Returns translation map for specified locale with fallback chain.
 **Returns:** `Object`
 
 ```javascript
-const t = competitionHub.getTranslations('fr-CA');
+const t = competitionHub.getTranslations({ locale: 'fr-CA' });
 // {
 //   "Start": "Démarrer",    // fr-CA override
 //   "Stop": "Arrêter",      // Fallback from "fr"
@@ -336,7 +336,7 @@ const t = competitionHub.getTranslations('fr-CA');
 
 ---
 
-#### `getSessionStatus(fopName)`
+#### `getSessionStatus({ fopName })`
 
 Returns session completion status for a FOP.
 
@@ -346,7 +346,7 @@ Returns session completion status for a FOP.
 **Returns:** `Object`
 
 ```javascript
-const status = competitionHub.getSessionStatus('Platform A');
+const status = competitionHub.getSessionStatus({ fopName: 'Platform A' });
 // {
 //   isDone: false,
 //   sessionName: "Session 1",
@@ -363,7 +363,7 @@ const status = competitionHub.getSessionStatus('Platform A');
 
 ---
 
-#### `getTeamNameById(teamId)`
+#### `getTeamNameById({ teamId })`
 
 Resolves team name from numeric team ID.
 
@@ -373,7 +373,7 @@ Resolves team name from numeric team ID.
 **Returns:** `string | null`
 
 ```javascript
-const teamName = competitionHub.getTeamNameById(12345);
+const teamName = competitionHub.getTeamNameById({ teamId: 12345 });
 // "USA Weightlifting"
 ```
 
@@ -398,7 +398,7 @@ if (competitionHub.isReady()) {
 
 ---
 
-#### `getFopStateVersion(fopName)`
+#### `getFopStateVersion({ fopName })`
 
 Returns version number for FOP state, increments on every relevant message.
 
@@ -408,7 +408,7 @@ Returns version number for FOP state, increments on every relevant message.
 **Returns:** `number`
 
 ```javascript
-const version = competitionHub.getFopStateVersion('Platform A');
+const version = competitionHub.getFopStateVersion({ fopName: 'Platform A' });
 // 42
 
 // Use in cache keys
@@ -458,7 +458,7 @@ const fops = competitionHub.getAvailableFOPs();
 
 ---
 
-#### `getFlagUrl(teamName)`
+#### `getFlagUrl({ teamName })`
 
 Returns a browser-consumable **URL path** to the team flag image (if available).
 
@@ -466,7 +466,7 @@ Notes:
 - This is a URL path you can put directly in an `<img src>`.
 - It is **not** a local filesystem path.
 - The returned URL is rooted at the configured `localUrlPrefix` (default: `/local`).
-- For backward compatibility, `getFlagPath(teamName)` is an alias of `getFlagUrl(teamName)`.
+- For backward compatibility, `getFlagPath({ teamName })` is an alias of `getFlagUrl({ teamName })`.
 
 **Parameters:**
 - `teamName` (string) - Team/country name
@@ -474,7 +474,7 @@ Notes:
 **Returns:** `string | null`
 
 ```javascript
-const flagUrl = competitionHub.getFlagUrl('USA Weightlifting');
+const flagUrl = competitionHub.getFlagUrl({ teamName: 'USA Weightlifting' });
 // "/local/flags/USA Weightlifting.svg"
 ```
 
@@ -482,7 +482,7 @@ const flagUrl = competitionHub.getFlagUrl('USA Weightlifting');
 
 ---
 
-#### `getLogoUrl(teamName)`
+#### `getLogoUrl({ teamName })`
 
 Returns a browser-consumable **URL path** to the team logo image (if available).
 
@@ -490,7 +490,7 @@ Notes:
 - This is a URL path you can put directly in an `<img src>`.
 - It is **not** a local filesystem path.
 - The returned URL is rooted at the configured `localUrlPrefix` (default: `/local`).
-- For backward compatibility, `getLogoPath(teamName)` is an alias of `getLogoUrl(teamName)`.
+- For backward compatibility, `getLogoPath({ teamName })` is an alias of `getLogoUrl({ teamName })`.
 
 ---
 
@@ -507,7 +507,7 @@ const prefix = competitionHub.getLocalUrlPrefix();
 
 ---
 
-#### `setLocalUrlPrefix(prefix)`
+#### `setLocalUrlPrefix({ prefix })`
 
 Configures the URL prefix under which local assets are served.
 
@@ -515,10 +515,10 @@ Configures the URL prefix under which local assets are served.
 - `prefix` (string) - Must start with `/` (e.g., `/local`, `/assets`)
 
 ```javascript
-competitionHub.setLocalUrlPrefix('/assets');
+competitionHub.setLocalUrlPrefix({ prefix: '/assets' });
 
 // Now URL helpers return:
-competitionHub.getFlagUrl('USA Weightlifting');
+competitionHub.getFlagUrl({ teamName: 'USA Weightlifting' });
 // "/assets/flags/USA Weightlifting.svg"
 ```
 
@@ -528,7 +528,7 @@ competitionHub.getFlagUrl('USA Weightlifting');
 **Returns:** `string | null`
 
 ```javascript
-const logoUrl = competitionHub.getLogoUrl('USA Weightlifting');
+const logoUrl = competitionHub.getLogoUrl({ teamName: 'USA Weightlifting' });
 // "/local/logos/USA Weightlifting.png"
 ```
 
@@ -712,7 +712,7 @@ app.get('/api/athletes', (req, res) => {
 });
 
 app.get('/api/lifting-order/:fop', (req, res) => {
-  const fopData = competitionHub.getFopUpdate(req.params.fop);
+  const fopData = competitionHub.getFopUpdate({ fopName: req.params.fop });
   const liftingOrder = competitionHub.getLiftingOrderEntries({ fopName: req.params.fop });
   res.json({
     currentAthlete: fopData?.fullName,
@@ -926,7 +926,7 @@ import {
   extractTimerAndDecisionState
 } from '@owlcms/tracker-core/helpers';
 
-const fopUpdate = competitionHub.getFopUpdate('Platform A');
+const fopUpdate = competitionHub.getFopUpdate({ fopName: 'Platform A' });
 
 // Extract timer states (athlete + break)
 const timers = extractTimers(fopUpdate);
@@ -953,7 +953,7 @@ import {
   hasCurrentAthlete
 } from '@owlcms/tracker-core/helpers';
 
-const fopUpdate = competitionHub.getFopUpdate('Platform A');
+const fopUpdate = competitionHub.getFopUpdate({ fopName: 'Platform A' });
 
 // Check if attempt bar should be shown
 const showAttemptBar = computeAttemptBarVisibility(fopUpdate);
@@ -971,7 +971,7 @@ const hasCurrent = hasCurrentAthlete(fopUpdate);
 ```javascript
 import { extractRecordsFromUpdate } from '@owlcms/tracker-core/records';
 
-const fopUpdate = competitionHub.getFopUpdate('Platform A');
+const fopUpdate = competitionHub.getFopUpdate({ fopName: 'Platform A' });
 
 // Get new records broken in current session
 const newRecords = extractRecordsFromUpdate(fopUpdate);
@@ -1092,7 +1092,7 @@ Complete structure returned by `getDatabaseState()`:
 
 ### FOP Update
 
-Complete structure returned by `getFopUpdate(fopName)`:
+Complete structure returned by `getFopUpdate({ fopName })`:
 
 ```javascript
 {
