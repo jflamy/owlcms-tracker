@@ -21,6 +21,13 @@ In this other example, a customized attempt board was created by cloning.  owlcm
 
 <img width="1896" height="1062" alt="image" src="https://github.com/user-attachments/assets/fb408431-221c-45f6-8802-1d1cf71e5c35" />
 
+Because owlcms-tracker can generate arbitrarily sophisticated HTML and CSS, it is even possible to generate printable documents that
+are printed as PDF.  A full IWF-style results book with participants, medals, team points, category rankings, session protocols and records was built this
+way.  A sample page follows:
+
+<img width="1284" height="906" alt="image" src="https://github.com/user-attachments/assets/266fda07-a758-4ecf-a6fd-d1926ce84335" />
+
+
 ## Features
 
 - **Multiple Scoreboard Types** - Lifting order, results, team rankings, and more  
