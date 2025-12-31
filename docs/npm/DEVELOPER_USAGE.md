@@ -223,15 +223,14 @@ Follow the setup steps in your Scenario above. This section intentionally avoids
 ### 1. Install Dependencies
 
 ```bash
-npm install @owlcms/tracker-core express ws axios
+npm install @owlcms/tracker-core express axios
 ```
 
 ### 2. Create `vmix-controller.js`
 
 ```javascript
-import { competitionHub, EVENT_TYPES } from '@owlcms/tracker-core';
+import { competitionHub, EVENT_TYPES, attachWebSocketToServer } from '@owlcms/tracker-core';
 import express from 'express';
-import { WebSocketServer } from 'ws';
 import axios from 'axios';
 
 // vMix Configuration
@@ -265,42 +264,19 @@ async function updateVmixScoreboard(fopUpdate) {
   }
 }
 
-// Start Express server for OWLCMS WebSocket connection
+// Start Express server
 const app = express();
 const server = app.listen(8096, () => {
-  console.log('[Server] Listening on port 8096 for OWLCMS WebSocket connection');
+  console.log('[Server] Running on port 8096');
 });
 
-// Create WebSocket server
-const wss = new WebSocketServer({ server, path: '/ws' });
-
-wss.on('connection', (ws) => {
-  console.log('[WebSocket] OWLCMS connected');
-  
-  ws.on('message', async (data) => {
-    try {
-      const message = JSON.parse(data.toString());
-      
-      // Forward message to competition hub
-      await competitionHub.handleOwlcmsMessage(message);
-      
-      // Send response back to OWLCMS
-      ws.send(JSON.stringify({
-        status: 200,
-        message: 'Update processed'
-      }));
-    } catch (error) {
-      console.error('[WebSocket] Message processing failed:', error.message);
-      ws.send(JSON.stringify({
-        status: 500,
-        message: 'Processing error'
-      }));
-    }
-  });
-  
-  ws.on('close', () => {
-    console.log('[WebSocket] OWLCMS disconnected');
-  });
+// Attach WebSocket handler to existing server (handles OWLCMS connection automatically)
+attachWebSocketToServer({
+  server,
+  path: '/ws',
+  hub: competitionHub,
+  onConnect: () => console.log('[WebSocket] OWLCMS connected'),
+  onDisconnect: () => console.log('[WebSocket] OWLCMS disconnected')
 });
 
 // Subscribe to competition events
