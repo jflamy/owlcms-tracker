@@ -16,9 +16,20 @@ export default defineConfig({
 			? [{
 				name: 'websocket-server',
 				configureServer(server) {
-					// Import and initialize WebSocket server
-					import('./src/lib/server/websocket-server.js').then(({ initWebSocketServer }) => {
-						initWebSocketServer(server.httpServer);
+					// Import and initialize WebSocket server using tracker-core
+					Promise.all([
+						import('@owlcms/tracker-core'),
+						import('@owlcms/tracker-core/websocket')
+					]).then(([{ competitionHub }, { attachWebSocketToServer }]) => {
+						attachWebSocketToServer({
+							server: server.httpServer,
+							path: '/ws',
+							hub: competitionHub,
+							localFilesDir: path.join(__dirname, 'local'),
+							localUrlPrefix: '/local',
+							onConnect: () => console.log('[WebSocket] OWLCMS connected'),
+							onDisconnect: () => console.log('[WebSocket] OWLCMS disconnected')
+						});
 					});
 					
 					// Serve /local directory (flags, pictures, styles)
