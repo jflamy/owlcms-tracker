@@ -5,7 +5,8 @@
  * so the /ws endpoint accepts OWLCMS WebSocket connections in production.
  */
 
-import { exec } from 'child_process';
+import { createServer } from 'http';
+import { handler } from './build/handler.js';
 
 // Add global uncaught exception handler to prevent crashes from abrupt connection resets
 process.on('uncaughtException', (err) => {
@@ -30,52 +31,32 @@ process.on('unhandledRejection', (reason, promise) => {
 (async () => {
   try {
     // Set port for adapter-node (default 5173, but we want 8096)
-    process.env.PORT = process.env.PORT || '8096';
+    const PORT = process.env.PORT || '8096';
 
-    // Import built server (adapter-node output)
-    const built = await import('./build/index.js');
+    // Create HTTP server to serve SvelteKit app
+    const httpServer = createServer(handler);
 
-    // Attempt to attach WebSocket server if available
+    // Attach WebSocket server for OWLCMS connections
     try {
-      const { initWebSocketServer } = await import('./build/lib/server/websocket-server.js');
-      // built.server is the Polka instance; its http server is at built.server.server
-      if (built && built.server && built.server.server) {
-        initWebSocketServer(built.server.server);
-        console.log('[Startup] WebSocket server attached to HTTP server');
-      } else {
-        console.warn('[Startup] Unable to locate built.server.server - WebSocket not attached');
-      }
+      const { initializeWebSocketServer } = await import('./build/lib/server/initialize-server.js');
+      await initializeWebSocketServer(httpServer);
+      console.log('[Startup] WebSocket server attached to HTTP server');
     } catch (err) {
-      console.warn('[Startup] Skipping WebSocket initialization:', err?.message || err);
+      console.warn('[Startup] WebSocket initialization warning:', err?.message || err);
+      console.warn('[Startup] OWLCMS connections will not work without WebSocket');
     }
 
-    // Open browser automatically (skip in Docker/headless environments)
-    if (!process.env.DOCKER && !process.env.NO_BROWSER) {
-      const url = `http://localhost:${process.env.PORT}`;
-      const platform = process.platform;
-      
-      // Small delay to ensure server is ready
-      setTimeout(() => {
-        let cmd;
-        if (platform === 'win32') {
-          cmd = `start "" "${url}"`;
-        } else if (platform === 'darwin') {
-          cmd = `open "${url}"`;
-        } else {
-          // Linux - try xdg-open (common on desktop Linux)
-          cmd = `xdg-open "${url}" 2>/dev/null || echo "Open browser to ${url}"`;
-        }
-        
-        exec(cmd, (err) => {
-          if (err && platform !== 'linux') {
-            console.log(`[Startup] Could not open browser. Navigate to: ${url}`);
-          }
-        });
-      }, 500);
-    }
+    // Start the server
+    httpServer.listen(PORT, () => {
+      console.log(`[Startup] Server running on http://localhost:${PORT}`);
+    });
 
-  } catch (err) {
-    console.error('Failed to start built server:', err);
+    // Store HTTP server reference for shutdown gracefully
+    globalThis.__httpServer = httpServer;
+
+  } catch (error) {
+    console.error('❌ Startup error:', error.message);
+    console.error('Stack:', error.stack);
     process.exit(1);
   }
 })();

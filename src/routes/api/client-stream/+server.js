@@ -1,4 +1,5 @@
 import { competitionHub } from '$lib/server/competition-hub.js';
+import { sseBroker } from '$lib/server/sse-broker.js';
 
 /**
  * Server-Sent Events endpoint for browser clients
@@ -18,7 +19,6 @@ export async function GET({ request, url }) {
     start(controller) {
       const encoder = new TextEncoder();
       let isClosed = false;
-      let unsubscribe = null;
       
       const send = (data) => {
         if (isClosed) {
@@ -35,16 +35,62 @@ export async function GET({ request, url }) {
         }
       };
 
+      // Define event handlers
+      const onFopUpdate = (eventData) => {
+        if (!isClosed) {
+          send({
+            type: 'fop_update',
+            fop: eventData.fop,
+            data: eventData.data,
+            timestamp: eventData.timestamp
+          });
+        }
+      };
+
+      const onCompetitionInitialized = (eventData) => {
+        if (!isClosed) {
+          send({
+            type: 'competition_initialized',
+            payload: eventData.payload,
+            timestamp: eventData.timestamp
+          });
+        }
+      };
+
+      const onHubReady = (eventData) => {
+        if (!isClosed) {
+          send({
+            type: 'hub_ready',
+            message: eventData.message,
+            timestamp: eventData.timestamp
+          });
+        }
+      };
+
+      const onWaiting = (eventData) => {
+        if (!isClosed) {
+          send({
+            type: 'waiting',
+            message: eventData.message,
+            timestamp: eventData.timestamp
+          });
+        }
+      };
+
       const cleanup = () => {
         if (isClosed) return; // Already cleaned up
         
         console.log(`[SSE] ${connectionId}: Cleaning up connection`);
         isClosed = true;
         
-        if (unsubscribe) {
-          unsubscribe();
-          unsubscribe = null;
-        }
+        // Unregister event handlers
+        competitionHub.off('fop_update', onFopUpdate);
+        competitionHub.off('competition_initialized', onCompetitionInitialized);
+        competitionHub.off('hub_ready_broadcast', onHubReady);
+        competitionHub.off('waiting', onWaiting);
+        
+        // Unregister client from broker
+        unregisterClient();
         
         try {
           controller.close();
@@ -52,6 +98,11 @@ export async function GET({ request, url }) {
           // Controller might already be closed - ignore
         }
       };
+      
+      // Register client with broker and get unregister function
+      const unregisterClient = sseBroker.registerClient();
+      console.log(`[SSE] ${connectionId}: Client registered (active: ${sseBroker.getActiveClientCount()})`);
+      
       // Ensure we listen for client aborts as early as possible to avoid races
       // where the request was aborted before the listener was registered.
       request.signal.addEventListener('abort', cleanup);
@@ -102,14 +153,12 @@ export async function GET({ request, url }) {
         }
       }
 
-      // Subscribe to hub updates (future broadcasts)
-      unsubscribe = competitionHub.subscribe((data) => {
-        if (!isClosed) {
-          send(data);
-        }
-      });
-
-      // NO KEEPALIVE - rely on browser's connection management for now
+      // Register event handlers for hub updates (future events)
+      // These events are emitted by tracker-core and already debounced internally
+      competitionHub.on('fop_update', onFopUpdate);
+      competitionHub.on('competition_initialized', onCompetitionInitialized);
+      competitionHub.on('hub_ready_broadcast', onHubReady);
+      competitionHub.on('waiting', onWaiting);
     }
   });
 

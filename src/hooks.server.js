@@ -10,6 +10,35 @@ const LEARNING_MODE = process.env.LEARNING_MODE === 'true';
 // Force competition hub initialization (this triggers the constructor and learning mode banner)
 const _ = competitionHub;
 
+// Attach WebSocket server to handle OWLCMS connections
+// This must happen once on startup and persist across HMR reloads
+if (!globalThis.__websocketServerInitialized) {
+  globalThis.__websocketServerInitialized = true;
+  
+  // Schedule WebSocket attachment for after the server is fully initialized
+  // This uses setImmediate to ensure it happens after all synchronous startup code
+  setImmediate(async () => {
+    try {
+      const { initializeWebSocketServer, getHttpServer } = await import('$lib/server/initialize-server.js');
+      
+      // Try to get the HTTP server from the process
+      // In production with adapter-node, it's available via global.__httpServer
+      // In Vite dev mode, it's handled by the vite plugin
+      if (globalThis.__httpServer) {
+        await initializeWebSocketServer(globalThis.__httpServer);
+      }
+    } catch (error) {
+      // WebSocket might be initialized by Vite plugin or start-with-ws.js
+      // So this error is not critical
+      if (process.env.NODE_ENV === 'development') {
+        // In dev mode, Vite plugin handles it - no error
+      } else {
+        console.warn('[WebSocket] Not initialized in hooks (may be done in startup script):', error.message);
+      }
+    }
+  });
+}
+
 // Flags are kept across restarts for convenience
 // The binary handler will overwrite any flags with the same name when new ones arrive
 

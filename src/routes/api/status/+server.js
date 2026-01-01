@@ -4,10 +4,11 @@
 
 import { json } from '@sveltejs/kit';
 import { competitionHub } from '$lib/server/competition-hub.js';
+import { sseBroker } from '$lib/server/sse-broker.js';
 
 export async function GET() {
-  const metrics = competitionHub.getMetrics();
   const state = competitionHub.getState();
+  const activeClients = sseBroker.getActiveClientCount();
   
   return json({
     status: 'ready',
@@ -24,9 +25,9 @@ export async function GET() {
       status: '/api/status'
     },
     metrics: {
-      activeClients: metrics.activeClients,
-      messagesReceived: metrics.messagesReceived,
-      messagesBroadcast: metrics.messagesBroadcast
+      activeClients,
+      messagesReceived: 0,
+      messagesBroadcast: 0
     },
     timestamp: new Date().toISOString()
   });
