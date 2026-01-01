@@ -73,6 +73,11 @@ To run the tracker from source code (for development or to access experimental p
    ```bash
    npm install
    ```
+   
+   *Note: This project uses `@owlcms/tracker-core`. If you need to install it manually:*
+   ```bash
+   npm install github:owlcms/tracker-core
+   ```
 
 3. **Run the tracker:**
    ```bash
