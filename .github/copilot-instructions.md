@@ -10,9 +10,7 @@ You are helping build a **SvelteKit application** that displays the state of an 
 2. **[CREATE_YOUR_OWN.md](../CREATE_YOUR_OWN.md)** - Create custom scoreboards
 3. **[docs/SCOREBOARD_ARCHITECTURE.md](../docs/SCOREBOARD_ARCHITECTURE.md)** - Complete system architecture
 4. **[docs/WEBSOCKET_MESSAGE_SPEC.md](../docs/WEBSOCKET_MESSAGE_SPEC.md)** - WebSocket message format & responses
-5. **[docs/FIELD_MAPPING.md](../docs/FIELD_MAPPING.md)** - Complete field-by-field data mapping
-6. **[docs/FIELD_MAPPING_OVERVIEW.md](../docs/FIELD_MAPPING_OVERVIEW.md)** - Quick reference for data sources
-7. **[docs/CACHING_IMPLEMENTATION.md](../docs/CACHING_IMPLEMENTATION.md)** - Performance & caching strategies
+
 
 **⚠️ IMPORTANT:** Before making any significant changes to the codebase:
 - Read ALL documentation files in the `/docs` folder
@@ -27,8 +25,76 @@ This instructions file provides **AI context only**. For detailed technical info
 
 **Operating System:** Windows with bash shell (Git Bash or WSL)
 - When generating terminal commands, use bash syntax
-- File paths use Windows format (`c:\Dev\...`) but commands are bash-style
+- File paths use Windows format (`c:\Dev\...`) but commands are bash-style- **CRITICAL:** Git Bash has limitations with heredocs - see section below
 
+------
+
+## 🚨 Git Bash Shell Limitations
+
+### DO NOT use heredocs with inline code
+
+**❌ WRONG - This will corrupt files:**
+```bash
+cat > file.js << 'EOF'
+const x = 'value';
+EOF
+```
+
+**❌ WRONG - Python heredocs also fail:**
+```bash
+python - <<'PY'
+import sys
+print("hello")
+PY
+```
+
+**Why it fails:**
+- Git Bash on Windows has issues with heredoc parsing
+- Results in corrupted files with mangled content
+- Particularly dangerous with search-and-replace operations
+
+### ✅ CORRECT Alternatives
+
+**Option 1: Create external script file first**
+```bash
+# Create the script file separately
+cat > /tmp/script.py
+# Then paste content manually or use text editor
+
+# Run it
+python /tmp/script.py
+```
+
+**Option 2: Use Node.js for simple replacements**
+```bash
+node -e "
+const fs = require('fs');
+let text = fs.readFileSync('file.js', 'utf8');
+text = text.replace(/oldPattern/g, 'newPattern');
+fs.writeFileSync('file.js', text);
+"
+```
+
+**Option 3: Create .cjs script file (for ESM projects)**
+```bash
+# Save script to file first
+cat > fix_script.cjs
+# Add content via editor or create_file tool
+
+# Run it
+node fix_script.cjs
+```
+
+**Option 4: Use sed for simple replacements**
+```bash
+# Single replacement (be careful with special characters)
+sed -i 's/console\.log(/logger.log(/g' file.js
+```
+
+**REMEMBER:** 
+- Always prefer creating files via the `create_file` tool
+- For complex multi-line scripts, create the file first, then execute
+- Test on a backup copy before modifying important files
 ------
 
 ## 🏗️ Architecture Summary
