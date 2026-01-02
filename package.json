@@ -14,7 +14,8 @@
     "check": "svelte-kit sync && svelte-check --tsconfig ./jsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./jsconfig.json --watch",
     "test": "vitest run",
-    "test:watch": "vitest watch"
+    "test:watch": "vitest watch",
+    "prepare-release": "node scripts/prepare-release.js"
   },
   "devDependencies": {
     "@sveltejs/adapter-auto": "^3.2.5",
