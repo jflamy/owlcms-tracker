@@ -8,42 +8,8 @@
  */
 
 import { competitionHub } from '$lib/server/competition-hub.js';
-import { getFlagUrl } from '$lib/server/flag-resolver.js';
+import { getFlagUrl, getPictureUrl } from '$lib/server/flag-resolver.js';
 import { extractTimerAndDecisionState } from '$lib/server/timer-decision-helpers.js';
-import fs from 'fs';
-import path from 'path';
-
-const PICTURE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.svg'];
-const PICTURES_DIR = path.join(process.cwd(), 'local', 'pictures');
-
-/**
- * Get picture URL for an athlete by membership ID
- * @param {string} membership - Athlete's membership ID
- * @returns {string|null} Path to picture or null if not found
- */
-function getPictureUrl(membership) {
-	if (!membership) {
-		return null;
-	}
-	
-	// Try direct membership ID first
-	for (const ext of PICTURE_EXTENSIONS) {
-		const fileName = `${membership}${ext}`;
-		const fullPath = path.join(PICTURES_DIR, fileName);
-		try {
-			if (fs.existsSync(fullPath)) {
-				console.log(`[Pictures] Found: ${fileName}`);
-				return `local/pictures/${fileName}`;
-			}
-		} catch (error) {
-			console.error(`[Pictures] Error checking ${fileName}: ${error.message}`);
-		}
-	}
-	
-	// Log if not found
-	console.log(`[Pictures] No picture found for membership: ${membership} in ${PICTURES_DIR}`);
-	return null;
-}
 
 /**
  * Get the full database state - SERVER-SIDE ONLY
@@ -266,20 +232,16 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		// Get weight from fopUpdate (current requested weight)
 		const weight = parseInt(fopUpdate?.weight) || 0;
 		
-		// Debug logging for picture resolution
-		const pictureUrl = getPictureUrl(currentAthlete.membership);
-		if (currentAthlete.membership) {
-			console.log(`[Attempt Board] Membership: ${currentAthlete.membership}, Picture found: ${!!pictureUrl}`);
-		} else {
-			console.log(`[Attempt Board] No membership ID available for athlete: ${fullName}`);
-		}
+		// Get picture and flag URLs using unified resolver
+		const pictureUrl = getPictureUrl(currentAthlete.membership, true);
+		const flagUrl = getFlagUrl(currentAthlete.teamName, true);
 		
 		currentAttempt = {
 			fullName,
 			lastName,
 			firstName,
 			teamName: currentAthlete.teamName || '',
-			flagUrl: getFlagUrl(currentAthlete.teamName, true),
+			flagUrl,
 			pictureUrl,
 			startNumber: currentAthlete.startNumber || fopUpdate?.startNumber || '',
 			categoryName: currentAthlete.category || fopUpdate?.categoryName || '',
