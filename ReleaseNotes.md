@@ -1,6 +1,7 @@
 # OWLCMS Tracker Release Notes
 
-## New in Release 2.4.0
+## New in Release 2.4
+- 2.4.1: fix flags and pictures handling
 - Internal change: Now built using the tracker-core module
 
 ## New in Release 2.3.3
