@@ -7,19 +7,25 @@
 When developing owlcms-tracker with local changes to tracker-core:
 
 ```bash
-# 1. Link tracker-core globally (from tracker-core directory)
+# 1. Install and link tracker-core globally (from tracker-core directory)
 cd ../tracker-core
+npm install
 npm link
 
-# 2. Link tracker-core in owlcms-tracker
+# 2. Install owlcms-tracker dependencies
 cd ../owlcms-tracker
+npm install
+
+# 3. Link tracker-core in owlcms-tracker
 npm link @owlcms/tracker-core
 
-# 3. Start development server
+# 4. Start development server
 npm run dev
 ```
 
 Changes to tracker-core will be immediately reflected in owlcms-tracker.
+
+> Note: If you run `npm install` (or `npm ci`) in `owlcms-tracker` later, npm may replace the symlink with the locked GitHub dependency. If that happens, just run `npm link @owlcms/tracker-core` again.
 
 ### Checking Link Status
 
@@ -63,37 +69,31 @@ npm run release -- 2.4.0
 **What the script does:**
 
 1. **Validates version** - Checks semver format (X.Y.Z or X.Y.Z-beta01)
-2. **Unlinks tracker-core** - Removes npm link if present
-3. **Updates from GitHub** - Fetches latest tracker-core commit
-4. **Commits changes** - Stages and commits package-lock.json
-5. **Pushes to GitHub** - Uploads the commit
-6. **Triggers workflow** - Uses `gh workflow run -f revision=<version>` to start build
-7. **Re-links tracker-core** - Restores npm link for development
+2. **Resolves tracker-core version** - Uses the provided version, or queries GitHub for the latest semver tag
+3. **Pins tracker-core in package.json** - Uses `npm pkg set` to set `@owlcms/tracker-core` to `github:owlcms/tracker-core#<version>`
+4. **Updates package-lock.json** - Uses `npm install --package-lock-only` (does not touch `node_modules`, so it won't break local links)
+5. **Commits changes** - Stages and commits `package.json`, `package-lock.json`, and `ReleaseNotes.md`
+6. **Pushes to GitHub** - Uploads the commit
+7. **Triggers workflow** - Uses `gh workflow run -f revision=<version>` to start build
 
 ### Manual Release Steps (if needed)
 
 If you need to perform steps manually:
 
 ```bash
-# 1. Unlink tracker-core
-npm unlink --no-save @owlcms/tracker-core
+# 1. Pin tracker-core to the desired tag
+npm pkg set dependencies.@owlcms/tracker-core=github:owlcms/tracker-core#1.0.0-rc01
 
-# 2. Update to latest from GitHub
-npm update @owlcms/tracker-core
+# 2. Update package-lock.json without touching node_modules
+npm install --package-lock-only
 
-# 3. Update release.yaml with version number
-# (Not needed - gh workflow run passes version directly)
-
-# 4. Commit and push
-git add package-lock.json
+# 3. Commit and push
+git add package.json package-lock.json ReleaseNotes.md
 git commit -m "chore: update tracker-core for release 2.4.0"
 git push
 
-# 5. Trigger workflow using gh CLI
+# 4. Trigger workflow using gh CLI
 gh workflow run release.yaml -f revision=2.4.0
-
-# 6. Re-link for development
-npm link @owlcms/tracker-core
 ```
 
 ## Release Workflow Details
@@ -128,15 +128,9 @@ When releasing both packages together:
 cd ../tracker-core
 npm run release 1.0.0-beta02
 
-# 2. Update owlcms-tracker dependencies
+# 2. Release owlcms-tracker pinned to that tracker-core tag
 cd ../owlcms-tracker
-npm update @owlcms/tracker-core
-
-# 3. Verify the commit hash
-grep "resolved.*tracker-core" package-lock.json
-
-# 4. Release owlcms-tracker
-npm run release -- 2.4.0
+npm run release -- 2.4.0 1.0.0-beta02
 ```
 
 ## Troubleshooting
@@ -159,11 +153,11 @@ gh auth login
 
 **Problem:** `npm ci` requires exact versions from package-lock.json
 
-**Solution:** Use `npm install` (preserves links) or unlink before running `npm ci`
+**Solution:** `npm ci` removes `node_modules` and installs exactly what's in `package-lock.json`. If you use `npm link`, run `npm ci` first, then re-link.
 
 ```bash
-npm unlink --no-save @owlcms/tracker-core
 npm ci
+npm link @owlcms/tracker-core
 ```
 
 ### Link is still present after release script
@@ -183,12 +177,11 @@ npm link @owlcms/tracker-core
 
 **Problem:** package-lock.json points to old commit
 
-**Solution:** Force update from GitHub
+**Solution:** Re-pin the dependency and regenerate the lock file
 
 ```bash
-npm unlink --no-save @owlcms/tracker-core
-npm update @owlcms/tracker-core
-npm link @owlcms/tracker-core
+npm pkg set dependencies.@owlcms/tracker-core=github:owlcms/tracker-core#1.0.0-rc01
+npm install --package-lock-only
 ```
 
 ### Vite not picking up changes

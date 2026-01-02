@@ -40,7 +40,16 @@ jobs:
           cache: 'npm'
       
       - name: Install dependencies
-        run: npm ci
+        run: |
+          echo "Installing dependencies from package-lock.json..."
+          npm ci
+          echo "✓ Dependencies installed"
+          
+          # Verify tracker-core version
+          echo ""
+          echo "📋 Checking @owlcms/tracker-core version:"
+          npm list @owlcms/tracker-core || true
+
       
       - name: Prepare standard plugins only (matching Docker)
         run: |

@@ -10,24 +10,97 @@
  *   npm run release -- 2.4.0 1.0.0-beta02
  * 
  * This script:
- * 1. Removes the npm link
- * 2. Installs tracker-core (latest or specific version) from GitHub
- * 3. Updates package-lock.json
+ * 1. Fetches latest tracker-core version from GitHub if not specified
+ * 2. Uses npm pkg set to update the dependency
+ * 3. Runs npm install to update package-lock.json
  * 4. Commits and pushes
  * 5. Triggers GitHub Actions workflow
- * 6. Re-links tracker-core for continued development
  */
 
 import { execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import https from 'https';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+/**
+ * Fetch latest semver tag from GitHub API
+ * @param {string} owner - Repository owner
+ * @param {string} repo - Repository name
+ * @returns {Promise<string>} Latest semver tag
+ */
+function fetchLatestGitHubTag(owner, repo) {
+  return new Promise((resolve, reject) => {
+    const options = {
+      hostname: 'api.github.com',
+      path: `/repos/${owner}/${repo}/tags`,
+      method: 'GET',
+      headers: {
+        'User-Agent': 'owlcms-tracker-release-script',
+        'Accept': 'application/vnd.github.v3+json'
+      }
+    };
+
+    https.get(options, (res) => {
+      let data = '';
+
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+
+      res.on('end', () => {
+        if (res.statusCode !== 200) {
+          reject(new Error(`GitHub API returned ${res.statusCode}: ${data}`));
+          return;
+        }
+
+        try {
+          const tags = JSON.parse(data);
+          
+          if (!Array.isArray(tags) || tags.length === 0) {
+            reject(new Error('No tags found in repository'));
+            return;
+          }
+
+          // Filter for semver tags and sort by version
+          const semverPattern = /^v?(\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?(\+[a-zA-Z0-9.]+)?)$/;
+          const semverTags = tags
+            .map(tag => tag.name)
+            .filter(name => semverPattern.test(name))
+            .map(name => name.replace(/^v/, '')) // Remove leading 'v' if present
+            .sort((a, b) => {
+              // Simple semver comparison (could use semver library for production)
+              const partsA = a.split(/[.-]/);
+              const partsB = b.split(/[.-]/);
+              for (let i = 0; i < Math.max(partsA.length, partsB.length); i++) {
+                const numA = parseInt(partsA[i]) || 0;
+                const numB = parseInt(partsB[i]) || 0;
+                if (numA !== numB) return numB - numA; // Descending order
+              }
+              return 0;
+            });
+
+          if (semverTags.length === 0) {
+            reject(new Error('No valid semver tags found'));
+            return;
+          }
+
+          resolve(semverTags[0]);
+        } catch (error) {
+          reject(new Error(`Failed to parse GitHub API response: ${error.message}`));
+        }
+      });
+    }).on('error', (error) => {
+      reject(new Error(`Failed to fetch tags from GitHub: ${error.message}`));
+    });
+  });
+}
+
 // Parse arguments
 const version = process.argv[2];
-const trackerCoreVersion = process.argv[3]; // Optional
+let trackerCoreVersion = process.argv[3]; // Optional
 
 if (!version) {
   console.error('❌ Error: Version number required');
@@ -47,53 +120,73 @@ if (!/^\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?(\+[a-zA-Z0-9.]+)?$/.test(version)) {
 
 console.log(`📦 Preparing release ${version}...\n`);
 
-// Check if we're in linked mode
-const trackerCorePath = path.join(process.cwd(), 'node_modules', '@owlcms', 'tracker-core');
-let wasLinked = false;
-try {
-  const stats = fs.lstatSync(trackerCorePath);
-  if (stats.isSymbolicLink()) {
-    wasLinked = true;
-    console.log('🔗 Detected linked tracker-core, unlinking...');
-    execSync('npm unlink --no-save @owlcms/tracker-core', { stdio: 'inherit' });
-  } else {
-    console.log('✓ Already using installed tracker-core (not linked)');
+// Fetch latest tracker-core version if not provided
+if (!trackerCoreVersion) {
+  console.log('🔍 Fetching latest tracker-core version from GitHub...');
+  try {
+    trackerCoreVersion = await fetchLatestGitHubTag('owlcms', 'tracker-core');
+    console.log(`✓ Found latest version: ${trackerCoreVersion}\n`);
+  } catch (error) {
+    console.error(`❌ Failed to fetch latest version: ${error.message}`);
+    console.error('Please specify tracker-core version explicitly.');
+    process.exit(1);
   }
-} catch (error) {
-  console.log('✓ tracker-core not found (will be installed)');
+} else {
+  console.log(`📌 Using specified tracker-core version: ${trackerCoreVersion}\n`);
 }
 
-// Update to latest or specific version from GitHub
-if (trackerCoreVersion) {
-  console.log(`\n📥 Installing tracker-core version ${trackerCoreVersion} from GitHub...`);
-  // Install specific tag from GitHub
-  execSync(`npm install github:owlcms/tracker-core#${trackerCoreVersion}`, { stdio: 'inherit' });
-} else {
-  console.log('\n📥 Updating tracker-core to latest from GitHub...');
-  execSync('npm update @owlcms/tracker-core', { stdio: 'inherit' });
+// Update dependency using npm pkg set
+console.log(`📝 Updating package.json to use tracker-core@${trackerCoreVersion}...`);
+try {
+  execSync(`npm pkg set dependencies.@owlcms/tracker-core=github:owlcms/tracker-core#${trackerCoreVersion}`, { stdio: 'inherit' });
+  console.log('✓ package.json updated');
+} catch (error) {
+  console.error('❌ Failed to update package.json:', error.message);
+  process.exit(1);
+}
+
+// Update package-lock.json only (preserves npm links in node_modules)
+console.log('\n📥 Updating package-lock.json...');
+try {
+  execSync('npm install --package-lock-only', { stdio: 'inherit' });
+  console.log('✓ package-lock.json updated (node_modules unchanged)');
+} catch (error) {
+  console.error('❌ Failed to update package-lock.json:', error.message);
+  process.exit(1);
 }
 
 // Show what we got
 console.log('\n📋 Checking installed version...');
-const packageLock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
-const trackerCoreInfo = packageLock.packages['node_modules/@owlcms/tracker-core'];
-const commitHash = trackerCoreInfo.resolved.split('#')[1];
-console.log(`   Resolved: ${trackerCoreInfo.resolved}`);
-console.log(`   Commit: ${commitHash}`);
+try {
+  const packageLock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
+  const trackerCoreInfo = packageLock.packages['node_modules/@owlcms/tracker-core'];
+  if (trackerCoreInfo) {
+    const commitHash = trackerCoreInfo.resolved?.split('#')[1] || 'unknown';
+    console.log(`   Resolved: ${trackerCoreInfo.resolved}`);
+    console.log(`   Commit: ${commitHash}`);
+  }
+} catch (error) {
+  console.log('⚠️  Could not read package-lock.json details');
+}
 
 // Commit and push
 console.log('\n💾 Committing changes...');
 try {
   execSync('git add package.json package-lock.json ReleaseNotes.md', { stdio: 'inherit' });
-  execSync(`git commit -m "chore: update tracker-core for release ${version}"`, { stdio: 'inherit' });
+  execSync(`git commit -m "chore: update tracker-core to ${trackerCoreVersion} for release ${version}"`, { stdio: 'inherit' });
   console.log('✓ Committed');
 } catch (error) {
   console.log('⚠️  No changes to commit (already up to date)');
 }
 
 console.log('\n🚀 Pushing changes...');
-execSync('git push', { stdio: 'inherit' });
-console.log('✓ Pushed');
+try {
+  execSync('git push', { stdio: 'inherit' });
+  console.log('✓ Pushed');
+} catch (error) {
+  console.error('❌ Failed to push:', error.message);
+  process.exit(1);
+}
 
 // Trigger GitHub Actions workflow using gh CLI
 console.log(`\n▶️  Triggering release workflow for version ${version}...`);
@@ -109,27 +202,11 @@ try {
   process.exit(1);
 }
 
-// Re-link tracker-core (assuming sibling directories)
-if (wasLinked) {
-  console.log('\n🔗 Re-linking tracker-core for development...');
-  const trackerCoreSiblingPath = path.resolve(process.cwd(), '..', 'tracker-core');
-  if (fs.existsSync(trackerCoreSiblingPath)) {
-    try {
-      // First ensure tracker-core is linked globally
-      execSync('npm link', { cwd: trackerCoreSiblingPath, stdio: 'inherit' });
-      // Then link it here
-      execSync('npm link @owlcms/tracker-core', { stdio: 'inherit' });
-      console.log('✓ Re-linked tracker-core');
-    } catch (error) {
-      console.error('⚠️  Failed to re-link tracker-core:', error.message);
-      console.log('You can manually re-link with: npm link @owlcms/tracker-core');
-    }
-  } else {
-    console.log('⚠️  tracker-core not found at:', trackerCoreSiblingPath);
-    console.log('You can manually re-link with: npm link @owlcms/tracker-core');
-  }
-}
-
 console.log(`\n✅ Release ${version} initiated!`);
+console.log(`   Tracker version: ${version}`);
+console.log(`   Tracker-core version: ${trackerCoreVersion}`);
 console.log('\nGitHub Actions will now build and create the release.');
 console.log('Monitor progress at: https://github.com/owlcms/owlcms-tracker/actions');
+console.log('\nNote: package-lock.json has been committed with the release dependency.');
+console.log('      Next git pull will restore it (it is gitignored for local links).');
+

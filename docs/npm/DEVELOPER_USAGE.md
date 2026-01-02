@@ -136,6 +136,8 @@ npm link @owlcms/tracker-core
 npm run dev
 ```
 
+> Note: The usual sequence is **checkout → `npm install` → `npm link`**. If you run `npm install` (or `npm ci`) in `owlcms-tracker` later, npm may replace the symlink with the locked GitHub dependency; just run `npm link @owlcms/tracker-core` again.
+
 **What happens:**
 - Tracker SvelteKit app runs on port 8096
 - `npm link` creates a symlink: `tracker/node_modules/@owlcms/tracker-core` → `../tracker-core/src`
