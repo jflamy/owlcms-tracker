@@ -84,7 +84,7 @@ console.log(`   Commit: ${commitHash}`);
 // Commit and push
 console.log('\n💾 Committing changes...');
 try {
-  execSync('git add package-lock.json', { stdio: 'inherit' });
+  execSync('git add package.json package-lock.json', { stdio: 'inherit' });
   execSync(`git commit -m "chore: update tracker-core for release ${version}"`, { stdio: 'inherit' });
   console.log('✓ Committed');
 } catch (error) {
