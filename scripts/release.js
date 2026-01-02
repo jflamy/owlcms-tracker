@@ -3,14 +3,18 @@
 /**
  * Prepare and trigger release - Complete automation
  * 
- * Usage: npm run prepare-release -- 2.4.0
+ * Usage: npm run release -- <tracker-version> [tracker-core-version]
+ * 
+ * Examples:
+ *   npm run release -- 2.4.0
+ *   npm run release -- 2.4.0 1.0.0-beta02
  * 
  * This script:
  * 1. Removes the npm link
- * 2. Installs latest tracker-core from GitHub
+ * 2. Installs tracker-core (latest or specific version) from GitHub
  * 3. Updates package-lock.json
- * 4. Updates release.yaml with version number
- * 5. Commits and pushes (triggers GitHub Actions)
+ * 4. Commits and pushes
+ * 5. Triggers GitHub Actions workflow
  * 6. Re-links tracker-core for continued development
  */
 
@@ -23,16 +27,21 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Parse arguments
 const version = process.argv[2];
+const trackerCoreVersion = process.argv[3]; // Optional
+
 if (!version) {
   console.error('❌ Error: Version number required');
-  console.error('Usage: npm run prepare-release -- 2.4.0');
+  console.error('Usage: npm run release -- <tracker-version> [tracker-core-version]');
+  console.error('Examples:');
+  console.error('  npm run release -- 2.4.0');
+  console.error('  npm run release -- 2.4.0 1.0.0-beta02');
   process.exit(1);
 }
 
 // Validate semver format (basic check)
-if (!/^\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?$/.test(version)) {
+if (!/^\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?(\+[a-zA-Z0-9.]+)?$/.test(version)) {
   console.error(`❌ Error: Invalid semver format: ${version}`);
-  console.error('Expected format: X.Y.Z or X.Y.Z-beta01');
+  console.error('Expected format: X.Y.Z or X.Y.Z-beta01 or X.Y.Z+build123');
   process.exit(1);
 }
 
@@ -54,9 +63,15 @@ try {
   console.log('✓ tracker-core not found (will be installed)');
 }
 
-// Update to latest from GitHub
-console.log('\n📥 Updating tracker-core from GitHub...');
-execSync('npm update @owlcms/tracker-core', { stdio: 'inherit' });
+// Update to latest or specific version from GitHub
+if (trackerCoreVersion) {
+  console.log(`\n📥 Installing tracker-core version ${trackerCoreVersion} from GitHub...`);
+  // Install specific tag from GitHub
+  execSync(`npm install github:owlcms/tracker-core#${trackerCoreVersion}`, { stdio: 'inherit' });
+} else {
+  console.log('\n📥 Updating tracker-core to latest from GitHub...');
+  execSync('npm update @owlcms/tracker-core', { stdio: 'inherit' });
+}
 
 // Show what we got
 console.log('\n📋 Checking installed version...');
@@ -66,30 +81,33 @@ const commitHash = trackerCoreInfo.resolved.split('#')[1];
 console.log(`   Resolved: ${trackerCoreInfo.resolved}`);
 console.log(`   Commit: ${commitHash}`);
 
-// Update release.yaml with version number
-console.log(`\n📝 Updating release.yaml with version ${version}...`);
-const releaseYamlPath = path.join(process.cwd(), '.github', 'workflows', 'release.yaml');
-let releaseYaml = fs.readFileSync(releaseYamlPath, 'utf8');
-releaseYaml = releaseYaml.replace(
-  /default: ['"][\d.]+(-[a-zA-Z0-9.]+)?['"]/,
-  `default: '${version}'`
-);
-fs.writeFileSync(releaseYamlPath, releaseYaml, 'utf8');
-console.log('✓ Updated release.yaml');
-
 // Commit and push
 console.log('\n💾 Committing changes...');
 try {
-  execSync('git add package-lock.json .github/workflows/release.yaml', { stdio: 'inherit' });
-  execSync(`git commit -m "chore: prepare release ${version}"`, { stdio: 'inherit' });
+  execSync('git add package-lock.json', { stdio: 'inherit' });
+  execSync(`git commit -m "chore: update tracker-core for release ${version}"`, { stdio: 'inherit' });
   console.log('✓ Committed');
 } catch (error) {
   console.log('⚠️  No changes to commit (already up to date)');
 }
 
-console.log('\n🚀 Pushing to trigger release workflow...');
+console.log('\n🚀 Pushing changes...');
 execSync('git push', { stdio: 'inherit' });
 console.log('✓ Pushed');
+
+// Trigger GitHub Actions workflow using gh CLI
+console.log(`\n▶️  Triggering release workflow for version ${version}...`);
+try {
+  execSync(`gh workflow run release.yaml -f revision=${version}`, { stdio: 'inherit' });
+  console.log('✓ Workflow triggered');
+} catch (error) {
+  console.error('⚠️  Failed to trigger workflow via gh CLI');
+  console.error('Make sure GitHub CLI is installed and authenticated:');
+  console.error('  gh auth login');
+  console.error('\nYou can manually trigger the workflow at:');
+  console.error('  https://github.com/owlcms/owlcms-tracker/actions/workflows/release.yaml');
+  process.exit(1);
+}
 
 // Re-link tracker-core (assuming sibling directories)
 if (wasLinked) {

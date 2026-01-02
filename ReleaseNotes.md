@@ -1,5 +1,8 @@
 # OWLCMS Tracker Release Notes
 
+## New in Release 2.4.0
+- Internal change: Now built using the tracker-core module
+
 ## New in Release 2.3.3
 - Team Points support in iwf-results plugin
 - Database is always sent in compressed format. Learning mode uncompresses the samples.

@@ -33,17 +33,31 @@ ls -l node_modules/@owlcms/tracker-core
 
 ## Release Process
 
-### Automated Release Script
+### Prerequisites
 
-The `prepare-release` script automates the entire release workflow:
+Install GitHub CLI if not already installed:
 
 ```bash
-npm run prepare-release -- <version>
+# Windows (via winget)
+winget install GitHub.cli
+
+# Or download from: https://cli.github.com/
+
+# Authenticate
+gh auth login
+```
+
+### Automated Release Script
+
+The `release` script automates the entire release workflow:
+
+```bash
+npm run release -- <version>
 ```
 
 **Example:**
 ```bash
-npm run prepare-release -- 2.4.0
+npm run release -- 2.4.0
 ```
 
 **What the script does:**
@@ -51,9 +65,9 @@ npm run prepare-release -- 2.4.0
 1. **Validates version** - Checks semver format (X.Y.Z or X.Y.Z-beta01)
 2. **Unlinks tracker-core** - Removes npm link if present
 3. **Updates from GitHub** - Fetches latest tracker-core commit
-4. **Updates release.yaml** - Changes default version in workflow file
-5. **Commits changes** - Stages package-lock.json and release.yaml
-6. **Pushes to GitHub** - Triggers GitHub Actions workflow
+4. **Commits changes** - Stages and commits package-lock.json
+5. **Pushes to GitHub** - Uploads the commit
+6. **Triggers workflow** - Uses `gh workflow run -f revision=<version>` to start build
 7. **Re-links tracker-core** - Restores npm link for development
 
 ### Manual Release Steps (if needed)
@@ -68,15 +82,15 @@ npm unlink --no-save @owlcms/tracker-core
 npm update @owlcms/tracker-core
 
 # 3. Update release.yaml with version number
-# Edit .github/workflows/release.yaml, change default: '2.3.3' to your version
+# (Not needed - gh workflow run passes version directly)
 
 # 4. Commit and push
-git add package-lock.json .github/workflows/release.yaml
-git commit -m "chore: prepare release 2.4.0"
+git add package-lock.json
+git commit -m "chore: update tracker-core for release 2.4.0"
 git push
 
-# 5. Trigger workflow in GitHub UI
-# Go to Actions → owlcms-tracker → Run workflow
+# 5. Trigger workflow using gh CLI
+gh workflow run release.yaml -f revision=2.4.0
 
 # 6. Re-link for development
 npm link @owlcms/tracker-core
@@ -122,10 +136,24 @@ npm update @owlcms/tracker-core
 grep "resolved.*tracker-core" package-lock.json
 
 # 4. Release owlcms-tracker
-npm run prepare-release -- 2.4.0
+npm run release -- 2.4.0
 ```
 
 ## Troubleshooting
+
+### GitHub CLI not installed
+
+**Problem:** Script fails with "gh: command not found"
+
+**Solution:** Install GitHub CLI
+
+```bash
+# Windows
+winget install GitHub.cli
+
+# Then authenticate
+gh auth login
+```
 
 ### "npm ci" fails with missing package
 
