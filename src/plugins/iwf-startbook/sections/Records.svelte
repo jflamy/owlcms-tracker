@@ -92,7 +92,7 @@
   }
   .record-block {
     page-break-inside: avoid;
-    margin-bottom: 25pt;
+    margin-bottom: 12pt;
     border-radius: 0;
     background: none;
     /* stylelint-disable-next-line property-no-unknown */
@@ -101,9 +101,9 @@
   .record-title {
     font-size: 14pt;
     font-weight: bold;
-    margin-bottom: 8pt;
+    margin-bottom: 4pt;
     background: #f0f0f0;
-    padding: 5pt 10pt;
+    padding: 4pt 10pt;
     border-left: 4pt solid #333;
     border-radius: 0;
   }
@@ -119,18 +119,20 @@
   .records-table th,
   .records-table td {
     border: 1pt solid #333;
-    padding: 4pt 3pt;
+    padding: 2pt 3pt;
     text-align: center;
     border-radius: 0;
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
+    line-height: 1.2;
   }
   .records-table th {
     background: #e8e8e8;
     font-weight: bold;
     text-transform: uppercase;
     font-size: 8pt;
+    padding: 3pt 3pt;
   }
   /* Page break for each federation except the first */
   .federation-page.page-break {
