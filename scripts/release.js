@@ -23,8 +23,69 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import https from 'https';
 import { gt } from 'semver';
+import readline from 'readline';
+
+/**
+ * Prompt user for confirmation
+ * @param {string} message - The confirmation message
+ * @returns {Promise<boolean>} true if user confirms, false otherwise
+ */
+function promptConfirmation(message) {
+  return new Promise((resolve) => {
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout
+    });
+
+    rl.question(`${message} (y/N): `, (answer) => {
+      rl.close();
+      resolve(answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes');
+    });
+  });
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+/**
+ * Check if a specific tag exists in a GitHub repository
+ * @param {string} owner - Repository owner
+ * @param {string} repo - Repository name  
+ * @param {string} tag - Tag to check
+ * @returns {Promise<boolean>} true if tag exists
+ */
+function checkTagExists(owner, repo, tag) {
+  return new Promise((resolve, reject) => {
+    const options = {
+      hostname: 'api.github.com',
+      path: `/repos/${owner}/${repo}/git/refs/tags/${tag}`,
+      method: 'GET',
+      headers: {
+        'User-Agent': 'owlcms-tracker-release-script',
+        'Accept': 'application/vnd.github.v3+json'
+      }
+    };
+
+    https.get(options, (res) => {
+      let data = '';
+      
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+
+      res.on('end', () => {
+        if (res.statusCode === 200) {
+          resolve(true);
+        } else if (res.statusCode === 404) {
+          resolve(false);
+        } else {
+          reject(new Error(`GitHub API returned ${res.statusCode}: ${data}`));
+        }
+      });
+    }).on('error', (error) => {
+      reject(new Error(`Failed to check tag: ${error.message}`));
+    });
+  });
+}
 
 /**
  * Fetch latest semver tag from GitHub API
@@ -120,13 +181,33 @@ if (!trackerCoreVersion) {
   try {
     trackerCoreVersion = await fetchLatestGitHubTag('owlcms', 'tracker-core');
     console.log(`✓ Found latest version: ${trackerCoreVersion}\n`);
+    
+    // Prompt for confirmation when auto-fetching tracker-core version
+    const confirmed = await promptConfirmation(`📋 Release ${version} will use tracker-core@${trackerCoreVersion}. Continue?`);
+    if (!confirmed) {
+      console.log('❌ Release cancelled by user.');
+      process.exit(0);
+    }
+    console.log('✅ Proceeding with release...\n');
   } catch (error) {
     console.error(`❌ Failed to fetch latest version: ${error.message}`);
     console.error('Please specify tracker-core version explicitly.');
     process.exit(1);
   }
 } else {
-  console.log(`📌 Using specified tracker-core version: ${trackerCoreVersion}\n`);
+  console.log(`📌 Validating specified tracker-core version: ${trackerCoreVersion}...`);
+  try {
+    const tagExists = await checkTagExists('owlcms', 'tracker-core', trackerCoreVersion);
+    if (!tagExists) {
+      console.error(`❌ Error: tracker-core version '${trackerCoreVersion}' does not exist`);
+      console.error('Available versions can be found at: https://github.com/owlcms/tracker-core/tags');
+      process.exit(1);
+    }
+    console.log(`✓ Version ${trackerCoreVersion} exists\n`);
+  } catch (error) {
+    console.error(`❌ Failed to validate tracker-core version: ${error.message}`);
+    process.exit(1);
+  }
 }
 
 // Update dependency using npm pkg set
@@ -137,6 +218,22 @@ try {
 } catch (error) {
   console.error('❌ Failed to update package.json:', error.message);
   process.exit(1);
+}
+
+// Remove stale tracker-core entry from package-lock.json to force re-resolution
+console.log('\n🔄 Forcing re-resolution of tracker-core...');
+try {
+  const packageLock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
+  // Remove the cached entry so npm must re-resolve
+  delete packageLock.packages['node_modules/@owlcms/tracker-core'];
+  // Also remove from legacy "dependencies" if present
+  if (packageLock.dependencies) {
+    delete packageLock.dependencies['@owlcms/tracker-core'];
+  }
+  fs.writeFileSync('package-lock.json', JSON.stringify(packageLock, null, 2) + '\n');
+  console.log('✓ Removed stale tracker-core entry from package-lock.json');
+} catch (error) {
+  console.log('⚠️  Could not modify package-lock.json (will try fresh install)');
 }
 
 // Update package-lock.json only (preserves npm links in node_modules)
