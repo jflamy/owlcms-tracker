@@ -13,6 +13,7 @@
 > which as an option to do the connection.
 
 ## New in Release 2.4
+- 2.4.2: Fix standard scoreboards layout for phones
 - 2.4.1: fix flags and pictures handling
 - Internal change: Now built using the tracker-core module
 
