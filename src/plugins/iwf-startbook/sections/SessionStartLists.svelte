@@ -343,18 +343,19 @@
     padding-left: 8px !important;
   }
 
-  /* Make this highly visible to confirm styles are applied */
+  /* Session-level records: align styling with main records chapter */
   :global(.records-section) {
-    margin-top: 20px;
+    margin-top: 15px;
+    margin-bottom: 15px;
     page-break-inside: avoid;
-    background: #fffa9d; /* bright yellow for visibility */
-    padding: 12px;
-    border: 2px solid #ff9800;
-    border-radius: 4px;
+    background: transparent;
+    padding: 0;
+    border: none;
+    border-radius: 0;
   }
 
   .records-section h4 {
-    margin: 10px 0 5px 0;
+    margin: 8px 0 5px 0;
     font-size: 12pt;
     font-weight: bold;
   }
@@ -394,6 +395,9 @@
   .records-table th {
     background: #f0f0f0;
     font-weight: bold;
+    text-transform: uppercase;
+    font-size: 8pt;
+    padding: 3pt 3pt;
   }
 
   .federation-spacer {

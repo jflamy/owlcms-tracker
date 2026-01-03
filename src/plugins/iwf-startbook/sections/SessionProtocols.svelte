@@ -396,6 +396,10 @@
     margin-top: 15px;
     margin-bottom: 15px;
     page-break-inside: avoid;
+    background: transparent;
+    padding: 0;
+    border: none;
+    border-radius: 0;
   }
 
   .records-section h4 {
@@ -429,6 +433,9 @@
   .records-table th {
     background: #f0f0f0;
     font-weight: bold;
+    text-transform: uppercase;
+    font-size: 8pt;
+    padding: 3pt 3pt;
     padding: 2px 3px;
     font-size: 8px;
     text-transform: uppercase;
