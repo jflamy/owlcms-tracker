@@ -1,5 +1,17 @@
 # OWLCMS Tracker Release Notes
 
+> owlcms-tracker requires version 64.0.0
+>
+> Currently in prerelease
+> you need to install it from the control panel, using the "Click here
+> to install additional versions" at the bottom, and then selecting
+> the "Show Prereleases"
+>
+> To connect owlcms to tracker, see OWLCMS Configuration below.
+>
+> There is also the option of using the latest prerelease of the control panel,
+> which as an option to do the connection.
+
 ## New in Release 2.4
 - 2.4.1: fix flags and pictures handling
 - Internal change: Now built using the tracker-core module
