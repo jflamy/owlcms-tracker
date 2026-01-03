@@ -544,11 +544,15 @@ export function getScoreboardData(fopName = '', options = {}, locale = 'en') {
   // Build participants matrix (Teams × Categories)
   const participants = buildParticipationData(databaseState);
 
+  // Build category participants data (Championship → Gender → Category → Items, sorted by lot number)
+  const rankings = buildCategoryParticipantsData(databaseState, transformAthlete, athleteParticipationByAgeGroup);
+
   // Cache and return
   const processedData = {
     competition,
     sessions,
     participants,
+    rankings,
     includeSessionStartLists,
     includeOfficials,
     productionTime: new Date().toLocaleString(locale, { 
@@ -1006,6 +1010,138 @@ function buildRankingsData(db, transformAthleteFn) {
     }));
   
   return rankings;
+}
+
+/**
+ * Build category participants data structure - similar to buildRankingsData but sorted by lot number
+ * Structure: Championship → Gender → Category → Items (sorted by lotNumber ascending)
+ * Items are deduped via seenLotNumbers Set, same as Rankings
+ */
+function buildCategoryParticipantsData(db, transformAthleteFn, athleteParticipationByAgeGroup) {
+  const athletes = db.athletes || [];
+  const ageGroups = db.ageGroups || [];
+  
+  if (athletes.length === 0) return [];
+  
+  // Build age group lookup for championship info - map by category CODE (not id)
+  const ageGroupMap = new Map();
+  ageGroups.forEach(ag => {
+    // Skip inactive age groups — only active groups should contribute mappings
+    if (ag.active === false) return;
+    ag.categories?.forEach(cat => {
+      // Map by category code (e.g., "SR_F48") which matches athlete.categoryCode
+      ageGroupMap.set(cat.code, {
+        championshipName: ag.championshipName || ag.code || 'Open',
+        ageGroupCode: ag.code,
+        maxAge: ag.maxAge || 999,
+        minAge: ag.minAge || 0
+      });
+    });
+  });
+  
+  // Group athletes by Championship → Gender → Category
+  const championshipMap = new Map();
+  
+  athletes.forEach(athlete => {
+    // 🎯 FILTERING: Session unknown -- athlete not in session -- should not be included
+    if (!athlete.sessionName || athlete.sessionName === 'Unknown') return;
+
+    // Transform athlete once - pass the athleteParticipationByAgeGroup map
+    const transformed = transformAthleteFn(athlete, db, athleteParticipationByAgeGroup);
+    
+    // Use participations if available, otherwise create a synthetic one from categoryCode
+    let participationsToProcess = athlete.participations;
+    if (!participationsToProcess || participationsToProcess.length === 0) {
+      // Athlete has no participations - create a default entry from their categoryCode
+      if (!athlete.categoryCode) return; // Skip athletes with no category at all
+      participationsToProcess = [{
+        categoryCode: athlete.categoryCode,
+        totalRank: athlete.totalRank,
+        snatchRank: athlete.snatchRank,
+        cleanJerkRank: athlete.cleanJerkRank
+      }];
+    }
+    
+    participationsToProcess.forEach(p => {
+      const gender = athlete.gender || 'M';
+      const catCode = p.categoryCode || athlete.categoryCode;
+      
+      // Get category weight for sorting
+      const catWeight = extractMaxWeight(catCode);
+
+      // Always resolve championship via category map
+      const info = catCode ? ageGroupMap.get(catCode) : null;
+      const champName = info?.championshipName || 'Open';
+      
+      // Use championshipName as the grouping key (e.g., "Senior", "Youth", "Masters")
+      if (!championshipMap.has(champName)) {
+        championshipMap.set(champName, {
+          name: champName,
+          genders: new Map()
+        });
+      }
+      
+      const champ = championshipMap.get(champName);
+      
+      if (!champ.genders.has(gender)) {
+        champ.genders.set(gender, {
+          gender,
+          genderName: gender === 'F' ? 'Women' : 'Men',
+          categories: new Map()
+        });
+      }
+      
+      const genderGroup = champ.genders.get(gender);
+      
+      if (!genderGroup.categories.has(catCode)) {
+        genderGroup.categories.set(catCode, {
+          categoryCode: catCode,
+          categoryName: athlete.categoryName || catCode,
+          maximumWeight: catWeight,
+          items: [],
+          seenLotNumbers: new Set()  // Track which athletes are already added
+        });
+      }
+      
+      const category = genderGroup.categories.get(catCode);
+      
+      // Avoid duplicate athletes (same lotNumber in same category)
+      const lotKey = athlete.lotNumber || athlete.key || `${athlete.lastName}-${athlete.firstName}`;
+      if (category.seenLotNumbers.has(lotKey)) {
+        return; // Skip duplicate
+      }
+      category.seenLotNumbers.add(lotKey);
+      
+      // Add athlete to category
+      category.items.push(transformed);
+    });
+  });
+  
+  // Convert to sorted array structure
+  const participants = Array.from(championshipMap.values())
+    .sort((a, b) => {
+      // Sort order: IWF first, then others alphabetically, DEFAULT last
+      const order = { 'IWF': 0, 'U': 1, 'MASTERS': 2, 'DEFAULT': 99 };
+      return (order[a.type] ?? 50) - (order[b.type] ?? 50);
+    })
+    .map(champ => ({
+      ...champ,
+      genders: Array.from(champ.genders.values())
+        .sort((a, b) => a.gender === 'F' ? -1 : 1) // Women first
+        .map(genderGroup => ({
+          ...genderGroup,
+          categories: Array.from(genderGroup.categories.values())
+            .sort((a, b) => a.maximumWeight - b.maximumWeight) // Lightest first
+            .map(cat => ({
+              ...cat,
+              // IMPORTANT: Sort items by LOT NUMBER ONLY (ascending)
+              // This is different from Rankings which sorts by rank fields first
+              items: cat.items.sort((a, b) => (a.lotNumber || 0) - (b.lotNumber || 0))
+            }))
+        }))
+    }));
+  
+  return participants;
 }
 
 function getChampionshipDisplayName(type) {

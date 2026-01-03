@@ -18,52 +18,40 @@
   <h1>Table of Contents</h1>
   
   <div class="toc-entries">
-    <!-- Participants -->
+    <!-- Statistics section -->
     <div class="toc-entry" style="font-weight: bold; margin-top: 8pt;">
-      <span class="toc-title">Participants</span>
+      <span class="toc-title">Statistics</span>
       <span class="toc-leader"></span>
       <span class="toc-page-number" data-ref="#participants"></span>
     </div>
     
-    <!-- Medals -->
+    <!-- Athletes by Category section -->
+    {#if rankings && rankings.length > 0}
     <div class="toc-entry" style="font-weight: bold; margin-top: 8pt;">
-      <span class="toc-title">Medals</span>
+      <span class="toc-title">Athletes by Category</span>
       <span class="toc-leader"></span>
-      <span class="toc-page-number" data-ref="#medals"></span>
-    </div>
-    
-    <!-- Team Points -->
-    <div class="toc-entry" style="font-weight: bold; margin-top: 8pt;">
-      <span class="toc-title">Team Points</span>
-      <span class="toc-leader"></span>
-      <span class="toc-page-number" data-ref="#team-points"></span>
-    </div>
-    
-    <!-- Rankings section -->
-    <div class="toc-entry" style="font-weight: bold; margin-top: 8pt;">
-      <span class="toc-title">Rankings</span>
-      <span class="toc-leader"></span>
-      <span class="toc-page-number" data-ref="#rankings"></span>
+      <span class="toc-page-number" data-ref="#ranking-{slugify(rankings[0].name)}-{slugify(rankings[0].genders[0].genderName)}"></span>
     </div>
     
     {#each rankings as championship}
       {#each championship.genders as genderGroup}
-        {#each genderGroup.categories as category}
-          <div class="toc-entry" style="padding-left: 20pt; font-size: 10pt;">
-            <span class="toc-title">{championship.name} - {genderGroup.genderName} - {category.categoryName}</span>
-            <span class="toc-leader"></span>
-            <span class="toc-page-number" data-ref="#ranking-{slugify(championship.name)}-{slugify(genderGroup.genderName)}-{slugify(category.categoryName)}"></span>
-          </div>
-        {/each}
+        <div class="toc-entry" style="padding-left: 20pt; font-size: 10pt;">
+          <span class="toc-title">{championship.name} - {genderGroup.genderName}</span>
+          <span class="toc-leader"></span>
+          <span class="toc-page-number" data-ref="#ranking-{slugify(championship.name)}-{slugify(genderGroup.genderName)}"></span>
+        </div>
       {/each}
     {/each}
+    {/if}
     
-    <!-- Session Protocols section -->
+    <!-- Session Start Lists section -->
+    {#if sessions && sessions.length > 0}
     <div class="toc-entry" style="font-weight: bold; margin-top: 8pt;">
-      <span class="toc-title">Session Protocols</span>
+      <span class="toc-title">Session Start Lists</span>
       <span class="toc-leader"></span>
-      <span class="toc-page-number" data-ref="#protocols"></span>
+      <span class="toc-page-number" data-ref="#session-{sessions[0].name}"></span>
     </div>
+    {/if}
     
     {#each sessions as session}
       <div class="toc-entry" style="padding-left: 20pt; font-size: 10pt;">
