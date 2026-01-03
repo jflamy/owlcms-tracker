@@ -298,19 +298,112 @@ T=1s:   OWLCMS recomputes rankings
 
 **Implementation Status:** 🚧 Not yet implemented - design documented for future development.
 
+### Cache Management & Manual Refresh
+
+**Cache Registry Pattern**
+
+All plugin caches register themselves at module load time to enable coordinated cache invalidation:
+
+```javascript
+// src/lib/server/cache-epoch.js
+let cacheEpoch = 0;
+const registeredCaches = new Set();
+
+export function registerCache(cacheMap) {
+  registeredCaches.add(cacheMap);
+}
+
+export function bumpCacheEpoch() {
+  cacheEpoch += 1;
+  for (const cache of registeredCaches) {
+    cache.clear();  // Clear all registered caches
+  }
+  return cacheEpoch;
+}
+```
+
+**Plugin Cache Registration**
+
+Each plugin registers its cache on module load:
+
+```javascript
+// src/plugins/team-scoreboard/helpers.data.js
+import { registerCache } from '$lib/server/cache-utils.js';
+
+const teamScoreboardCache = new Map();
+registerCache(teamScoreboardCache);  // Auto-cleared on refresh
+```
+
+**Registered Caches (8 total):**
+1. `standard-scoreboard-helpers.js` → `scoreboardCache` (shared by lifting-order, rankings, session-results)
+2. `team-scoreboard/helpers.data.js` → `teamScoreboardCache`
+3. `attempt-bar/helpers.data.js` → `attemptBarCache`
+4. `lower-third/helpers.data.js` → `lowerThirdCache`
+5. `ranking-box/helpers.data.js` → `rankingBoxCache`
+6. `referee-assignments/helpers.data.js` → `refereeAssignmentsCache`
+7. `iwf-startbook/helpers.data.js` → `protocolCache`
+8. `iwf-results/helpers.data.js` → `protocolCache`
+
+**Manual Refresh Endpoint**
+
+Developers can manually flush all caches via REST API:
+
+```bash
+# Flush plugin caches only (keeps hub data)
+curl -X POST http://localhost:8096/api/refresh
+
+# Full refresh: close WebSocket, force OWLCMS to reconnect and resend all data
+curl -X POST http://localhost:8096/api/refresh?fullRefresh=true
+```
+
+**Refresh Flow:**
+
+1. **POST `/api/refresh`** → `scoreboardRegistry.flushCaches()`
+2. **Bump epoch** → Clear all registered caches (prevents memory leaks)
+3. **Emit SSE events** → Notify all connected browsers for each FOP
+4. **Browsers receive SSE** → Re-fetch scoreboard data via `/api/scoreboard`
+5. **First browser** → Cache miss, recomputes from hub data (50ms)
+6. **Remaining browsers** → Cache hit, instant response (1ms each)
+
+**Response Example:**
+
+```json
+{
+  "success": true,
+  "message": "Plugin caches flushed - browsers notified to re-fetch",
+  "fullRefresh": false,
+  "connectionClosed": false,
+  "cacheEpoch": 42,
+  "browsersNotified": 4,
+  "timestamp": 1735862400000
+}
+```
+
+**Benefits:**
+- ✅ **No memory leaks** - Caches are cleared directly, no orphaned entries
+- ✅ **Automatic browser updates** - SSE triggers immediate re-fetch
+- ✅ **Development workflow** - Test plugin changes without restarting server
+- ✅ **Coordinated invalidation** - All plugins cleared atomically
+- ✅ **Observable** - Response includes epoch and notification count
+
+---
+
 ## Directory Structure
 
 ```
 src/
 ├── lib/server/
 │   ├── competition-hub.js          # Stores per-FOP data from OWLCMS
-│   └── scoreboard-registry.js      # Auto-discovers scoreboard plugins
+│   ├── scoreboard-registry.js      # Auto-discovers scoreboard plugins
+│   ├── cache-epoch.js              # Global cache epoch and registry
+│   └── cache-utils.js              # Shim for buildCacheKey + registerCache
 ├── routes/
 │   ├── [scoreboard]/
 │   │   ├── +page.server.js         # Dynamic route handler
 │   │   └── +page.svelte            # Generic scoreboard wrapper
-│   └── api/scoreboard/
-│       └── +server.js              # Unified API endpoint
+│   └── api/
+│       ├── scoreboard/+server.js   # Unified API endpoint
+│       └── refresh/+server.js      # Manual cache flush endpoint
 └── plugins/
     ├── lifting-order/   # Scoreboard type 1
     │   ├── config.js               # Metadata, options
@@ -342,8 +435,17 @@ The **only** place where data processing occurs.
     - `competitionHub.getDatabaseState()` for full competition data (athletes, teams, records).
     - `competitionHub.getSessionAthletes(fop)` for flattened session athlete list.
   - **Translation:** All translation keys must be resolved here using `competitionHub.getTranslations()`. The Svelte component receives already-translated strings.
-  - **Caching:** Must implement a local cache (Map) keyed by FOP version and options to avoid recomputing on every request.
+  - **Caching:** Must implement a local cache (Map) keyed by FOP version and options to avoid recomputing on every request. **Register the cache** using `registerCache()` from `$lib/server/cache-utils.js` so it gets cleared on manual refresh.
   - **Transformation:** Sorts, filters, and formats data for display.
+
+**Example cache registration:**
+
+```javascript
+import { buildCacheKey, registerCache } from '$lib/server/cache-utils.js';
+
+const myPluginCache = new Map();
+registerCache(myPluginCache);  // Auto-cleared on /api/refresh
+```
 
 ### 3. `page.svelte` (Presentation)
 A "dumb" view component that renders the data provided by the helper.
@@ -353,5 +455,206 @@ A "dumb" view component that renders the data provided by the helper.
   - Render HTML/CSS based on the pre-computed data.
   - Handle client-side timer countdowns (visual only).
   - **No Translations:** Should not perform translation lookups; display provided strings directly.
+
+---
+
+## API Endpoints
+
+The tracker exposes several REST and streaming endpoints for different purposes.
+
+### Browser-Consumed Endpoints
+
+#### `/api/scoreboard` (GET)
+**Purpose:** Primary data endpoint for all scoreboard types
+
+**Parameters:**
+- `type` (string, required) - Scoreboard type (e.g., `lifting-order`, `team-scoreboard`, `results`)
+- `fop` (string, required*) - FOP name (e.g., `Platform_A`, `A`, `B`)
+  - *Not required for global scoreboards like `iwf-startbook` or `referee-assignments`
+- Additional parameters vary by scoreboard (e.g., `showRecords=true`, `gender=F`, `topN=10`)
+
+**Example:**
+```bash
+GET /api/scoreboard?type=lifting-order&fop=Platform_A&showRecords=true
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "type": "lifting-order",
+  "fop": "Platform_A",
+  "options": { "showRecords": true },
+  "data": {
+    "competition": { "name": "2025 Nationals", "fop": "Platform_A" },
+    "athletes": [...],
+    "timer": { "state": "running", "timeRemaining": 45000 },
+    "decision": { "type": null },
+    "records": [...]
+  },
+  "timestamp": 1735862400000
+}
+```
+
+**Usage Flow:**
+1. Browser loads scoreboard page (`/lifting-order?fop=A`)
+2. Browser fetches initial data via `/api/scoreboard?type=lifting-order&fop=A`
+3. Browser subscribes to SSE for real-time updates
+4. On each SSE event, browser re-fetches `/api/scoreboard` for fresh data
+
+---
+
+#### `/api/client-stream` (GET)
+**Purpose:** Server-Sent Events (SSE) endpoint for real-time push notifications
+
+**Parameters:**
+- `lang` (string, optional) - Language preference (e.g., `en`, `fr`, `es`). Default: `en`
+
+**Example:**
+```bash
+GET /api/client-stream?lang=fr
+```
+
+**Event Types:**
+- `fop_update` - FOP data changed (lifting order, athlete switch, weight change)
+- `competition_initialized` - Database loaded from OWLCMS
+- `hub_ready` - Hub fully initialized (database + translations)
+- `waiting` - No competition data available yet
+- `translations` - Translation data for requested language
+
+**Event Format:**
+```
+data: {"type":"fop_update","fop":"Platform_A","data":{...},"timestamp":1735862400000}
+
+data: {"type":"timer","fop":"Platform_A","timestamp":1735862400000}
+
+data: {"type":"decision","fop":"Platform_A","timestamp":1735862400000}
+```
+
+**Browser Usage:**
+```javascript
+const eventSource = new EventSource('/api/client-stream?lang=en');
+
+eventSource.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+  
+  if (data.type === 'fop_update' && data.fop === currentFop) {
+    // Re-fetch scoreboard data
+    fetch(`/api/scoreboard?type=lifting-order&fop=${currentFop}`)
+      .then(res => res.json())
+      .then(result => updateDisplay(result.data));
+  }
+};
+```
+
+---
+
+### Development & Admin Endpoints
+
+#### `/api/refresh` (POST)
+**Purpose:** Manually flush plugin caches and notify browsers to re-fetch
+
+**Parameters:**
+- `fullRefresh=true` (optional) - Close WebSocket to force OWLCMS reconnection
+
+**Examples:**
+```bash
+# Flush plugin caches only (keeps hub data)
+curl -X POST http://localhost:8096/api/refresh
+
+# Full refresh: close WebSocket, force OWLCMS to reconnect
+curl -X POST http://localhost:8096/api/refresh?fullRefresh=true
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Plugin caches flushed - browsers notified to re-fetch",
+  "fullRefresh": false,
+  "connectionClosed": false,
+  "cacheEpoch": 42,
+  "browsersNotified": 4,
+  "timestamp": 1735862400000
+}
+```
+
+**Workflow:**
+1. Clears all registered plugin caches (8 caches total)
+2. Emits SSE events for all FOPs (triggers browser re-fetch)
+3. Optionally closes WebSocket (if `fullRefresh=true`)
+
+**Use Cases:**
+- Testing plugin changes without server restart
+- Forcing fresh data fetch during development
+- Debugging cache-related issues
+
+---
+
+#### `/api/health` (GET)
+**Purpose:** Health check endpoint for monitoring and orchestration
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "timestamp": "2026-01-03T14:30:00.000Z",
+  "uptime": 3600,
+  "memory": {
+    "heapUsedMB": 150,
+    "heapTotalMB": 200,
+    "rssMB": 300,
+    "heapUsagePercent": 75
+  },
+  "competition": {
+    "databaseLoaded": true,
+    "athleteCount": 50,
+    "fopCount": 3,
+    "localeCount": 26
+  },
+  "metrics": {
+    "messagesReceived": 1234,
+    "messagesBroadcast": 2468
+  }
+}
+```
+
+**Status Values:**
+- `healthy` - All systems operational
+- `degraded` - Partial functionality (high memory, missing data)
+- `unhealthy` - Critical failure
+
+---
+
+#### `/api/status` (GET)
+**Purpose:** Simple readiness check (lighter than `/api/health`)
+
+**Response:**
+```json
+{
+  "status": "ready",
+  "message": "Competition Hub is ready to receive OWLCMS messages",
+  "ready": true,
+  "hasCompetitionData": true,
+  "metrics": {
+    "activeClients": 12,
+    "messagesReceived": 1234,
+    "messagesBroadcast": 2468
+  },
+  "timestamp": "2026-01-03T14:30:00.000Z"
+}
+```
+
+---
+
+### Endpoint Summary
+
+| Endpoint | Method | Purpose | Used By |
+|----------|--------|---------|---------|
+| `/api/scoreboard` | GET | Fetch processed scoreboard data | Browsers (on load + SSE trigger) |
+| `/api/client-stream` | GET | Real-time SSE push notifications | Browsers (persistent connection) |
+| `/api/refresh` | POST | Flush caches + notify browsers | Developers, CI/CD |
+| `/api/health` | GET | Detailed health metrics | Monitoring systems |
+| `/api/status` | GET | Simple readiness check | Healthcheck probes |
 
 
