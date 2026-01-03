@@ -22,6 +22,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import https from 'https';
+import { gt } from 'semver';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -64,22 +65,15 @@ function fetchLatestGitHubTag(owner, repo) {
             return;
           }
 
-          // Filter for semver tags and sort by version
+          // Filter for semver tags and sort by version using semver library
           const semverPattern = /^v?(\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?(\+[a-zA-Z0-9.]+)?)$/;
           const semverTags = tags
             .map(tag => tag.name)
             .filter(name => semverPattern.test(name))
             .map(name => name.replace(/^v/, '')) // Remove leading 'v' if present
             .sort((a, b) => {
-              // Simple semver comparison (could use semver library for production)
-              const partsA = a.split(/[.-]/);
-              const partsB = b.split(/[.-]/);
-              for (let i = 0; i < Math.max(partsA.length, partsB.length); i++) {
-                const numA = parseInt(partsA[i]) || 0;
-                const numB = parseInt(partsB[i]) || 0;
-                if (numA !== numB) return numB - numA; // Descending order
-              }
-              return 0;
+              // Use semver library for proper comparison (handles alpha < beta < rc)
+              return gt(a, b) ? -1 : gt(b, a) ? 1 : 0; // Descending order
             });
 
           if (semverTags.length === 0) {
