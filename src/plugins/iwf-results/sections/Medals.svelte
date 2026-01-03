@@ -235,7 +235,7 @@
   text-transform: uppercase;
   color: #444;
 }
-.champ-block.avoid-break, .champ-block, .overall-block {
+.champ-block, .overall-block {
   margin-bottom: 10pt;
   border-radius: 0;
   break-inside: avoid;
