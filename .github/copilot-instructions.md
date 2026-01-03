@@ -276,7 +276,27 @@ tests/                      # Test scripts and utilities
 
 ------
 
-## ��� AI-Assisted Development Target
+## 🖨️ Document Generation Plugins (iwf-startbook, iwf-results)
+
+When creating or modifying document generation plugins (printable start books, results books, etc.):
+
+### Styling Requirements
+- **No rounded corners** - All borders must use square corners (0px border-radius)
+- **Table borders**: Use solid black borders (1px) with `border-collapse: collapse`
+- **Cell borders**: Define borders on individual cells (`th`, `td`) with `border: 1px solid black`
+- **Page size**: A4 landscape with 10mm margins
+- **Font**: Arial, 10-11px base size for tables
+- **Column widths**: Use percentage-based widths for print consistency
+
+### Data Architecture
+- **All data computation in `helpers.data.js`** - Server-side only
+- **Svelte components are display-only** - No calculations, filtering, or sorting
+- **Attach computed data to athlete objects** - e.g., `athlete.ageGroupParticipation`
+- **Use pre-computed display values** - Don't recompute in templates
+
+------
+
+## 🎯 AI-Assisted Development Target
 
 This architecture is **designed for AI pair programming**. A novice programmer using GitHub Copilot should be able to:
 
