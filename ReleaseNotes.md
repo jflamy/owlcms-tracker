@@ -14,6 +14,8 @@
 
 ## New in Release 2.4
 - 2.4.2: Fix standard scoreboards layout for phones
+- 2.4.2: Added a "refresh" end point on API clears all the plugin caches and triggers a reload from tracker-core data
+- 2.4.2: First release of an IWF start book (but no ITO timetable yet)
 - 2.4.1: fix flags and pictures handling
 - Internal change: Now built using the tracker-core module
 

@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "node node_modules/vite/bin/vite.js dev --port 8096",
     "dev:learning": "cross-env LEARNING_MODE=true node node_modules/vite/bin/vite.js dev --port 8096",
-    "build": "svelte-kit sync && vite build && node scripts/copy-server.js",
+    "build": "svelte-kit sync && vite build && node scripts/copy-runtime-server-files.js",
     "build:windows": "npm run build && node scripts/build-windows.js",
     "build:macos": "npm run build && node scripts/build-macos.js",
     "build:rpi": "npm run build && node scripts/build-rpi.js",
@@ -15,6 +15,7 @@
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./jsconfig.json --watch",
     "test": "vitest run",
     "test:watch": "vitest watch",
+    "latest": "node scripts/get-latest-versions.js",
     "release": "node scripts/release.js"
   },
   "devDependencies": {
