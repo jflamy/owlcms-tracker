@@ -18,6 +18,8 @@
   $: hasRecords = data.hasRecords || false;
   $: newRecordsBroken = data.newRecordsBroken || false;
   $: format = options.format || 'complete';
+  $: includeSessionStartLists = data.includeSessionStartLists !== false;
+  $: includeCategoryParticipants = data.includeCategoryParticipants === true;
   $: competitionName = competition.name || 'Competition';
   $: competitionDates = competition.dateRange || '';
   
@@ -114,11 +116,17 @@
       <TableOfContents {sessions} {rankings} {allRecords} {hasRecords} />
     </div>
     <Participants {data} />
-    <CategoryParticipants {rankings} {competition} />
-    <SessionStartLists {sessions} {competition} productionTime={data.productionTime} />
+    {#if includeCategoryParticipants}
+      <CategoryParticipants {rankings} {competition} />
+    {/if}
+    {#if includeSessionStartLists}
+      <SessionStartLists {sessions} {competition} productionTime={data.productionTime} />
+    {/if}
     <Records {allRecords} {hasRecords} {newRecordsBroken} {labels} />
   {:else}
-    <SessionStartLists {sessions} {competition} productionTime={data.productionTime} />
+    {#if includeSessionStartLists}
+      <SessionStartLists {sessions} {competition} productionTime={data.productionTime} />
+    {/if}
   {/if}
 </div>
 

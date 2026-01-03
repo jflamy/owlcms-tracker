@@ -35,7 +35,6 @@ function buildCategoryMap(ageGroups) {
     
     // Use ag.championshipName as the age group identifier (this is what buildParticipationData uses)
     const ageGroupName = ag.championshipName;
-    logger.debug(`[buildCategoryMap] Age group: code="${ag.code}", championshipName="${ag.championshipName}", ageGroupName="${ageGroupName}"`);
     
     (ag.categories || []).forEach(cat => {
       const code = cat.code; // Use explicit code field
@@ -231,7 +230,6 @@ function extractSessionAgeGroupsWithWeights(sessionData, allAthletes, categoryMa
     
     // Use ageGroupName (from ag.championshipName, matching buildCategoryMap)
     const ageGroup = catInfo.ageGroupName;
-    logger.debug(`[extractSessionAgeGroupsWithWeights] Athlete catCode="${catCode}", ageGroupName="${ageGroup}", weight="${catInfo.weight}"`);
     const weightClass = catInfo.weight; // Extracted weight (e.g., 44, 48)
     
     if (!ageGroupWeights.has(ageGroup)) {
@@ -323,12 +321,13 @@ export function getScoreboardData(fopName = '', options = {}, locale = 'en') {
   // Extract options
   const includeSessionStartLists = options.includeSessionStartLists !== false;
   const includeOfficials = options.includeOfficials !== false;
+  const includeCategoryParticipants = options.includeCategoryParticipants === true;
   
   // Cache key based on database checksum, options, and code version
   // Increment CODE_VERSION when processing logic changes to bust cache
   const CODE_VERSION = 6;
   const dbVersion = databaseState.databaseChecksum || databaseState.lastUpdate;
-  const cacheKey = `v${CODE_VERSION}-${dbVersion}-startbook-${includeSessionStartLists}-${includeOfficials}-${locale}`;
+  const cacheKey = `v${CODE_VERSION}-${dbVersion}-startbook-${includeSessionStartLists}-${includeOfficials}-${includeCategoryParticipants}-${locale}`;
 
   logger.debug(`[StartBook] Cache key: ${cacheKey}, cache size: ${protocolCache.size}`);
 
@@ -373,11 +372,7 @@ export function getScoreboardData(fopName = '', options = {}, locale = 'en') {
 
   // Build category and participation maps once
   const categoryMap = buildCategoryMap(databaseState.ageGroups);
-  logger.debug(`[StartBook] categoryMap size: ${categoryMap.size}`);
-  logger.debug(`[StartBook] Sample category entries:`, Array.from(categoryMap.entries()).slice(0, 3));
   const athleteParticipationByAgeGroup = buildAthleteAgeGroupParticipation(athletesToProcess, categoryMap);
-  logger.debug(`[StartBook] athleteParticipationByAgeGroup size: ${athleteParticipationByAgeGroup.size}`);
-  logger.debug(`[StartBook] Sample participation entries:`, Array.from(athleteParticipationByAgeGroup.entries()).slice(0, 3));
 
   // 2. Group athletes by session then by category
   const sessionMap = new Map(); // { sessionName => { categoryCode => [athletes] } }
@@ -523,7 +518,7 @@ export function getScoreboardData(fopName = '', options = {}, locale = 'en') {
       ageGroupsWithWeights: extractSessionAgeGroupsWithWeights(dbSession, athletesToProcess, categoryMap, databaseState.ageGroups),
       athleteParticipationByAgeGroup: Object.fromEntries(athleteParticipationByAgeGroup),
       officials: mapOfficials(dbSession, databaseState),
-      records: extractRecords(databaseState, finalCategories),
+      records: extractRecords(databaseState, finalCategories, sessions.length === 0),
       newRecords: extractNewRecords(databaseState, dbSession.name)
     });
     
@@ -562,6 +557,7 @@ export function getScoreboardData(fopName = '', options = {}, locale = 'en') {
     newRecordsBroken: allRecordsData.newRecordsBroken,
     includeSessionStartLists,
     includeOfficials,
+    includeCategoryParticipants,
     productionTime: new Date().toLocaleString(locale, { 
       year: 'numeric', 
       month: '2-digit', 
@@ -603,32 +599,94 @@ export function getScoreboardData(fopName = '', options = {}, locale = 'en') {
   return processedData;
 }
 
-function extractRecords(db, sessionCategories = []) {
+function extractRecords(db, sessionCategories = [], isFirstSession = false) {
   const allRecords = db.records || [];
+  if (isFirstSession) logger.debug(`[extractRecords] Session 1: Starting with ${allRecords.length} total records in database`);
   
-  // Extract unique athlete characteristics from session (federation, body weight, age)
-  const sessionAthleteSet = new Set();
+  // Build list of athletes with their matching criteria
+  const sessionAthletes = [];
+  let athleteCount = 0;
   
   sessionCategories.forEach(category => {
     category.items?.forEach(athlete => {
-      // Create a key based on federation, body weight category, and age group
-      const fed = athlete.federation || 'WFA';
-      const bwCat = athlete.categoryCode || '';  // Body weight category code
-      const ageGrp = athlete.ageGroup || '';     // Age group name
+      athleteCount++;
       
-      // Normalize the key
-      const key = `${fed}|${bwCat}|${ageGrp}`.toLowerCase();
-      sessionAthleteSet.add(key);
+      // Parse record federations (comma-separated, trimmed)
+      // Field name is 'federationCodes' in OWLCMS database
+      const recordFederationsStr = athlete.federationCodes || athlete.federation || '';
+      const recordFederations = recordFederationsStr 
+        ? recordFederationsStr.split(',').map(f => f.trim().toUpperCase())
+        : []; // Empty array means all federations acceptable
+      
+      // Get category info to extract age range and weight limit
+      // categoryCode format: "SR_F48", "JR_M73", etc.
+      const categoryCode = athlete.categoryCode || '';
+      
+      // Extract maximum body weight from category (subtract 0.1 for upper bound)
+      // bwCatUpper from athlete or parse from category code
+      let maxBodyWeight = parseFloat(athlete.bwCatUpper) || 999;
+      if (!athlete.bwCatUpper && categoryCode) {
+        const weightMatch = categoryCode.match(/(\d+)$/);
+        if (weightMatch) {
+          maxBodyWeight = parseFloat(weightMatch[1]);
+        }
+      }
+      const searchBodyWeight = maxBodyWeight - 0.1;
+      
+      // Extract maximum age from category's age group
+      // ageGrpUpper from athlete or default to 999 for senior
+      const maxAge = parseInt(athlete.ageGrpUpper) || 999;
+      
+      sessionAthletes.push({
+        name: `${athlete.firstName} ${athlete.lastName}`,
+        recordFederations: recordFederations,
+        bodyWeight: searchBodyWeight,
+        age: maxAge,
+        gender: athlete.gender,
+        categoryCode: categoryCode
+      });
     });
   });
+  
+  if (isFirstSession && sessionAthletes.length > 0) {
+    const first = sessionAthletes[0];
+    logger.debug(`[extractRecords] Session 1: Found ${sessionAthletes.length} athletes`);
+    logger.debug(`[extractRecords] Session 1: First athlete: ${first.name}`);
+    logger.debug(`[extractRecords] Session 1: ═══ EXTRACTED VALUES FOR FILTERING ═══`);
+    logger.debug(`[extractRecords]   Category code: ${first.categoryCode}`);
+    logger.debug(`[extractRecords]   Record federations: ${first.recordFederations.length > 0 ? first.recordFederations.join(', ') : '(ALL ACCEPTABLE)'}`);
+    logger.debug(`[extractRecords]   Body weight for search: ${first.bodyWeight} kg (max category weight - 0.1)`);
+    logger.debug(`[extractRecords]   Age for search: ${first.age} years (max age for category)`);
+    logger.debug(`[extractRecords]   Gender: ${first.gender}`);
+  }
   
   // Group records by: federation + lift + gender + ageGrp + bwCatLower + bwCatUpper
   // For each group, keep the record with the highest value
   const recordMap = new Map();
+  let matchedCount = 0;
+  let loggingComplete = false;
+  const firstRecordDetails = [];
   
-  allRecords.forEach(r => {
+  allRecords.forEach((r, idx) => {
+    // Collect first 5 records for logging
+    if (isFirstSession && firstRecordDetails.length < 5) {
+      firstRecordDetails.push({
+        idx,
+        federation: r.recordFederation,
+        bwRange: `${r.bwCatLower}-${r.bwCatUpper}`,
+        ageRange: `${r.ageGrpLower || '?'}-${r.ageGrpUpper || '?'}`,
+        ageGrp: r.ageGrp,
+        gender: r.gender,
+        lift: r.recordLift,
+        name: r.recordName,
+        value: r.recordValue
+      });
+    }
+    
     // Skip if missing critical fields
-    if (!r.recordFederation || !r.recordLift || !r.gender || r.bwCatLower === undefined || r.bwCatUpper === undefined) {
+    if (!r.recordFederation || !r.recordLift || !r.gender || 
+        r.bwCatLower === undefined || r.bwCatUpper === undefined ||
+        r.ageGrpLower === undefined || r.ageGrpUpper === undefined) {
       return;
     }
     
@@ -637,17 +695,50 @@ function extractRecords(db, sessionCategories = []) {
       return;
     }
     
-    // Match record to session athletes by federation, body weight, and age group
-    const fed = r.recordFederation || 'WFA';
-    const bwCat = r.bwCatString || '';
-    const ageGrp = r.ageGrp || '';
+    // Log first 5 records structure for Session 1
+    if (isFirstSession && !loggingComplete) {
+      loggingComplete = true;
+      logger.debug(`[extractRecords] Session 1: ═══ EXAMINING RECORDS ═══`);
+      logger.debug(`[extractRecords] Session 1: First 5 records in database:`);
+      firstRecordDetails.forEach(rec => {
+        logger.debug(`[extractRecords]   [${rec.idx}] ${rec.federation} | BW:${rec.bwRange} | Age:${rec.ageRange}(${rec.ageGrp}) | ${rec.gender} | ${rec.lift} | ${rec.name} ${rec.value}kg`);
+      });
+    }
     
-    const recordKey = `${fed}|${bwCat}|${ageGrp}`.toLowerCase();
+    // Check if record matches any athlete in session
+    let matched = false;
+    for (const athlete of sessionAthletes) {
+      // 1. Check federation (if athlete has record federations, must match one; if empty, all acceptable)
+      const federationMatch = athlete.recordFederations.length === 0 || 
+                             athlete.recordFederations.includes(r.recordFederation.toUpperCase());
+      
+      // 2. Check gender (exact match)
+      const genderMatch = athlete.gender === r.gender;
+      
+      // 3. Check body weight (athlete's BW must be within record's range: lower exclusive, upper inclusive)
+      const bwMatch = athlete.bodyWeight > r.bwCatLower && athlete.bodyWeight <= r.bwCatUpper;
+      
+      // 4. Check age (athlete's age must be within record's age range)
+      const ageMatch = athlete.age >= r.ageGrpLower && athlete.age <= r.ageGrpUpper;
+      
+      if (federationMatch && genderMatch && bwMatch && ageMatch) {
+        matched = true;
+        if (isFirstSession && matchedCount < 3) {
+          logger.debug(`[extractRecords] Session 1: ✓ MATCHED record [${idx}]: ${r.recordName} for ${athlete.name}`);
+          logger.debug(`[extractRecords]   Federation: ${r.recordFederation} (athlete accepts: ${athlete.recordFederations.join(', ') || 'ALL'})`);
+          logger.debug(`[extractRecords]   BW: ${athlete.bodyWeight} in [${r.bwCatLower}, ${r.bwCatUpper}]`);
+          logger.debug(`[extractRecords]   Age: ${athlete.age} in [${r.ageGrpLower}, ${r.ageGrpUpper}]`);
+          logger.debug(`[extractRecords]   Gender: ${athlete.gender} === ${r.gender}`);
+        }
+        break;
+      }
+    }
     
-    // Only include records that match an athlete in the session
-    if (!sessionAthleteSet.has(recordKey)) {
+    if (!matched) {
       return;
     }
+    
+    matchedCount++;
     
     // Create a unique key for this record type (including age group and weight boundaries)
     const key = `${r.recordFederation}|${r.recordLift}|${r.gender}|${r.ageGrp || ''}|${r.bwCatLower}|${r.bwCatUpper}`;
@@ -660,6 +751,11 @@ function extractRecords(db, sessionCategories = []) {
       recordMap.set(key, r);
     }
   });
+  
+  if (isFirstSession) {
+    logger.debug(`[extractRecords] Session 1: Matched ${matchedCount} records out of ${allRecords.length}`);
+    logger.debug(`[extractRecords] Session 1: Final recordMap has ${recordMap.size} unique records`);
+  }
   
   // Convert map to array and format for display
   const sessionRecords = Array.from(recordMap.values()).map(r => {
@@ -674,10 +770,12 @@ function extractRecords(db, sessionCategories = []) {
       lift: r.recordLift,
       value: r.recordValue,
       holder: r.athleteName,
-      nation: athleteTeam || r.nation || r.recordFederation || '',
+      nation: athleteTeam || r.nation || '',
       born: ''
     };
   });
+  
+  if (isFirstSession) logger.debug(`[extractRecords] Session 1: Returning ${sessionRecords.length} formatted session records`);
 
   return sessionRecords;
 }
@@ -698,7 +796,7 @@ function extractNewRecords(db, sessionName) {
         lift: r.recordLift,
         value: r.recordValue,
         holder: r.athleteName,
-        nation: athleteTeam || r.nation || r.recordFederation || '',
+        nation: athleteTeam || r.nation || '',
         born: ''
       };
     });
@@ -1286,7 +1384,7 @@ function buildAllRecordsData(db) {
       lift: r.recordLift,
       value: r.recordValue,
       holder: r.athleteName,
-      nation: athleteTeam || r.nation || r.recordFederation || '',
+      nation: athleteTeam || r.nation || '',
       isNew: !!(r.groupNameString && r.groupNameString !== '')
     });
   });

@@ -12,6 +12,34 @@
     if (!athlete.ageGroupParticipation) return '';
     return athlete.ageGroupParticipation[ageGroup] || '';
   }
+
+  // Check if session has any technical officials
+  function hasOfficials(session) {
+    if (!session?.officials) return false;
+    const officials = session.officials;
+    return !!(
+      officials.centerReferee ||
+      officials.sideReferee1 ||
+      officials.sideReferee2 ||
+      officials.sideReferee3 ||
+      officials.reserveReferee ||
+      officials.marshal1 ||
+      officials.marshal2 ||
+      officials.timekeeper ||
+      officials.technicalController1 ||
+      officials.technicalController2 ||
+      officials.competitionSecretary ||
+      officials.competitionSecretary2 ||
+      officials.doctor1 ||
+      officials.doctor2 ||
+      officials.juryPresident ||
+      officials.juryMember1 ||
+      officials.juryMember2 ||
+      officials.juryMember3 ||
+      officials.juryMember4 ||
+      officials.juryMember5
+    );
+  }
 </script>
 
 <div class="session-start-lists-section" id="session-start-lists">
@@ -64,7 +92,129 @@
         </tbody>
       </table>
 
-      <!-- Records section (if any) -->
+      <!-- Technical Officials section (if any) -->
+      {#if hasOfficials(session)}
+      <div class="officials-section">
+        <h4>Technical Officials</h4>
+        <div class="officials-grid">
+          <!-- Column 1: Referees, Marshals, Timekeeper -->
+          <div class="officials-column">
+            {#if session.officials.centerReferee}
+              <div class="official-item">
+                <span class="label">Center Referee</span>
+                <span class="name">{session.officials.centerReferee.fullName}</span>
+              </div>
+            {/if}
+            {#if session.officials.sideReferee1}
+              <div class="official-item">
+                <span class="label">Side Referee</span>
+                <span class="name">{session.officials.sideReferee1.fullName}</span>
+              </div>
+            {/if}
+            {#if session.officials.sideReferee2}
+              <div class="official-item">
+                <span class="label">Side Referee</span>
+                <span class="name">{session.officials.sideReferee2.fullName}</span>
+              </div>
+            {/if}
+            {#if session.officials.sideReferee3}
+              <div class="official-item">
+                <span class="label">Side Referee</span>
+                <span class="name">{session.officials.sideReferee3.fullName}</span>
+              </div>
+            {/if}
+            {#if session.officials.reserveReferee}
+              <div class="official-item">
+                <span class="label">Reserve Referee</span>
+                <span class="name">{session.officials.reserveReferee.fullName}</span>
+              </div>
+            {/if}
+            <div class="spacer"></div>
+            {#if session.officials.marshal1}
+              <div class="official-item">
+                <span class="label">Marshal</span>
+                <span class="name">{session.officials.marshal1.fullName}</span>
+              </div>
+            {/if}
+            {#if session.officials.marshal2}
+              <div class="official-item">
+                <span class="label">Marshal</span>
+                <span class="name">{session.officials.marshal2.fullName}</span>
+              </div>
+            {/if}
+            <div class="spacer"></div>
+            {#if session.officials.timekeeper}
+              <div class="official-item">
+                <span class="label">Timekeeper</span>
+                <span class="name">{session.officials.timekeeper.fullName}</span>
+              </div>
+            {/if}
+          </div>
+
+          <!-- Column 2: Technical Controllers, Secretaries, Doctors -->
+          <div class="officials-column">
+            {#if session.officials.technicalController1}
+              <div class="official-item">
+                <span class="label">Technical Controller</span>
+                <span class="name">{session.officials.technicalController1.fullName}</span>
+              </div>
+            {/if}
+            {#if session.officials.technicalController2}
+              <div class="official-item">
+                <span class="label">Technical Controller</span>
+                <span class="name">{session.officials.technicalController2.fullName}</span>
+              </div>
+            {/if}
+            <div class="spacer"></div>
+            {#if session.officials.competitionSecretary}
+              <div class="official-item">
+                <span class="label">Competition Secretary</span>
+                <span class="name">{session.officials.competitionSecretary.fullName}</span>
+              </div>
+            {/if}
+            {#if session.officials.competitionSecretary2}
+              <div class="official-item">
+                <span class="label">Competition Secretary</span>
+                <span class="name">{session.officials.competitionSecretary2.fullName}</span>
+              </div>
+            {/if}
+            <div class="spacer"></div>
+            {#if session.officials.doctor1}
+              <div class="official-item">
+                <span class="label">Doctor</span>
+                <span class="name">{session.officials.doctor1.fullName}</span>
+              </div>
+            {/if}
+            {#if session.officials.doctor2}
+              <div class="official-item">
+                <span class="label">Doctor</span>
+                <span class="name">{session.officials.doctor2.fullName}</span>
+              </div>
+            {/if}
+          </div>
+
+          <!-- Column 3: Jury -->
+          <div class="officials-column">
+            {#if session.officials.juryPresident}
+              <div class="official-item">
+                <span class="label">Jury President</span>
+                <span class="name">{session.officials.juryPresident.fullName}</span>
+              </div>
+            {/if}
+            {#each [1, 2, 3, 4, 5] as i}
+              {#if session.officials[`juryMember${i}`]}
+                <div class="official-item">
+                  <span class="label">Jury Member</span>
+                  <span class="name">{session.officials[`juryMember${i}`].fullName}</span>
+                </div>
+              {/if}
+            {/each}
+          </div>
+        </div>
+      </div>
+      {/if}
+
+      <!-- Session Records section (if any) -->
       {#if session.records && session.records.length > 0}
         <div class="records-section">
           <h4>Records</h4>
@@ -82,7 +232,12 @@
               </tr>
             </thead>
             <tbody>
-              {#each session.records as record}
+              {#each session.records as record, i}
+                {#if i > 0 && record.federation !== session.records[i - 1].federation}
+                  <tr class="federation-spacer">
+                    <td colspan="8"></td>
+                  </tr>
+                {/if}
                 <tr>
                   <td>{record.federation || 'WFA'}</td>
                   <td>{record.recordName}</td>
@@ -205,7 +360,7 @@
     border-collapse: collapse;
     border-radius: 0;
     font-size: 9px;
-    border: 1px solid #999;
+    border: none;
   }
 
   .records-table th,
@@ -215,8 +370,76 @@
     text-align: left;
   }
 
+  /* Widen the Name column in records table */
+  .records-table th:nth-child(7),
+  .records-table td:nth-child(7) {
+    width: 30%;
+  }
+
+  /* Center specific records table columns: Age Group (3), Cat. (4), Record (6) */
+  .records-table th:nth-child(3),
+  .records-table td:nth-child(3),
+  .records-table th:nth-child(4),
+  .records-table td:nth-child(4),
+  .records-table th:nth-child(6),
+  .records-table td:nth-child(6) {
+    text-align: center;
+  }
+
   .records-table th {
     background: #f0f0f0;
     font-weight: bold;
+  }
+
+  .federation-spacer {
+    height: 8px;
+    background: transparent;
+  }
+
+  .federation-spacer td {
+    border: none !important;
+    padding: 0;
+  }
+
+  .officials-section {
+    margin-top: 20px;
+    page-break-inside: avoid;
+  }
+
+  .officials-section h4 {
+    font-size: 12pt;
+    font-weight: bold;
+    margin-bottom: 10px;
+  }
+
+  .officials-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 20px;
+  }
+
+  .officials-column {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .official-item {
+    display: flex;
+    font-size: 9pt;
+    line-height: 1.2;
+  }
+
+  .official-item .label {
+    font-weight: bold;
+    min-width: 110px;
+  }
+
+  .official-item .name {
+    flex: 1;
+  }
+
+  .spacer {
+    height: 8px;
   }
 </style>

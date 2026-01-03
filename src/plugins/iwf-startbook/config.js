@@ -6,6 +6,13 @@ export default {
   fopRequired: false,
   options: [
     {
+      key: 'includeCategoryParticipants',
+      label: 'Include Category Participants Section',
+      type: 'boolean',
+      default: false,
+      description: 'Include section showing all participants grouped by age group and category'
+    },
+    {
       key: 'includeSessionStartLists',
       label: 'Include Session Start Lists',
       type: 'boolean',

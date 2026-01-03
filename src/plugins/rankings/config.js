@@ -10,7 +10,7 @@ export default {
 	// Category for grouping in the UI
 	category: 'standard',
 	
-	// Sort order within category
+	// on the home page, sort order within the category
 	order: 300,
 
 	// Whether this scoreboard requires athlete pictures
@@ -23,7 +23,6 @@ export default {
 			type: 'boolean',
 			default: true,
 			description: 'Display the leaders section on the grid'
-		},
-	],
-	requiredFields: ['fullName', 'total', 'totalRank']
+		}
+	]
 };

@@ -14,7 +14,7 @@ export default {
 	// Category for grouping in the UI
 	category: 'documents',
 	
-	// Sort order within category
+	// on the home page, sort order within the category
 	order: 100,
 	
 	// FOP requirement: false = not used, true = required, 'optional' = show All button
@@ -33,11 +33,6 @@ export default {
 			default: 'en',
 			description: 'Choose scoreboard text language'
 		}
-	],
-	
-	// Required FOP data fields
-	requiredFields: [
-		'database'
 	],
 	
 	// This scoreboard works with any FOP (doesn't need current athlete data)

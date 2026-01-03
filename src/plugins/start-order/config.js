@@ -14,7 +14,7 @@ export default {
 	// Category for grouping in the UI
 	category: 'standard',
 	
-	// Sort order within category
+	// on the home page, sort order within the category
 	order: 100,
 
 	// Whether this scoreboard requires athlete pictures
@@ -36,28 +36,5 @@ export default {
 			default: true,
 			description: 'Display competition records'
 		}
-	],
-	
-	// Required FOP data fields
-	requiredFields: [
-		'fullName',
-		'startNumber',
-		'teamName',
-		'categoryName',
-		'startOrderAthletes'
-	],
-	
-	// AI prompt for modifications
-	aiPrompt: `
-This scoreboard displays all athletes in the session sorted by standard order (category, lot number).
-
-Data Structure:
-- startOrderAthletes: Array of all athletes in the session with their attempts
-- status: 'ready' | 'waiting'
-
-To modify this scoreboard:
-1. Update helpers.data.js to change how data is extracted/processed
-2. Update page.svelte to change the display
-3. Update this config to add new options
-	`
+	]
 };

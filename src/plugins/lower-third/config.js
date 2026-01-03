@@ -5,7 +5,7 @@ export default {
 	// Category for grouping in the UI
 	category: 'video-overlay',
 	
-	// Sort order within category
+	// on the home page, sort order within the category
 	order: 100,
 
 	// Lower-third scoreboard marker
@@ -31,6 +31,5 @@ export default {
 			default: 'medium',
 			description: 'Text size for athlete name and weight'
 		}
-	],
-	requiredFields: ['fullName', 'weight', 'timer', 'decision']
+	]
 };

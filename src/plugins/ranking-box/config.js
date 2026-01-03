@@ -14,7 +14,7 @@ export default {
 	// Category for grouping in the UI
 	category: 'video-overlay',
 	
-	// Sort order within category
+	// on the home page, sort order within the category
 	order: 300,
 
 	// Lower-third scoreboard marker
@@ -42,36 +42,5 @@ export default {
 			default: 'total',
 			description: 'snatch: 3 snatch attempts + best snatch | cj: 3 C&J attempts + best C&J | total: best snatch, best C&J, total'
 		}
-	],
-	
-	// Required FOP data fields
-	requiredFields: [
-		'sessionName',
-		'fullName',
-		'startNumber',
-		'teamName',
-		'categoryName',
-		'total'
-	],
-	
-	// AI prompt for modifications
-	aiPrompt: `
-This scoreboard displays a lower-third overlay with an animated SVG ranking box in the lower left.
-
-The SVG contains:
-- Rounded rectangle background
-- Centered text showing the current lifting session name
-- Animated page transitions for athlete rankings
-
-Data Structure:
-- competitionName: Name of competition
-- sessionName: Current session/group name
-- athletes: Array of current session athletes
-- pageInterval: Seconds between page transitions
-
-To modify this scoreboard:
-1. Update helpers.data.js to change how data is extracted/processed
-2. Update page.svelte to change the SVG display and animations
-3. Update this config to add new options or change page interval
-	`
+	]
 };
