@@ -9,7 +9,7 @@ You are helping build a **SvelteKit application** that displays the state of an 
 1. **[README.md](../README.md)** - Project overview & setup
 2. **[CREATE_YOUR_OWN.md](../CREATE_YOUR_OWN.md)** - Create custom scoreboards
 3. **[docs/SCOREBOARD_ARCHITECTURE.md](../docs/SCOREBOARD_ARCHITECTURE.md)** - Complete system architecture
-4. **[docs/WEBSOCKET_MESSAGE_SPEC.md](../docs/WEBSOCKET_MESSAGE_SPEC.md)** - WebSocket message format & responses
+4. **WEBSOCKET_MESSAGE_SPEC.md** (in `@owlcms/tracker-core`) - WebSocket message format & responses
 
 
 **⚠️ IMPORTANT:** Before making any significant changes to the codebase:

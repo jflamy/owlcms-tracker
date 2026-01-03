@@ -325,8 +325,7 @@ Point the agent to these files for context:
 | Document | What It Contains |
 |----------|------------------|
 | `docs/SCOREBOARD_ARCHITECTURE.md` | Complete system architecture, data flow, caching, display fields |
-| `docs/WEBSOCKET_MESSAGE_SPEC.md` | Message formats from OWLCMS |
-| `docs/OWLCMS_TRANSLATIONS_SPEC.md` | Translation system and displayInfo structure |
+| `WEBSOCKET_MESSAGE_SPEC.md` (in `@owlcms/tracker-core`) | Message formats from OWLCMS |
 | `src/plugins/team-scoreboard/` | Complex example with team grouping |
 | `src/plugins/lifting-order/` | Standard scoreboard pattern |
 | `src/lib/timer-logic.js` | Reusable timer countdown logic |
