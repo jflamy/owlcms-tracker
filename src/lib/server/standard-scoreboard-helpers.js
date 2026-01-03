@@ -11,12 +11,13 @@
 import { competitionHub } from '$lib/server/competition-hub.js';
 import { extractRecordsFromUpdate } from '$lib/server/records-extractor.js';
 import { getFlagUrl } from '$lib/server/flag-resolver.js';
-import { buildCacheKey } from '$lib/server/cache-utils.js';
+import { buildCacheKey, registerCache } from '$lib/server/cache-utils.js';
 import { extractTimerAndDecisionState } from '$lib/server/timer-decision-helpers.js';
 import { computeAttemptBarVisibility } from '$lib/server/attempt-bar-visibility.js';
 
 // Shared cache for all standard scoreboards (keyed by scoreboard type + fop + options)
 const scoreboardCache = new Map();
+registerCache(scoreboardCache);
 
 /**
  * Configuration for standard scoreboard types

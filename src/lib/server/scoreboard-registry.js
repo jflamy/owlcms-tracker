@@ -12,6 +12,8 @@
  * runtime filesystem access.
  */
 
+import { bumpCacheEpoch } from './cache-epoch.js';
+
 // Eager imports so Vite includes all plugins at build time
 // Note: import.meta.glob is a Vite COMPILE-TIME feature - it gets transformed
 // into actual imports during build. It does NOT exist as a function at runtime.
@@ -149,13 +151,19 @@ class ScoreboardRegistry {
 	 * Called when OWLCMS establishes a new connection to clear stale cached data
 	 */
 	flushCaches() {
-		// Each scoreboard plugin maintains its own cache Map
-		// We can't directly access those caches from here, so we signal that caches should be cleared
-		// by setting a flag or timestamp that plugins can check
-		// For now, plugins implement their own cache invalidation based on hub FOP state version
-		console.log('[ScoreboardRegistry] Cache flush requested (plugins use hub state version for invalidation)');
+		// Force invalidation of any cache keys that include the global cache epoch.
+		// Many plugin helpers build cache keys using $lib/server/cache-utils.js; we append
+		// this epoch there. Document plugins that build custom keys should include it too.
+		//
+		// Note: we do not attempt to directly clear plugin-private Map instances.
+		// This avoids tight coupling and keeps plugins in control of their own caches.
+		//
+		const newEpoch = bumpCacheEpoch();
+		console.log(`[ScoreboardRegistry] Cache epoch bumped to ${newEpoch} (was ${newEpoch - 1})`);
+		return newEpoch;
 	}
 }
 
 // Singleton instance
 export const scoreboardRegistry = new ScoreboardRegistry();
+
