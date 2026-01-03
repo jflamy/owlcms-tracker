@@ -1,13 +1,13 @@
 import { json } from '@sveltejs/kit';
-import { closeConnection } from '@owlcms/tracker-core';
-
-// Import cache clearing functions from plugins
-import { clearCache as clearStartbookCache } from '../../../plugins/iwf-startbook/helpers.data.js';
+import { closeConnection, competitionHub } from '@owlcms/tracker-core';
+import { scoreboardRegistry } from '$lib/server/scoreboard-registry.js';
 
 /**
  * Manual refresh endpoint
- * POST - Clear plugin caches only (keeps hub data, rebuilds from last OWLCMS data)
+ * POST - Flush all plugin caches (keeps hub data, rebuilds from last OWLCMS data)
  * POST with ?fullRefresh=true - Close WebSocket to force OWLCMS full reconnect and data resend
+ * 
+ * Both modes broadcast an SSE event so browsers automatically re-fetch data.
  */
 export async function POST({ url }) {
   try {
@@ -15,14 +15,8 @@ export async function POST({ url }) {
     
     console.log('[API] Refresh requested: fullRefresh=' + fullRefresh);
     
-    // Clear plugin caches (always - safe operation)
-    const cacheResults = [];
-    try {
-      const startbookResult = clearStartbookCache();
-      cacheResults.push({ plugin: 'iwf-startbook', ...startbookResult });
-    } catch (err) {
-      console.error('[API] Error clearing startbook cache:', err.message);
-    }
+    // Flush all plugin caches via the registry
+    const cacheEpoch = scoreboardRegistry.flushCaches();
     
     // Full refresh closes WebSocket - OWLCMS will automatically reconnect and resend everything
     let connectionClosed = false;
@@ -30,16 +24,34 @@ export async function POST({ url }) {
       connectionClosed = closeConnection();
     }
     
+    // Broadcast refresh event to all connected browsers via SSE
+    // This triggers browsers to re-fetch their scoreboard data immediately
+    const fops = competitionHub.getAvailableFOPs();
+    for (const fop of fops) {
+      competitionHub.emit('fop_update', {
+        fop,
+        data: { refreshTriggered: true, cacheEpoch },
+        timestamp: Date.now()
+      });
+    }
+    // Also emit for browsers not listening to a specific FOP
+    competitionHub.emit('fop_update', {
+      fop: 'ALL',
+      data: { refreshTriggered: true, cacheEpoch },
+      timestamp: Date.now()
+    });
+    
     return json({
       success: true,
       message: fullRefresh 
         ? (connectionClosed 
             ? 'Full refresh - WebSocket closed, OWLCMS will reconnect and resend all data'
             : 'Full refresh requested but no active connection to close')
-        : 'Plugin caches cleared - data will rebuild from existing hub state',
-      cachesCleared: cacheResults,
+        : 'Plugin caches flushed - browsers notified to re-fetch',
       fullRefresh,
       connectionClosed,
+      cacheEpoch,
+      browsersNotified: fops.length + 1,
       timestamp: Date.now()
     });
   } catch (err) {
@@ -56,13 +68,12 @@ export async function POST({ url }) {
  * Get refresh status
  */
 export async function GET() {
-  const state = competitionHub.getState();
-  const metrics = competitionHub.getMetrics();
+  // Import hub dynamically to avoid circular dependencies
+  const { competitionHub } = await import('@owlcms/tracker-core');
   
   return json({
-    hasState: !!state,
-    metrics,
-    lastUpdate: state?.lastUpdate,
+    isReady: competitionHub.isReady(),
+    fops: competitionHub.getAvailableFOPs(),
     timestamp: Date.now()
   });
 }

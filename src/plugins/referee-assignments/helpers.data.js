@@ -6,10 +6,11 @@
  */
 
 import { competitionHub } from '$lib/server/competition-hub.js';
-import { buildCacheKey } from '$lib/server/cache-utils.js';
+import { buildCacheKey, registerCache } from '$lib/server/cache-utils.js';
 
 // Cache for referee-assignments
 const refereeAssignmentsCache = new Map();
+registerCache(refereeAssignmentsCache);
 
 /**
  * Main function to get referee assignment data

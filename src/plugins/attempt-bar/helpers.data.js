@@ -5,7 +5,7 @@
 
 import { competitionHub } from '$lib/server/competition-hub.js';
 import { getFlagUrl } from '$lib/server/flag-resolver.js';
-import { buildCacheKey } from '$lib/server/cache-utils.js';
+import { buildCacheKey, registerCache } from '$lib/server/cache-utils.js';
 import { extractTimerAndDecisionState } from '$lib/server/timer-decision-helpers.js';
 import { computeAttemptBarVisibility } from '$lib/server/attempt-bar-visibility.js';
 
@@ -13,6 +13,7 @@ import { computeAttemptBarVisibility } from '$lib/server/attempt-bar-visibility.
  * Plugin-specific cache
  */
 const attemptBarCache = new Map();
+registerCache(attemptBarCache);
 
 /**
  * Get the full database state (raw athlete data) - SERVER-SIDE ONLY

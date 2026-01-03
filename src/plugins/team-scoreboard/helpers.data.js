@@ -23,7 +23,7 @@ import { calculateTeamPoints } from '$lib/server/team-points-formula.js';
 import { CalculateSinclair2024, CalculateSinclair2020, getMastersAgeFactor } from '$lib/sinclair-coefficients.js';
 import { CalculateQPoints } from '$lib/qpoints-coefficients.js';
 import { computeGamx, Variant } from '$lib/gamx2.js';
-import { buildCacheKey } from '$lib/server/cache-utils.js';
+import { buildCacheKey, registerCache } from '$lib/server/cache-utils.js';
 import { extractTimers, computeDisplayMode, extractDecisionState } from '$lib/server/timer-decision-helpers.js';
 import { computeAttemptBarVisibility, hasCurrentAthlete, logAttemptBarDebug } from '$lib/server/attempt-bar-visibility.js';
 
@@ -35,6 +35,7 @@ import { computeAttemptBarVisibility, hasCurrentAthlete, logAttemptBarDebug } fr
  * Plugin-specific cache to avoid recomputing team data on every browser request
  */
 const teamScoreboardCache = new Map();
+registerCache(teamScoreboardCache);
 
 /**
  * Track last known session gender per FOP

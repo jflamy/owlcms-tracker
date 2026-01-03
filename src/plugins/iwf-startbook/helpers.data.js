@@ -1,10 +1,12 @@
 import { competitionHub } from '$lib/server/competition-hub.js';
 import { logger } from '@owlcms/tracker-core';
+import { registerCache } from '$lib/server/cache-epoch.js';
 
 /**
  * Plugin-specific cache to avoid recomputing on every browser request
  */
 const protocolCache = new Map();
+registerCache(protocolCache);
 
 /**
  * Clear the plugin cache - useful for development or when processing logic changes

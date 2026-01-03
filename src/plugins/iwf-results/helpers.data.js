@@ -1,11 +1,13 @@
 import { competitionHub } from '$lib/server/competition-hub.js';
 import { logger } from '@owlcms/tracker-core';
 import { calculateTeamPoints } from '$lib/server/team-points-formula.js';
+import { registerCache } from '$lib/server/cache-epoch.js';
 
 /**
  * Plugin-specific cache to avoid recomputing on every browser request
  */
 const protocolCache = new Map();
+registerCache(protocolCache);
 
 export function getScoreboardData(fopName = '', options = {}, locale = 'en') {
   const databaseState = competitionHub.getDatabaseState();

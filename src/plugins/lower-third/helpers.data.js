@@ -1,10 +1,11 @@
 import { competitionHub } from '$lib/server/competition-hub.js';
 import { getFlagUrl } from '$lib/server/flag-resolver.js';
 import { extractTimerAndDecisionState, computeDisplayMode } from '$lib/server/timer-decision-helpers.js';
-import { buildCacheKey } from '$lib/server/cache-utils.js';
+import { buildCacheKey, registerCache } from '$lib/server/cache-utils.js';
 
 // Plugin cache for lower-third
 const lowerThirdCache = new Map();
+registerCache(lowerThirdCache);
 
 export function getScoreboardData(fopName = 'A', options = {}) {
 	const fopUpdate = competitionHub.getFopUpdate(fopName);
