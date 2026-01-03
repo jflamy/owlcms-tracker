@@ -4,61 +4,56 @@ This folder contains the permanent documentation for developing and extending th
 
 ## 📚 Core Documents
 
-### Architecture & Design
+### Scoreboard System
 - **[SCOREBOARD_ARCHITECTURE.md](./SCOREBOARD_ARCHITECTURE.md)** - Complete system architecture
   - Multi-FOP, multi-scoreboard design
   - Plugin system patterns
   - Data flow and caching strategy
   - **Start here** for understanding the system
 
+### WebSocket & Integration
 - **[WEBSOCKET_MESSAGE_SPEC.md](./WEBSOCKET_MESSAGE_SPEC.md)** - WebSocket API specification
-  - OWLCMS message formats
+  - OWLCMS message formats (UPDATE, TIMER, DECISION, DATABASE, Binary)
   - Message type documentation
   - Integration requirements
+  - **Also see:** [PROTOCOL_REPLICATION_SPEC.md](./PROTOCOL_REPLICATION_SPEC.md) - Protocol implementation details
 
-### Data Mapping
-- **[FIELD_MAPPING_OVERVIEW.md](./FIELD_MAPPING_OVERVIEW.md)** - Quick reference guide
-  - Navigation index
-  - Common questions
-  - Troubleshooting guide
-  - **Start here** for data mapping questions
+- **[WEBSOCKET_CONFIGURATION.md](./WEBSOCKET_CONFIGURATION.md)** - OWLCMS configuration guide
+  - Setting up WebSocket connection
+  - URL configuration
 
-- **[FIELD_MAPPING.md](./FIELD_MAPPING.md)** - Complete field reference
-  - Field-by-field mapping tables
-  - Data source comparison
-  - Merging strategy
-  - Type conversions
+### Data & Features
+- **[OWLCMS_TRANSLATIONS_SPEC.md](./OWLCMS_TRANSLATIONS_SPEC.md)** - Translation system documentation
+  - Translation structure
+  - displayInfo fields
+  - Localization support
 
-- **[FIELD_MAPPING_SAMPLES.md](./FIELD_MAPPING_SAMPLES.md)** - Real-world examples
-  - Actual OWLCMS JSON samples
-  - Transformation code
-  - Before/after comparisons
+- **[USING_LOGOS_IN_SCOREBOARDS.md](./USING_LOGOS_IN_SCOREBOARDS.md)** - Logo handling guide
+  - ZIP extraction
+  - Logo access in templates
 
-### Performance
-- **[CACHING_IMPLEMENTATION.md](./CACHING_IMPLEMENTATION.md)** - Caching patterns
-  - Plugin-level caching
-  - Cache key strategies
-  - Performance optimization
-  - Timer event handling
+- **[HUB_UPDATE_FLOW.md](./HUB_UPDATE_FLOW.md)** - Competition hub update flow
+  - Message processing
+  - State management
 
 ## 🚀 Quick Start
 
 ### For New Developers
 1. Read **[SCOREBOARD_ARCHITECTURE.md](./SCOREBOARD_ARCHITECTURE.md)** - Understand the system
-2. Review **[FIELD_MAPPING_OVERVIEW.md](./FIELD_MAPPING_OVERVIEW.md)** - Learn data sources
+2. Review **[WEBSOCKET_MESSAGE_SPEC.md](./WEBSOCKET_MESSAGE_SPEC.md)** - Learn about data sources
 3. See **[CREATE_YOUR_OWN.md](../CREATE_YOUR_OWN.md)** - Create your first scoreboard
 
 ### Creating Custom Scoreboards
 - See **[CREATE_YOUR_OWN.md](../CREATE_YOUR_OWN.md)** in project root
 - Follow plugin patterns in **[SCOREBOARD_ARCHITECTURE.md](./SCOREBOARD_ARCHITECTURE.md)**
-- Use **[FIELD_MAPPING.md](./FIELD_MAPPING.md)** for data field reference
+- Use **[WEBSOCKET_MESSAGE_SPEC.md](./WEBSOCKET_MESSAGE_SPEC.md)** for data field reference
 
 ### Understanding Data Flow
 ```
 OWLCMS WebSocket → Competition Hub → Plugin Processing → Browser Display
       ↓                   ↓                  ↓                  ↓
-  See WEBSOCKET_    See SCOREBOARD_    See CACHING_      See Plugin
-  MESSAGE_SPEC.md   ARCHITECTURE.md   IMPLEMENTATION.md  READMEs
+  See WEBSOCKET_    See SCOREBOARD_    See OWLCMS_        See Plugin
+  MESSAGE_SPEC.md   ARCHITECTURE.md    TRANSLATIONS_SPEC  READMEs
 ```
 
 ## 📖 Document Organization
@@ -69,12 +64,24 @@ The system follows the **"Session Athletes First"** principle:
 1. **Primary source:** Session athletes from `groupAthletes` key (WebSocket type="update")
    - Contains current session data with highlighting
    - Precomputed by OWLCMS with display-ready values
+   - See: [OWLCMS_TRANSLATIONS_SPEC.md](./OWLCMS_TRANSLATIONS_SPEC.md)
 
 2. **Secondary source:** Database athletes (WebSocket type="database")
    - ONLY for athletes NOT in current session
    - Requires field transformation
+   - See: [WEBSOCKET_MESSAGE_SPEC.md](./WEBSOCKET_MESSAGE_SPEC.md)
 
-See **[FIELD_MAPPING_OVERVIEW.md](./FIELD_MAPPING_OVERVIEW.md)** for details.
+See [SCOREBOARD_ARCHITECTURE.md](./SCOREBOARD_ARCHITECTURE.md) for implementation details.
+
+### Document Categories
+
+| Category | Purpose | Files |
+|----------|---------|-------|
+| **Scoreboards** | Building display components | SCOREBOARD_ARCHITECTURE.md, CREATE_YOUR_OWN.md |
+| **Integration** | WebSocket & OWLCMS setup | WEBSOCKET_MESSAGE_SPEC.md, WEBSOCKET_CONFIGURATION.md |
+| **Translations** | UI text & display fields | OWLCMS_TRANSLATIONS_SPEC.md |
+| **Assets** | Logos, flags, pictures | USING_LOGOS_IN_SCOREBOARDS.md |
+| **Architecture** | Internal system docs | HUB_UPDATE_FLOW.md, PROTOCOL_REPLICATION_SPEC.md |
 
 ## 🔧 Change Tracking
 
@@ -91,13 +98,10 @@ Temporary change logs and compliance documents are kept in the **[/compliance](.
 | Task | Document |
 |------|----------|
 | Create new scoreboard | [SCOREBOARD_ARCHITECTURE.md](./SCOREBOARD_ARCHITECTURE.md) + [CREATE_YOUR_OWN.md](../CREATE_YOUR_OWN.md) |
-| Find data field | [FIELD_MAPPING_OVERVIEW.md](./FIELD_MAPPING_OVERVIEW.md) |
-| Understand caching | [CACHING_IMPLEMENTATION.md](./CACHING_IMPLEMENTATION.md) |
-| Debug highlighting | [FIELD_MAPPING_OVERVIEW.md](./FIELD_MAPPING_OVERVIEW.md) → Troubleshooting |
-| Add FOP support | [SCOREBOARD_ARCHITECTURE.md](./SCOREBOARD_ARCHITECTURE.md) → Multi-FOP |
-
-### Troubleshooting
-See the **Troubleshooting** section in [FIELD_MAPPING_OVERVIEW.md](./FIELD_MAPPING_OVERVIEW.md)
+| Understand data fields | [WEBSOCKET_MESSAGE_SPEC.md](./WEBSOCKET_MESSAGE_SPEC.md) + [OWLCMS_TRANSLATIONS_SPEC.md](./OWLCMS_TRANSLATIONS_SPEC.md) |
+| Configure OWLCMS | [WEBSOCKET_CONFIGURATION.md](./WEBSOCKET_CONFIGURATION.md) |
+| Handle logos/flags | [USING_LOGOS_IN_SCOREBOARDS.md](./USING_LOGOS_IN_SCOREBOARDS.md) |
+| Understand system internals | [HUB_UPDATE_FLOW.md](./HUB_UPDATE_FLOW.md) |
 
 ## 📝 Contributing
 
