@@ -80,7 +80,7 @@
 	<div class="grid-row header header-primary" role="row">
 		<div class="cell header col-start span-two" role="columnheader">{translations.Start || 'Start'}</div>
 		<div class="cell header col-name span-two" role="columnheader">{translations.Name || 'Name'}</div>
-		<div class="cell header col-cat span-two" role="columnheader">{translations.Category || 'Cat.'}</div>
+		<div class="cell header col-cat span-two" role="columnheader">{translations['Scoreboard.Category'] || 'Cat.'}</div>
 		<div class="cell header col-born span-two" role="columnheader">{translations.Birth || 'Born'}</div>
 		<div class="cell header col-team span-two" role="columnheader">{translations.Team || 'Team'}</div>
 		<div class="cell header v-spacer v-spacer-snatch span-two" aria-hidden="true"></div>
@@ -625,63 +625,82 @@
 		}
 	}
 
-	/* iPhone XR+ landscape (896x414) and smaller tablets: Compact layout */
-	@media (max-width: 926px) and (orientation: landscape) {
+	/* iPhone XR+ landscape (896x414) and iPhone Pro models (960x440): Compact layout */
+	@media (max-width: 960px) and (orientation: landscape) {
 		.scoreboard-grid {
-			--col-start: 3.5rem;
-			--col-name: minmax(9rem, 1.8fr);
-			--col-team: minmax(6rem, 1.3fr);
-			--col-cat: 8ch;
+			--col-start: 2.5rem;
+			--col-name: minmax(6rem, 1.5fr);
+			--col-team: minmax(3rem, 0.8fr);
+			--col-cat: 7ch;
 			--col-born: 0; /* Hide birth year on small screens */
-			--col-attempt: 3.2rem;
-			--col-best: 3.2rem;
-			--col-total: 3.8rem;
-			--col-rank: 3.5rem;
-			--col-gap: 0.35rem;
-			--header-primary-height: 2.3rem;
+			--col-attempt: 2.4rem;
+			--col-best: 2.4rem;
+			--col-total: 2.8rem;
+			--col-rank: 2.5rem;
+			--col-gap: 0.2rem;
+			--header-primary-height: 1.4rem;
 		}
 
 		.cell {
-			font-size: 0.9rem;
-			padding: 0.25rem 0.15rem;
+			font-size: 0.7rem;
+			padding: 0.15rem 0.1rem;
 		}
 
-		.header-secondary > .cell {
-			font-size: 0.85rem;
-		}
-
+		.header-primary > .cell,
+		.header-secondary > .cell,
 		.col-group {
-			font-size: 1rem;
+			font-size: 0.6rem;
+			padding: 0.05rem;
+			line-height: 0.9;
 		}
 
 		/* Hide birth year column on small screens */
 		.header-primary .col-born,
 		.grid-row.data-row > .born,
 		.grid-row.leader-row > .born {
-			display: none;
+			visibility: hidden;
+			width: 0;
+			padding: 0;
+			border: none;
+			overflow: hidden;
+			display: block;
 		}
 	}
 
 	/* ===== PORTRAIT MODE ===== */
 	
-	/* All portrait modes: Hide team, born, and best columns */
+	/* All portrait modes: Hide team, born, best, start, and category columns - show only name, lifts, total */
 	@media (orientation: portrait) {
 		.scoreboard-grid {
+			--col-start: 0;
 			--col-team: 0;
 			--col-born: 0;
 			--col-best: 0;
+			--col-cat: 0;
+			--col-rank: 0;
 		}
 
-		/* Hide team, born, and best columns with visibility */
+		/* Hide team, born, best, start, cat, rank columns with visibility */
 		.header-primary .col-team,
 		.header-primary .col-born,
+		.header-primary .col-start,
+		.header-primary .col-cat,
+		.header-primary .col-rank,
 		.header-secondary .col-best,
+
+		.header-secondary .col-rank-portrait,
 		.grid-row.data-row > .team-name,
 		.grid-row.data-row > .born,
 		.grid-row.data-row > .best,
+		.grid-row.data-row > .start-num,
+		.grid-row.data-row > .cat,
+		.grid-row.data-row > .rank,
 		.grid-row.leader-row > .team-name,
 		.grid-row.leader-row > .born,
-		.grid-row.leader-row > .best {
+		.grid-row.leader-row > .best,
+		.grid-row.leader-row > .start-num,
+		.grid-row.leader-row > .cat,
+		.grid-row.leader-row > .rank {
 			visibility: hidden;
 			width: 0;
 			padding: 0;
@@ -693,12 +712,9 @@
 	/* iPad portrait (768x1024): Comfortable sizing */
 	@media (max-width: 1024px) and (orientation: portrait) {
 		.scoreboard-grid {
-			--col-start: 3.5rem;
 			--col-name: minmax(10rem, 2fr);
-			--col-cat: 9ch;
 			--col-attempt: 3.5rem;
 			--col-total: 4rem;
-			--col-rank: 3.5rem;
 			--col-gap: 0.4rem;
 		}
 
@@ -715,52 +731,60 @@
 	/* Large phones portrait (430px - iPhone Plus/Pro Max): Very compact */
 	@media (max-width: 430px) and (orientation: portrait) {
 		.scoreboard-grid {
-			--col-start: 2.5rem;
-			--col-name: minmax(7rem, 1.5fr);
-			--col-cat: 7ch;
-			--col-attempt: 2.5rem;
-			--col-total: 3rem;
-			--col-rank: 2.8rem;
-			--col-gap: 0.25rem;
+			--col-name: minmax(6rem, 1.5fr);
+			--col-attempt: 2rem;
+			--col-total: 2.5rem;
+			--col-gap: 0.15rem;
+			--header-primary-height: 1rem;
+			--header-secondary-height: 0.7rem;
 		}
 
 		.cell {
-			font-size: 0.85rem;
-			padding: 0.2rem 0.1rem;
+			font-size: 0.6rem;
+			padding: 0.15rem 0.05rem;
+		}
+
+		.header-primary > .cell,
+		.col-group {
+			font-size: 0.55rem;
+			padding: 0.02rem;
+			line-height: 0.8;
 		}
 
 		.header-secondary > .cell {
-			font-size: 0.8rem;
-		}
-
-		.col-group {
-			font-size: 0.9rem;
+			font-size: 0.55rem;
+			padding: 0;
+			line-height: 0.7;
 		}
 	}
 
 	/* Standard phones portrait (390px - iPhone 15/16): Minimal layout */
 	@media (max-width: 390px) and (orientation: portrait) {
 		.scoreboard-grid {
-			--col-start: 2.2rem;
-			--col-name: minmax(6rem, 1.3fr);
-			--col-cat: 6ch;
-			--col-attempt: 2.2rem;
-			--col-total: 2.8rem;
-			--col-rank: 2.5rem;
-			--col-gap: 0.2rem;
+			--col-name: minmax(5rem, 1.3fr);
+			--col-attempt: 1.8rem;
+			--col-total: 2.2rem;
+			--col-gap: 0.1rem;
+			--header-primary-height: 0.9rem;
+			--header-secondary-height: 0.65rem;
 		}
 
 		.cell {
-			font-size: 0.75rem;
-			padding: 0.15rem 0.1rem;
+			font-size: 0.55rem;
+			padding: 0.12rem 0.03rem;
+		}
+
+		.header-primary > .cell,
+		.col-group {
+			font-size: 0.5rem;
+			padding: 0.01rem;
+			line-height: 0.75;
 		}
 
 		.header-secondary > .cell {
-			font-size: 0.7rem;
-		}
-
-		.col-group {
-			font-size: 0.8rem;
+			font-size: 0.5rem;
+			padding: 0;
+			line-height: 0.65;
 		}
 	}
 </style>

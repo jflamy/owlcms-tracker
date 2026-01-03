@@ -431,7 +431,7 @@
 	}
 
 	/* iPhone XR+ landscape (896x414) and smaller tablets: Very compact */
-	@media (max-width: 926px) and (orientation: landscape) {
+	@media (max-width: 960px) and (orientation: landscape) {
 		.header {
 			padding: 0.4rem 0.8rem;
 			border-bottom-width: 1px;
@@ -492,7 +492,7 @@
 		}
 
 		.session-info {
-			font-size: 1rem;
+			display: none;
 		}
 	}
 
@@ -658,6 +658,13 @@
 
 		.session-info {
 			font-size: 0.75rem;
+		}
+	}
+
+	/* Portrait mode: Hide session info */
+	@media (orientation: portrait) {
+		.session-info {
+			display: none;
 		}
 	}
 </style>

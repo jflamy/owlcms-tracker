@@ -1,6 +1,5 @@
 <script>
   export let sessions = [];
-  export let competition = {};
 
   // Extract unique age groups and their weight classes from a session
   function getSessionAgeGroups(session) {
@@ -344,9 +343,14 @@
     padding-left: 8px !important;
   }
 
-  .records-section {
+  /* Make this highly visible to confirm styles are applied */
+  :global(.records-section) {
     margin-top: 20px;
     page-break-inside: avoid;
+    background: #fffa9d; /* bright yellow for visibility */
+    padding: 12px;
+    border: 2px solid #ff9800;
+    border-radius: 4px;
   }
 
   .records-section h4 {
@@ -361,6 +365,7 @@
     border-radius: 0;
     font-size: 9px;
     border: none;
+    table-layout: fixed;
   }
 
   .records-table th,
@@ -399,6 +404,35 @@
   .federation-spacer td {
     border: none !important;
     padding: 0;
+  }
+
+  /* Compact the records area on small landscape screens (e.g., 896x414) */
+  @media (max-width: 926px) and (orientation: landscape) {
+    .records-section {
+      margin-top: 8px;
+    }
+
+    .records-table {
+      font-size: 7px;
+    }
+
+    .records-table th,
+    .records-table td {
+      padding: 0.5px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* Fixed widths to stay within viewport */
+    .records-table th:nth-child(1), .records-table td:nth-child(1) { width: 10%; }
+    .records-table th:nth-child(2), .records-table td:nth-child(2) { width: 18%; }
+    .records-table th:nth-child(3), .records-table td:nth-child(3) { width: 10%; }
+    .records-table th:nth-child(4), .records-table td:nth-child(4) { width: 8%; }
+    .records-table th:nth-child(5), .records-table td:nth-child(5) { width: 10%; }
+    .records-table th:nth-child(6), .records-table td:nth-child(6) { width: 8%; }
+    .records-table th:nth-child(7), .records-table td:nth-child(7) { width: 26%; }
+    .records-table th:nth-child(8), .records-table td:nth-child(8) { width: 10%; }
   }
 
   .officials-section {

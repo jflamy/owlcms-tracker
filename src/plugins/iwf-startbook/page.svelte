@@ -139,18 +139,22 @@
 
   /* Capture strings for Paged.js headers/footers */
   :global(.competition-name-string) {
+    /* stylelint-disable-next-line property-no-unknown */
     string-set: competition-name content();
   }
   
   :global(.competition-dates-string) {
+    /* stylelint-disable-next-line property-no-unknown */
     string-set: competition-dates content();
   }
   
   :global(.generation-time-string) {
+    /* stylelint-disable-next-line property-no-unknown */
     string-set: generation-time content();
   }
   
   :global(.footer-info-string) {
+    /* stylelint-disable-next-line property-no-unknown */
     string-set: footer-info content();
   }
 

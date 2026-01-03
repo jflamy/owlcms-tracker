@@ -259,40 +259,56 @@
 		}
 	}
 
-	@media (max-width: 926px) and (orientation: landscape) {
+	@media (max-width: 960px) and (orientation: landscape) {
 		.records-section {
-			padding: 1.5em 0 0 0;
+			padding: 0.8em 0 0 0;
 		}
 
 		.records-table-grid {
-			--col-lift: 2.8rem;
-			--col-spacer: 0.35rem;
-			--data-row-height: 1.6rem;
+			--col-lift: 2.0rem;
+			--col-spacer: 0.2rem;
+			--data-row-height: 1.3rem;
+			--header-primary-height: 0.8rem;
+			--header-secondary-height: 0.7rem;
+			grid-template-columns: 18ch repeat(var(--num-categories), var(--col-spacer) var(--col-lift) var(--col-lift) var(--col-lift));
 		}
 
 		.records-title-cell {
-			font-size: 1rem;
-			grid-template-columns: 25ch;
+			font-size: 0.6rem;
+			line-height: 0.85;
 		}
 
 		.records-category-header {
-			font-size: 1rem;
-			padding: 0.2rem 0.1rem;
+			font-size: 0.6rem;
+			padding: 0.08rem 0.02rem;
+			line-height: 0.85;
+			min-height: 0;
+			height: auto;
 		}
 
 		.records-subheader {
-			font-size: 0.9rem;
-			padding: 0.15rem 0.1rem;
+			font-size: 0.5rem;
+			padding: 0.08rem 0.02rem;
+			line-height: 0.85;
+			min-height: 0;
+			height: auto;
 		}
 
 		.records-federation-cell {
-			font-size: 0.9rem;
-			padding: 0.15rem 0.5rem;
+			font-size: 0.65rem;
+			padding: 0.1rem 0.3rem;
 		}
 
 		.records-cell {
-			font-size: 0.9rem;
-			padding: 0.15rem;
+			font-size: 0.65rem;
+			padding: 0.1rem;
+		}
+	}
+
+	/* Portrait mode: Hide records section entirely */
+	@media (orientation: portrait) {
+		.records-section {
+			display: none;
 		}
 	}
 </style>
