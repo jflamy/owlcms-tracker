@@ -2,7 +2,7 @@ export default {
   name: 'IWF Results',
   description: 'Results book with participants, medals, rankings, session protocols and records',
   category: 'documents',
-  order: 101,
+  order: 111,
   fopRequired: false,
   options: [
     {
