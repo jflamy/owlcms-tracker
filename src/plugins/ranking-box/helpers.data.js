@@ -6,6 +6,7 @@
  */
 
 import { competitionHub } from '$lib/server/competition-hub.js';
+import { logger } from '@owlcms/tracker-core';
 import { getFlagUrl } from '$lib/server/flag-resolver.js';
 
 import { buildCacheKey } from '$lib/server/cache-utils.js';
@@ -59,13 +60,13 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 				: fopUpdate.athletes;
 			
 			athletes = Array.isArray(parsed) ? parsed : [];
-			console.log('[Ranking Box] Parsed athletes count:', athletes.length);
+			logger.debug('[Ranking Box] Parsed athletes count:', athletes.length);
 		} catch (e) {
-			console.error('[Ranking Box] Error parsing athletes:', e);
+			logger.error('[Ranking Box] Error parsing athletes:', e);
 			athletes = [];
 		}
 	} else {
-		console.warn('[Ranking Box] No athletes found in fopUpdate');
+		logger.warn('[Ranking Box] No athletes found in fopUpdate');
 	}
 	
 	// Filter athletes with valid data and sort by total (descending)
@@ -156,7 +157,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			return totalB - totalA;
 		});
 	
-	console.log(`[Ranking Box] Filtered & sorted athletes count: ${athletes.length} (modality: ${modality})`);
+	logger.debug(`[Ranking Box] Filtered & sorted athletes count: ${athletes.length} (modality: ${modality})`);
 	
 	return {
 		competition: {

@@ -8,6 +8,7 @@
  */
 
 import { competitionHub } from '$lib/server/competition-hub.js';
+import { logger } from '@owlcms/tracker-core';
 import { getFlagUrl, getPictureUrl } from '$lib/server/flag-resolver.js';
 import { extractTimerAndDecisionState } from '$lib/server/timer-decision-helpers.js';
 
@@ -194,9 +195,9 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		// Find platform matching this FOP name
 		platform = databaseState.platforms.find(p => p.name === fopName) 
 			|| databaseState.platforms[0];
-		console.log(`[Attempt Board] Platform found: ${platform?.name}, fopName: ${fopName}, nbL_25: ${platform?.nbL_25}`);
+		logger.debug(`[Attempt Board] Platform found: ${platform?.name}, fopName: ${fopName}, nbL_25: ${platform?.nbL_25}`);
 	} else {
-		console.log(`[Attempt Board] No platforms in database. databaseState exists: ${!!databaseState}`);
+		logger.debug(`[Attempt Board] No platforms in database. databaseState exists: ${!!databaseState}`);
 	}
 	
 	// Extract current athlete from session athletes

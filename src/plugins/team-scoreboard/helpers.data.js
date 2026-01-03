@@ -17,6 +17,7 @@
  */
 
 import { competitionHub } from '$lib/server/competition-hub.js';
+import { logger } from '@owlcms/tracker-core';
 import { getFlagUrl } from '$lib/server/flag-resolver.js';
 import { calculateTeamPoints } from '$lib/server/team-points-formula.js';
 import { CalculateSinclair2024, CalculateSinclair2020, getMastersAgeFactor } from '$lib/sinclair-coefficients.js';
@@ -967,10 +968,10 @@ function calculateAthleteTeamPoints(athlete, competition) {
 
 	// Debug: log first athlete's rank fields to understand data structure
 	if (!calculateAthleteTeamPoints._debugLogged) {
-		console.log(`[TeamPoints DEBUG] Sample athlete keys with 'rank':`, Object.keys(athlete).filter(k => k.toLowerCase().includes('rank')));
-		console.log(`[TeamPoints DEBUG] snatchRank=${snatchRank}, cleanJerkRank=${cleanJerkRank}, totalRank=${totalRank}`);
-		console.log(`[TeamPoints DEBUG] Raw values: athlete.snatchRank=${athlete.snatchRank}, athlete.totalRank=${athlete.totalRank}, athlete.championshipType=${athlete.championshipType}`);
-		console.log(`[TeamPoints DEBUG] tp1=${tp1}, tp2=${tp2}, tp3=${tp3}, snatchCJTotal=${snatchCJTotal}`);
+		logger.debug(`[TeamPoints DEBUG] Sample athlete keys with 'rank':`, Object.keys(athlete).filter(k => k.toLowerCase().includes('rank')));
+		logger.debug(`[TeamPoints DEBUG] snatchRank=${snatchRank}, cleanJerkRank=${cleanJerkRank}, totalRank=${totalRank}`);
+		logger.debug(`[TeamPoints DEBUG] Raw values: athlete.snatchRank=${athlete.snatchRank}, athlete.totalRank=${athlete.totalRank}, athlete.championshipType=${athlete.championshipType}`);
+		logger.debug(`[TeamPoints DEBUG] tp1=${tp1}, tp2=${tp2}, tp3=${tp3}, snatchCJTotal=${snatchCJTotal}`);
 		calculateAthleteTeamPoints._debugLogged = true;
 	}
 
@@ -986,7 +987,7 @@ function calculateAthleteTeamPoints(athlete, competition) {
 
 	// Debug: log first athlete and ALJASIM
 	if (!calculateAthleteTeamPoints._loggedOnce) {
-		console.log(`[TeamPoints] First athlete:`, {
+		logger.debug(`[TeamPoints] First athlete:`, {
 			fullName: athlete.fullName,
 			lastName: athlete.lastName,
 			bestSnatch,
@@ -1000,7 +1001,7 @@ function calculateAthleteTeamPoints(athlete, competition) {
 	}
 
 	if (athlete.lastName?.includes('ALJASIM') || athlete.fullName?.includes('ALJASIM') || athlete.fullName?.includes('aljasim')) {
-		console.log(`[TeamPoints ALJASIM]`, {
+		logger.debug(`[TeamPoints ALJASIM]`, {
 			fullName: athlete.fullName,
 			lastName: athlete.lastName,
 			snatchRank,
@@ -1024,7 +1025,7 @@ function calculateAthleteTeamPoints(athlete, competition) {
 		const totalPoints = calculateTeamPoints(totalRank, total, teamMember, tp1, tp2, tp3);
 		
 		if (athlete.lastName?.includes('ALJASIM') || athlete.fullName?.includes('ALJASIM') || athlete.fullName?.includes('aljasim')) {
-			console.log(`[TeamPoints ALJASIM CALC]`, { snatchPoints, cjPoints, totalPoints, sum: snatchPoints + cjPoints + totalPoints });
+			logger.debug(`[TeamPoints ALJASIM CALC]`, { snatchPoints, cjPoints, totalPoints, sum: snatchPoints + cjPoints + totalPoints });
 		}
 		
 		points += snatchPoints;
@@ -1132,7 +1133,7 @@ function findTopContributors(athletes, gender, scoreFn, topCounts = {}) {
  */
 function groupByTeams(teamAthletes, gender, headers, topCounts = {}, includeAllAthletes = false, competition = {}, options = {}) {
 	const { topM = 4, topF = 4, topMFm = 2, topMFf = 2 } = topCounts;
-	console.log(`[Team groupByTeams] Input: ${teamAthletes.length} athletes, gender filter: ${gender}, topCounts: M=${topM}, F=${topF}, MFm=${topMFm}, MFf=${topMFf}, includeAll=${includeAllAthletes}`);
+	logger.debug(`[Team groupByTeams] Input: ${teamAthletes.length} athletes, gender filter: ${gender}, topCounts: M=${topM}, F=${topF}, MFm=${topMFm}, MFf=${topMFf}, includeAll=${includeAllAthletes}`);
 	
 	// Filter athletes with no team
 	const athletesWithTeams = teamAthletes.filter(a => {
@@ -1140,14 +1141,14 @@ function groupByTeams(teamAthletes, gender, headers, topCounts = {}, includeAllA
 		return teamName.length > 0;
 	});
 	
-	console.log(`[Team groupByTeams] After team filter: ${athletesWithTeams.length} athletes with teams`);
+	logger.debug(`[Team groupByTeams] After team filter: ${athletesWithTeams.length} athletes with teams`);
 	
 	// Filter by gender if not mixed
 	const filteredAthletes = gender !== 'MF' 
 		? athletesWithTeams.filter(a => normalizeGender(a.gender) === gender)
 		: athletesWithTeams;
 	
-	console.log(`[Team groupByTeams] After gender filter: ${filteredAthletes.length} athletes`);
+	logger.debug(`[Team groupByTeams] After gender filter: ${filteredAthletes.length} athletes`);
 	
 	// Group by team
 	const teamMap = new Map();
@@ -1328,7 +1329,7 @@ function groupByTeams(teamAthletes, gender, headers, topCounts = {}, includeAllA
  * @returns {Object} Formatted data ready for browser consumption
  */
 export function getScoreboardData(fopName = 'A', options = {}) {
-	console.log(`[TeamScoreboard] ===== START getScoreboardData fop=${fopName}, scoringSystem=${options.scoringSystem} =====`);
+	logger.debug(`[TeamScoreboard] ===== START getScoreboardData fop=${fopName}, scoringSystem=${options.scoringSystem} =====`);
 	
 	const fopUpdate = getFopUpdate(fopName);
 	const databaseState = getDatabaseState();
@@ -1357,7 +1358,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	const dbTopNFemale = databaseState.competition?.womensTeamSize || 0;
 	const hasDbTopN = scoringSystem === 'TeamPoints' && (dbTopNMale > 0 || dbTopNFemale > 0);
 	
-	console.log(`[TeamScoreboard] TopN settings from DB: mensTeamSize=${dbTopNMale}, womensTeamSize=${dbTopNFemale}, hasDbTopN=${hasDbTopN}`);
+	logger.debug(`[TeamScoreboard] TopN settings from DB: mensTeamSize=${dbTopNMale}, womensTeamSize=${dbTopNFemale}, hasDbTopN=${hasDbTopN}`);
 	
 	// Check if "include all athletes" mode is enabled
 	// Logic:
@@ -1378,7 +1379,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		includeAllAthletes = true;
 	}
 	
-	console.log(`[TeamScoreboard] includeAllAthletes=${includeAllAthletes}`);
+	logger.debug(`[TeamScoreboard] includeAllAthletes=${includeAllAthletes}`);
 	// Top score counts for team scoring (configurable per federation)
 	// When includeAllAthletes is true, use 10 for all counts (effectively includes everyone)
 	// When database has topN settings (TeamPoints mode), use those values
@@ -1420,7 +1421,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// Get the last known gender for this FOP (may be undefined if never set)
 	const lastKnownGender = lastKnownGenderByFop.get(fopName);
 	
-	console.log(`[Team helpers] Detected session athlete: "${helperDetectedAthlete?.fullName || 'none'}" gender: ${helperDetectedGender}, lastKnown: ${lastKnownGender || 'none'}`);
+	logger.debug(`[Team helpers] Detected session athlete: "${helperDetectedAthlete?.fullName || 'none'}" gender: ${helperDetectedGender}, lastKnown: ${lastKnownGender || 'none'}`);
 
 	// Track if we're in "current" mode with no gender history
 	// This is used to show just the attempt bar when no session has run yet
@@ -1524,7 +1525,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// This avoids showing arbitrary gender data before any session has started
 	// unless we have database data to show.
 	if (noGenderHistory && helperDetectedGender === 'unknown' && (!databaseState?.athletes || databaseState.athletes.length === 0)) {
-		console.log(`[Team helpers] No gender history, no active session, and no database data - showing minimal UI`);
+		logger.debug(`[Team helpers] No gender history, no active session, and no database data - showing minimal UI`);
 		const { timer, breakTimer } = extractTimers(fopUpdate, language);
 		const decision = extractDecisionState(fopUpdate);
 		const { displayMode, displayClass, activeTimer } = computeDisplayMode(timer, breakTimer, decision);
@@ -1566,7 +1567,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// isExplicitMixedMode is true when user explicitly set gender=MF in URL
 	if (gender === 'MF' && !isExplicitMixedMode && helperDetectedGender === 'unknown' && databaseState?.athletes?.length > 0) {
 		gender = 'M';
-		console.log(`[Team helpers] No active session, defaulting to M (show men from database)`);
+		logger.debug(`[Team helpers] No active session, defaulting to M (show men from database)`);
 	}
 
 	// Check cache - include hub FOP version and resolved gender in cache key
@@ -1579,12 +1580,12 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// Also include whether a session is selected (sessionName present) so null-session switches invalidate cache
 	const sessionKeyState = (fopUpdate?.sessionName != null && fopUpdate?.sessionName !== '') ? 'session' : 'no-session';
 	const cacheKey = buildCacheKey({ fopName, includeFop: true, opts: { gender, sessionKeyState, ...options } });
-	console.log(`[Team helpers] Cache check: key=${String(cacheKey).substring(0, 120)}..., gender=${gender}`);
-	console.log(`[Team helpers] Debug state: fopState=${fopUpdate?.fopState}, currentAthleteKey=${fopUpdate?.currentAthleteKey}, sessionName=${fopUpdate?.sessionName}`);
+	logger.debug(`[Team helpers] Cache check: key=${String(cacheKey).substring(0, 120)}..., gender=${gender}`);
+	logger.debug(`[Team helpers] Debug state: fopState=${fopUpdate?.fopState}, currentAthleteKey=${fopUpdate?.currentAthleteKey}, sessionName=${fopUpdate?.sessionName}`);
 	
 	if (teamScoreboardCache.has(cacheKey)) {
 		const cached = teamScoreboardCache.get(cacheKey);
-		console.log(`[Team helpers] Cache HIT - returning cached data with ${cached.teams?.length || 0} teams`);
+		logger.debug(`[Team helpers] Cache HIT - returning cached data with ${cached.teams?.length || 0} teams`);
 		let sessionStatusMessage = null;
 		if (sessionStatus.isDone && fopUpdate?.fullName) {
 			sessionStatusMessage = (fopUpdate.fullName || '').replace(/&ndash;/g, '–').replace(/&mdash;/g, '—');
@@ -1647,7 +1648,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		};
 	}
 	
-	console.log(`[Team helpers] Cache MISS - computing data for gender=${gender}`);
+	logger.debug(`[Team helpers] Cache MISS - computing data for gender=${gender}`);
 
 	// Determine current lift type
 	const liftTypeKey = fopUpdate?.liftTypeKey || 'Snatch';
@@ -1693,13 +1694,13 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// Process ALL database athletes - use session data if available, else database data
 	const allTeamAthletes = [];
 	
-	console.log(`[Team helpers] Database has ${databaseState?.athletes?.length || 0} athletes, session has ${sessionAthletesByKey.size} athletes`);
+	logger.debug(`[Team helpers] Database has ${databaseState?.athletes?.length || 0} athletes, session has ${sessionAthletesByKey.size} athletes`);
 	
 	if (databaseState?.athletes && Array.isArray(databaseState.athletes)) {
 		for (const dbAthlete of databaseState.athletes) {
 			const athleteKey = normalizeKey(dbAthlete.key);
 			if (!athleteKey) {
-				console.log(`[Team helpers] Skipping athlete with no key:`, dbAthlete?.lastName);
+				logger.debug(`[Team helpers] Skipping athlete with no key:`, dbAthlete?.lastName);
 				continue;
 			}
 			
@@ -1726,13 +1727,13 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 				if (wrapped) {
 					allTeamAthletes.push(wrapped);
 				} else {
-					console.log(`[Team helpers] teamAthleteFromDatabase returned null for:`, dbAthlete?.lastName);
+					logger.debug(`[Team helpers] teamAthleteFromDatabase returned null for:`, dbAthlete?.lastName);
 				}
 			}
 		}
 	}
 	
-	console.log(`[Team helpers] Built ${allTeamAthletes.length} team athletes from database`);
+	logger.debug(`[Team helpers] Built ${allTeamAthletes.length} team athletes from database`);
 	
 	// Add flag URLs
 	const athletesWithFlags = allTeamAthletes.map(athlete => ({
@@ -1753,9 +1754,9 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// =========================================================================
 	const teams = groupByTeams(athletesWithFlags, gender, headers, topCounts, includeAllAthletes, competitionSettings, options);
 	
-	console.log(`[Team helpers] Grouped ${allTeamAthletes.length} athletes into ${teams.length} teams (gender=${gender})`);
+	logger.debug(`[Team helpers] Grouped ${allTeamAthletes.length} athletes into ${teams.length} teams (gender=${gender})`);
 	if (teams.length > 0) {
-		teams.forEach(t => console.log(`[Team helpers]   Team "${t.teamName}": ${t.athleteCount} athletes, score=${t.teamScore?.toFixed(2)}`));
+		teams.forEach(t => logger.debug(`[Team helpers]   Team "${t.teamName}": ${t.athleteCount} athletes, score=${t.teamScore?.toFixed(2)}`));
 	}
 	
 	// Determine if there's a current athlete lifting
@@ -1910,7 +1911,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		options: responseOptions
 	});
 	
-	console.log(`[Team] Cache now has ${teamScoreboardCache.size} entries`);
+	logger.debug(`[Team] Cache now has ${teamScoreboardCache.size} entries`);
     
 	// Cleanup old cache entries (keep last 3)
 	// Null out large objects before deletion to help V8 GC

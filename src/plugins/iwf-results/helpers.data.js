@@ -1,4 +1,5 @@
 import { competitionHub } from '$lib/server/competition-hub.js';
+import { logger } from '@owlcms/tracker-core';
 import { calculateTeamPoints } from '$lib/server/team-points-formula.js';
 
 /**
@@ -70,7 +71,7 @@ export function getScoreboardData(fopName = '', options = {}, locale = 'en') {
 
   // 1. Determine which sessions to include
   const athletesToProcess = databaseState.athletes;
-  console.log(`[Protocol] Processing ${sessionFilter ? 'session: ' + sessionFilter : 'all sessions'}`);
+  logger.debug(`[Protocol] Processing ${sessionFilter ? 'session: ' + sessionFilter : 'all sessions'}`);
 
   // 2. Group athletes by session then by category
   const sessionMap = new Map(); // { sessionName => { categoryCode => [athletes] } }
@@ -164,7 +165,7 @@ export function getScoreboardData(fopName = '', options = {}, locale = 'en') {
   const participants = buildParticipationData(databaseState);
 
   // Cache and return
-  console.warn('[getScoreboardData] allRecordsData:', {
+  logger.warn('[getScoreboardData] allRecordsData:', {
     hasRecords: allRecordsData.hasRecords,
     newRecordsBroken: allRecordsData.newRecordsBroken,
     recordsLength: allRecordsData.records?.length
@@ -219,9 +220,9 @@ export function getScoreboardData(fopName = '', options = {}, locale = 'en') {
   };
 
   protocolCache.set(cacheKey, processedData);
-  console.warn('[getScoreboardData] Returning data with allRecords length:', processedData.allRecords?.length || 0);
+  logger.warn('[getScoreboardData] Returning data with allRecords length:', processedData.allRecords?.length || 0);
   if (processedData.allRecords && processedData.allRecords.length > 0) {
-    console.warn('[getScoreboardData] allRecords[0]:', processedData.allRecords[0]);
+    logger.warn('[getScoreboardData] allRecords[0]:', processedData.allRecords[0]);
   }
   return processedData;
 }
@@ -631,20 +632,20 @@ function extractMaxWeight(categoryCode) {
  */
 function buildAllRecordsData(db) {
   const allRecords = db.records || [];
-  console.warn('[buildAllRecordsData] Total records in DB:', allRecords.length);
+  logger.warn('[buildAllRecordsData] Total records in DB:', allRecords.length);
   
   // hasRecords = true if any records are loaded (even if none broken during competition)
   const hasRecords = allRecords.length > 0;
   
   if (!hasRecords) {
-    console.warn('[buildAllRecordsData] No records found, returning object with hasRecords=false');
+    logger.warn('[buildAllRecordsData] No records found, returning object with hasRecords=false');
     return { hasRecords: false, newRecordsBroken: false, records: [] };
   }
 
   // Debug: Show sample records to understand the data structure
-  console.warn('[buildAllRecordsData] Sample records from DB:');
+  logger.warn('[buildAllRecordsData] Sample records from DB:');
   allRecords.slice(0, 5).forEach((r, i) => {
-    console.warn(`  [${i}] federation=${r.recordFederation}, gender=${r.gender}, ageGrp=${r.ageGrp}, groupNameString="${r.groupNameString}", athlete=${r.athleteName}`);
+    logger.warn(`  [${i}] federation=${r.recordFederation}, gender=${r.gender}, ageGrp=${r.ageGrp}, groupNameString="${r.groupNameString}", athlete=${r.athleteName}`);
   });
   
   // Count records by federation and groupNameString status
@@ -657,8 +658,8 @@ function buildAllRecordsData(db) {
       newRecordsByFed[fed] = (newRecordsByFed[fed] || 0) + 1;
     }
   });
-  console.warn('[buildAllRecordsData] Records by federation:', fedCounts);
-  console.warn('[buildAllRecordsData] NEW records by federation:', newRecordsByFed);
+  logger.warn('[buildAllRecordsData] Records by federation:', fedCounts);
+  logger.warn('[buildAllRecordsData] NEW records by federation:', newRecordsByFed);
 
   // Grouping: Federation -> Gender -> Age Group
   // 🎯 FILTER: Only include records with non-empty groupNameString (new records set during competition)
@@ -710,8 +711,8 @@ function buildAllRecordsData(db) {
   });
 
   // Convert to sorted array
-  console.warn('[buildAllRecordsData] Records with groupNameString (new records):', recordsWithGroup);
-  console.warn('[buildAllRecordsData] Federation map size:', fedMap.size);
+  logger.warn('[buildAllRecordsData] Records with groupNameString (new records):', recordsWithGroup);
+  logger.warn('[buildAllRecordsData] Federation map size:', fedMap.size);
   
   const result = Array.from(fedMap.entries())
     .sort(([fedA], [fedB]) => {
@@ -731,16 +732,16 @@ function buildAllRecordsData(db) {
         }))
     }));
   
-  console.warn('[buildAllRecordsData] Returning result with', result.length, 'federations');
+  logger.warn('[buildAllRecordsData] Returning result with', result.length, 'federations');
   result.forEach(fed => {
     fed.genders.forEach(gen => {
       const totalRecords = gen.ageGroups.reduce((sum, ag) => sum + ag.records.length, 0);
-      console.warn(`[buildAllRecordsData]   ${fed.federation} - ${gen.genderName}: ${totalRecords} records`);
+      logger.warn(`[buildAllRecordsData]   ${fed.federation} - ${gen.genderName}: ${totalRecords} records`);
     });
   });
   
   const newRecordsBroken = recordsWithGroup > 0;
-  console.warn('[buildAllRecordsData] hasRecords:', hasRecords, 'newRecordsBroken:', newRecordsBroken);
+  logger.warn('[buildAllRecordsData] hasRecords:', hasRecords, 'newRecordsBroken:', newRecordsBroken);
   
   return {
     hasRecords,
@@ -754,13 +755,13 @@ function buildAllRecordsData(db) {
  * Returns { teams: [...], womenCategories: [...], menCategories: [...], matrix: Map<team, Map<catCode, count>> }
  */
 function buildParticipationData(db) {
-  console.warn('[Participation] buildParticipationData: start');
+  logger.warn('[Participation] buildParticipationData: start');
   const athletes = db?.athletes || [];
-  console.log(`[Participation] Athletes count: ${athletes.length}`);
+  logger.debug(`[Participation] Athletes count: ${athletes.length}`);
   if (athletes.length === 0) return { championships: [] };
 
   const ageGroups = db?.ageGroups || [];
-  console.log(`[Participation] Age groups count: ${ageGroups.length}`);
+  logger.debug(`[Participation] Age groups count: ${ageGroups.length}`);
 
   // Build team ID to name lookup
   const teamIdToName = new Map();
@@ -769,7 +770,7 @@ function buildParticipationData(db) {
       teamIdToName.set(t.id, t.name);
     }
   });
-  console.log(`[Participation] Teams lookup size: ${teamIdToName.size}`);
+  logger.debug(`[Participation] Teams lookup size: ${teamIdToName.size}`);
 
   // Build category-to-championship lookup AND category name lookup
   const catToChampionship = new Map();
@@ -789,7 +790,7 @@ function buildParticipationData(db) {
       catToGender.set(cat.code, genderMatch ? genderMatch[1] : 'M');
     });
   });
-  console.log(`[Participation] Category-to-championship map size: ${catToChampionship.size}`);
+  logger.debug(`[Participation] Category-to-championship map size: ${catToChampionship.size}`);
 
   // Group by championship: { champName -> { teamCounts, womenCatSet, menCatSet } }
   // Pre-populate ALL categories from age groups into each championship
@@ -831,7 +832,7 @@ function buildParticipationData(db) {
 
   // Debug: check first few athletes
   athletes.slice(0, 3).forEach((a, i) => {
-    console.log(`[Participation] Athlete ${i}: team=${a.team} (type: ${typeof a.team}), categoryCode=${a.categoryCode}, participations=${JSON.stringify(a.participations?.length || 0)}`);
+    logger.debug(`[Participation] Athlete ${i}: team=${a.team} (type: ${typeof a.team}), categoryCode=${a.categoryCode}, participations=${JSON.stringify(a.participations?.length || 0)}`);
   });
 
   // Process each athlete's participations
@@ -840,7 +841,7 @@ function buildParticipationData(db) {
     const gender = (a.gender || 'M').toUpperCase();
 
     if (team === 'JOR' || team === 'PLE') {
-      console.warn(`[Participation] Processing athlete for team ${team}: cat=${a.categoryCode}, participations=${JSON.stringify(a.participations || [])}`);
+      logger.warn(`[Participation] Processing athlete for team ${team}: cat=${a.categoryCode}, participations=${JSON.stringify(a.participations || [])}`);
     }
 
     // Get participations or create synthetic one
@@ -861,7 +862,7 @@ function buildParticipationData(db) {
       // Get championship entry (should already exist from pre-population)
       const champ = championshipMap.get(champName);
       if (!champ) {
-        console.warn(`[Participation] Warning: Championship "${champName}" not found for category ${catCode}`);
+        logger.warn(`[Participation] Warning: Championship "${champName}" not found for category ${catCode}`);
         return;
       }
 
@@ -869,7 +870,7 @@ function buildParticipationData(db) {
       if (!champ.teamCounts.has(team)) {
         champ.teamCounts.set(team, { categories: new Map(), womenTotal: 0, menTotal: 0, total: 0 });
         if (team === 'JOR' || team === 'PLE') {
-          console.warn(`[Participation] Created team entry for ${team} in championship ${champName}`);
+          logger.warn(`[Participation] Created team entry for ${team} in championship ${champName}`);
         }
       }
       const teamData = champ.teamCounts.get(team);
@@ -894,9 +895,9 @@ function buildParticipationData(db) {
   }
 
   // Build output for each championship
-  console.log(`[Participation] Championship map size: ${championshipMap.size}`);
+  logger.debug(`[Participation] Championship map size: ${championshipMap.size}`);
   championshipMap.forEach((v, k) => {
-    console.log(`[Participation] Championship "${k}": ${v.teamCounts.size} teams, ${v.womenCatSet.size} women cats, ${v.menCatSet.size} men cats`);
+    logger.debug(`[Participation] Championship "${k}": ${v.teamCounts.size} teams, ${v.womenCatSet.size} women cats, ${v.menCatSet.size} men cats`);
   });
   
   const championships = Array.from(championshipMap.values()).map(champ => {
@@ -908,8 +909,8 @@ function buildParticipationData(db) {
     const womenCategories = womenCatCodes.map(code => ({ code, name: catToName.get(code) || code }));
     const menCategories = menCatCodes.map(code => ({ code, name: catToName.get(code) || code }));
     
-    console.log(`[Participation] Women categories: ${JSON.stringify(womenCategories)}`);
-    console.log(`[Participation] Men categories: ${JSON.stringify(menCategories)}`);
+    logger.debug(`[Participation] Women categories: ${JSON.stringify(womenCategories)}`);
+    logger.debug(`[Participation] Men categories: ${JSON.stringify(menCategories)}`);
 
     // Sort teams alphabetically
     const teams = Array.from(champ.teamCounts.keys()).sort((a, b) => a.localeCompare(b));
@@ -927,7 +928,7 @@ function buildParticipationData(db) {
       };
 
       if (team === 'JOR' || team === 'PLE') {
-        console.warn(`[Participation] Row for ${team} in ${champ.name}: womenCells=${JSON.stringify(row.womenCells)}, menCells=${JSON.stringify(row.menCells)}, totals w:${row.womenTotal} m:${row.menTotal} t:${row.total}`);
+        logger.warn(`[Participation] Row for ${team} in ${champ.name}: womenCells=${JSON.stringify(row.womenCells)}, menCells=${JSON.stringify(row.menCells)}, totals w:${row.womenTotal} m:${row.menTotal} t:${row.total}`);
       }
 
       return row;
@@ -952,15 +953,15 @@ function buildParticipationData(db) {
     };
   });
 
-  console.log(`[Participation] Returning ${championships.length} championships`);
+  logger.debug(`[Participation] Returning ${championships.length} championships`);
   championships.forEach(c => {
-    console.warn(`[Participation] Championship ${c.name}: rows=${c.rows?.length || 0}, womenCats=${c.womenCategories.length}, menCats=${c.menCategories.length}`);
+    logger.warn(`[Participation] Championship ${c.name}: rows=${c.rows?.length || 0}, womenCats=${c.womenCategories.length}, menCats=${c.menCategories.length}`);
   });
   if (championships.length > 0) {
-    console.log(`[Participation] First championship has ${championships[0].rows?.length} rows`);
+    logger.debug(`[Participation] First championship has ${championships[0].rows?.length} rows`);
   }
 
-  console.warn('[Participation] buildParticipationData: end');
+  logger.warn('[Participation] buildParticipationData: end');
 
   return { championships };
 }
@@ -1181,8 +1182,8 @@ function buildTeamPointsData(db, includeSnCj = false, tp1 = 28, tp2 = 25, tp3 = 
   }
 
   // Build championships array
-  console.warn(`[TeamPoints] Used championship names: ${Array.from(usedChampTypes).join(', ')}`);
-  console.warn(`[TeamPoints] topN settings: Male=${topNMale}, Female=${topNFemale}`);
+  logger.warn(`[TeamPoints] Used championship names: ${Array.from(usedChampTypes).join(', ')}`);
+  logger.warn(`[TeamPoints] topN settings: Male=${topNMale}, Female=${topNFemale}`);
   const championshipsArr = Array.from(usedChampTypes).map(name => {
     const champ = {
       type: name,
@@ -1190,7 +1191,7 @@ function buildTeamPointsData(db, includeSnCj = false, tp1 = 28, tp2 = 25, tp3 = 
       women: mapToSortedArray(champData[name].women, topNFemale),
       men: mapToSortedArray(champData[name].men, topNMale)
     };
-    console.warn(`[TeamPoints] Championship ${name}: women=${champ.women.length}, men=${champ.men.length}`);
+    logger.warn(`[TeamPoints] Championship ${name}: women=${champ.women.length}, men=${champ.men.length}`);
     return champ;
   });
 
@@ -1267,7 +1268,7 @@ function buildMedalsData(db, includeSnCj = false) {
   athletes.forEach(a => {
     const parts = a.participations && a.participations.length > 0 ? a.participations : [];
     if (!parts || parts.length === 0) {
-      console.warn(`[Medals Debug] Skipping athlete ${a.lastName} - no participations (no fallback)`);
+      logger.warn(`[Medals Debug] Skipping athlete ${a.lastName} - no participations (no fallback)`);
       return; // skip this athlete entirely
     }
     parts.forEach(p => {
@@ -1297,7 +1298,7 @@ function buildMedalsData(db, includeSnCj = false) {
     const parts = a.participations && a.participations.length > 0 ? a.participations : [];
     if (!parts || parts.length === 0) {
       // Do not fallback to eligibility categories — skip athlete
-      console.warn(`[Medals Debug] Skipping athlete ${a.lastName} during medal counting - no participations`);
+      logger.warn(`[Medals Debug] Skipping athlete ${a.lastName} during medal counting - no participations`);
       return;
     }
 
@@ -1355,8 +1356,8 @@ function buildMedalsData(db, includeSnCj = false) {
   }
 
   // Build championships array from used championships (preserve ordering by insertion from usedChampTypes)
-  console.warn(`[Medals] Used championship names: ${Array.from(usedChampTypes).join(', ')}`);
-  console.warn(`[Medals] champData keys: ${Object.keys(champData).join(', ')}`);
+  logger.warn(`[Medals] Used championship names: ${Array.from(usedChampTypes).join(', ')}`);
+  logger.warn(`[Medals] champData keys: ${Object.keys(champData).join(', ')}`);
   const championshipsArr = Array.from(usedChampTypes).map(name => {
     const champ = {
       type: name,
@@ -1365,10 +1366,10 @@ function buildMedalsData(db, includeSnCj = false) {
       men: mapToSortedArray(champData[name].men),
       combined: mapToSortedArray(champData[name].combined)
     };
-    console.warn(`[Medals] Championship ${name}: women=${champ.women.length}, men=${champ.men.length}, combined=${champ.combined.length}`);
+    logger.warn(`[Medals] Championship ${name}: women=${champ.women.length}, men=${champ.men.length}, combined=${champ.combined.length}`);
     return champ;
   });
-  console.warn(`[Medals] Total championships in result: ${championshipsArr.length}`);
+  logger.warn(`[Medals] Total championships in result: ${championshipsArr.length}`);
 
   return {
     championships: championshipsArr,
