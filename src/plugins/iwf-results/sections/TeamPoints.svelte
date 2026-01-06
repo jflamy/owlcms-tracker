@@ -20,8 +20,8 @@
     return sorted.map((team, index) => ({ ...team, rank: index + 1 }));
   }
 
-  // Split array into chunks of max 25 items
-  function chunk(arr, size = 25) {
+  // Split array into chunks of max 20 items
+  function chunk(arr, size = 20) {
     const chunks = [];
     for (let i = 0; i < arr.length; i += size) {
       chunks.push(arr.slice(i, i + size));
@@ -34,106 +34,115 @@
   $: tp2 = data?.teamPoints?.tp2 || 26;
 </script>
 
-<div class="team-points-section" id="team-points">
-  {#if championships.length > 0}
-    {#each championships as champ, champIndex}
-      <!-- Women Tables -->
-      {#if champ.women && champ.women.length > 0}
-        {@const sortedWomen = sortTeamsByPoints(champ.women)}
-        {@const womenChunks = chunk(sortedWomen, 25)}
-        {#each womenChunks as womenChunk, chunkIndex}
-          <div class="champ-gender-block" class:page-break={champIndex > 0 && chunkIndex === 0} class:avoid-break={chunkIndex > 0}>
-            {#if chunkIndex === 0}
-              {#if champIndex === 0}
-                <h1 class="section-header">Team Points</h1>
-              {/if}
-              <h3 class="champ-heading">{champ.name} - Women</h3>
-            {/if}
-            <table class="team-points-table">
-              <thead>
-                <tr>
-                  <th style="width: 5%;">Rank</th>
-                  <th style="width: 27%;">Team</th>
-                  <th style="width: 10%;">Points</th>
-                  <th style="width: 9.6%;">Members</th>
-                  <th style="width: 9.6%;">Gold</th>
-                  <th style="width: 9.6%;">Silver</th>
-                  <th style="width: 9.6%;">Bronze</th>
-                  <th style="width: 9.6%;">4th</th>
-                  <th style="width: 9.6%;">5th</th>
-                </tr>
-              </thead>
-              <tbody>
-                {#each womenChunk as row}
-                  <tr>
-                    <td class="rank-cell">{row.rank}</td>
-                    <td class="team-cell">{row.team}</td>
-                    <td>{Math.floor(row.points || 0)}</td>
-                    <td>{row.memberCount || 0}</td>
-                    <td>{fmt(row.count1st)}</td>
-                    <td>{fmt(row.count2nd)}</td>
-                    <td>{fmt(row.count3rd)}</td>
-                    <td>{fmt(row.count4th)}</td>
-                    <td>{fmt(row.count5th)}</td>
-                  </tr>
-                {/each}
-              </tbody>
-            </table>
-          </div>
-        {/each}
-      {/if}
+{#if championships.length > 0}
+  <h1 class="section-header team-points-header">Team Points</h1>
+  {@const firstHeading = { value: true }}
+  {#each championships as champ, champIndex}
+    <!-- Women Tables -->
+    {#if champ.women && champ.women.length > 0}
+      {@const sortedWomen = sortTeamsByPoints(champ.women)}
+      {@const womenChunks = chunk(sortedWomen, 20)}
+      {#each womenChunks as womenChunk, chunkIndex}
+        {#if chunkIndex === 0}
+          <h3 class="champ-heading" class:page-break-before={!firstHeading.value}>{champ.name} - Women</h3>
+          {void (firstHeading.value = false)}
+        {/if}
+        <table class="team-points-table">
+          <thead>
+            <tr>
+              <th style="width: 5%;">Rank</th>
+              <th style="width: 27%;">Team</th>
+              <th style="width: 10%;">Points</th>
+              <th style="width: 9.6%;">Members</th>
+              <th style="width: 9.6%;">Gold</th>
+              <th style="width: 9.6%;">Silver</th>
+              <th style="width: 9.6%;">Bronze</th>
+              <th style="width: 9.6%;">4th</th>
+              <th style="width: 9.6%;">5th</th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each womenChunk as row}
+              <tr>
+                <td class="rank-cell">{row.rank}</td>
+                <td class="team-cell">{row.team}</td>
+                <td>{Math.floor(row.points || 0)}</td>
+                <td>{row.memberCount || 0}</td>
+                <td>{fmt(row.count1st)}</td>
+                <td>{fmt(row.count2nd)}</td>
+                <td>{fmt(row.count3rd)}</td>
+                <td>{fmt(row.count4th)}</td>
+                <td>{fmt(row.count5th)}</td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      {/each}
+    {/if}
 
-      <!-- Men Tables -->
-      {#if champ.men && champ.men.length > 0}
-        {@const sortedMen = sortTeamsByPoints(champ.men)}
-        {@const menChunks = chunk(sortedMen, 25)}
-        {#each menChunks as menChunk, chunkIndex}
-          <div class="champ-gender-block" class:page-break={chunkIndex === 0} class:avoid-break={chunkIndex > 0}>
-            {#if chunkIndex === 0}
-              <h3 class="champ-heading">{champ.name} - Men</h3>
-            {/if}
-            <table class="team-points-table">
-              <thead>
-                <tr>
-                  <th style="width: 5%;">Rank</th>
-                  <th style="width: 27%;">Team</th>
-                  <th style="width: 10%;">Points</th>
-                  <th style="width: 9.6%;">Members</th>
-                  <th style="width: 9.6%;">Gold</th>
-                  <th style="width: 9.6%;">Silver</th>
-                  <th style="width: 9.6%;">Bronze</th>
-                  <th style="width: 9.6%;">4th</th>
-                  <th style="width: 9.6%;">5th</th>
-                </tr>
-              </thead>
-              <tbody>
-                {#each menChunk as row}
-                  <tr>
-                    <td class="rank-cell">{row.rank}</td>
-                    <td class="team-cell">{row.team}</td>
-                    <td>{Math.floor(row.points || 0)}</td>
-                    <td>{row.memberCount || 0}</td>
-                    <td>{fmt(row.count1st)}</td>
-                    <td>{fmt(row.count2nd)}</td>
-                    <td>{fmt(row.count3rd)}</td>
-                    <td>{fmt(row.count4th)}</td>
-                    <td>{fmt(row.count5th)}</td>
-                  </tr>
-                {/each}
-              </tbody>
-            </table>
-          </div>
-        {/each}
-      {/if}
-    {/each}
-  {:else}
-    <div class="no-data">No team points data available.</div>
-  {/if}
-</div>
+    <!-- Men Tables -->
+    {#if champ.men && champ.men.length > 0}
+      {@const sortedMen = sortTeamsByPoints(champ.men)}
+      {@const menChunks = chunk(sortedMen, 20)}
+      {#each menChunks as menChunk, chunkIndex}
+        {#if chunkIndex === 0}
+          <h3 class="champ-heading" class:page-break-before={!firstHeading.value}>{champ.name} - Men</h3>
+          {void (firstHeading.value = false)}
+        {/if}
+        <table class="team-points-table">
+          <thead>
+            <tr>
+              <th style="width: 5%;">Rank</th>
+              <th style="width: 27%;">Team</th>
+              <th style="width: 10%;">Points</th>
+              <th style="width: 9.6%;">Members</th>
+              <th style="width: 9.6%;">Gold</th>
+              <th style="width: 9.6%;">Silver</th>
+              <th style="width: 9.6%;">Bronze</th>
+              <th style="width: 9.6%;">4th</th>
+              <th style="width: 9.6%;">5th</th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each menChunk as row}
+              <tr>
+                <td class="rank-cell">{row.rank}</td>
+                <td class="team-cell">{row.team}</td>
+                <td>{Math.floor(row.points || 0)}</td>
+                <td>{row.memberCount || 0}</td>
+                <td>{fmt(row.count1st)}</td>
+                <td>{fmt(row.count2nd)}</td>
+                <td>{fmt(row.count3rd)}</td>
+                <td>{fmt(row.count4th)}</td>
+                <td>{fmt(row.count5th)}</td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      {/each}
+    {/if}
+  {/each}
+{:else}
+  <div class="no-data">No team points data available.</div>
+{/if}
 
 <style>
 .team-points-section {
   margin: 0.5rem 0;
+}
+
+.team-points-break {
+  break-before: page;
+  page-break-before: always;
+}
+
+.avoid-break {
+  break-inside: auto;
+  page-break-inside: auto;
+}
+
+.page-break {
+  break-before: page;
   page-break-before: always;
 }
 
@@ -145,24 +154,15 @@
   border-bottom: 1pt solid #333;
   padding-bottom: 5pt;
   /* stylelint-disable-next-line property-no-unknown */
-  bookmark-level: 1; /* non-standard property for PDF bookmarks */
+  bookmark-level: 1;
   /* stylelint-disable-next-line property-no-unknown */
-  bookmark-label: "Team Points"; /* non-standard property for PDF bookmarks */
+  bookmark-label: "Team Points";
+  break-before: page;
+  page-break-before: always;
 }
 
 .champ-gender-block {
   margin-bottom: 10pt;
-  break-inside: avoid;
-  page-break-inside: avoid;
-}
-
-.champ-gender-block.page-break {
-  page-break-before: always;
-}
-
-.champ-gender-block.avoid-break {
-  break-inside: avoid;
-  page-break-inside: avoid;
 }
 
 .champ-heading {
@@ -175,6 +175,11 @@
   border-radius: 0;
 }
 
+.champ-heading.page-break-before {
+  break-before: page;
+  page-break-before: always;
+}
+
 .team-points-table {
   width: 100%;
   border-collapse: collapse;
@@ -182,8 +187,24 @@
   margin-bottom: 1rem;
   border: 1pt solid #333;
   table-layout: fixed;
-  border-radius: 0;
   outline: 1pt solid #333;
+  border-radius: 0;
+  page-break-inside: auto;
+  break-inside: auto;
+}
+
+.team-points-table thead {
+  display: table-header-group;
+}
+
+.team-points-table tfoot {
+  display: table-footer-group;
+}
+
+.team-points-table tbody {
+  display: table-row-group;
+  page-break-inside: auto;
+  break-inside: auto;
 }
 
 .team-points-table th,
@@ -191,11 +212,17 @@
   border: 1pt solid #333;
   padding: 3pt 4pt;
   text-align: center;
-  border-radius: 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
   line-height: 1.1;
+  border-radius: 0;
+}
+
+.team-points-table tr {
+  page-break-inside: avoid;
+  break-inside: avoid;
+  page-break-after: auto;
 }
 
 .team-points-table th {
