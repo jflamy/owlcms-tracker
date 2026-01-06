@@ -370,7 +370,7 @@
   }
 
   .records-section h4 {
-    font-size: 9px;
+    font-size: 14pt;
     font-weight: bold;
     margin: 8px 0 5px 0;
   }
@@ -421,7 +421,7 @@
   }
 
   .officials-section h4 {
-    font-size: 9px;
+    font-size: 14pt;
     font-weight: bold;
     margin-bottom: 10px;
   }

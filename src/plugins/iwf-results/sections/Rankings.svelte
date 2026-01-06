@@ -27,43 +27,55 @@
     }
     return '';
   }
+
+  // Split array into chunks of max 20 items
+  function chunk(arr, size = 20) {
+    const chunks = [];
+    for (let i = 0; i < arr.length; i += size) {
+      chunks.push(arr.slice(i, i + size));
+    }
+    return chunks;
+  }
 </script>
 
 <div class="section-page" id="rankings">
   <h1 class="section-header">Rankings</h1>
   
   {#each rankings as championship, champIndex}
+    {@const firstCategory = { value: true }}
     {#each championship.genders as genderGroup, genderIndex}
-      <div class="ranking-block" class:page-break={champIndex > 0 || genderIndex > 0}>
-        <h2 class="championship-header">{championship.name} - {genderGroup.genderName}</h2>
+      <h2 class="championship-header" class:page-break-before={champIndex > 0 || genderIndex > 0}>{championship.name} - {genderGroup.genderName}</h2>
 
-        {#each genderGroup.categories as category, catIndex}
-          <div class="category-block" id="ranking-{slugify(championship.name)}-{slugify(genderGroup.genderName)}-{slugify(category.categoryName)}">
+      {#each genderGroup.categories as category, catIndex}
+        {@const athleteChunks = chunk(category.items, 20)}
+        {@const totalChunks = athleteChunks.length}
+        {#each athleteChunks as athleteChunk, chunkIndex}
+          <div class="category-block" class:page-break-before={!firstCategory.value} id="ranking-{slugify(championship.name)}-{slugify(genderGroup.genderName)}-{slugify(category.categoryName)}-{chunkIndex}">
             <table class="protocol-table">
-                <thead>
-                  <tr>
-                    <th rowspan="2" class="col-lot">Lot</th>
-                    <th rowspan="2" class="col-name">Last Name</th>
-                    <th rowspan="2" class="col-firstname">First Name</th>
-                    <th rowspan="2" class="col-team">Team</th>
-                    <th rowspan="2" class="col-cat">Cat.</th>
-                    <th rowspan="2" class="col-bw">B.W.</th>
-                    <th rowspan="2" class="col-born">Born</th>
-                    <th colspan="5">Snatch</th>
-                    <th colspan="5">Clean&Jerk</th>
-                    <th colspan="2">Total</th>
-                  </tr>
-                  <tr>
-                    <th class="col-attempt">1</th><th class="col-attempt">2</th><th class="col-attempt">3</th><th class="col-max">Max</th><th class="col-rank">Rank</th>
-                    <th class="col-attempt">1</th><th class="col-attempt">2</th><th class="col-attempt">3</th><th class="col-max">Max</th><th class="col-rank">Rank</th>
-                    <th class="col-total">Total</th><th class="col-rank">Rank</th>
-                  </tr>
-                </thead>
+              <thead>
+                <tr>
+                  <th rowspan="2" class="col-lot">Lot</th>
+                  <th rowspan="2" class="col-name">Last Name</th>
+                  <th rowspan="2" class="col-firstname">First Name</th>
+                  <th rowspan="2" class="col-team">Team</th>
+                  <th rowspan="2" class="col-cat">Cat.</th>
+                  <th rowspan="2" class="col-bw">B.W.</th>
+                  <th rowspan="2" class="col-born">Born</th>
+                  <th colspan="5">Snatch</th>
+                  <th colspan="5">Clean&Jerk</th>
+                  <th colspan="2">Total</th>
+                </tr>
+                <tr>
+                  <th class="col-attempt">1</th><th class="col-attempt">2</th><th class="col-attempt">3</th><th class="col-max">Max</th><th class="col-rank">Rank</th>
+                  <th class="col-attempt">1</th><th class="col-attempt">2</th><th class="col-attempt">3</th><th class="col-max">Max</th><th class="col-rank">Rank</th>
+                  <th class="col-total">Total</th><th class="col-rank">Rank</th>
+                </tr>
+              </thead>
               <tbody>
                 <tr class="category-row">
-                  <td colspan="19">{category.categoryName}</td>
+                  <td colspan="19">{category.categoryName}{totalChunks > 1 ? ` (${chunkIndex + 1}/${totalChunks})` : ''}{void (firstCategory.value = false)}</td>
                 </tr>
-                {#each category.items as athlete}
+                {#each athleteChunk as athlete}
                   <tr>
                     <td class="col-lot">{athlete.lotNumber}</td>
                     <td class="col-name">{athlete.lastName}</td>
@@ -89,10 +101,8 @@
               </tbody>
             </table>
           </div>
-          <!-- Spacer between categories for page break control -->
-          <div class="category-spacer"></div>
         {/each}
-      </div>
+      {/each}
     {/each}
   {/each}
 </div>
@@ -204,6 +214,12 @@
   .category-block {
     page-break-inside: avoid;
     break-inside: avoid;
+  }
+
+  /* Page break before 2nd+ category blocks */
+  .category-block.page-break-before {
+    break-before: page;
+    page-break-before: always;
   }
 
   /* Spacer between categories - this is where page breaks can occur */

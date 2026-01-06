@@ -764,10 +764,14 @@ export function getScoreboardData(fopName = '', options = {}, locale = 'en') {
   // Resolve header logos (try header_left/header_right first, then left/right)
   const headerLeftUrl = getHeaderLogoUrl({ baseNames: ['header_left', 'left'] });
   const headerRightUrl = getHeaderLogoUrl({ baseNames: ['header_right', 'right'] });
+  const frontLogoUrl = getHeaderLogoUrl({ baseNames: ['front'] });
 
   // Cache and return
   const processedData = {
-    competition,
+    competition: {
+      ...competition,
+      frontLogoUrl
+    },
     sessions,
     participants,
     rankings,

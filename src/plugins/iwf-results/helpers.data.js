@@ -176,9 +176,13 @@ export function getScoreboardData(fopName = '', options = {}, locale = 'en') {
   // Resolve header logos (scan for available image formats)
   const headerLeftUrl = getHeaderLogoUrl({ baseNames: ['header_left', 'left'] });
   const headerRightUrl = getHeaderLogoUrl({ baseNames: ['header_right', 'right'] });
+  const frontLogoUrl = getHeaderLogoUrl({ baseNames: ['front'] });
   
   const processedData = {
-    competition,
+    competition: {
+      ...competition,
+      frontLogoUrl
+    },
     sessions,
     rankings,
     allRecords: allRecordsData.records,

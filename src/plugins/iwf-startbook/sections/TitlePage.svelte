@@ -1,10 +1,16 @@
 <script>
   export let competition = {};
+  
+  $: logoUrl = competition.frontLogoUrl;
 </script>
 
 <div class="title-page">
   <div class="title-content">
+    {#if logoUrl}
+      <img src="{logoUrl}" alt="Competition Logo" class="title-logo" />
+    {/if}
     <h1>{competition.name || 'Competition Name'}</h1>
+    <h1>Start Book</h1>
     <h2>{competition.city || 'Location'}</h2>
     <h2>{competition.dateRange || 'Date Range'}</h2>
     <div class="organizer">
@@ -31,7 +37,14 @@
 
   .title-content {
     max-width: 80%;
-    margin-top: -35em;
+    margin-top: -55em;
+  }
+
+  .title-logo {
+    height: 80mm;
+    width: auto;
+    max-width: 160mm;
+    margin-bottom: 30pt;
   }
 
   h1 {
