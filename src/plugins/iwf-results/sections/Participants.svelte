@@ -138,6 +138,12 @@
     background: white;
   }
 
+  .header-block {
+    /* Prevent page break after header - keep with first content */
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
   .section-header {
     font-size: 16pt;
     font-weight: bold;

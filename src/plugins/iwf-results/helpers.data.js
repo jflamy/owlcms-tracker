@@ -174,8 +174,8 @@ export function getScoreboardData(fopName = '', options = {}, locale = 'en') {
   });
   
   // Resolve header logos (scan for available image formats)
-  const headerLeftUrl = getHeaderLogoUrl({ baseName: 'header_left' });
-  const headerRightUrl = getHeaderLogoUrl({ baseName: 'header_right' });
+  const headerLeftUrl = getHeaderLogoUrl({ baseNames: ['header_left', 'left'] });
+  const headerRightUrl = getHeaderLogoUrl({ baseNames: ['header_right', 'right'] });
   
   const processedData = {
     competition,

@@ -31,6 +31,7 @@
 
   .title-content {
     max-width: 80%;
+    margin-top: -35em;
   }
 
   h1 {

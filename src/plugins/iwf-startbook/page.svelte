@@ -214,22 +214,25 @@
   <link rel="stylesheet" href="/iwf-results-print.css" />
 </svelte:head>
 
-<!-- Running elements for header logos (positioned via CSS) -->
-{#if headerLeftUrl}
-  <div class="header-left-logo"><img src="{headerLeftUrl}" alt="Left logo" /></div>
-{:else}
-  <div class="header-left-logo"></div>
-{/if}
-{#if headerRightUrl}
-  <div class="header-right-logo"><img src="{headerRightUrl}" alt="Right logo" /></div>
-{:else}
-  <div class="header-right-logo"></div>
-{/if}
+<!-- Running elements container - positioned out of flow to not affect layout -->
+<div class="running-elements-container">
+  <!-- Running elements for header logos (positioned via CSS) -->
+  {#if headerLeftUrl}
+    <div class="header-left-logo"><img src="{headerLeftUrl}" alt="Left logo" /></div>
+  {:else}
+    <div class="header-left-logo"></div>
+  {/if}
+  {#if headerRightUrl}
+    <div class="header-right-logo"><img src="{headerRightUrl}" alt="Right logo" /></div>
+  {:else}
+    <div class="header-right-logo"></div>
+  {/if}
 
-<!-- Running element for centered header -->
-<div class="header-center">
-  <div class="header-competition-name">{competitionName}</div>
-  <div class="header-competition-dates">{competitionDates}</div>
+  <!-- Running element for centered header -->
+  <div class="header-center">
+    <div class="header-competition-name">{competitionName}</div>
+    <div class="header-competition-dates">{competitionDates}</div>
+  </div>
 </div>
 
 <!-- Hidden elements for Paged.js string() function -->

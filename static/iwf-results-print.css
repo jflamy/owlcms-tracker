@@ -3,7 +3,7 @@
 /* All pages are landscape (mixed orientations not reliably supported by Paged.js) */
 @page {
   size: A4 landscape;
-  margin-top: 20mm;
+  margin-top: 25mm;
   margin-bottom: 15mm;
   margin-left: 10mm;
   margin-right: 10mm;
@@ -43,6 +43,11 @@
   @bottom-right { content: none; }
 }
 
+/* Running elements container - prevents layout interference */
+.running-elements-container {
+  display: none;
+}
+
 /* Running elements for header logos (for future use) */
 .header-left-logo {
   position: running(headerLeftLogo);
@@ -77,8 +82,9 @@
   break-after: page;
 }
 
+/* No forced break after TOC - let content flow naturally */
 .toc-section {
-  break-after: page;
+  /* break-after: page removed to avoid empty page before next section */
 }
 
 /* PDF Bookmarks for main sections */
