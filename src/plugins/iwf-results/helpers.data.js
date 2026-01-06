@@ -1,5 +1,5 @@
 import { competitionHub } from '$lib/server/competition-hub.js';
-import { logger } from '@owlcms/tracker-core';
+import { logger, getHeaderLogoUrl } from '@owlcms/tracker-core';
 import { calculateTeamPoints } from '$lib/server/team-points-formula.js';
 import { registerCache } from '$lib/server/cache-epoch.js';
 
@@ -173,6 +173,10 @@ export function getScoreboardData(fopName = '', options = {}, locale = 'en') {
     recordsLength: allRecordsData.records?.length
   });
   
+  // Resolve header logos (scan for available image formats)
+  const headerLeftUrl = getHeaderLogoUrl({ baseName: 'header_left' });
+  const headerRightUrl = getHeaderLogoUrl({ baseName: 'header_right' });
+  
   const processedData = {
     competition,
     sessions,
@@ -180,6 +184,8 @@ export function getScoreboardData(fopName = '', options = {}, locale = 'en') {
     allRecords: allRecordsData.records,
     hasRecords: allRecordsData.hasRecords,
     newRecordsBroken: allRecordsData.newRecordsBroken,
+    headerLeftUrl,
+    headerRightUrl,
     medals,
     teamPoints,
     participants,

@@ -8,16 +8,17 @@
   margin-left: 10mm;
   margin-right: 10mm;
 
-  /* Header: Competition name (left) and date range (right) */
+  /* Header: Logo (left), competition info (center), logo (right) */
   @top-left {
-    content: string(competition-name);
-    font-size: 10pt;
-    font-weight: bold;
+    content: element(headerLeftLogo);
+  }
+  
+  @top-center {
+    content: element(headerCenter);
   }
   
   @top-right {
-    content: string(competition-dates);
-    font-size: 10pt;
+    content: element(headerRightLogo);
   }
 
   /* Footer: OWLCMS version and export date (left) and page number (right) */
@@ -36,9 +37,39 @@
 /* No headers/footers on title page */
 @page :first {
   @top-left { content: none; }
+  @top-center { content: none; }
   @top-right { content: none; }
   @bottom-left { content: none; }
   @bottom-right { content: none; }
+}
+
+/* Running elements for header logos (for future use) */
+.header-left-logo {
+  position: running(headerLeftLogo);
+}
+
+.header-center {
+  position: running(headerCenter);
+  text-align: center;
+}
+
+.header-center .header-competition-name {
+  font-size: 10pt;
+  font-weight: bold;
+}
+
+.header-center .header-competition-dates {
+  font-size: 9pt;
+}
+
+.header-right-logo {
+  position: running(headerRightLogo);
+}
+
+.header-left-logo img,
+.header-right-logo img {
+  max-height: 18mm;
+  object-fit: contain;
 }
 
 /* Page breaks */

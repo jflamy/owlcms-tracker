@@ -1,5 +1,5 @@
 import { competitionHub } from '$lib/server/competition-hub.js';
-import { logger } from '@owlcms/tracker-core';
+import { logger, getHeaderLogoUrl } from '@owlcms/tracker-core';
 import { registerCache } from '$lib/server/cache-epoch.js';
 
 const OFFICIAL_ROLE_TRANSLATION_KEYS = {
@@ -761,6 +761,10 @@ export function getScoreboardData(fopName = '', options = {}, locale = 'en') {
 
   const timetableData = buildTimetableData(sessions, technicalOfficialsTimetable);
 
+  // Resolve header logos (try header_left/header_right first, then left/right)
+  const headerLeftUrl = getHeaderLogoUrl({ baseNames: ['header_left', 'left'] });
+  const headerRightUrl = getHeaderLogoUrl({ baseNames: ['header_right', 'right'] });
+
   // Cache and return
   const processedData = {
     competition,
@@ -770,6 +774,8 @@ export function getScoreboardData(fopName = '', options = {}, locale = 'en') {
     allRecords: allRecordsData.records,
     hasRecords: allRecordsData.hasRecords,
     newRecordsBroken: allRecordsData.newRecordsBroken,
+    headerLeftUrl,
+    headerRightUrl,
     technicalOfficials,
     technicalOfficialsTimetable,
     officialSections: buildOfficialSections(technicalOfficials),

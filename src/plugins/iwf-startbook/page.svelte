@@ -23,6 +23,8 @@
   $: includeCategoryParticipants = data.includeCategoryParticipants !== false;
   $: competitionName = competition.name || 'Competition';
   $: competitionDates = competition.dateRange || '';
+  $: headerLeftUrl = data.headerLeftUrl || '';
+  $: headerRightUrl = data.headerRightUrl || '';
   
   // Debug: trace data flow
   $: console.log('[iwf-startbook] data received:', {
@@ -211,6 +213,24 @@
   <title>Start Book - {competitionName}</title>
   <link rel="stylesheet" href="/iwf-results-print.css" />
 </svelte:head>
+
+<!-- Running elements for header logos (positioned via CSS) -->
+{#if headerLeftUrl}
+  <div class="header-left-logo"><img src="{headerLeftUrl}" alt="Left logo" /></div>
+{:else}
+  <div class="header-left-logo"></div>
+{/if}
+{#if headerRightUrl}
+  <div class="header-right-logo"><img src="{headerRightUrl}" alt="Right logo" /></div>
+{:else}
+  <div class="header-right-logo"></div>
+{/if}
+
+<!-- Running element for centered header -->
+<div class="header-center">
+  <div class="header-competition-name">{competitionName}</div>
+  <div class="header-competition-dates">{competitionDates}</div>
+</div>
 
 <!-- Hidden elements for Paged.js string() function -->
 <div style="display: none;">

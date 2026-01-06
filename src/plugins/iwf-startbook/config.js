@@ -4,6 +4,11 @@ export default {
   category: 'documents',
   order: 110,
   fopRequired: false,
+  
+  // Required resources that must be loaded before this plugin can render
+  // When accessed, missing resources will be requested from OWLCMS via 428
+  requires: ['logos_zip'],
+  
   options: [
     {
       key: 'includeCategoryParticipants',
