@@ -54,6 +54,26 @@ export default defineConfig({
 							res.end('Not found');
 						}
 					});
+					
+					// Serve pagedjs from node_modules (pinned to 0.4.3)
+					server.middlewares.use('/node_modules/pagedjs', (req, res, next) => {
+						const filePath = path.join(__dirname, 'node_modules', 'pagedjs', req.url);
+						
+						// Security: prevent directory traversal
+						if (!filePath.startsWith(path.join(__dirname, 'node_modules', 'pagedjs'))) {
+							res.statusCode = 403;
+							res.end('Forbidden');
+							return;
+						}
+						
+						if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+							res.setHeader('Content-Type', getMimeType(filePath));
+							res.end(fs.readFileSync(filePath));
+						} else {
+							res.statusCode = 404;
+							res.end('Not found');
+						}
+					});
 				}
 			}]
 			: [])

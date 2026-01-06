@@ -196,13 +196,13 @@
             {/if}
             {#if session.officials.sideReferee2}
               <div class="official-item">
-                <span class="label">Side Referee</span>
+                <span class="label"></span>
                 <span class="name">{session.officials.sideReferee2.fullName}</span>
               </div>
             {/if}
             {#if session.officials.sideReferee3}
               <div class="official-item">
-                <span class="label">Side Referee</span>
+                <span class="label"></span>
                 <span class="name">{session.officials.sideReferee3.fullName}</span>
               </div>
             {/if}
@@ -221,7 +221,7 @@
             {/if}
             {#if session.officials.marshal2}
               <div class="official-item">
-                <span class="label">Marshal</span>
+                <span class="label"></span>
                 <span class="name">{session.officials.marshal2.fullName}</span>
               </div>
             {/if}
@@ -244,7 +244,7 @@
             {/if}
             {#if session.officials.technicalController2}
               <div class="official-item">
-                <span class="label">Technical Controller</span>
+                <span class="label"></span>
                 <span class="name">{session.officials.technicalController2.fullName}</span>
               </div>
             {/if}
@@ -257,7 +257,7 @@
             {/if}
             {#if session.officials.competitionSecretary2}
               <div class="official-item">
-                <span class="label">Competition Secretary</span>
+                <span class="label"></span>
                 <span class="name">{session.officials.competitionSecretary2.fullName}</span>
               </div>
             {/if}
@@ -270,7 +270,7 @@
             {/if}
             {#if session.officials.doctor2}
               <div class="official-item">
-                <span class="label">Doctor</span>
+                <span class="label"></span>
                 <span class="name">{session.officials.doctor2.fullName}</span>
               </div>
             {/if}
@@ -287,7 +287,7 @@
             {#each [1, 2, 3, 4, 5] as i}
               {#if session.officials[`juryMember${i}`]}
                 <div class="official-item">
-                  <span class="label">Jury Member</span>
+                  <span class="label">{i === 1 || !session.officials[`juryMember${i-1}`] ? 'Jury Member' : ''}</span>
                   <span class="name">{session.officials[`juryMember${i}`].fullName}</span>
                 </div>
               {/if}

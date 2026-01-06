@@ -423,20 +423,28 @@ function mapOfficials(session, db) {
     doctor1: session.doctor,
     doctor2: session.doctor2,
     marshal1: session.marshall,
-    marshal2: session.marshall2,
+    marshal2: session.marshal2,
     timekeeper: session.timeKeeper
   };
 
-  Object.entries(fieldMappings).forEach(([officialKey, officialId]) => {
-    if (officialId) {
-      const to = toList.find(o => o.id === officialId || o.key === officialId);
+  Object.entries(fieldMappings).forEach(([officialKey, officialNameOrId]) => {
+    if (officialNameOrId) {
+      // Session stores official names as strings, not IDs - match by fullName
+      const to = toList.find(o => 
+        o.id === officialNameOrId || 
+        o.key === officialNameOrId || 
+        o.fullName === officialNameOrId ||
+        o.fullName?.toUpperCase() === String(officialNameOrId).toUpperCase()
+      );
       if (to) {
+        const fullName = `${to.lastName?.toUpperCase() || ''} ${to.firstName || ''}`.trim();
+        const federation = to.federation || '';
         officials[officialKey] = { 
-          fullName: `${to.lastName?.toUpperCase() || ''} ${to.firstName || ''}`.trim(),
-          federationId: to.federationId || to.federation || ''
+          fullName,
+          federation
         };
       } else {
-        officials[officialKey] = { fullName: String(officialId), federationId: '' };
+        officials[officialKey] = { fullName: String(officialNameOrId), federation: '' };
       }
     }
   });

@@ -33172,10 +33172,2377 @@
     ],
     "hasRecords": true,
     "newRecordsBroken": true,
+    "technicalOfficials": [
+      {
+        "id": 1853577565042116900,
+        "lastName": "AHMAD MOHYUDDIN",
+        "firstName": "",
+        "level": null,
+        "iwfId": "",
+        "federation": "BAN",
+        "federationId": "",
+        "affiliation": "",
+        "technicalOfficialTeam": 2,
+        "teamRole": "JURY",
+        "active": true,
+        "fullName": "AHMAD MOHYUDDIN",
+        "accreditationRole": "TECHNICAL_OFFICIAL"
+      },
+      {
+        "id": 1853577565062250800,
+        "lastName": "AIDH ALMANDHARI",
+        "firstName": "",
+        "level": null,
+        "iwfId": "",
+        "federation": "OMA",
+        "federationId": "",
+        "affiliation": "",
+        "technicalOfficialTeam": 1,
+        "teamRole": "JURY",
+        "active": true,
+        "fullName": "AIDH ALMANDHARI",
+        "accreditationRole": "TECHNICAL_OFFICIAL"
+      },
+      {
+        "id": 1853577565063932400,
+        "lastName": "AL-JARMAL ABDULLAH",
+        "firstName": "",
+        "level": null,
+        "iwfId": "",
+        "federation": "YEM",
+        "federationId": "",
+        "affiliation": "",
+        "technicalOfficialTeam": 2,
+        "teamRole": "COMPETITION_SECRETARY",
+        "active": true,
+        "fullName": "AL-JARMAL ABDULLAH",
+        "accreditationRole": "COMPETITION_SECRETARY"
+      },
+      {
+        "id": 1853577565064199400,
+        "lastName": "ALAJARMEH AHMAD",
+        "firstName": "",
+        "level": null,
+        "iwfId": "",
+        "federation": "JOR",
+        "federationId": "",
+        "affiliation": "",
+        "technicalOfficialTeam": 1,
+        "teamRole": "REFEREE",
+        "active": true,
+        "fullName": "ALAJARMEH AHMAD",
+        "accreditationRole": "TECHNICAL_OFFICIAL"
+      },
+      {
+        "id": 1853577565064383700,
+        "lastName": "ALAWADHI JASSIM",
+        "firstName": "",
+        "level": null,
+        "iwfId": "",
+        "federation": "UAE",
+        "federationId": "",
+        "affiliation": "",
+        "technicalOfficialTeam": 1,
+        "teamRole": "MARSHAL",
+        "active": true,
+        "fullName": "ALAWADHI JASSIM",
+        "accreditationRole": "TECHNICAL_OFFICIAL"
+      },
+      {
+        "id": 1853577565064562200,
+        "lastName": "ALKHAZRAJ SALEH",
+        "firstName": "",
+        "level": null,
+        "iwfId": "",
+        "federation": "KSA",
+        "federationId": "",
+        "affiliation": "",
+        "technicalOfficialTeam": 1,
+        "teamRole": "TIMEKEEPER",
+        "active": true,
+        "fullName": "ALKHAZRAJ SALEH",
+        "accreditationRole": "TECHNICAL_OFFICIAL"
+      },
+      {
+        "id": 1853577565063676200,
+        "lastName": "ALMUTAIRI ABDULRAHMAN",
+        "firstName": "",
+        "level": null,
+        "iwfId": "",
+        "federation": "KUW",
+        "federationId": "",
+        "affiliation": "",
+        "technicalOfficialTeam": 2,
+        "teamRole": "TIMEKEEPER",
+        "active": true,
+        "fullName": "ALMUTAIRI ABDULRAHMAN",
+        "accreditationRole": "TECHNICAL_OFFICIAL"
+      },
+      {
+        "id": 1853577565064907500,
+        "lastName": "ALQUTHAMI AHMED",
+        "firstName": "",
+        "level": null,
+        "iwfId": "",
+        "federation": "KSA",
+        "federationId": "",
+        "affiliation": "",
+        "technicalOfficialTeam": 1,
+        "teamRole": "JURY",
+        "active": true,
+        "fullName": "ALQUTHAMI AHMED",
+        "accreditationRole": "TECHNICAL_OFFICIAL"
+      },
+      {
+        "id": 1853577565065118700,
+        "lastName": "ALRADDAWI HAMMOUD",
+        "firstName": "",
+        "level": null,
+        "iwfId": "",
+        "federation": "SYR",
+        "federationId": "",
+        "affiliation": "",
+        "technicalOfficialTeam": 2,
+        "teamRole": "DOCTOR",
+        "active": true,
+        "fullName": "ALRADDAWI HAMMOUD",
+        "accreditationRole": "DOCTOR"
+      },
+      {
+        "id": 1853577565065290500,
+        "lastName": "ALYAAGOUB WALEED SALEH",
+        "firstName": "",
+        "level": null,
+        "iwfId": "",
+        "federation": "KSA",
+        "federationId": "",
+        "affiliation": "",
+        "technicalOfficialTeam": 2,
+        "teamRole": "TECHNICAL_CONTROLLER",
+        "active": true,
+        "fullName": "ALYAAGOUB WALEED SALEH",
+        "accreditationRole": "TECHNICAL_OFFICIAL"
+      },
+      {
+        "id": 1853577565065437200,
+        "lastName": "BHBEHANI SHAHED",
+        "firstName": "",
+        "level": null,
+        "iwfId": "",
+        "federation": "KUW",
+        "federationId": "",
+        "affiliation": "",
+        "technicalOfficialTeam": 1,
+        "teamRole": "REFEREE",
+        "active": true,
+        "fullName": "BHBEHANI SHAHED",
+        "accreditationRole": "TECHNICAL_OFFICIAL"
+      },
+      {
+        "id": 1853577565065604000,
+        "lastName": "DIRIK OZLEM",
+        "firstName": "",
+        "level": null,
+        "iwfId": "",
+        "federation": "TUR",
+        "federationId": "",
+        "affiliation": "",
+        "technicalOfficialTeam": 3,
+        "teamRole": "REFEREE",
+        "active": true,
+        "fullName": "DIRIK OZLEM",
+        "accreditationRole": "TECHNICAL_OFFICIAL"
+      },
+      {
+        "id": 1853577565064731600,
+        "lastName": "FATHI MASMOUDI",
+        "firstName": "",
+        "level": null,
+        "iwfId": "",
+        "federation": "TUN",
+        "federationId": "",
+        "affiliation": "",
+        "technicalOfficialTeam": 2,
+        "teamRole": "DOCTOR",
+        "active": true,
+        "fullName": "FATHI MASMOUDI",
+        "accreditationRole": "DOCTOR"
+      },
+      {
+        "id": 1853577565066025500,
+        "lastName": "HASANI ASTRIT",
+        "firstName": "",
+        "level": null,
+        "iwfId": "",
+        "federation": "ALB",
+        "federationId": "",
+        "affiliation": "",
+        "technicalOfficialTeam": 1,
+        "teamRole": "COMPETITION_SECRETARY",
+        "active": true,
+        "fullName": "HASANI ASTRIT",
+        "accreditationRole": "COMPETITION_SECRETARY"
+      },
+      {
+        "id": 1853577565066192000,
+        "lastName": "IBRAHIM BASEL",
+        "firstName": "",
+        "level": null,
+        "iwfId": "",
+        "federation": "SYR",
+        "federationId": "",
+        "affiliation": "",
+        "technicalOfficialTeam": 2,
+        "teamRole": "MARSHAL",
+        "active": true,
+        "fullName": "IBRAHIM BASEL",
+        "accreditationRole": "TECHNICAL_OFFICIAL"
+      },
+      {
+        "id": 1853577565066334000,
+        "lastName": "IQUAIBOM LAWRENCE",
+        "firstName": "",
+        "level": null,
+        "iwfId": "",
+        "federation": "NGR",
+        "federationId": "",
+        "affiliation": "",
+        "technicalOfficialTeam": 2,
+        "teamRole": "JURY",
+        "active": true,
+        "fullName": "IQUAIBOM LAWRENCE",
+        "accreditationRole": "TECHNICAL_OFFICIAL"
+      },
+      {
+        "id": 1853577565066470000,
+        "lastName": "KOHI MOHAMMAD AZAM",
+        "firstName": "",
+        "level": null,
+        "iwfId": "",
+        "federation": "AFG",
+        "federationId": "",
+        "affiliation": "",
+        "technicalOfficialTeam": 1,
+        "teamRole": "REFEREE",
+        "active": true,
+        "fullName": "KOHI MOHAMMAD AZAM",
+        "accreditationRole": "TECHNICAL_OFFICIAL"
+      },
+      {
+        "id": 1853577565066603000,
+        "lastName": "MASIC ENISA",
+        "firstName": "",
+        "level": null,
+        "iwfId": "",
+        "federation": "BIH",
+        "federationId": "",
+        "affiliation": "",
+        "technicalOfficialTeam": 1,
+        "teamRole": "REFEREE",
+        "active": true,
+        "fullName": "MASIC ENISA",
+        "accreditationRole": "TECHNICAL_OFFICIAL"
+      },
+      {
+        "id": 1853577565066738000,
+        "lastName": "MASIC NEDIM",
+        "firstName": "",
+        "level": null,
+        "iwfId": "",
+        "federation": "BIH",
+        "federationId": "",
+        "affiliation": "",
+        "technicalOfficialTeam": 2,
+        "teamRole": "JURY",
+        "active": true,
+        "fullName": "MASIC NEDIM",
+        "accreditationRole": "TECHNICAL_OFFICIAL"
+      },
+      {
+        "id": 1853577565066891000,
+        "lastName": "MOHAMED RAGHEB",
+        "firstName": "",
+        "level": null,
+        "iwfId": "",
+        "federation": "EGY",
+        "federationId": "",
+        "affiliation": "",
+        "technicalOfficialTeam": 2,
+        "teamRole": "REFEREE",
+        "active": true,
+        "fullName": "MOHAMED RAGHEB",
+        "accreditationRole": "TECHNICAL_OFFICIAL"
+      },
+      {
+        "id": 1853577565067342000,
+        "lastName": "MOHAMMAD KABIRI",
+        "firstName": "",
+        "level": null,
+        "iwfId": "",
+        "federation": "IRI",
+        "federationId": "",
+        "affiliation": "",
+        "technicalOfficialTeam": 3,
+        "teamRole": "REFEREE",
+        "active": true,
+        "fullName": "MOHAMMAD KABIRI",
+        "accreditationRole": "TECHNICAL_OFFICIAL"
+      },
+      {
+        "id": 1853577565067536600,
+        "lastName": "MOUSA WAFFA",
+        "firstName": "",
+        "level": null,
+        "iwfId": "",
+        "federation": "EGY",
+        "federationId": "",
+        "affiliation": "",
+        "technicalOfficialTeam": 1,
+        "teamRole": "COMPETITION_SECRETARY",
+        "active": true,
+        "fullName": "MOUSA WAFFA",
+        "accreditationRole": "COMPETITION_SECRETARY"
+      },
+      {
+        "id": 1853577565067686000,
+        "lastName": "MUSTAFAYEV AZAD",
+        "firstName": "",
+        "level": null,
+        "iwfId": "",
+        "federation": "AZE",
+        "federationId": "",
+        "affiliation": "",
+        "technicalOfficialTeam": 2,
+        "teamRole": "REFEREE",
+        "active": true,
+        "fullName": "MUSTAFAYEV AZAD",
+        "accreditationRole": "TECHNICAL_OFFICIAL"
+      },
+      {
+        "id": 1853577565067830000,
+        "lastName": "NAMWANGA JANET MUSOKE",
+        "firstName": "",
+        "level": null,
+        "iwfId": "",
+        "federation": "UGA",
+        "federationId": "",
+        "affiliation": "",
+        "technicalOfficialTeam": 2,
+        "teamRole": "REFEREE",
+        "active": true,
+        "fullName": "NAMWANGA JANET MUSOKE",
+        "accreditationRole": "TECHNICAL_OFFICIAL"
+      },
+      {
+        "id": 1853577565068022800,
+        "lastName": "OGUZKAN CAHIT",
+        "firstName": "",
+        "level": null,
+        "iwfId": "",
+        "federation": "TUR",
+        "federationId": "",
+        "affiliation": "",
+        "technicalOfficialTeam": 1,
+        "teamRole": "TECHNICAL_CONTROLLER",
+        "active": true,
+        "fullName": "OGUZKAN CAHIT",
+        "accreditationRole": "TECHNICAL_OFFICIAL"
+      },
+      {
+        "id": 1853577565068167400,
+        "lastName": "ONUBAYE SEFIYA AHUOIZA",
+        "firstName": "",
+        "level": null,
+        "iwfId": "",
+        "federation": "NGR",
+        "federationId": "",
+        "affiliation": "",
+        "technicalOfficialTeam": 3,
+        "teamRole": "REFEREE",
+        "active": true,
+        "fullName": "ONUBAYE SEFIYA AHUOIZA",
+        "accreditationRole": "TECHNICAL_OFFICIAL"
+      },
+      {
+        "id": 1853577565068331300,
+        "lastName": "ORAZDURDYYEV DOVRAN",
+        "firstName": "",
+        "level": null,
+        "iwfId": "",
+        "federation": "TKM",
+        "federationId": "",
+        "affiliation": "",
+        "technicalOfficialTeam": 2,
+        "teamRole": "COMPETITION_SECRETARY",
+        "active": true,
+        "fullName": "ORAZDURDYYEV DOVRAN",
+        "accreditationRole": "COMPETITION_SECRETARY"
+      },
+      {
+        "id": 1853577565068502500,
+        "lastName": "QIRMASH ESAM",
+        "firstName": "",
+        "level": null,
+        "iwfId": "",
+        "federation": "ALI",
+        "federationId": "",
+        "affiliation": "",
+        "technicalOfficialTeam": 1,
+        "teamRole": "TECHNICAL_CONTROLLER",
+        "active": true,
+        "fullName": "QIRMASH ESAM",
+        "accreditationRole": "TECHNICAL_OFFICIAL"
+      },
+      {
+        "id": 1853577565068663000,
+        "lastName": "QIRMASH ESAM ALI",
+        "firstName": "",
+        "level": null,
+        "iwfId": "",
+        "federation": "LBA",
+        "federationId": "",
+        "affiliation": "",
+        "technicalOfficialTeam": 1,
+        "teamRole": "TECHNICAL_CONTROLLER",
+        "active": true,
+        "fullName": "QIRMASH ESAM ALI",
+        "accreditationRole": "TECHNICAL_OFFICIAL"
+      },
+      {
+        "id": 1853577565068790000,
+        "lastName": "RAHMA ALI YUSUF",
+        "firstName": "",
+        "level": null,
+        "iwfId": "",
+        "federation": "BRN",
+        "federationId": "",
+        "affiliation": "",
+        "technicalOfficialTeam": 3,
+        "teamRole": "REFEREE",
+        "active": true,
+        "fullName": "RAHMA ALI YUSUF",
+        "accreditationRole": "TECHNICAL_OFFICIAL"
+      },
+      {
+        "id": 1853577565068939500,
+        "lastName": "REEM HAZZAZI",
+        "firstName": "",
+        "level": null,
+        "iwfId": "",
+        "federation": "KSA",
+        "federationId": "",
+        "affiliation": "",
+        "technicalOfficialTeam": 2,
+        "teamRole": "REFEREE",
+        "active": true,
+        "fullName": "REEM HAZZAZI",
+        "accreditationRole": "TECHNICAL_OFFICIAL"
+      },
+      {
+        "id": 1853577565069085000,
+        "lastName": "REZA SHIRVANI BAKHTIYARI",
+        "firstName": "",
+        "level": null,
+        "iwfId": "",
+        "federation": "IRI",
+        "federationId": "",
+        "affiliation": "",
+        "technicalOfficialTeam": 1,
+        "teamRole": "DOCTOR",
+        "active": true,
+        "fullName": "REZA SHIRVANI BAKHTIYARI",
+        "accreditationRole": "DOCTOR"
+      },
+      {
+        "id": 1853577565069740800,
+        "lastName": "SOLOVYEVA OLGA",
+        "firstName": "",
+        "level": null,
+        "iwfId": "",
+        "federation": "KAZ",
+        "federationId": "",
+        "affiliation": "",
+        "technicalOfficialTeam": 1,
+        "teamRole": "JURY_PRESIDENT",
+        "active": true,
+        "fullName": "SOLOVYEVA OLGA",
+        "accreditationRole": "TECHNICAL_OFFICIAL"
+      },
+      {
+        "id": 1853577565070262300,
+        "lastName": "SONNY KASIRAN",
+        "firstName": "",
+        "level": null,
+        "iwfId": "",
+        "federation": "INA",
+        "federationId": "",
+        "affiliation": "",
+        "technicalOfficialTeam": 2,
+        "teamRole": "MARSHAL",
+        "active": true,
+        "fullName": "SONNY KASIRAN",
+        "accreditationRole": "TECHNICAL_OFFICIAL"
+      },
+      {
+        "id": 1853577565070681300,
+        "lastName": "SSENKUNGU SALIM MUSOKE",
+        "firstName": "",
+        "level": null,
+        "iwfId": "",
+        "federation": "UGA",
+        "federationId": "",
+        "affiliation": "",
+        "technicalOfficialTeam": 1,
+        "teamRole": "JURY",
+        "active": true,
+        "fullName": "SSENKUNGU SALIM MUSOKE",
+        "accreditationRole": "TECHNICAL_OFFICIAL"
+      },
+      {
+        "id": 1853577565071129000,
+        "lastName": "SULEYMANOV ELKHAN",
+        "firstName": "",
+        "level": null,
+        "iwfId": "",
+        "federation": "AZE",
+        "federationId": "",
+        "affiliation": "",
+        "technicalOfficialTeam": 1,
+        "teamRole": "MARSHAL",
+        "active": true,
+        "fullName": "SULEYMANOV ELKHAN",
+        "accreditationRole": "TECHNICAL_OFFICIAL"
+      },
+      {
+        "id": 1853577565071526000,
+        "lastName": "TAHORI AHMED",
+        "firstName": "",
+        "level": null,
+        "iwfId": "",
+        "federation": "MAR",
+        "federationId": "",
+        "affiliation": "",
+        "technicalOfficialTeam": 2,
+        "teamRole": "TECHNICAL_CONTROLLER",
+        "active": true,
+        "fullName": "TAHORI AHMED",
+        "accreditationRole": "TECHNICAL_OFFICIAL"
+      },
+      {
+        "id": 1853577565071836400,
+        "lastName": "TARIGAN PERGUNAN",
+        "firstName": "",
+        "level": null,
+        "iwfId": "",
+        "federation": "INA",
+        "federationId": "",
+        "affiliation": "",
+        "technicalOfficialTeam": 2,
+        "teamRole": "JURY",
+        "active": true,
+        "fullName": "TARIGAN PERGUNAN",
+        "accreditationRole": "TECHNICAL_OFFICIAL"
+      },
+      {
+        "id": 1853577565072127200,
+        "lastName": "TCHOBANIAN HAROUTUN",
+        "firstName": "",
+        "level": null,
+        "iwfId": "",
+        "federation": "LBN",
+        "federationId": "",
+        "affiliation": "",
+        "technicalOfficialTeam": 1,
+        "teamRole": "JURY",
+        "active": true,
+        "fullName": "TCHOBANIAN HAROUTUN",
+        "accreditationRole": "TECHNICAL_OFFICIAL"
+      },
+      {
+        "id": 1853577565072488200,
+        "lastName": "TCHOBANIAN SEZA",
+        "firstName": "",
+        "level": null,
+        "iwfId": "",
+        "federation": "LBN",
+        "federationId": "",
+        "affiliation": "",
+        "technicalOfficialTeam": 1,
+        "teamRole": "DOCTOR",
+        "active": true,
+        "fullName": "TCHOBANIAN SEZA",
+        "accreditationRole": "DOCTOR"
+      },
+      {
+        "id": 1853577565072815900,
+        "lastName": "YAHYA ALI ABDULLAH",
+        "firstName": "",
+        "level": null,
+        "iwfId": "",
+        "federation": "BRN",
+        "federationId": "",
+        "affiliation": "",
+        "technicalOfficialTeam": 2,
+        "teamRole": "JURY_PRESIDENT",
+        "active": true,
+        "fullName": "YAHYA ALI ABDULLAH",
+        "accreditationRole": "TECHNICAL_OFFICIAL"
+      }
+    ],
+    "technicalOfficialsTimetable": [
+      {
+        "sessionName": "1",
+        "roleCategory": "JURY",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "1",
+        "roleCategory": "REFEREE",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "1",
+        "roleCategory": "MARSHALL",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "1",
+        "roleCategory": "TIMEKEEPER",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "1",
+        "roleCategory": "TECHNICAL_CONTROLLER",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "1",
+        "roleCategory": "DOCTOR",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "1",
+        "roleCategory": "COMPETITION_SECRETARY",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "2",
+        "roleCategory": "JURY",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "2",
+        "roleCategory": "REFEREE",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "2",
+        "roleCategory": "MARSHALL",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "2",
+        "roleCategory": "TIMEKEEPER",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "2",
+        "roleCategory": "TECHNICAL_CONTROLLER",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "2",
+        "roleCategory": "DOCTOR",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "2",
+        "roleCategory": "COMPETITION_SECRETARY",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "3",
+        "roleCategory": "JURY",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "3",
+        "roleCategory": "REFEREE",
+        "teamNumber": 3
+      },
+      {
+        "sessionName": "3",
+        "roleCategory": "MARSHALL",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "3",
+        "roleCategory": "TIMEKEEPER",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "3",
+        "roleCategory": "TECHNICAL_CONTROLLER",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "3",
+        "roleCategory": "DOCTOR",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "3",
+        "roleCategory": "COMPETITION_SECRETARY",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "4",
+        "roleCategory": "JURY",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "4",
+        "roleCategory": "REFEREE",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "4",
+        "roleCategory": "MARSHALL",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "4",
+        "roleCategory": "TIMEKEEPER",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "4",
+        "roleCategory": "TECHNICAL_CONTROLLER",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "4",
+        "roleCategory": "DOCTOR",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "4",
+        "roleCategory": "COMPETITION_SECRETARY",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "5",
+        "roleCategory": "JURY",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "5",
+        "roleCategory": "REFEREE",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "5",
+        "roleCategory": "MARSHALL",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "5",
+        "roleCategory": "TIMEKEEPER",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "5",
+        "roleCategory": "TECHNICAL_CONTROLLER",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "5",
+        "roleCategory": "DOCTOR",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "5",
+        "roleCategory": "COMPETITION_SECRETARY",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "6",
+        "roleCategory": "JURY",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "6",
+        "roleCategory": "REFEREE",
+        "teamNumber": 3
+      },
+      {
+        "sessionName": "6",
+        "roleCategory": "MARSHALL",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "6",
+        "roleCategory": "TIMEKEEPER",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "6",
+        "roleCategory": "TECHNICAL_CONTROLLER",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "6",
+        "roleCategory": "DOCTOR",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "6",
+        "roleCategory": "COMPETITION_SECRETARY",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "7",
+        "roleCategory": "JURY",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "7",
+        "roleCategory": "REFEREE",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "7",
+        "roleCategory": "MARSHALL",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "7",
+        "roleCategory": "TIMEKEEPER",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "7",
+        "roleCategory": "TECHNICAL_CONTROLLER",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "7",
+        "roleCategory": "DOCTOR",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "7",
+        "roleCategory": "COMPETITION_SECRETARY",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "8",
+        "roleCategory": "JURY",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "8",
+        "roleCategory": "REFEREE",
+        "teamNumber": 3
+      },
+      {
+        "sessionName": "8",
+        "roleCategory": "MARSHALL",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "8",
+        "roleCategory": "TIMEKEEPER",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "8",
+        "roleCategory": "TECHNICAL_CONTROLLER",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "8",
+        "roleCategory": "DOCTOR",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "8",
+        "roleCategory": "COMPETITION_SECRETARY",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "9",
+        "roleCategory": "JURY",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "9",
+        "roleCategory": "REFEREE",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "9",
+        "roleCategory": "MARSHALL",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "9",
+        "roleCategory": "TIMEKEEPER",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "9",
+        "roleCategory": "TECHNICAL_CONTROLLER",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "9",
+        "roleCategory": "DOCTOR",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "9",
+        "roleCategory": "COMPETITION_SECRETARY",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "10",
+        "roleCategory": "JURY",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "10",
+        "roleCategory": "REFEREE",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "10",
+        "roleCategory": "MARSHALL",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "10",
+        "roleCategory": "TIMEKEEPER",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "10",
+        "roleCategory": "TECHNICAL_CONTROLLER",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "10",
+        "roleCategory": "DOCTOR",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "10",
+        "roleCategory": "COMPETITION_SECRETARY",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "11",
+        "roleCategory": "JURY",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "11",
+        "roleCategory": "REFEREE",
+        "teamNumber": 3
+      },
+      {
+        "sessionName": "11",
+        "roleCategory": "MARSHALL",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "11",
+        "roleCategory": "TIMEKEEPER",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "11",
+        "roleCategory": "TECHNICAL_CONTROLLER",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "11",
+        "roleCategory": "DOCTOR",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "11",
+        "roleCategory": "COMPETITION_SECRETARY",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "12",
+        "roleCategory": "JURY",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "12",
+        "roleCategory": "REFEREE",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "12",
+        "roleCategory": "MARSHALL",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "12",
+        "roleCategory": "TIMEKEEPER",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "12",
+        "roleCategory": "TECHNICAL_CONTROLLER",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "12",
+        "roleCategory": "DOCTOR",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "12",
+        "roleCategory": "COMPETITION_SECRETARY",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "13",
+        "roleCategory": "JURY",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "13",
+        "roleCategory": "REFEREE",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "13",
+        "roleCategory": "MARSHALL",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "13",
+        "roleCategory": "TIMEKEEPER",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "13",
+        "roleCategory": "TECHNICAL_CONTROLLER",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "13",
+        "roleCategory": "DOCTOR",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "13",
+        "roleCategory": "COMPETITION_SECRETARY",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "14",
+        "roleCategory": "JURY",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "14",
+        "roleCategory": "REFEREE",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "14",
+        "roleCategory": "MARSHALL",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "14",
+        "roleCategory": "TIMEKEEPER",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "14",
+        "roleCategory": "TECHNICAL_CONTROLLER",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "14",
+        "roleCategory": "DOCTOR",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "14",
+        "roleCategory": "COMPETITION_SECRETARY",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "15",
+        "roleCategory": "JURY",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "15",
+        "roleCategory": "REFEREE",
+        "teamNumber": 1
+      },
+      {
+        "sessionName": "15",
+        "roleCategory": "MARSHALL",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "15",
+        "roleCategory": "TIMEKEEPER",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "15",
+        "roleCategory": "TECHNICAL_CONTROLLER",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "15",
+        "roleCategory": "DOCTOR",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "15",
+        "roleCategory": "COMPETITION_SECRETARY",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "16",
+        "roleCategory": "JURY",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "16",
+        "roleCategory": "REFEREE",
+        "teamNumber": 3
+      },
+      {
+        "sessionName": "16",
+        "roleCategory": "MARSHALL",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "16",
+        "roleCategory": "TIMEKEEPER",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "16",
+        "roleCategory": "TECHNICAL_CONTROLLER",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "16",
+        "roleCategory": "DOCTOR",
+        "teamNumber": 2
+      },
+      {
+        "sessionName": "16",
+        "roleCategory": "COMPETITION_SECRETARY",
+        "teamNumber": 2
+      }
+    ],
+    "officialSections": [
+      {
+        "roleCategory": "JURY",
+        "officials": [
+          {
+            "id": 1853577565042116900,
+            "lastName": "AHMAD MOHYUDDIN",
+            "firstName": "",
+            "level": null,
+            "iwfId": "",
+            "federation": "BAN",
+            "federationId": "",
+            "affiliation": "",
+            "technicalOfficialTeam": 2,
+            "teamRole": "JURY",
+            "active": true,
+            "fullName": "AHMAD MOHYUDDIN",
+            "accreditationRole": "TECHNICAL_OFFICIAL"
+          },
+          {
+            "id": 1853577565062250800,
+            "lastName": "AIDH ALMANDHARI",
+            "firstName": "",
+            "level": null,
+            "iwfId": "",
+            "federation": "OMA",
+            "federationId": "",
+            "affiliation": "",
+            "technicalOfficialTeam": 1,
+            "teamRole": "JURY",
+            "active": true,
+            "fullName": "AIDH ALMANDHARI",
+            "accreditationRole": "TECHNICAL_OFFICIAL"
+          },
+          {
+            "id": 1853577565064907500,
+            "lastName": "ALQUTHAMI AHMED",
+            "firstName": "",
+            "level": null,
+            "iwfId": "",
+            "federation": "KSA",
+            "federationId": "",
+            "affiliation": "",
+            "technicalOfficialTeam": 1,
+            "teamRole": "JURY",
+            "active": true,
+            "fullName": "ALQUTHAMI AHMED",
+            "accreditationRole": "TECHNICAL_OFFICIAL"
+          },
+          {
+            "id": 1853577565066334000,
+            "lastName": "IQUAIBOM LAWRENCE",
+            "firstName": "",
+            "level": null,
+            "iwfId": "",
+            "federation": "NGR",
+            "federationId": "",
+            "affiliation": "",
+            "technicalOfficialTeam": 2,
+            "teamRole": "JURY",
+            "active": true,
+            "fullName": "IQUAIBOM LAWRENCE",
+            "accreditationRole": "TECHNICAL_OFFICIAL"
+          },
+          {
+            "id": 1853577565066738000,
+            "lastName": "MASIC NEDIM",
+            "firstName": "",
+            "level": null,
+            "iwfId": "",
+            "federation": "BIH",
+            "federationId": "",
+            "affiliation": "",
+            "technicalOfficialTeam": 2,
+            "teamRole": "JURY",
+            "active": true,
+            "fullName": "MASIC NEDIM",
+            "accreditationRole": "TECHNICAL_OFFICIAL"
+          },
+          {
+            "id": 1853577565070681300,
+            "lastName": "SSENKUNGU SALIM MUSOKE",
+            "firstName": "",
+            "level": null,
+            "iwfId": "",
+            "federation": "UGA",
+            "federationId": "",
+            "affiliation": "",
+            "technicalOfficialTeam": 1,
+            "teamRole": "JURY",
+            "active": true,
+            "fullName": "SSENKUNGU SALIM MUSOKE",
+            "accreditationRole": "TECHNICAL_OFFICIAL"
+          },
+          {
+            "id": 1853577565071836400,
+            "lastName": "TARIGAN PERGUNAN",
+            "firstName": "",
+            "level": null,
+            "iwfId": "",
+            "federation": "INA",
+            "federationId": "",
+            "affiliation": "",
+            "technicalOfficialTeam": 2,
+            "teamRole": "JURY",
+            "active": true,
+            "fullName": "TARIGAN PERGUNAN",
+            "accreditationRole": "TECHNICAL_OFFICIAL"
+          },
+          {
+            "id": 1853577565072127200,
+            "lastName": "TCHOBANIAN HAROUTUN",
+            "firstName": "",
+            "level": null,
+            "iwfId": "",
+            "federation": "LBN",
+            "federationId": "",
+            "affiliation": "",
+            "technicalOfficialTeam": 1,
+            "teamRole": "JURY",
+            "active": true,
+            "fullName": "TCHOBANIAN HAROUTUN",
+            "accreditationRole": "TECHNICAL_OFFICIAL"
+          }
+        ],
+        "translationKey": "Jury"
+      },
+      {
+        "roleCategory": "JURY_PRESIDENT",
+        "officials": [
+          {
+            "id": 1853577565069740800,
+            "lastName": "SOLOVYEVA OLGA",
+            "firstName": "",
+            "level": null,
+            "iwfId": "",
+            "federation": "KAZ",
+            "federationId": "",
+            "affiliation": "",
+            "technicalOfficialTeam": 1,
+            "teamRole": "JURY_PRESIDENT",
+            "active": true,
+            "fullName": "SOLOVYEVA OLGA",
+            "accreditationRole": "TECHNICAL_OFFICIAL"
+          },
+          {
+            "id": 1853577565072815900,
+            "lastName": "YAHYA ALI ABDULLAH",
+            "firstName": "",
+            "level": null,
+            "iwfId": "",
+            "federation": "BRN",
+            "federationId": "",
+            "affiliation": "",
+            "technicalOfficialTeam": 2,
+            "teamRole": "JURY_PRESIDENT",
+            "active": true,
+            "fullName": "YAHYA ALI ABDULLAH",
+            "accreditationRole": "TECHNICAL_OFFICIAL"
+          }
+        ],
+        "translationKey": "JuryPresident"
+      },
+      {
+        "roleCategory": "REFEREE",
+        "officials": [
+          {
+            "id": 1853577565064199400,
+            "lastName": "ALAJARMEH AHMAD",
+            "firstName": "",
+            "level": null,
+            "iwfId": "",
+            "federation": "JOR",
+            "federationId": "",
+            "affiliation": "",
+            "technicalOfficialTeam": 1,
+            "teamRole": "REFEREE",
+            "active": true,
+            "fullName": "ALAJARMEH AHMAD",
+            "accreditationRole": "TECHNICAL_OFFICIAL"
+          },
+          {
+            "id": 1853577565065437200,
+            "lastName": "BHBEHANI SHAHED",
+            "firstName": "",
+            "level": null,
+            "iwfId": "",
+            "federation": "KUW",
+            "federationId": "",
+            "affiliation": "",
+            "technicalOfficialTeam": 1,
+            "teamRole": "REFEREE",
+            "active": true,
+            "fullName": "BHBEHANI SHAHED",
+            "accreditationRole": "TECHNICAL_OFFICIAL"
+          },
+          {
+            "id": 1853577565065604000,
+            "lastName": "DIRIK OZLEM",
+            "firstName": "",
+            "level": null,
+            "iwfId": "",
+            "federation": "TUR",
+            "federationId": "",
+            "affiliation": "",
+            "technicalOfficialTeam": 3,
+            "teamRole": "REFEREE",
+            "active": true,
+            "fullName": "DIRIK OZLEM",
+            "accreditationRole": "TECHNICAL_OFFICIAL"
+          },
+          {
+            "id": 1853577565066470000,
+            "lastName": "KOHI MOHAMMAD AZAM",
+            "firstName": "",
+            "level": null,
+            "iwfId": "",
+            "federation": "AFG",
+            "federationId": "",
+            "affiliation": "",
+            "technicalOfficialTeam": 1,
+            "teamRole": "REFEREE",
+            "active": true,
+            "fullName": "KOHI MOHAMMAD AZAM",
+            "accreditationRole": "TECHNICAL_OFFICIAL"
+          },
+          {
+            "id": 1853577565066603000,
+            "lastName": "MASIC ENISA",
+            "firstName": "",
+            "level": null,
+            "iwfId": "",
+            "federation": "BIH",
+            "federationId": "",
+            "affiliation": "",
+            "technicalOfficialTeam": 1,
+            "teamRole": "REFEREE",
+            "active": true,
+            "fullName": "MASIC ENISA",
+            "accreditationRole": "TECHNICAL_OFFICIAL"
+          },
+          {
+            "id": 1853577565066891000,
+            "lastName": "MOHAMED RAGHEB",
+            "firstName": "",
+            "level": null,
+            "iwfId": "",
+            "federation": "EGY",
+            "federationId": "",
+            "affiliation": "",
+            "technicalOfficialTeam": 2,
+            "teamRole": "REFEREE",
+            "active": true,
+            "fullName": "MOHAMED RAGHEB",
+            "accreditationRole": "TECHNICAL_OFFICIAL"
+          },
+          {
+            "id": 1853577565067342000,
+            "lastName": "MOHAMMAD KABIRI",
+            "firstName": "",
+            "level": null,
+            "iwfId": "",
+            "federation": "IRI",
+            "federationId": "",
+            "affiliation": "",
+            "technicalOfficialTeam": 3,
+            "teamRole": "REFEREE",
+            "active": true,
+            "fullName": "MOHAMMAD KABIRI",
+            "accreditationRole": "TECHNICAL_OFFICIAL"
+          },
+          {
+            "id": 1853577565067686000,
+            "lastName": "MUSTAFAYEV AZAD",
+            "firstName": "",
+            "level": null,
+            "iwfId": "",
+            "federation": "AZE",
+            "federationId": "",
+            "affiliation": "",
+            "technicalOfficialTeam": 2,
+            "teamRole": "REFEREE",
+            "active": true,
+            "fullName": "MUSTAFAYEV AZAD",
+            "accreditationRole": "TECHNICAL_OFFICIAL"
+          },
+          {
+            "id": 1853577565067830000,
+            "lastName": "NAMWANGA JANET MUSOKE",
+            "firstName": "",
+            "level": null,
+            "iwfId": "",
+            "federation": "UGA",
+            "federationId": "",
+            "affiliation": "",
+            "technicalOfficialTeam": 2,
+            "teamRole": "REFEREE",
+            "active": true,
+            "fullName": "NAMWANGA JANET MUSOKE",
+            "accreditationRole": "TECHNICAL_OFFICIAL"
+          },
+          {
+            "id": 1853577565068167400,
+            "lastName": "ONUBAYE SEFIYA AHUOIZA",
+            "firstName": "",
+            "level": null,
+            "iwfId": "",
+            "federation": "NGR",
+            "federationId": "",
+            "affiliation": "",
+            "technicalOfficialTeam": 3,
+            "teamRole": "REFEREE",
+            "active": true,
+            "fullName": "ONUBAYE SEFIYA AHUOIZA",
+            "accreditationRole": "TECHNICAL_OFFICIAL"
+          },
+          {
+            "id": 1853577565068790000,
+            "lastName": "RAHMA ALI YUSUF",
+            "firstName": "",
+            "level": null,
+            "iwfId": "",
+            "federation": "BRN",
+            "federationId": "",
+            "affiliation": "",
+            "technicalOfficialTeam": 3,
+            "teamRole": "REFEREE",
+            "active": true,
+            "fullName": "RAHMA ALI YUSUF",
+            "accreditationRole": "TECHNICAL_OFFICIAL"
+          },
+          {
+            "id": 1853577565068939500,
+            "lastName": "REEM HAZZAZI",
+            "firstName": "",
+            "level": null,
+            "iwfId": "",
+            "federation": "KSA",
+            "federationId": "",
+            "affiliation": "",
+            "technicalOfficialTeam": 2,
+            "teamRole": "REFEREE",
+            "active": true,
+            "fullName": "REEM HAZZAZI",
+            "accreditationRole": "TECHNICAL_OFFICIAL"
+          }
+        ],
+        "translationKey": "Referee"
+      },
+      {
+        "roleCategory": "TIMEKEEPER",
+        "officials": [
+          {
+            "id": 1853577565064562200,
+            "lastName": "ALKHAZRAJ SALEH",
+            "firstName": "",
+            "level": null,
+            "iwfId": "",
+            "federation": "KSA",
+            "federationId": "",
+            "affiliation": "",
+            "technicalOfficialTeam": 1,
+            "teamRole": "TIMEKEEPER",
+            "active": true,
+            "fullName": "ALKHAZRAJ SALEH",
+            "accreditationRole": "TECHNICAL_OFFICIAL"
+          },
+          {
+            "id": 1853577565063676200,
+            "lastName": "ALMUTAIRI ABDULRAHMAN",
+            "firstName": "",
+            "level": null,
+            "iwfId": "",
+            "federation": "KUW",
+            "federationId": "",
+            "affiliation": "",
+            "technicalOfficialTeam": 2,
+            "teamRole": "TIMEKEEPER",
+            "active": true,
+            "fullName": "ALMUTAIRI ABDULRAHMAN",
+            "accreditationRole": "TECHNICAL_OFFICIAL"
+          }
+        ],
+        "translationKey": "Timekeeper"
+      },
+      {
+        "roleCategory": "TECHNICAL_CONTROLLER",
+        "officials": [
+          {
+            "id": 1853577565065290500,
+            "lastName": "ALYAAGOUB WALEED SALEH",
+            "firstName": "",
+            "level": null,
+            "iwfId": "",
+            "federation": "KSA",
+            "federationId": "",
+            "affiliation": "",
+            "technicalOfficialTeam": 2,
+            "teamRole": "TECHNICAL_CONTROLLER",
+            "active": true,
+            "fullName": "ALYAAGOUB WALEED SALEH",
+            "accreditationRole": "TECHNICAL_OFFICIAL"
+          },
+          {
+            "id": 1853577565068022800,
+            "lastName": "OGUZKAN CAHIT",
+            "firstName": "",
+            "level": null,
+            "iwfId": "",
+            "federation": "TUR",
+            "federationId": "",
+            "affiliation": "",
+            "technicalOfficialTeam": 1,
+            "teamRole": "TECHNICAL_CONTROLLER",
+            "active": true,
+            "fullName": "OGUZKAN CAHIT",
+            "accreditationRole": "TECHNICAL_OFFICIAL"
+          },
+          {
+            "id": 1853577565068502500,
+            "lastName": "QIRMASH ESAM",
+            "firstName": "",
+            "level": null,
+            "iwfId": "",
+            "federation": "ALI",
+            "federationId": "",
+            "affiliation": "",
+            "technicalOfficialTeam": 1,
+            "teamRole": "TECHNICAL_CONTROLLER",
+            "active": true,
+            "fullName": "QIRMASH ESAM",
+            "accreditationRole": "TECHNICAL_OFFICIAL"
+          },
+          {
+            "id": 1853577565068663000,
+            "lastName": "QIRMASH ESAM ALI",
+            "firstName": "",
+            "level": null,
+            "iwfId": "",
+            "federation": "LBA",
+            "federationId": "",
+            "affiliation": "",
+            "technicalOfficialTeam": 1,
+            "teamRole": "TECHNICAL_CONTROLLER",
+            "active": true,
+            "fullName": "QIRMASH ESAM ALI",
+            "accreditationRole": "TECHNICAL_OFFICIAL"
+          },
+          {
+            "id": 1853577565071526000,
+            "lastName": "TAHORI AHMED",
+            "firstName": "",
+            "level": null,
+            "iwfId": "",
+            "federation": "MAR",
+            "federationId": "",
+            "affiliation": "",
+            "technicalOfficialTeam": 2,
+            "teamRole": "TECHNICAL_CONTROLLER",
+            "active": true,
+            "fullName": "TAHORI AHMED",
+            "accreditationRole": "TECHNICAL_OFFICIAL"
+          }
+        ],
+        "translationKey": "TechnicalController"
+      },
+      {
+        "roleCategory": "DOCTOR",
+        "officials": [
+          {
+            "id": 1853577565065118700,
+            "lastName": "ALRADDAWI HAMMOUD",
+            "firstName": "",
+            "level": null,
+            "iwfId": "",
+            "federation": "SYR",
+            "federationId": "",
+            "affiliation": "",
+            "technicalOfficialTeam": 2,
+            "teamRole": "DOCTOR",
+            "active": true,
+            "fullName": "ALRADDAWI HAMMOUD",
+            "accreditationRole": "DOCTOR"
+          },
+          {
+            "id": 1853577565064731600,
+            "lastName": "FATHI MASMOUDI",
+            "firstName": "",
+            "level": null,
+            "iwfId": "",
+            "federation": "TUN",
+            "federationId": "",
+            "affiliation": "",
+            "technicalOfficialTeam": 2,
+            "teamRole": "DOCTOR",
+            "active": true,
+            "fullName": "FATHI MASMOUDI",
+            "accreditationRole": "DOCTOR"
+          },
+          {
+            "id": 1853577565069085000,
+            "lastName": "REZA SHIRVANI BAKHTIYARI",
+            "firstName": "",
+            "level": null,
+            "iwfId": "",
+            "federation": "IRI",
+            "federationId": "",
+            "affiliation": "",
+            "technicalOfficialTeam": 1,
+            "teamRole": "DOCTOR",
+            "active": true,
+            "fullName": "REZA SHIRVANI BAKHTIYARI",
+            "accreditationRole": "DOCTOR"
+          },
+          {
+            "id": 1853577565072488200,
+            "lastName": "TCHOBANIAN SEZA",
+            "firstName": "",
+            "level": null,
+            "iwfId": "",
+            "federation": "LBN",
+            "federationId": "",
+            "affiliation": "",
+            "technicalOfficialTeam": 1,
+            "teamRole": "DOCTOR",
+            "active": true,
+            "fullName": "TCHOBANIAN SEZA",
+            "accreditationRole": "DOCTOR"
+          }
+        ],
+        "translationKey": "Doctor"
+      },
+      {
+        "roleCategory": "COMPETITION_SECRETARY",
+        "officials": [
+          {
+            "id": 1853577565063932400,
+            "lastName": "AL-JARMAL ABDULLAH",
+            "firstName": "",
+            "level": null,
+            "iwfId": "",
+            "federation": "YEM",
+            "federationId": "",
+            "affiliation": "",
+            "technicalOfficialTeam": 2,
+            "teamRole": "COMPETITION_SECRETARY",
+            "active": true,
+            "fullName": "AL-JARMAL ABDULLAH",
+            "accreditationRole": "COMPETITION_SECRETARY"
+          },
+          {
+            "id": 1853577565066025500,
+            "lastName": "HASANI ASTRIT",
+            "firstName": "",
+            "level": null,
+            "iwfId": "",
+            "federation": "ALB",
+            "federationId": "",
+            "affiliation": "",
+            "technicalOfficialTeam": 1,
+            "teamRole": "COMPETITION_SECRETARY",
+            "active": true,
+            "fullName": "HASANI ASTRIT",
+            "accreditationRole": "COMPETITION_SECRETARY"
+          },
+          {
+            "id": 1853577565067536600,
+            "lastName": "MOUSA WAFFA",
+            "firstName": "",
+            "level": null,
+            "iwfId": "",
+            "federation": "EGY",
+            "federationId": "",
+            "affiliation": "",
+            "technicalOfficialTeam": 1,
+            "teamRole": "COMPETITION_SECRETARY",
+            "active": true,
+            "fullName": "MOUSA WAFFA",
+            "accreditationRole": "COMPETITION_SECRETARY"
+          },
+          {
+            "id": 1853577565068331300,
+            "lastName": "ORAZDURDYYEV DOVRAN",
+            "firstName": "",
+            "level": null,
+            "iwfId": "",
+            "federation": "TKM",
+            "federationId": "",
+            "affiliation": "",
+            "technicalOfficialTeam": 2,
+            "teamRole": "COMPETITION_SECRETARY",
+            "active": true,
+            "fullName": "ORAZDURDYYEV DOVRAN",
+            "accreditationRole": "COMPETITION_SECRETARY"
+          }
+        ],
+        "translationKey": "CompetitionSecretary"
+      },
+      {
+        "roleCategory": "MARSHAL",
+        "officials": [
+          {
+            "id": 1853577565064383700,
+            "lastName": "ALAWADHI JASSIM",
+            "firstName": "",
+            "level": null,
+            "iwfId": "",
+            "federation": "UAE",
+            "federationId": "",
+            "affiliation": "",
+            "technicalOfficialTeam": 1,
+            "teamRole": "MARSHAL",
+            "active": true,
+            "fullName": "ALAWADHI JASSIM",
+            "accreditationRole": "TECHNICAL_OFFICIAL"
+          },
+          {
+            "id": 1853577565066192000,
+            "lastName": "IBRAHIM BASEL",
+            "firstName": "",
+            "level": null,
+            "iwfId": "",
+            "federation": "SYR",
+            "federationId": "",
+            "affiliation": "",
+            "technicalOfficialTeam": 2,
+            "teamRole": "MARSHAL",
+            "active": true,
+            "fullName": "IBRAHIM BASEL",
+            "accreditationRole": "TECHNICAL_OFFICIAL"
+          },
+          {
+            "id": 1853577565070262300,
+            "lastName": "SONNY KASIRAN",
+            "firstName": "",
+            "level": null,
+            "iwfId": "",
+            "federation": "INA",
+            "federationId": "",
+            "affiliation": "",
+            "technicalOfficialTeam": 2,
+            "teamRole": "MARSHAL",
+            "active": true,
+            "fullName": "SONNY KASIRAN",
+            "accreditationRole": "TECHNICAL_OFFICIAL"
+          },
+          {
+            "id": 1853577565071129000,
+            "lastName": "SULEYMANOV ELKHAN",
+            "firstName": "",
+            "level": null,
+            "iwfId": "",
+            "federation": "AZE",
+            "federationId": "",
+            "affiliation": "",
+            "technicalOfficialTeam": 1,
+            "teamRole": "MARSHAL",
+            "active": true,
+            "fullName": "SULEYMANOV ELKHAN",
+            "accreditationRole": "TECHNICAL_OFFICIAL"
+          }
+        ],
+        "translationKey": "MARSHAL"
+      }
+    ],
+    "technicalOfficialsTimetableRows": [
+      {
+        "sessionName": "1",
+        "description": "Women 48kg A",
+        "date": "2025-11-08",
+        "time": "12:00",
+        "platform": "A",
+        "roles": {
+          "JURY": [
+            1
+          ],
+          "REFEREE": [
+            1
+          ],
+          "MARSHALL": [
+            1
+          ],
+          "TIMEKEEPER": [
+            1
+          ],
+          "TECHNICAL_CONTROLLER": [
+            1
+          ],
+          "DOCTOR": [
+            1
+          ],
+          "COMPETITION_SECRETARY": [
+            1
+          ]
+        }
+      },
+      {
+        "sessionName": "2",
+        "description": "Men 60kg A",
+        "date": "2025-11-08",
+        "time": "15:00",
+        "platform": "A",
+        "roles": {
+          "JURY": [
+            1
+          ],
+          "REFEREE": [
+            2
+          ],
+          "MARSHALL": [
+            1
+          ],
+          "TIMEKEEPER": [
+            1
+          ],
+          "TECHNICAL_CONTROLLER": [
+            1
+          ],
+          "DOCTOR": [
+            1
+          ],
+          "COMPETITION_SECRETARY": [
+            1
+          ]
+        }
+      },
+      {
+        "sessionName": "3",
+        "description": "Women 53kg A",
+        "date": "2025-11-08",
+        "time": "18:00",
+        "platform": "A",
+        "roles": {
+          "JURY": [
+            2
+          ],
+          "REFEREE": [
+            3
+          ],
+          "MARSHALL": [
+            2
+          ],
+          "TIMEKEEPER": [
+            2
+          ],
+          "TECHNICAL_CONTROLLER": [
+            2
+          ],
+          "DOCTOR": [
+            2
+          ],
+          "COMPETITION_SECRETARY": [
+            2
+          ]
+        }
+      },
+      {
+        "sessionName": "4",
+        "description": "Men 65kg A",
+        "date": "2025-11-09",
+        "time": "11:00",
+        "platform": "A",
+        "roles": {
+          "JURY": [
+            2
+          ],
+          "REFEREE": [
+            2
+          ],
+          "MARSHALL": [
+            2
+          ],
+          "TIMEKEEPER": [
+            2
+          ],
+          "TECHNICAL_CONTROLLER": [
+            2
+          ],
+          "DOCTOR": [
+            2
+          ],
+          "COMPETITION_SECRETARY": [
+            2
+          ]
+        }
+      },
+      {
+        "sessionName": "5",
+        "description": "Women 58kg A",
+        "date": "2025-11-09",
+        "time": "14:30",
+        "platform": "A",
+        "roles": {
+          "JURY": [
+            2
+          ],
+          "REFEREE": [
+            1
+          ],
+          "MARSHALL": [
+            2
+          ],
+          "TIMEKEEPER": [
+            2
+          ],
+          "TECHNICAL_CONTROLLER": [
+            2
+          ],
+          "DOCTOR": [
+            2
+          ],
+          "COMPETITION_SECRETARY": [
+            2
+          ]
+        }
+      },
+      {
+        "sessionName": "6",
+        "description": "Men 71kg A",
+        "date": "2025-11-09",
+        "time": "17:30",
+        "platform": "A",
+        "roles": {
+          "JURY": [
+            1
+          ],
+          "REFEREE": [
+            3
+          ],
+          "MARSHALL": [
+            1
+          ],
+          "TIMEKEEPER": [
+            1
+          ],
+          "TECHNICAL_CONTROLLER": [
+            1
+          ],
+          "DOCTOR": [
+            1
+          ],
+          "COMPETITION_SECRETARY": [
+            1
+          ]
+        }
+      },
+      {
+        "sessionName": "7",
+        "description": "Women 63kg A",
+        "date": "2025-11-10",
+        "time": "11:00",
+        "platform": "A",
+        "roles": {
+          "JURY": [
+            1
+          ],
+          "REFEREE": [
+            1
+          ],
+          "MARSHALL": [
+            1
+          ],
+          "TIMEKEEPER": [
+            1
+          ],
+          "TECHNICAL_CONTROLLER": [
+            1
+          ],
+          "DOCTOR": [
+            1
+          ],
+          "COMPETITION_SECRETARY": [
+            1
+          ]
+        }
+      },
+      {
+        "sessionName": "8",
+        "description": "Men 79kg A",
+        "date": "2025-11-10",
+        "time": "14:30",
+        "platform": "A",
+        "roles": {
+          "JURY": [
+            1
+          ],
+          "REFEREE": [
+            3
+          ],
+          "MARSHALL": [
+            1
+          ],
+          "TIMEKEEPER": [
+            1
+          ],
+          "TECHNICAL_CONTROLLER": [
+            1
+          ],
+          "DOCTOR": [
+            1
+          ],
+          "COMPETITION_SECRETARY": [
+            1
+          ]
+        }
+      },
+      {
+        "sessionName": "9",
+        "description": "Women 69kg A",
+        "date": "2025-11-10",
+        "time": "17:30",
+        "platform": "A",
+        "roles": {
+          "JURY": [
+            2
+          ],
+          "REFEREE": [
+            2
+          ],
+          "MARSHALL": [
+            2
+          ],
+          "TIMEKEEPER": [
+            2
+          ],
+          "TECHNICAL_CONTROLLER": [
+            2
+          ],
+          "DOCTOR": [
+            2
+          ],
+          "COMPETITION_SECRETARY": [
+            2
+          ]
+        }
+      },
+      {
+        "sessionName": "10",
+        "description": "Men 88kg A",
+        "date": "2025-11-10",
+        "time": "19:30",
+        "platform": "A",
+        "roles": {
+          "JURY": [
+            2
+          ],
+          "REFEREE": [
+            1
+          ],
+          "MARSHALL": [
+            2
+          ],
+          "TIMEKEEPER": [
+            2
+          ],
+          "TECHNICAL_CONTROLLER": [
+            2
+          ],
+          "DOCTOR": [
+            2
+          ],
+          "COMPETITION_SECRETARY": [
+            2
+          ]
+        }
+      },
+      {
+        "sessionName": "11",
+        "description": "Women 77kg A",
+        "date": "2025-11-11",
+        "time": "12:00",
+        "platform": "A",
+        "roles": {
+          "JURY": [
+            2
+          ],
+          "REFEREE": [
+            3
+          ],
+          "MARSHALL": [
+            2
+          ],
+          "TIMEKEEPER": [
+            2
+          ],
+          "TECHNICAL_CONTROLLER": [
+            2
+          ],
+          "DOCTOR": [
+            2
+          ],
+          "COMPETITION_SECRETARY": [
+            2
+          ]
+        }
+      },
+      {
+        "sessionName": "12",
+        "description": "Men 94kg A",
+        "date": "2025-11-11",
+        "time": "15:00",
+        "platform": "A",
+        "roles": {
+          "JURY": [
+            1
+          ],
+          "REFEREE": [
+            1
+          ],
+          "MARSHALL": [
+            1
+          ],
+          "TIMEKEEPER": [
+            1
+          ],
+          "TECHNICAL_CONTROLLER": [
+            1
+          ],
+          "DOCTOR": [
+            1
+          ],
+          "COMPETITION_SECRETARY": [
+            1
+          ]
+        }
+      },
+      {
+        "sessionName": "13",
+        "description": "Women 86kg A",
+        "date": "2025-11-11",
+        "time": "18:00",
+        "platform": "A",
+        "roles": {
+          "JURY": [
+            1
+          ],
+          "REFEREE": [
+            2
+          ],
+          "MARSHALL": [
+            1
+          ],
+          "TIMEKEEPER": [
+            1
+          ],
+          "TECHNICAL_CONTROLLER": [
+            1
+          ],
+          "DOCTOR": [
+            1
+          ],
+          "COMPETITION_SECRETARY": [
+            1
+          ]
+        }
+      },
+      {
+        "sessionName": "14",
+        "description": "Men 110kg A",
+        "date": "2025-11-12",
+        "time": "12:00",
+        "platform": "A",
+        "roles": {
+          "JURY": [
+            1
+          ],
+          "REFEREE": [
+            2
+          ],
+          "MARSHALL": [
+            1
+          ],
+          "TIMEKEEPER": [
+            1
+          ],
+          "TECHNICAL_CONTROLLER": [
+            1
+          ],
+          "DOCTOR": [
+            1
+          ],
+          "COMPETITION_SECRETARY": [
+            1
+          ]
+        }
+      },
+      {
+        "sessionName": "15",
+        "description": "Women +86kg A",
+        "date": "2025-11-12",
+        "time": "15:00",
+        "platform": "A",
+        "roles": {
+          "JURY": [
+            2
+          ],
+          "REFEREE": [
+            1
+          ],
+          "MARSHALL": [
+            2
+          ],
+          "TIMEKEEPER": [
+            2
+          ],
+          "TECHNICAL_CONTROLLER": [
+            2
+          ],
+          "DOCTOR": [
+            2
+          ],
+          "COMPETITION_SECRETARY": [
+            2
+          ]
+        }
+      },
+      {
+        "sessionName": "16",
+        "description": "Men +110kg A",
+        "date": "2025-11-12",
+        "time": "18:00",
+        "platform": "A",
+        "roles": {
+          "JURY": [
+            2
+          ],
+          "REFEREE": [
+            3
+          ],
+          "MARSHALL": [
+            2
+          ],
+          "TIMEKEEPER": [
+            2
+          ],
+          "TECHNICAL_CONTROLLER": [
+            2
+          ],
+          "DOCTOR": [
+            2
+          ],
+          "COMPETITION_SECRETARY": [
+            2
+          ]
+        }
+      }
+    ],
+    "technicalOfficialsTimetableRoles": [
+      {
+        "roleCategory": "JURY",
+        "translationKey": "Jury"
+      },
+      {
+        "roleCategory": "REFEREE",
+        "translationKey": "Referee"
+      },
+      {
+        "roleCategory": "MARSHALL",
+        "translationKey": "Marshall"
+      },
+      {
+        "roleCategory": "TIMEKEEPER",
+        "translationKey": "Timekeeper"
+      },
+      {
+        "roleCategory": "TECHNICAL_CONTROLLER",
+        "translationKey": "TechnicalController"
+      },
+      {
+        "roleCategory": "DOCTOR",
+        "translationKey": "Doctor"
+      },
+      {
+        "roleCategory": "COMPETITION_SECRETARY",
+        "translationKey": "CompetitionSecretary"
+      }
+    ],
+    "technicalOfficialsTimetableHasMultiplePlatforms": false,
+    "officialRoleLabels": {
+      "JURY": "Jury",
+      "COMPETITION_SECRETARY": "Competition Secretary",
+      "REFEREE": "Referee",
+      "MARSHAL": "MARSHAL",
+      "TIMEKEEPER": "Timekeeper",
+      "DOCTOR": "Doctor",
+      "TECHNICAL_CONTROLLER": "Technical Controller",
+      "JURY_PRESIDENT": "Jury President"
+    },
     "includeSessionStartLists": true,
     "includeOfficials": true,
     "includeCategoryParticipants": false,
-    "productionTime": "01/06/2026, 10:05:43 AM",
+    "productionTime": "01/06/2026, 11:28:08 AM",
     "labels": {
       "lot": "Lot",
       "name": "Name",
@@ -33204,5 +35571,5 @@
     },
     "status": "ready"
   },
-  "timestamp": 1767712665627
+  "timestamp": 1767716892604
 }

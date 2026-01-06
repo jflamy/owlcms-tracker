@@ -20,11 +20,13 @@
 
 <style>
   .title-page {
-    height: 100vh;
+    /* Use fixed page height instead of vh which confuses Paged.js */
+    height: 257mm; /* A4 landscape height minus margins */
     display: flex;
     align-items: center;
     justify-content: center;
     page-break-after: always;
+    break-after: page;
     text-align: center;
     background: white;
   }
@@ -57,7 +59,7 @@
 
   @media print {
     .title-page {
-      height: 100vh;
+      height: 257mm;
     }
   }
 </style>

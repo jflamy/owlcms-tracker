@@ -10,6 +10,10 @@
 	let scoreboardData = null;
 	let unsubscribeSSE = null;
 	
+	// Check if this is a document-type plugin (no live updates needed)
+	// Use direct property access since this is needed at mount time
+	const isDocument = data.config?.category === 'documents';
+	
 	// Get language preference from URL parameter or config default or fallback to 'en'
 	$: language = $page.url.searchParams.get('lang') || $page.url.searchParams.get('language') || data.config?.options?.find(o => o.key === 'language')?.default || 'en';
 	
@@ -35,11 +39,13 @@
 	}
 	
 	onMount(() => {
+		console.log('[Scoreboard] Mount - isDocument:', isDocument, 'category:', data.config?.category);
+		
 		// Initial fetch
 		fetchData();
 		
-		// Connect to shared SSE (browser only)
-		if (browser) {
+		// Connect to shared SSE (browser only) - skip for document-type plugins
+		if (browser && !isDocument) {
 			connectSSE(language);
 			
 			// Subscribe to SSE messages

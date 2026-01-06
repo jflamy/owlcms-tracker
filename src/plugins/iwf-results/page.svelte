@@ -71,12 +71,19 @@
   // Load Paged.js dynamically when format is 'complete'
   onMount(() => {
     if (format === 'complete' && typeof window !== 'undefined') {
+      // Prevent Paged.js from running multiple times (e.g., due to HMR or re-renders)
+      if (window.__pagedjs_started) {
+        console.log('[Paged.js] Already started, skipping');
+        return;
+      }
+      window.__pagedjs_started = true;
+      
       // Set up Paged.js completion handler BEFORE loading the script
+      // Use auto: false and manually trigger after DOM is stable
       window.PagedConfig = {
-        auto: true,
+        auto: false,
         after: () => {
           console.log('[Paged.js] Rendering complete, setting ready flag');
-          // Give extra time for target-counter() to be computed
           setTimeout(() => {
             window.__pagedjs_ready = true;
             console.log('[Paged.js] Ready flag set');
@@ -87,6 +94,16 @@
       const script = document.createElement('script');
       // Use locally bundled Paged.js (pinned to 0.4.3)
       script.src = '/node_modules/pagedjs/dist/paged.polyfill.js';
+      script.onload = () => {
+        // Wait for DOM to stabilize, then trigger Paged.js manually
+        console.log('[Paged.js] Script loaded, waiting for DOM to stabilize...');
+        setTimeout(() => {
+          console.log('[Paged.js] Triggering preview...');
+          if (window.PagedPolyfill) {
+            window.PagedPolyfill.preview();
+          }
+        }, 100);
+      };
       document.head.appendChild(script);
       
       // Safety timeout: if Paged.js takes more than 30 seconds, something is wrong
@@ -144,18 +161,22 @@
 
   /* Capture strings for Paged.js headers/footers */
   :global(.competition-name-string) {
+    /* stylelint-disable-next-line property-no-unknown */
     string-set: competition-name content();
   }
   
   :global(.competition-dates-string) {
+    /* stylelint-disable-next-line property-no-unknown */
     string-set: competition-dates content();
   }
   
   :global(.generation-time-string) {
+    /* stylelint-disable-next-line property-no-unknown */
     string-set: generation-time content();
   }
   
   :global(.footer-info-string) {
+    /* stylelint-disable-next-line property-no-unknown */
     string-set: footer-info content();
   }
 

@@ -185,51 +185,51 @@
             {#if session.officials.centerReferee}
               <div class="official-item">
                 <span class="label">Center Referee</span>
-                <span class="name">{session.officials.centerReferee.fullName}</span>
+                <span class="name">{session.officials.centerReferee.fullName} ({session.officials.centerReferee.federation})</span>
               </div>
             {/if}
             {#if session.officials.sideReferee1}
               <div class="official-item">
                 <span class="label">Side Referee</span>
-                <span class="name">{session.officials.sideReferee1.fullName}</span>
+                <span class="name">{session.officials.sideReferee1.fullName} ({session.officials.sideReferee1.federation})</span>
               </div>
             {/if}
             {#if session.officials.sideReferee2}
               <div class="official-item">
-                <span class="label">Side Referee</span>
-                <span class="name">{session.officials.sideReferee2.fullName}</span>
+                <span class="label"></span>
+                <span class="name">{session.officials.sideReferee2.fullName} ({session.officials.sideReferee2.federation})</span>
               </div>
             {/if}
             {#if session.officials.sideReferee3}
               <div class="official-item">
-                <span class="label">Side Referee</span>
-                <span class="name">{session.officials.sideReferee3.fullName}</span>
+                <span class="label"></span>
+                <span class="name">{session.officials.sideReferee3.fullName} ({session.officials.sideReferee3.federation})</span>
               </div>
             {/if}
             {#if session.officials.reserveReferee}
               <div class="official-item">
                 <span class="label">Reserve Referee</span>
-                <span class="name">{session.officials.reserveReferee.fullName}</span>
+                <span class="name">{session.officials.reserveReferee.fullName} ({session.officials.reserveReferee.federation})</span>
               </div>
             {/if}
             <div class="spacer"></div>
             {#if session.officials.marshal1}
               <div class="official-item">
                 <span class="label">Marshal</span>
-                <span class="name">{session.officials.marshal1.fullName}</span>
+                <span class="name">{session.officials.marshal1.fullName} ({session.officials.marshal1.federation})</span>
               </div>
             {/if}
             {#if session.officials.marshal2}
               <div class="official-item">
-                <span class="label">Marshal</span>
-                <span class="name">{session.officials.marshal2.fullName}</span>
+                <span class="label"></span>
+                <span class="name">{session.officials.marshal2.fullName} ({session.officials.marshal2.federation})</span>
               </div>
             {/if}
             <div class="spacer"></div>
             {#if session.officials.timekeeper}
               <div class="official-item">
                 <span class="label">Timekeeper</span>
-                <span class="name">{session.officials.timekeeper.fullName}</span>
+                <span class="name">{session.officials.timekeeper.fullName} ({session.officials.timekeeper.federation})</span>
               </div>
             {/if}
           </div>
@@ -239,39 +239,39 @@
             {#if session.officials.technicalController1}
               <div class="official-item">
                 <span class="label">Technical Controller</span>
-                <span class="name">{session.officials.technicalController1.fullName}</span>
+                <span class="name">{session.officials.technicalController1.fullName} ({session.officials.technicalController1.federation})</span>
               </div>
             {/if}
             {#if session.officials.technicalController2}
               <div class="official-item">
-                <span class="label">Technical Controller</span>
-                <span class="name">{session.officials.technicalController2.fullName}</span>
+                <span class="label"></span>
+                <span class="name">{session.officials.technicalController2.fullName} ({session.officials.technicalController2.federation})</span>
               </div>
             {/if}
             <div class="spacer"></div>
             {#if session.officials.competitionSecretary}
               <div class="official-item">
                 <span class="label">Competition Secretary</span>
-                <span class="name">{session.officials.competitionSecretary.fullName}</span>
+                <span class="name">{session.officials.competitionSecretary.fullName} ({session.officials.competitionSecretary.federation})</span>
               </div>
             {/if}
             {#if session.officials.competitionSecretary2}
               <div class="official-item">
-                <span class="label">Competition Secretary</span>
-                <span class="name">{session.officials.competitionSecretary2.fullName}</span>
+                <span class="label"></span>
+                <span class="name">{session.officials.competitionSecretary2.fullName} ({session.officials.competitionSecretary2.federation})</span>
               </div>
             {/if}
             <div class="spacer"></div>
             {#if session.officials.doctor1}
               <div class="official-item">
                 <span class="label">Doctor</span>
-                <span class="name">{session.officials.doctor1.fullName}</span>
+                <span class="name">{session.officials.doctor1.fullName} ({session.officials.doctor1.federation})</span>
               </div>
             {/if}
             {#if session.officials.doctor2}
               <div class="official-item">
-                <span class="label">Doctor</span>
-                <span class="name">{session.officials.doctor2.fullName}</span>
+                <span class="label"></span>
+                <span class="name">{session.officials.doctor2.fullName} ({session.officials.doctor2.federation})</span>
               </div>
             {/if}
           </div>
@@ -281,14 +281,14 @@
             {#if session.officials.juryPresident}
               <div class="official-item">
                 <span class="label">Jury President</span>
-                <span class="name">{session.officials.juryPresident.fullName}</span>
+                <span class="name">{session.officials.juryPresident.fullName} ({session.officials.juryPresident.federation})</span>
               </div>
             {/if}
             {#each [1, 2, 3, 4, 5] as i}
               {#if session.officials[`juryMember${i}`]}
                 <div class="official-item">
-                  <span class="label">Jury Member</span>
-                  <span class="name">{session.officials[`juryMember${i}`].fullName}</span>
+                  <span class="label">{i === 1 || !session.officials[`juryMember${i-1}`] ? 'Jury Member' : ''}</span>
+                  <span class="name">{session.officials[`juryMember${i}`].fullName} ({session.officials[`juryMember${i}`].federation})</span>
                 </div>
               {/if}
             {/each}

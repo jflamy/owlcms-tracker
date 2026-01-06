@@ -5,8 +5,8 @@ import { sseBroker } from '$lib/server/sse-broker.js';
  * Server-Sent Events endpoint for browser clients
  * One-way push from server to browsers
  * 
- * Sends raw competition state - individual plugins process this data
- * using their own helpers when needed.
+ * The SSE broker listens to hub events and broadcasts to all clients.
+ * This endpoint registers clients with the broker and sends initial state.
  */
 export async function GET({ request, url }) {
   const connectionId = Math.random().toString(36).substr(2, 9);
@@ -22,7 +22,6 @@ export async function GET({ request, url }) {
       
       const send = (data) => {
         if (isClosed) {
-          console.log(`[SSE] ${connectionId}: Attempted to send to closed connection`);
           return;
         }
         
@@ -35,59 +34,11 @@ export async function GET({ request, url }) {
         }
       };
 
-      // Define event handlers
-      const onFopUpdate = (eventData) => {
-        if (!isClosed) {
-          send({
-            type: 'fop_update',
-            fop: eventData.fop,
-            data: eventData.data,
-            timestamp: eventData.timestamp
-          });
-        }
-      };
-
-      const onCompetitionInitialized = (eventData) => {
-        if (!isClosed) {
-          send({
-            type: 'competition_initialized',
-            payload: eventData.payload,
-            timestamp: eventData.timestamp
-          });
-        }
-      };
-
-      const onHubReady = (eventData) => {
-        if (!isClosed) {
-          send({
-            type: 'hub_ready',
-            message: eventData.message,
-            timestamp: eventData.timestamp
-          });
-        }
-      };
-
-      const onWaiting = (eventData) => {
-        if (!isClosed) {
-          send({
-            type: 'waiting',
-            message: eventData.message,
-            timestamp: eventData.timestamp
-          });
-        }
-      };
-
       const cleanup = () => {
-        if (isClosed) return; // Already cleaned up
+        if (isClosed) return;
         
         console.log(`[SSE] ${connectionId}: Cleaning up connection`);
         isClosed = true;
-        
-        // Unregister event handlers
-        competitionHub.off('fop_update', onFopUpdate);
-        competitionHub.off('competition_initialized', onCompetitionInitialized);
-        competitionHub.off('hub_ready_broadcast', onHubReady);
-        competitionHub.off('waiting', onWaiting);
         
         // Unregister client from broker
         unregisterClient();
@@ -99,15 +50,12 @@ export async function GET({ request, url }) {
         }
       };
       
-      // Register client with broker and get unregister function
-      const unregisterClient = sseBroker.registerClient();
-      console.log(`[SSE] ${connectionId}: Client registered (active: ${sseBroker.getActiveClientCount()})`);
+      // Register client with broker - broker handles hub events and broadcasts
+      const unregisterClient = sseBroker.registerClient(send, connectionId);
       
-      // Ensure we listen for client aborts as early as possible to avoid races
-      // where the request was aborted before the listener was registered.
+      // Handle client disconnect
       request.signal.addEventListener('abort', cleanup);
       if (request.signal.aborted) {
-        // Client already disconnected - clean up immediately
         cleanup();
         return;
       }
@@ -127,8 +75,18 @@ export async function GET({ request, url }) {
           timestamp: Date.now()
         });
       }
+      
+      // If hub is already ready, explicitly send hub_ready so browser knows to fetch data
+      if (competitionHub.isReady()) {
+        console.log(`[SSE] ${connectionId}: Hub already ready, sending hub_ready`);
+        send({
+          type: 'hub_ready',
+          message: 'Hub ready - reconnected with data available',
+          timestamp: Date.now()
+        });
+      }
 
-      // Send translations for the requested language only
+      // Send translations for the requested language
       const translations = competitionHub.getTranslations(language);
       if (translations && Object.keys(translations).length > 0) {
         send({
@@ -152,13 +110,6 @@ export async function GET({ request, url }) {
           });
         }
       }
-
-      // Register event handlers for hub updates (future events)
-      // These events are emitted by tracker-core and already debounced internally
-      competitionHub.on('fop_update', onFopUpdate);
-      competitionHub.on('competition_initialized', onCompetitionInitialized);
-      competitionHub.on('hub_ready_broadcast', onHubReady);
-      competitionHub.on('waiting', onWaiting);
     }
   });
 

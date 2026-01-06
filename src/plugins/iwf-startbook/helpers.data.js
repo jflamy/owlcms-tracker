@@ -2,6 +2,205 @@ import { competitionHub } from '$lib/server/competition-hub.js';
 import { logger } from '@owlcms/tracker-core';
 import { registerCache } from '$lib/server/cache-epoch.js';
 
+const OFFICIAL_ROLE_TRANSLATION_KEYS = {
+  REFEREE: 'Referee',
+  CENTER_REFEREE: 'CenterReferee',
+  LEFT_REFEREE: 'SideReferee',
+  RIGHT_REFEREE: 'SideReferee',
+  REFEREE_RESERVE: 'ReserveReferee',
+  MARSHAL1: 'ChiefMarshal',
+  MARSHAL2: 'AssistantMarshal',
+  MARSHALL: 'Marshall',
+  TIMEKEEPER: 'Timekeeper',
+  TECHNICAL_CONTROLLER: 'TechnicalController',
+  TECHNICAL_CONTROLLER1: 'TechnicalController',
+  TECHNICAL_CONTROLLER2: 'TechnicalController',
+  DOCTOR: 'Doctor',
+  DOCTOR2: 'Doctor',
+  DOCTOR3: 'Doctor',
+  COMPETITION_SECRETARY: 'CompetitionSecretary',
+  COMPETITION_SECRETARY2: 'CompetitionSecretary',
+  ANNOUNCER: 'Announcer',
+  WEIGHIN1: 'Weighin',
+  WEIGHIN2: 'Weighin',
+  JURY_PRESIDENT: 'JuryPresident',
+  JURY_MEMBER: 'JuryMember',
+  JURY_A: 'JuryMember',
+  JURY_B: 'JuryMember',
+  JURY_C: 'JuryMember',
+  JURY_D: 'JuryMember',
+  JURY_RESERVE: 'ReserveJury',
+  JURY: 'Jury'
+};
+
+export function getOfficialRoleTranslationKey(roleCategory) {
+  return OFFICIAL_ROLE_TRANSLATION_KEYS[roleCategory] || roleCategory;
+}
+
+const OFFICIAL_ROLE_PRESENTATION_ORDER = [
+  'JURY',
+  'JURY_PRESIDENT',
+  'JURY_MEMBER',
+  'JURY_A',
+  'JURY_B',
+  'JURY_C',
+  'JURY_D',
+  'JURY_RESERVE',
+  'REFEREE',
+  'CENTER_REFEREE',
+  'LEFT_REFEREE',
+  'RIGHT_REFEREE',
+  'REFEREE_RESERVE',
+  'MARSHAL1',
+  'MARSHAL2',
+  'MARSHALL',
+  'TIMEKEEPER',
+  'TECHNICAL_CONTROLLER1',
+  'TECHNICAL_CONTROLLER2',
+  'TECHNICAL_CONTROLLER',
+  'DOCTOR',
+  'DOCTOR2',
+  'DOCTOR3',
+  'COMPETITION_SECRETARY',
+  'COMPETITION_SECRETARY2',
+  'ANNOUNCER',
+  'WEIGHIN1',
+  'WEIGHIN2'
+];
+
+function sortOfficialsList(officials = []) {
+  return [...officials].sort((a, b) => {
+    const lastNameComparison = (a.lastName || '').localeCompare(b.lastName || '');
+    if (lastNameComparison !== 0) {
+      return lastNameComparison;
+    }
+    return (a.firstName || '').localeCompare(b.firstName || '');
+  });
+}
+
+function buildOfficialSections(officials = []) {
+  const buckets = new Map();
+  officials.forEach((official) => {
+    const roleCategory = official.teamRole || 'OTHER';
+    if (!buckets.has(roleCategory)) {
+      buckets.set(roleCategory, []);
+    }
+    buckets.get(roleCategory).push(official);
+  });
+
+  const sections = [];
+  OFFICIAL_ROLE_PRESENTATION_ORDER.forEach((roleCategory) => {
+    if (buckets.has(roleCategory)) {
+      sections.push({
+        roleCategory,
+        officials: sortOfficialsList(buckets.get(roleCategory)),
+        translationKey: getOfficialRoleTranslationKey(roleCategory)
+      });
+      buckets.delete(roleCategory);
+    }
+  });
+
+  for (const [roleCategory, officials] of buckets.entries()) {
+    sections.push({
+      roleCategory,
+      officials: sortOfficialsList(officials),
+      translationKey: getOfficialRoleTranslationKey(roleCategory)
+    });
+  }
+
+  return sections;
+}
+
+function buildTimetableData(sessions = [], entries = []) {
+  const sessionMeta = new Map();
+  const platformSet = new Set();
+  sessions.forEach((session) => {
+    if (!session || !session.name) {
+      return;
+    }
+    // Extract date and time from startTime (format: "2025-11-08 09:00:00")
+    let date = '';
+    let time = '';
+    if (session.startTime) {
+      const parts = session.startTime.split(' ');
+      date = parts[0] || '';
+      time = parts[1] || '';
+    }
+    
+    sessionMeta.set(session.name, {
+      description: session.description || session.name,
+      date,
+      time,
+      platform: session.platform || '',
+      sessionName: session.name
+    });
+    if (session.platform) {
+      platformSet.add(session.platform);
+    }
+  });
+
+  const roleSet = new Set();
+  const rowMap = new Map();
+
+  entries.forEach((entry) => {
+    if (!entry) {
+      return;
+    }
+    const sessionName = entry.sessionName || entry.session;
+    const roleCategory = entry.roleCategory;
+    if (!sessionName || !roleCategory || roleCategory === 'JURY_PRESIDENT') {
+      return;
+    }
+    const teamNumber = entry.teamNumber || entry.team;
+    roleSet.add(roleCategory);
+
+    if (!rowMap.has(sessionName)) {
+      const sessionInfo = sessionMeta.get(sessionName) || {};
+      rowMap.set(sessionName, {
+        sessionName,
+        description: sessionInfo.description || sessionName,
+        date: sessionInfo.date,
+        time: sessionInfo.time,
+        platform: sessionInfo.platform || sessionInfo.sessionPlatform,
+        roles: {}
+      });
+    }
+
+    const row = rowMap.get(sessionName);
+    if (!row.roles[roleCategory]) {
+      row.roles[roleCategory] = new Set();
+    }
+    if (teamNumber) {
+      row.roles[roleCategory].add(teamNumber);
+    }
+  });
+
+  const orderedRoles = OFFICIAL_ROLE_PRESENTATION_ORDER.filter((roleCategory) => roleSet.has(roleCategory) && roleCategory !== 'JURY_PRESIDENT');
+  const extraRoles = [...roleSet].filter((roleCategory) => !orderedRoles.includes(roleCategory) && roleCategory !== 'JURY_PRESIDENT');
+  extraRoles.sort();
+
+  const roleInfo = [...orderedRoles, ...extraRoles].map((roleCategory) => ({
+    roleCategory,
+    translationKey: getOfficialRoleTranslationKey(roleCategory)
+  }));
+
+  const rows = [...rowMap.values()].map((row) => ({
+    ...row,
+    roles: Object.fromEntries(
+      Object.entries(row.roles).map(([roleCategory, teamSet]) => [
+        roleCategory,
+        [...teamSet].sort((a, b) => a - b)
+      ])
+    )
+  }));
+
+  return {
+    rows,
+    roleInfo,
+    hasMultiplePlatforms: platformSet.size > 1
+  };
+}
+
 /**
  * Plugin-specific cache to avoid recomputing on every browser request
  */
@@ -327,7 +526,7 @@ export function getScoreboardData(fopName = '', options = {}, locale = 'en') {
   
   // Cache key based on database checksum, options, and code version
   // Increment CODE_VERSION when processing logic changes to bust cache
-  const CODE_VERSION = 6;
+  const CODE_VERSION = 8;
   const dbVersion = databaseState.databaseChecksum || databaseState.lastUpdate;
   const cacheKey = `v${CODE_VERSION}-${dbVersion}-startbook-${includeSessionStartLists}-${includeOfficials}-${includeCategoryParticipants}-${locale}`;
 
@@ -548,6 +747,20 @@ export function getScoreboardData(fopName = '', options = {}, locale = 'en') {
   // Build all records data structure: Federation → Gender → Age Group (with deduplication - highest value wins)
   const allRecordsData = buildAllRecordsData(databaseState);
 
+  // Get technical officials data
+  const technicalOfficials = competitionHub.getTechnicalOfficials?.() || [];
+  const technicalOfficialsTimetable = competitionHub.getTimetable?.() || [];
+
+  // Pre-translate official role names for client-side display
+  const uniqueRoleCategories = [...new Set(technicalOfficials.map(o => o.teamRole))];
+  const officialRoleLabels = {};
+  uniqueRoleCategories.forEach(roleCategory => {
+    const translationKey = OFFICIAL_ROLE_TRANSLATION_KEYS[roleCategory] || roleCategory;
+    officialRoleLabels[roleCategory] = translations[translationKey] || roleCategory;
+  });
+
+  const timetableData = buildTimetableData(sessions, technicalOfficialsTimetable);
+
   // Cache and return
   const processedData = {
     competition,
@@ -557,6 +770,13 @@ export function getScoreboardData(fopName = '', options = {}, locale = 'en') {
     allRecords: allRecordsData.records,
     hasRecords: allRecordsData.hasRecords,
     newRecordsBroken: allRecordsData.newRecordsBroken,
+    technicalOfficials,
+    technicalOfficialsTimetable,
+    officialSections: buildOfficialSections(technicalOfficials),
+    technicalOfficialsTimetableRows: timetableData.rows,
+    technicalOfficialsTimetableRoles: timetableData.roleInfo,
+    technicalOfficialsTimetableHasMultiplePlatforms: timetableData.hasMultiplePlatforms,
+    officialRoleLabels,
     includeSessionStartLists,
     includeOfficials,
     includeCategoryParticipants,
@@ -941,6 +1161,26 @@ function formatSessionTime(timeArray) {
 function mapOfficials(session, db) {
   const officials = {};
   const toList = db.technicalOfficials || [];
+  
+  logger.error(`[mapOfficials] Called for session ${session.name}, technicalOfficials count: ${toList.length}`);
+  logger.error(`[mapOfficials] Session official fields:`, JSON.stringify({
+    referee1: session.referee1,
+    referee2: session.referee2,
+    referee3: session.referee3,
+    refereeReserve: session.refereeReserve,
+    marshall: session.marshall,
+    marshall2: session.marshall2,
+    timeKeeper: session.timeKeeper,
+    technicalController: session.technicalController,
+    technicalController2: session.technicalController2,
+    doctor: session.doctor,
+    doctor2: session.doctor2,
+    secretary: session.secretary,
+    juryPresident: session.juryPresident
+  }, null, 2));
+  if (toList.length > 0) {
+    logger.error(`[mapOfficials] First official sample:`, JSON.stringify(toList[0], null, 2));
+  }
 
   // Map session fields to officials
   const fieldMappings = {
@@ -962,20 +1202,30 @@ function mapOfficials(session, db) {
     doctor1: session.doctor,
     doctor2: session.doctor2,
     marshal1: session.marshall,
-    marshal2: session.marshall2,
+    marshal2: session.marshal2,
     timekeeper: session.timeKeeper
   };
 
-  Object.entries(fieldMappings).forEach(([officialKey, officialId]) => {
-    if (officialId) {
-      const to = toList.find(o => o.id === officialId || o.key === officialId);
+  Object.entries(fieldMappings).forEach(([officialKey, officialNameOrId]) => {
+    if (officialNameOrId) {
+      // Session stores official names as strings, not IDs - match by fullName
+      const to = toList.find(o => 
+        o.id === officialNameOrId || 
+        o.key === officialNameOrId || 
+        o.fullName === officialNameOrId ||
+        o.fullName?.toUpperCase() === String(officialNameOrId).toUpperCase()
+      );
       if (to) {
+        const fullName = `${to.lastName?.toUpperCase() || ''} ${to.firstName || ''}`.trim();
+        const federation = to.federation || '';
+        logger.error(`[mapOfficials] ${officialKey}: name=${officialNameOrId}, FOUND, fullName=${fullName}, federation='${federation}'`);
         officials[officialKey] = { 
-          fullName: `${to.lastName?.toUpperCase() || ''} ${to.firstName || ''}`.trim(),
-          federationId: to.federationId || to.federation || ''
+          fullName,
+          federation
         };
       } else {
-        officials[officialKey] = { fullName: String(officialId), federationId: '' };
+        logger.error(`[mapOfficials] ${officialKey}: name=${officialNameOrId} NOT FOUND in technicalOfficials list`);
+        officials[officialKey] = { fullName: String(officialNameOrId), federation: '' };
       }
     }
   });
