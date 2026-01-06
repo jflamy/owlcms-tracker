@@ -23,6 +23,16 @@
   $: competitionName = competition.name || 'Competition';
   $: competitionDates = competition.dateRange || '';
   
+  // Debug: trace data flow
+  $: console.log('[iwf-startbook] data received:', {
+    hasData: !!data,
+    status: data?.status,
+    sessionsCount: sessions?.length,
+    competitionName: competition?.name,
+    participantsChampionships: data?.participants?.championships?.length,
+    allRecordsCount: allRecords?.length
+  });
+  
   // Format current date/time for footer (local time with timezone)
   $: generationTime = (() => {
     if (data.productionTime) {
@@ -84,8 +94,16 @@
       };
       
       const script = document.createElement('script');
-      script.src = 'https://unpkg.com/pagedjs/dist/paged.polyfill.js';
+      // Pin to version 0.4.3 which was known to work (latest may have breaking changes)
+      script.src = 'https://unpkg.com/pagedjs@0.4.3/dist/paged.polyfill.js';
       document.head.appendChild(script);
+      
+      // Safety timeout: if Paged.js takes more than 30 seconds, something is wrong
+      setTimeout(() => {
+        if (!window.__pagedjs_ready) {
+          console.error('[Paged.js] Timeout - layout taking too long, may be stuck in loop');
+        }
+      }, 30000);
     }
   });
 </script>
