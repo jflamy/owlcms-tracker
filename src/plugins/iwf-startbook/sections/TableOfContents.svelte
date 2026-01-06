@@ -3,6 +3,7 @@
   export let rankings = [];
   export let allRecords = [];
   export let hasRecords = false;
+  export let hasTechnicalOfficials = false;
   
   // Slugify strings for valid HTML IDs (no spaces, lowercase, URL-safe)
   function slugify(str) {
@@ -25,21 +26,32 @@
       <span class="toc-page-number" data-ref="#participants"></span>
     </div>
     
+    <!-- Technical Officials section -->
+    {#if hasTechnicalOfficials}
+    <div class="toc-entry" style="font-weight: bold; margin-top: 8pt;">
+      <span class="toc-title">Technical Officials</span>
+      <span class="toc-leader"></span>
+      <span class="toc-page-number" data-ref="#technical-officials"></span>
+    </div>
+    {/if}
+    
     <!-- Athletes by Category section -->
     {#if rankings && rankings.length > 0}
     <div class="toc-entry" style="font-weight: bold; margin-top: 8pt;">
       <span class="toc-title">Athletes by Category</span>
       <span class="toc-leader"></span>
-      <span class="toc-page-number" data-ref="#ranking-{slugify(rankings[0].name)}-{slugify(rankings[0].genders[0].genderName)}"></span>
+      <span class="toc-page-number" data-ref="#category-participants"></span>
     </div>
     
     {#each rankings as championship}
       {#each championship.genders as genderGroup}
-        <div class="toc-entry" style="padding-left: 20pt; font-size: 10pt;">
-          <span class="toc-title">{championship.name} - {genderGroup.genderName}</span>
-          <span class="toc-leader"></span>
-          <span class="toc-page-number" data-ref="#ranking-{slugify(championship.name)}-{slugify(genderGroup.genderName)}"></span>
-        </div>
+        {#each genderGroup.categories as category}
+          <div class="toc-entry" style="padding-left: 20pt; font-size: 10pt;">
+            <span class="toc-title">{championship.name} - {genderGroup.genderName} - {category.categoryName}</span>
+            <span class="toc-leader"></span>
+            <span class="toc-page-number" data-ref="#catparticipant-{slugify(championship.name)}-{slugify(genderGroup.genderName)}-{slugify(category.categoryName)}"></span>
+          </div>
+        {/each}
       {/each}
     {/each}
     {/if}

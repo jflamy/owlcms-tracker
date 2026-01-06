@@ -18,11 +18,11 @@
   
   {#each rankings as championship, champIndex}
     {#each championship.genders as genderGroup, genderIndex}
-      <div class="participant-block" class:page-break={champIndex > 0 || genderIndex > 0} id="ranking-{slugify(championship.name)}-{slugify(genderGroup.genderName)}">
+      <div class="participant-block" class:page-break={champIndex > 0 || genderIndex > 0}>
         <h2 class="championship-header">{championship.name} - {genderGroup.genderName}</h2>
 
         {#each genderGroup.categories as category, catIndex}
-          <div class="category-block">
+          <div class="category-block" id="catparticipant-{slugify(championship.name)}-{slugify(genderGroup.genderName)}-{slugify(category.categoryName)}">
             <table class="protocol-table">
                 <thead>
                   <tr>

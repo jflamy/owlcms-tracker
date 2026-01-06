@@ -19,7 +19,8 @@
   $: newRecordsBroken = data.newRecordsBroken || false;
   $: format = options.format || 'complete';
   $: includeSessionStartLists = data.includeSessionStartLists !== false;
-  $: includeCategoryParticipants = data.includeCategoryParticipants === true;
+  $: includeOfficials = data.includeOfficials !== false;
+  $: includeCategoryParticipants = data.includeCategoryParticipants !== false;
   $: competitionName = competition.name || 'Competition';
   $: competitionDates = competition.dateRange || '';
   
@@ -229,11 +230,11 @@
       <TitlePage {competition} />
     </div>
     <div class="toc-section">
-      <TableOfContents {sessions} {rankings} {allRecords} {hasRecords} />
+      <TableOfContents {sessions} {rankings} {allRecords} {hasRecords} hasTechnicalOfficials={includeOfficials && data?.technicalOfficials?.length > 0} />
     </div>
     <Participants {data} />
-    {#if data?.technicalOfficials && data.technicalOfficials.length > 0}
-      <section class="technical-officials-section">
+    {#if includeOfficials && data?.technicalOfficials && data.technicalOfficials.length > 0}
+      <section class="technical-officials-section" id="technical-officials">
         <!-- Wrap header + Teams in a single no-break block -->
         <div class="officials-teams-block">
           <h2 class="section-title">Technical Officials</h2>
@@ -326,12 +327,12 @@
       <CategoryParticipants {rankings} {competition} />
     {/if}
     {#if includeSessionStartLists}
-      <SessionStartLists {sessions} {competition} productionTime={data.productionTime} />
+      <SessionStartLists {sessions} {competition} {includeOfficials} productionTime={data.productionTime} />
     {/if}
     <Records {allRecords} {hasRecords} {newRecordsBroken} {labels} />
   {:else}
     {#if includeSessionStartLists}
-      <SessionStartLists {sessions} {competition} productionTime={data.productionTime} />
+      <SessionStartLists {sessions} {competition} {includeOfficials} productionTime={data.productionTime} />
     {/if}
   {/if}
 </div>

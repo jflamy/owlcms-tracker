@@ -1,5 +1,6 @@
 <script>
   export let sessions = [];
+  export let includeOfficials = true;
 
   // Extract unique age groups and their weight classes from a session
   function getSessionAgeGroups(session) {
@@ -92,7 +93,7 @@
       </table>
 
       <!-- Technical Officials section (if any) -->
-      {#if hasOfficials(session)}
+      {#if includeOfficials && hasOfficials(session)}
       <div class="officials-section">
         <h4>Technical Officials</h4>
         <div class="officials-grid">

@@ -522,7 +522,7 @@ export function getScoreboardData(fopName = '', options = {}, locale = 'en') {
   // Extract options
   const includeSessionStartLists = options.includeSessionStartLists !== false;
   const includeOfficials = options.includeOfficials !== false;
-  const includeCategoryParticipants = options.includeCategoryParticipants === true;
+  const includeCategoryParticipants = options.includeCategoryParticipants !== false;
   
   // Cache key based on database checksum, options, and code version
   // Increment CODE_VERSION when processing logic changes to bust cache

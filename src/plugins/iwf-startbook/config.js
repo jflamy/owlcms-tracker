@@ -9,7 +9,7 @@ export default {
       key: 'includeCategoryParticipants',
       label: 'Include Category Participants Section',
       type: 'boolean',
-      default: false,
+      default: true,
       description: 'Include section showing all participants grouped by age group and category'
     },
     {

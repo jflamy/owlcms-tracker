@@ -4,8 +4,8 @@
   import Participants from './sections/Participants.svelte';
   import Medals from './sections/Medals.svelte';
   import Rankings from './sections/Rankings.svelte';
-  import SessionProtocols from './sections/SessionProtocols.svelte';
   import Records from './sections/Records.svelte';
+  import SessionStartLists from './sections/SessionStartLists.svelte';
 
   export let data = {};
 
@@ -104,11 +104,10 @@
     <!-- Rankings Section -->
     <Rankings rankings={data.rankings} {competition} />
 
-    <!-- Session Protocols Section -->
-    <SessionProtocols 
+    <!-- Session Start Lists Section -->
+    <SessionStartLists 
       {sessions} 
       {competition} 
-      productionTime={data.productionTime}
     />
 
     <!-- Records Section -->

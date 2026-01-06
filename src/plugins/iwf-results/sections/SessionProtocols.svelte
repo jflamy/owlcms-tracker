@@ -108,74 +108,6 @@
         </tbody>
       </table>
 
-      {#if session.records && session.records.length > 0}
-        <div class="records-section">
-          <h4>Records</h4>
-          <table class="records-table">
-            <thead>
-              <tr>
-                <th>Federation</th>
-                <th>Record Name</th>
-                <th>Age Group</th>
-                <th>Cat.</th>
-                <th>Type</th>
-                <th>Record</th>
-                <th>Name</th>
-                <th>Nation</th>
-              </tr>
-            </thead>
-            <tbody>
-              {#each session.records as record}
-                <tr>
-                  <td>{record.federation || 'WFA'}</td>
-                  <td>{record.recordName}</td>
-                  <td>{record.ageGroup}</td>
-                  <td>{record.categoryCode}</td>
-                  <td>{record.lift}</td>
-                  <td>{record.value}</td>
-                  <td>{record.holder}</td>
-                  <td>{record.nation}</td>
-                </tr>
-              {/each}
-            </tbody>
-          </table>
-        </div>
-      {/if}
-
-      {#if session.newRecords && session.newRecords.length > 0}
-        <div class="records-section new-records">
-          <h4>New Records</h4>
-          <table class="records-table">
-            <thead>
-              <tr>
-                <th>Federation</th>
-                <th>Record Name</th>
-                <th>Age Group</th>
-                <th>Cat.</th>
-                <th>Type</th>
-                <th>Record</th>
-                <th>Name</th>
-                <th>Nation</th>
-              </tr>
-            </thead>
-            <tbody>
-              {#each session.newRecords as record}
-                <tr>
-                  <td>{record.federation || 'WFA'}</td>
-                  <td>{record.recordName}</td>
-                  <td>{record.ageGroup}</td>
-                  <td>{record.categoryCode}</td>
-                  <td>{record.lift}</td>
-                  <td>{record.value}</td>
-                  <td>{record.holder}</td>
-                  <td>{record.nation}</td>
-                </tr>
-              {/each}
-            </tbody>
-          </table>
-        </div>
-      {/if}
-
       {#if hasOfficials(session)}
       <div class="officials-section">
         <h4>Technical Officials</h4>
@@ -296,6 +228,45 @@
         </div>
       </div>
       {/if}
+
+      {#if session.newRecords && session.newRecords.length > 0}
+        <div class="records-section new-records">
+          <h4>New Records</h4>
+          <table class="records-table">
+            <thead>
+              <tr>
+                <th>Federation</th>
+                <th>Record Name</th>
+                <th>Age Group</th>
+                <th>Cat.</th>
+                <th>Type</th>
+                <th>Record</th>
+                <th>Name</th>
+                <th>Nation</th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each session.newRecords as record, i}
+                {#if i > 0 && record.federation !== session.newRecords[i - 1].federation}
+                  <tr class="federation-spacer">
+                    <td colspan="8"></td>
+                  </tr>
+                {/if}
+                <tr>
+                  <td>{record.federation || 'WFA'}</td>
+                  <td>{record.recordName}</td>
+                  <td>{record.ageGroup}</td>
+                  <td>{record.categoryCode}</td>
+                  <td>{record.lift}</td>
+                  <td>{record.value}</td>
+                  <td>{record.holder}</td>
+                  <td>{record.nation}</td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+      {/if}
     </div>
   {/each}
 </div>
@@ -409,7 +380,7 @@
     border-collapse: collapse;
     border-radius: 0;
     font-size: 9px;
-    border: 1px solid #999;
+    border: none;
     table-layout: auto;
   }
 
@@ -432,6 +403,16 @@
     padding: 2px 3px;
     font-size: 8px;
     text-transform: uppercase;
+  }
+
+  .federation-spacer {
+    height: 8px;
+    background: transparent;
+  }
+
+  .federation-spacer td {
+    border: none !important;
+    padding: 0;
   }
 
   .officials-section {
