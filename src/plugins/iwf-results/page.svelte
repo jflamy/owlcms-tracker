@@ -85,8 +85,8 @@
       };
       
       const script = document.createElement('script');
-      // Pin to version 0.4.3 which was known to work (latest may have breaking changes)
-      script.src = 'https://unpkg.com/pagedjs@0.4.3/dist/paged.polyfill.js';
+      // Use locally bundled Paged.js (pinned to 0.4.3)
+      script.src = '/node_modules/pagedjs/dist/paged.polyfill.js';
       document.head.appendChild(script);
       
       // Safety timeout: if Paged.js takes more than 30 seconds, something is wrong
