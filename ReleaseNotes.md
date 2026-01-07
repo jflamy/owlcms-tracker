@@ -12,6 +12,10 @@
 > There is also the option of using the latest prerelease of the control panel,
 > which as an option to do the connection.
 
+## New in Release 2.5
+- 2.5.0: Full versions of IWF-style start book and results book are available as examples when checking out
+- 2.5.0: Logos can be used (see the iwf-starbook and iwf-results), tracker-core used for asset resolution.)
+
 ## New in Release 2.4
 - 2.4.2: Fix standard scoreboards layout for phones
 - 2.4.2: Added a "refresh" end point on API clears all the plugin caches and triggers a reload from tracker-core data

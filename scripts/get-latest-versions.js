@@ -81,7 +81,7 @@ async function main() {
     console.log('🔍 Fetching latest versions from GitHub...\n');
     
     const [trackerVersion, coreVersion] = await Promise.all([
-      fetchLatestGitHubTag('jflamy', 'owlcms-tracker'),
+      fetchLatestGitHubTag('owlcms', 'owlcms-tracker'),
       fetchLatestGitHubTag('owlcms', 'tracker-core')
     ]);
 
