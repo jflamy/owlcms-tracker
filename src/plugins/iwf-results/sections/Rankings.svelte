@@ -240,17 +240,7 @@
   .rank-1 { background-color: #FFD700; font-weight: bold; font-size: 1.2em; } /* Gold */
   .rank-2 { background-color: #C0C0C0; font-weight: bold; font-size: 1.2em; } /* Silver */
   .rank-3 { background-color: #CD7F32; font-weight: bold; font-size: 1.2em; } /* Bronze */
-
-  .category-row {
-    background: #e8e8e8;
-    font-weight: bold;
-    font-size: 12pt;
-  }
-
-  .category-row td {
-    text-align: left !important;
-    padding-left: 8px !important;
-  }
+  .rank-3 { background-color: #CD7F32; font-weight: bold; font-size: 1.2em; } /* Bronze */
 
   /* Each category is its own table - keep it together */
   .category-block {

@@ -20,7 +20,7 @@
 
 {#if hasRecords}
 <div class="title-page-records">
-  <h1 class="title-page-header">Records</h1>
+  <h1 class="title-page-header">New Records</h1>
 </div>
 
 <div class="records-section-page" id="records">
@@ -98,33 +98,19 @@
     font-weight: bold;
     border-bottom: 2pt solid #333;
     padding-bottom: 10pt;
-    /* stylelint-disable-next-line property-no-unknown */
+    /* stylelint-disable property-no-unknown */
     bookmark-level: 1;
-    /* stylelint-disable-next-line property-no-unknown */
     bookmark-label: "Records";
-  }
-
-  .section-header {
-    font-size: 20pt;
-    font-weight: bold;
-    text-align: center;
-    margin: 30pt 0 20pt 0;
-    page-break-before: always;
-    break-before: always;
-    border-bottom: 2pt solid #333;
-    padding-bottom: 10pt;
-    /* stylelint-disable-next-line property-no-unknown */
-    bookmark-level: 1;
-    /* stylelint-disable-next-line property-no-unknown */
-    bookmark-label: "Records";
+    /* stylelint-enable property-no-unknown */
   }
   .record-block {
     page-break-inside: avoid;
     margin-bottom: 25pt;
     border-radius: 0;
     background: none;
-    /* stylelint-disable-next-line property-no-unknown */
+    /* stylelint-disable property-no-unknown */
     bookmark-level: 2;
+    /* stylelint-enable property-no-unknown */
   }
   .record-title {
     font-size: 14pt;

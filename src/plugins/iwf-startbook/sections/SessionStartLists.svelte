@@ -284,25 +284,10 @@
     font-weight: bold;
     border-bottom: 2pt solid #333;
     padding-bottom: 10pt;
-    /* stylelint-disable-next-line property-no-unknown */
+    /* stylelint-disable property-no-unknown */
     bookmark-level: 1;
-    /* stylelint-disable-next-line property-no-unknown */
     bookmark-label: "Session Start Lists";
-  }
-
-  .section-header {
-    font-size: 20pt;
-    font-weight: bold;
-    text-align: center;
-    margin: 30pt 0 20pt 0;
-    page-break-before: always;
-    border-bottom: 2pt solid #333;
-    padding-bottom: 10pt;
-    width: 100%;
-    /* stylelint-disable-next-line property-no-unknown */
-    bookmark-level: 1;
-    /* stylelint-disable-next-line property-no-unknown */
-    bookmark-label: "Session Start Lists";
+    /* stylelint-enable property-no-unknown */
   }
 
   .session-page {
@@ -320,10 +305,10 @@
     font-weight: bold;
     text-align: center;
     margin: 10pt 0 10pt 0;
-    /* stylelint-disable-next-line property-no-unknown */
+    /* stylelint-disable property-no-unknown */
     bookmark-level: 2;
-    /* stylelint-disable-next-line property-no-unknown */
     bookmark-label: content();
+    /* stylelint-enable property-no-unknown */
   }
 
   .protocol-table {
@@ -333,8 +318,9 @@
     margin-bottom: 15px;
     font-size: 10px;
     border: 1px solid black;
-    /* stylelint-disable-next-line property-no-unknown */
+    /* stylelint-disable property-no-unknown */
     bookmark-level: none;
+    /* stylelint-enable property-no-unknown */
     table-layout: fixed;
     page-break-inside: auto;
   }

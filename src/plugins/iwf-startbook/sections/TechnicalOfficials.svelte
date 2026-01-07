@@ -1,8 +1,8 @@
 <script>
   export let data = {};
   export let timetableRoleInfo = [];
-  export let timetableRows = [];
-  export let showPlatformColumn = false;
+  export const timetableRows = [];
+  export const showPlatformColumn = false;
 
   // Build team listing for a role category: group officials by team number
   function buildTeamListing(officials = [], roleCategory) {
@@ -233,11 +233,7 @@
     text-align: center;
   }
 
-  .official-name {
-    font-size: 8pt;
-    line-height: 1.2;
-    white-space: nowrap;
-  }
+  /* .official-name removed — not used in template */
 
   .team-number {
     font-size: 9pt;

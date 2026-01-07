@@ -10,7 +10,7 @@
     "build:macos": "npm run build && node scripts/build-macos.js",
     "build:rpi": "npm run build && node scripts/build-rpi.js",
     "build:all": "npm run build:windows && npm run build:macos && npm run build:rpi",
-    "preview": "vite preview --port 8096",
+    "preview": "node start-with-ws.js",
     "check": "svelte-kit sync && svelte-check --tsconfig ./jsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./jsconfig.json --watch",
     "test": "vitest run",

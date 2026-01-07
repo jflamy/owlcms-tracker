@@ -1,8 +1,8 @@
 <script>
   export let data = {};
   export let timetableRoleInfo = [];
-  export let timetableRows = [];
-  export let showPlatformColumn = false;
+  export const timetableRows = [];
+  export const showPlatformColumn = false;
 
   // Debug: log what we receive
   $: console.log('[TechnicalOfficials] data.technicalOfficials:', data?.technicalOfficials?.length, 'timetableRoleInfo:', timetableRoleInfo?.length);

@@ -820,8 +820,8 @@
 {/if}
 
 {#if showPdfModal}
-  <div class="modal-overlay" on:click={closePdfModal}>
-    <div class="modal-content" on:click|stopPropagation>
+  <div class="modal-overlay" role="dialog" tabindex="0" on:click={closePdfModal} on:keydown={(e) => e.key === 'Escape' && closePdfModal()}>
+    <div class="modal-content" role="none" on:click|stopPropagation>
       <div class="modal-header">
         <h3>PDF Generation (dev mode)</h3>
         <button class="close-btn" on:click={closePdfModal}>×</button>

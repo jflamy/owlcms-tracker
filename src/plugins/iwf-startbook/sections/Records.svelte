@@ -97,33 +97,19 @@
     font-weight: bold;
     border-bottom: 2pt solid #333;
     padding-bottom: 10pt;
-    /* stylelint-disable-next-line property-no-unknown */
+    /* stylelint-disable property-no-unknown */
     bookmark-level: 1;
-    /* stylelint-disable-next-line property-no-unknown */
     bookmark-label: "Records";
-  }
-
-  .section-header {
-    font-size: 20pt;
-    font-weight: bold;
-    text-align: center;
-    margin: 30pt 0 20pt 0;
-    page-break-before: always;
-    break-before: always;
-    border-bottom: 2pt solid #333;
-    padding-bottom: 10pt;
-    /* stylelint-disable-next-line property-no-unknown */
-    bookmark-level: 1;
-    /* stylelint-disable-next-line property-no-unknown */
-    bookmark-label: "Records";
+    /* stylelint-enable property-no-unknown */
   }
   .record-block {
     margin-bottom: 12pt;
     border-radius: 0;
     background: none;
     page-break-inside: avoid;
-    /* stylelint-disable-next-line property-no-unknown */
+    /* stylelint-disable property-no-unknown */
     bookmark-level: 2;
+    /* stylelint-enable property-no-unknown */
   }
 
   /* Only break before 2nd+ federations */
