@@ -4,6 +4,7 @@
   export let hasRecords = false;
   export let newRecordsBroken = false;
 
+  // Records are already ordered by bwCatUpper and lift priority before reaching the template
   // Slugify strings for valid HTML IDs (no spaces, lowercase, URL-safe)
   function slugify(str) {
     return String(str || '')

@@ -1,5 +1,5 @@
 import { competitionHub } from '$lib/server/competition-hub.js';
-import { logger, getHeaderLogoUrl } from '@owlcms/tracker-core';
+import { logger, getHeaderLogoUrl, formatCategoryDisplay, sortRecordsList } from '@owlcms/tracker-core';
 import { calculateTeamPoints } from '$lib/server/team-points-formula.js';
 import { registerCache } from '$lib/server/cache-epoch.js';
 
@@ -261,8 +261,9 @@ function extractRecords(db, categoryCodes) {
         federation: r.recordFederation || 'WFA',
         recordName: r.recordName,
         ageGroup: r.ageGrp || '',
-        category: cat.categoryName,
+        category: formatCategoryDisplay(r.bwCatString || cat.categoryName || ''),
         categoryCode: r.bwCatString || catCode,
+        bwCatUpper: r.bwCatUpper,
         lift: r.recordLift,
         value: r.recordValue,
         holder: r.athleteName,
@@ -272,29 +273,32 @@ function extractRecords(db, categoryCodes) {
     });
   });
 
-  return sessionRecords;
+  return sortRecordsList(sessionRecords);
 }
 
 function extractNewRecords(db, sessionName) {
   const allRecords = db.records || [];
-  return allRecords
-    .filter(r => r.groupNameString === sessionName)
-    .map(r => {
+  return sortRecordsList(
+    allRecords
+      .filter(r => r.groupNameString === sessionName)
+      .map(r => {
       const athleteTeam = getAthleteTeam(db, r.athleteName);
       
       return {
         federation: r.recordFederation || 'WFA',
         recordName: r.recordName,
         ageGroup: r.ageGrp || '',
-        category: r.bwCatString || '',
+        category: formatCategoryDisplay(r.bwCatString || ''),
         categoryCode: r.bwCatString || '',
+        bwCatUpper: r.bwCatUpper,
         lift: r.recordLift,
         value: r.recordValue,
         holder: r.athleteName,
         nation: athleteTeam || r.nation || r.recordFederation || '',
         born: ''
       };
-    });
+      })
+  );
 }
 
 function getAthleteTeam(db, athleteName) {
@@ -721,7 +725,9 @@ function buildAllRecordsData(db) {
     
     ageMap.get(ageGrp).records.push({
       recordName: r.recordName,
-      category: r.bwCatString || '',
+      category: formatCategoryDisplay(r.bwCatString || ''),
+      categoryCode: r.bwCatString || '',
+      bwCatUpper: r.bwCatUpper,
       lift: r.recordLift,
       value: r.recordValue,
       holder: r.athleteName,
@@ -749,6 +755,10 @@ function buildAllRecordsData(db) {
           genderName: gender === 'F' ? 'Women' : 'Men',
           ageGroups: Array.from(ageMap.values())
             .sort((a, b) => a.upperLimit - b.upperLimit)
+            .map(ageGroup => ({
+              ...ageGroup,
+              records: sortRecordsList(ageGroup.records)
+            }))
         }))
     }));
   

@@ -26,8 +26,8 @@
   {:else if !allRecords || allRecords.length === 0}
     <div class="no-records">No new records to display.</div>
   {:else}
-    {#each allRecords as fed, fedIdx}
-      <div class="federation-page" class:page-break={fedIdx > 0}>
+    {#each allRecords as fed}
+      <div class="federation-page">
         {#each fed.genders as genderGroup}
           {#each genderGroup.ageGroups as ageGroup}
             <div class="record-block" id="records-{slugify(fed.federation)}-{slugify(genderGroup.genderName)}-{slugify(ageGroup.name)}">
@@ -91,10 +91,11 @@
     bookmark-label: "Records";
   }
   .record-block {
-    page-break-inside: avoid;
     margin-bottom: 12pt;
     border-radius: 0;
     background: none;
+    page-break-before: always;
+    page-break-inside: avoid;
     /* stylelint-disable-next-line property-no-unknown */
     bookmark-level: 2;
   }
@@ -110,11 +111,13 @@
   .records-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 9pt;
+    font-size: 8pt;
     border: 1pt solid #333;
     table-layout: fixed;
     border-radius: 0;
     outline: 1pt solid #333; /* visible outline */
+    page-break-inside: auto;
+    break-inside: auto;
   }
   .records-table th,
   .records-table td {
@@ -133,10 +136,6 @@
     text-transform: uppercase;
     font-size: 8pt;
     padding: 3pt 3pt;
-  }
-  /* Page break for each federation except the first */
-  .federation-page.page-break {
-    page-break-before: always;
   }
   .no-records {
     text-align: center;

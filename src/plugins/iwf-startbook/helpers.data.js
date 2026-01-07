@@ -1,5 +1,5 @@
 import { competitionHub } from '$lib/server/competition-hub.js';
-import { logger, getHeaderLogoUrl } from '@owlcms/tracker-core';
+import { logger, getHeaderLogoUrl, formatCategoryDisplay, sortRecordsList } from '@owlcms/tracker-core';
 import { registerCache } from '$lib/server/cache-epoch.js';
 
 const OFFICIAL_ROLE_TRANSLATION_KEYS = {
@@ -77,6 +77,7 @@ function sortOfficialsList(officials = []) {
     return (a.firstName || '').localeCompare(b.firstName || '');
   });
 }
+
 
 function buildOfficialSections(officials = []) {
   const buckets = new Map();
@@ -990,22 +991,26 @@ function extractRecords(db, sessionCategories = [], isFirstSession = false) {
   }
   
   // Convert map to array and format for display
-  const sessionRecords = Array.from(recordMap.values()).map(r => {
+  const sessionRecords = sortRecordsList(
+    Array.from(recordMap.values()).map(r => {
     const athleteTeam = getAthleteTeam(db, r.athleteName);
+    const categoryString = r.bwCatString || '';
     
     return {
       federation: r.recordFederation || 'WFA',
       recordName: r.recordName,
       ageGroup: r.ageGrp || '',
-      category: r.bwCatString || '',
-      categoryCode: r.bwCatString || '',
+      category: formatCategoryDisplay(categoryString),
+      categoryCode: categoryString,
+      bwCatUpper: r.bwCatUpper,
       lift: r.recordLift,
       value: r.recordValue,
       holder: r.athleteName,
       nation: athleteTeam || r.nation || '',
       born: ''
     };
-  });
+    })
+  );
   
   if (isFirstSession) logger.debug(`[extractRecords] Session 1: Returning ${sessionRecords.length} formatted session records`);
 
@@ -1014,25 +1019,29 @@ function extractRecords(db, sessionCategories = [], isFirstSession = false) {
 
 function extractNewRecords(db, sessionName) {
   const allRecords = db.records || [];
-  return allRecords
-    .filter(r => r.groupNameString === sessionName)
-    .map(r => {
+  return sortRecordsList(
+    allRecords
+      .filter(r => r.groupNameString === sessionName)
+      .map(r => {
       const athleteTeam = getAthleteTeam(db, r.athleteName);
+      const categoryString = r.bwCatString || '';
       
       return {
         federation: r.recordFederation || 'WFA',
         recordName: r.recordName,
         ageGroup: r.ageGrp || '',
-        category: r.bwCatString || '',
-        categoryCode: r.bwCatString || '',
+        category: formatCategoryDisplay(categoryString),
+        categoryCode: categoryString,
+        bwCatUpper: r.bwCatUpper,
         lift: r.recordLift,
         value: r.recordValue,
         holder: r.athleteName,
         nation: athleteTeam || r.nation || '',
         born: ''
       };
-    });
-}
+    })
+    );
+  }
 
 function getAthleteTeam(db, athleteName) {
   if (!athleteName || !db.athletes) return null;
@@ -1639,10 +1648,13 @@ function buildAllRecordsData(db) {
     }
     
     const athleteTeam = getAthleteTeam(db, r.athleteName);
+    const categoryString = r.bwCatString || '';
     
     ageMap.get(ageGrp).records.push({
       recordName: r.recordName,
-      category: r.bwCatString || '',
+      category: formatCategoryDisplay(categoryString),
+      categoryCode: categoryString,
+      bwCatUpper: r.bwCatUpper,
       lift: r.recordLift,
       value: r.recordValue,
       holder: r.athleteName,
@@ -1662,16 +1674,20 @@ function buildAllRecordsData(db) {
       if (fedB === 'IWF') return 1;
       return fedA.localeCompare(fedB);
     })
-    .map(([fedName, genderMap]) => ({
-      federation: fedName,
-      genders: Array.from(genderMap.entries())
-        .sort(([genA], [genB]) => genA === 'F' ? -1 : 1)
-        .map(([gender, ageMap]) => ({
-          gender,
-          genderName: gender === 'F' ? 'Women' : 'Men',
-          ageGroups: Array.from(ageMap.values())
-            .sort((a, b) => a.upperLimit - b.upperLimit)
-        }))
+      .map(([fedName, genderMap]) => ({
+        federation: fedName,
+        genders: Array.from(genderMap.entries())
+          .sort(([genA], [genB]) => genA === 'F' ? -1 : 1)
+          .map(([gender, ageMap]) => ({
+            gender,
+            genderName: gender === 'F' ? 'Women' : 'Men',
+            ageGroups: Array.from(ageMap.values())
+              .sort((a, b) => a.upperLimit - b.upperLimit)
+              .map(ageGroup => ({
+                ...ageGroup,
+                records: sortRecordsList(ageGroup.records)
+              }))
+          }))
     }));
   
   logger.warn('[buildAllRecordsData] Returning result with', result.length, 'federations');

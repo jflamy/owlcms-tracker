@@ -52,7 +52,7 @@
           {@const categoryId = `ranking-${slugify(championship.name)}-${slugify(genderGroup.genderName)}-${slugify(category.categoryName)}`}
           <div class="category-block" class:page-break-before={!firstCategory.value} id="{chunkIndex === 0 ? categoryId : `${categoryId}-${chunkIndex}`}">
             {#if isFirstInGender}
-              <h2 class="championship-header">{championship.name} - {genderGroup.genderName}</h2>
+              <h2 class="championship-header" class:page-break-before={!(champIndex === 0 && genderIndex === 0)}>{championship.name} - {genderGroup.genderName}</h2>
             {/if}
             <table class="protocol-table">
               <thead>
@@ -150,6 +150,12 @@
     font-weight: bold;
     text-align: center;
     margin: 10pt 0 10pt 0;
+    page-break-before: auto;
+  }
+
+  .championship-header.page-break-before {
+    break-before: page;
+    page-break-before: always;
   }
 
   .protocol-table {
