@@ -1,5 +1,5 @@
 <script>
-  import { browser } from '$app/environment';
+  import { browser, dev } from '$app/environment';
   import { invalidateAll } from '$app/navigation';
   import { onMount } from 'svelte';
   export let data;
@@ -226,6 +226,19 @@
     }
     return false;
   }
+
+  let showPdfModal = false;
+
+  function handlePdfClick(event, scoreboardType) {
+    if (dev) {
+      event.preventDefault();
+      showPdfModal = true;
+    }
+  }
+
+  function closePdfModal() {
+    showPdfModal = false;
+  }
 </script>
 
 <svelte:head>
@@ -448,13 +461,22 @@
                             >
                               Generate
                             </a>
-                            <a 
-                              href="/api/generate-pdf?type={scoreboard.type}"
-                              class="pdf-btn"
-                              title="Generate PDF with mixed page orientations"
-                            >
-                              📄 PDF
-                            </a>
+                            <div class="pdf-btn-container">
+                              <a 
+                                href="/api/generate-pdf?type={scoreboard.type}"
+                                class="pdf-btn"
+                                class:disabled={dev}
+                                title={dev 
+                                  ? "In dev mode, you have to use the browser print. Automated generation requires a build version, click for details" 
+                                  : "Please be patient, PDF generation can take a minute"}
+                                on:click={(e) => handlePdfClick(e, scoreboard.type)}
+                              >
+                                📄 PDF
+                              </a>
+                              {#if dev}
+                                <span class="pdf-tooltip">In dev mode, you have to use the browser print<br/>Automated generation requires a build version, click for details</span>
+                              {/if}
+                            </div>
                             {#if scoreboard.options && scoreboard.options.length > 0}
                               <button
                                 class="options-btn"
@@ -797,6 +819,29 @@
   </div>
 {/if}
 
+{#if showPdfModal}
+  <div class="modal-overlay" on:click={closePdfModal}>
+    <div class="modal-content" on:click|stopPropagation>
+      <div class="modal-header">
+        <h3>PDF Generation (dev mode)</h3>
+        <button class="close-btn" on:click={closePdfModal}>×</button>
+      </div>
+      <div class="modal-body">
+        <p><strong>In dev mode, you have to use the browser print.</strong><br/>Open the document in your browser and use <strong>Print → Save as PDF</strong>.</p>
+        <p>Automated generation requires a build version. To generate PDFs automatically:</p>
+        <ol>
+          <li>Build the app: <code>npm run build</code></li>
+          <li>Run production: <code>node start-with-ws.js</code></li>
+          <li>Then use the PDF generation</li>
+        </ol>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-primary" on:click={closePdfModal}>OK</button>
+      </div>
+    </div>
+  </div>
+{/if}
+
 <style>
   :global(body) {
     margin: 0;
@@ -1013,7 +1058,39 @@
     border-color: #ea6666;
     transform: scale(1.05);
   }
-  
+
+  .pdf-btn.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .pdf-btn-container {
+    position: relative;
+    display: inline-block;
+  }
+
+  .pdf-tooltip {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #000;
+    color: #fff;
+    padding: 6px 8px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+    z-index: 5;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  }
+
+  .pdf-btn-container:hover .pdf-tooltip {
+    opacity: 1;
+  }
+
   /* Modal Styles */
   .modal-overlay {
     position: fixed;
@@ -1082,6 +1159,19 @@
     padding: 1.5rem;
     overflow-y: auto;
     flex: 1;
+    color: #e2e8f0;
+  }
+
+  .modal-body ol {
+    padding-left: 1.5rem;
+    margin: 0.5rem 0 1rem;
+  }
+
+  .modal-body code {
+    background: rgba(255, 255, 255, 0.08);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: #fbd38d;
   }
   
   .modal-footer {
