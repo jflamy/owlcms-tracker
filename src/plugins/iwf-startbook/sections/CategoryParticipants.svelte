@@ -38,6 +38,7 @@
             {#if isFirstInGender}
               <h2 class="championship-header" class:page-break-before={!(champIndex === 0 && genderIndex === 0)}>{championship.name} - {genderGroup.genderName}</h2>
             {/if}
+            <h4 class="category-header">{category.categoryName}{totalChunks > 1 ? ` (${chunkIndex + 1}/${totalChunks})` : ''}{void (firstCategory.value = false)}</h4>
             <table class="protocol-table">
               <thead>
                 <tr>
@@ -51,9 +52,6 @@
                 </tr>
               </thead>
               <tbody>
-                <tr class="category-row">
-                  <td colspan="7">{category.categoryName}{totalChunks > 1 ? ` (${chunkIndex + 1}/${totalChunks})` : ''}{void (firstCategory.value = false)}</td>
-                </tr>
                 {#each athleteChunk as athlete}
                   <tr>
                     <td class="col-lot">{athlete.lotNumber}</td>
@@ -111,6 +109,14 @@
   .championship-header.page-break-before {
     break-before: page;
     page-break-before: always;
+  }
+
+  .category-header {
+    font-size: 13pt;
+    font-weight: bold;
+    margin: 8pt 0 6pt 0;
+    padding: 0;
+    border-bottom: none;
   }
 
   .protocol-table {
