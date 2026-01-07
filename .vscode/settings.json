@@ -19,8 +19,7 @@
   // Let Stylelint handle CSS validation instead of the built-in VS Code validator
   "css.validate": false,
   "scss.validate": false,
-  "less.validate": false
-  ,
+  "less.validate": false,
   // Route linting to Stylelint (includes Svelte <style> blocks)
   "stylelint.validate": ["css", "scss", "less", "svelte"],
   // Disable Svelte's built-in CSS diagnostics so Stylelint is the single source

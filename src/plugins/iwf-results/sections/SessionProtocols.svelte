@@ -281,10 +281,10 @@
     page-break-before: always;
     border-bottom: 2pt solid #333;
     padding-bottom: 10pt;
-    /* stylelint-disable-next-line property-no-unknown */
+    /* stylelint-disable property-no-unknown */
     bookmark-level: 1; /* non-standard property for PDF bookmarks */
-    /* stylelint-disable-next-line property-no-unknown */
     bookmark-label: "Session Protocols"; /* non-standard property for PDF bookmarks */
+    /* stylelint-enable property-no-unknown */
   }
 
   .session-page {
@@ -299,10 +299,10 @@
     margin: 10px 0;
     font-size: 16pt;
     line-height: 1.2;
-    /* stylelint-disable-next-line property-no-unknown */
+    /* stylelint-disable property-no-unknown */
     bookmark-level: 2;
-    /* stylelint-disable-next-line property-no-unknown */
     bookmark-label: content();
+    /* stylelint-enable property-no-unknown */
   }
 
   .protocol-table {

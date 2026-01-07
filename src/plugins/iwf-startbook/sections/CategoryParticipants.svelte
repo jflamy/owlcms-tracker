@@ -88,15 +88,16 @@
     border-bottom: 2pt solid #333;
     padding-bottom: 10pt;
     width: 100%;
-    /* stylelint-disable-next-line property-no-unknown */
+    /* stylelint-disable property-no-unknown */
     bookmark-level: 1; /* non-standard property for PDF bookmarks */
-    /* stylelint-disable-next-line property-no-unknown */
     bookmark-label: "Category Participants"; /* non-standard property for PDF bookmarks */
+    /* stylelint-enable property-no-unknown */
   }
 
   .category-block {
-    /* stylelint-disable-next-line property-no-unknown */
+    /* stylelint-disable property-no-unknown */
     bookmark-level: 2; /* non-standard property for PDF bookmarks */
+    /* stylelint-enable property-no-unknown */
   }
 
   .championship-header {

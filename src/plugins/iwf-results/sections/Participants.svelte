@@ -152,10 +152,10 @@
     border-bottom: 1pt solid #333;
     padding-bottom: 5pt;
     /* Paged.js PDF bookmark properties (not standard CSS) */
-    /* stylelint-disable-next-line property-no-unknown */
+    /* stylelint-disable property-no-unknown */
     bookmark-level: 1;
-    /* stylelint-disable-next-line property-no-unknown */
     bookmark-label: "Participants";
+    /* stylelint-enable property-no-unknown */
   }
 
   .champ-block {

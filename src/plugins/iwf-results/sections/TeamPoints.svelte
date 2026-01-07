@@ -127,25 +127,6 @@
 {/if}
 
 <style>
-.team-points-section {
-  margin: 0.5rem 0;
-}
-
-.team-points-break {
-  break-before: page;
-  page-break-before: always;
-}
-
-.avoid-break {
-  break-inside: auto;
-  page-break-inside: auto;
-}
-
-.page-break {
-  break-before: page;
-  page-break-before: always;
-}
-
 .section-header {
   font-size: 16pt;
   font-weight: bold;
@@ -153,16 +134,12 @@
   margin: 10pt 0 8pt 0;
   border-bottom: 1pt solid #333;
   padding-bottom: 5pt;
-  /* stylelint-disable-next-line property-no-unknown */
-  bookmark-level: 1;
-  /* stylelint-disable-next-line property-no-unknown */
-  bookmark-label: "Team Points";
   break-before: page;
   page-break-before: always;
-}
-
-.champ-gender-block {
-  margin-bottom: 10pt;
+  /* stylelint-disable property-no-unknown */
+  bookmark-level: 1;
+  bookmark-label: "Team Points";
+  /* stylelint-enable property-no-unknown */
 }
 
 .champ-heading {
@@ -195,10 +172,6 @@
 
 .team-points-table thead {
   display: table-header-group;
-}
-
-.team-points-table tfoot {
-  display: table-footer-group;
 }
 
 .team-points-table tbody {
