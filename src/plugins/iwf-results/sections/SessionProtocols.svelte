@@ -54,11 +54,8 @@
     <div
       class="session-page"
       id="session-{session.name}"
-      data-bookmark={`Session ${session.name} : ${session.description}`}
     >
-      <div class="session-title">
-        <p><strong>Session {session.name} : {session.description}</strong>     {session.startTime}</p>
-      </div>
+      <h4 class="session-heading">Session {session.name} : {session.description} {session.startTime}</h4>
 
       <table class="protocol-table">
         <thead>
@@ -114,7 +111,7 @@
 
       {#if hasOfficials(session)}
       <div class="officials-section">
-        <h4>Technical Officials</h4>
+        <div class="subsection-heading">Technical Officials</div>
         <div class="officials-grid">
           <!-- Column 1: Referees, Marshals, Timekeeper -->
           <div class="officials-column">
@@ -235,7 +232,7 @@
 
       {#if session.newRecords && session.newRecords.length > 0}
         <div class="records-section new-records">
-          <h4>New Records</h4>
+          <div class="subsection-heading">New Records</div>
           <table class="records-table">
             <thead>
               <tr>
@@ -295,21 +292,17 @@
     padding: 20px;
     position: relative;
     background: white;
+  }
+
+  .session-heading {
+    text-align: center;
+    margin: 10px 0;
+    font-size: 16pt;
+    line-height: 1.2;
     /* stylelint-disable-next-line property-no-unknown */
     bookmark-level: 2;
     /* stylelint-disable-next-line property-no-unknown */
-    bookmark-label: attr(data-bookmark);
-  }
-
-  .session-title {
-    text-align: center;
-    margin-bottom: 10px;
-    line-height: 1.2;
-  }
-
-  .session-title p {
-    margin: 10px 0;
-    font-size: 16pt;
+    bookmark-label: content();
   }
 
   .protocol-table {
@@ -375,12 +368,10 @@
     page-break-inside: avoid;
   }
 
-  .records-section h4 {
+  .subsection-heading {
     font-size: 12pt;
     font-weight: bold;
     margin: 8px 0 5px 0;
-    /* stylelint-disable-next-line property-no-unknown */
-    bookmark-level: none;
   }
 
   .records-table {
@@ -428,12 +419,8 @@
     page-break-inside: avoid;
   }
 
-  .officials-section h4 {
-    font-size: 12pt;
-    font-weight: bold;
+  .officials-section .subsection-heading {
     margin-bottom: 10px;
-    /* stylelint-disable-next-line property-no-unknown */
-    bookmark-level: none;
   }
 
   .officials-grid {
