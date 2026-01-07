@@ -35,10 +35,10 @@
   },
   "type": "module",
   "dependencies": {
-    "@owlcms/tracker-core": "github:owlcms/tracker-core#1.0.0-rc04",
+    "@owlcms/tracker-core": "github:owlcms/tracker-core#1.0.0",
     "adm-zip": "^0.5.10",
-    "pagedjs": "0.4.3",
     "gsap": "^3.13.0",
+    "pagedjs": "0.4.3",
     "puppeteer-core": "^24.34.0",
     "ws": "^8.18.3"
   }
