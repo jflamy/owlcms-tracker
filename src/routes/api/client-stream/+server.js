@@ -78,7 +78,6 @@ export async function GET({ request, url }) {
       
       // If hub is already ready, explicitly send hub_ready so browser knows to fetch data
       if (competitionHub.isReady()) {
-        console.log(`[SSE] ${connectionId}: Hub already ready, sending hub_ready`);
         send({
           type: 'hub_ready',
           message: 'Hub ready - reconnected with data available',

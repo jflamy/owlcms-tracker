@@ -1,13 +1,18 @@
 <script>
   export let competition = {};
+  let showLogo = true;
   
   $: logoUrl = competition.frontLogoUrl;
+
+  function hideLogo() {
+    showLogo = false;
+  }
 </script>
 
 <div class="title-page">
   <div class="title-content">
-    {#if logoUrl}
-      <img src="{logoUrl}" alt="Competition Logo" class="title-logo" />
+    {#if logoUrl && showLogo}
+      <img src="{logoUrl}" alt="Competition Logo" class="title-logo" on:error={hideLogo} />
     {/if}
     <h1>{competition.name || 'Competition Name'}</h1>
     <h1>Start Book</h1>

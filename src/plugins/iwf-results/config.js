@@ -4,6 +4,7 @@ export default {
   category: 'documents',
   order: 111,
   fopRequired: false,
+  requires: ['logos_zip'],
   options: [
     {
       key: 'format',

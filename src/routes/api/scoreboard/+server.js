@@ -31,18 +31,9 @@ export async function GET({ url }) {
 			}, { status: 400 });
 		}
 
-		// Check plugin-specific preconditions (flags, logos, pictures, etc.)
-		// If resources are missing, request them from OWLCMS (async, non-blocking)
-		const pluginRequires = scoreboard?.config?.requires || [];
-		if (pluginRequires.length > 0) {
-			const { competitionHub } = await import('$lib/server/competition-hub.js');
-			const missingResources = competitionHub.checkPluginPreconditions(pluginRequires);
-			if (missingResources.length > 0) {
-				console.log(`[API /api/scoreboard] Plugin '${type}' needs: ${pluginRequires.join(', ')}. Missing: ${missingResources.join(', ')}`);
-				// Request missing resources from OWLCMS (fire and forget)
-				competitionHub.requestPluginPreconditions(missingResources);
-			}
-		}
+		// Note: Plugin resource requirements (flags, logos, pictures) are handled
+		// centrally by scoreboardRegistry.processData() which checks config.requires
+		// before invoking the plugin helper
 
 		// Extract all other parameters as options
 		const options = {};
@@ -59,7 +50,7 @@ export async function GET({ url }) {
 		// Process data using the scoreboard's helper
 		const data = await scoreboardRegistry.processData(type, fopName, options);
 		
-		console.warn('[API /api/scoreboard] Returning data with allRecords length:', data.allRecords?.length || 0);
+		// console.warn('[API /api/scoreboard] Returning data with allRecords length:', data.allRecords?.length || 0);
 		
 		return json({
 			success: true,

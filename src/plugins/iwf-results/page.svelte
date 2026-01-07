@@ -4,6 +4,7 @@
   import TitlePage from './sections/TitlePage.svelte';
   import TableOfContents from './sections/TableOfContents.svelte';
   import Participants from './sections/Participants.svelte';
+  import TechnicalOfficials from './sections/TechnicalOfficials.svelte';
   import Medals from './sections/Medals.svelte';
   import TeamPoints from './sections/TeamPoints.svelte';
   import Rankings from './sections/Rankings.svelte';
@@ -23,6 +24,17 @@
   $: format = options.format || 'complete';
   $: competitionName = competition.name || 'Competition';
   $: competitionDates = competition.dateRange || '';
+  $: timetableRoleInfo = data.technicalOfficialsTimetableRoles || [];
+  let showHeaderLeft = true;
+  let showHeaderRight = true;
+
+  function hideHeaderLeftLogo() {
+    showHeaderLeft = false;
+  }
+
+  function hideHeaderRightLogo() {
+    showHeaderRight = false;
+  }
   
   // Format current date/time for footer (local time with timezone)
   $: generationTime = (() => {
@@ -126,13 +138,13 @@
 <!-- Running elements container - positioned out of flow to not affect layout -->
 <div class="running-elements-container">
   <!-- Running elements for header logos (positioned via CSS) -->
-  {#if data.headerLeftUrl}
-    <div class="header-left-logo"><img src="{data.headerLeftUrl}" alt="Left logo" /></div>
+  {#if data.headerLeftUrl && showHeaderLeft}
+    <div class="header-left-logo"><img src="{data.headerLeftUrl}" alt="Left logo" on:error={hideHeaderLeftLogo} /></div>
   {:else}
     <div class="header-left-logo"></div>
   {/if}
-  {#if data.headerRightUrl}
-    <div class="header-right-logo"><img src="{data.headerRightUrl}" alt="Right logo" /></div>
+  {#if data.headerRightUrl && showHeaderRight}
+    <div class="header-right-logo"><img src="{data.headerRightUrl}" alt="Right logo" on:error={hideHeaderRightLogo} /></div>
   {:else}
     <div class="header-right-logo"></div>
   {/if}
@@ -165,6 +177,7 @@
       <TableOfContents {sessions} {rankings} {allRecords} {hasRecords} />
     </div>
     <Participants {data} />
+    <TechnicalOfficials {data} {timetableRoleInfo} timetableRows={[]} showPlatformColumn={false} />
     <Medals {data} />
     <TeamPoints {data} />
     <Rankings {rankings} {competition} />

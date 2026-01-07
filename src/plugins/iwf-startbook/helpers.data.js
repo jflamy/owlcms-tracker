@@ -1,5 +1,5 @@
 import { competitionHub } from '$lib/server/competition-hub.js';
-import { logger, getHeaderLogoUrl, formatCategoryDisplay, sortRecordsList } from '@owlcms/tracker-core';
+import { logger, getHeaderLogoUrl, formatCategoryDisplay, sortRecordsByFederation, sortRecordsList } from '@owlcms/tracker-core';
 import { registerCache } from '$lib/server/cache-epoch.js';
 
 const OFFICIAL_ROLE_TRANSLATION_KEYS = {
@@ -511,7 +511,7 @@ function buildAthleteAgeGroupParticipation(allAthletes, categoryMap) {
   return participationMap;
 }
 
-export function getScoreboardData(fopName = '', options = {}, locale = 'en') {
+export async function getScoreboardData(fopName = '', options = {}, locale = 'en') {
   const databaseState = competitionHub.getDatabaseState();
   const translations = competitionHub.getTranslations(locale) || {};
 
@@ -519,6 +519,8 @@ export function getScoreboardData(fopName = '', options = {}, locale = 'en') {
   if (!competitionHub.isReady()) {
     return { status: 'waiting', message: 'Waiting for competition data...' };
   }
+
+  // Note: Resource requirements (logos_zip) are handled by registry before calling this helper
 
   // Extract options
   const includeSessionStartLists = options.includeSessionStartLists !== false;
@@ -834,7 +836,7 @@ export function getScoreboardData(fopName = '', options = {}, locale = 'en') {
 
 function extractRecords(db, sessionCategories = [], isFirstSession = false) {
   const allRecords = db.records || [];
-  if (isFirstSession) logger.debug(`[extractRecords] Session 1: Starting with ${allRecords.length} total records in database`);
+
   
   // Build list of athletes with their matching criteria
   const sessionAthletes = [];
@@ -883,14 +885,7 @@ function extractRecords(db, sessionCategories = [], isFirstSession = false) {
   
   if (isFirstSession && sessionAthletes.length > 0) {
     const first = sessionAthletes[0];
-    logger.debug(`[extractRecords] Session 1: Found ${sessionAthletes.length} athletes`);
-    logger.debug(`[extractRecords] Session 1: First athlete: ${first.name}`);
-    logger.debug(`[extractRecords] Session 1: ═══ EXTRACTED VALUES FOR FILTERING ═══`);
-    logger.debug(`[extractRecords]   Category code: ${first.categoryCode}`);
-    logger.debug(`[extractRecords]   Record federations: ${first.recordFederations.length > 0 ? first.recordFederations.join(', ') : '(ALL ACCEPTABLE)'}`);
-    logger.debug(`[extractRecords]   Body weight for search: ${first.bodyWeight} kg (max category weight - 0.1)`);
-    logger.debug(`[extractRecords]   Age for search: ${first.age} years (max age for category)`);
-    logger.debug(`[extractRecords]   Gender: ${first.gender}`);
+
   }
   
   // Group records by: federation + lift + gender + ageGrp + bwCatLower + bwCatUpper
@@ -928,15 +923,15 @@ function extractRecords(db, sessionCategories = [], isFirstSession = false) {
       return;
     }
     
-    // Log first 5 records structure for Session 1
-    if (isFirstSession && !loggingComplete) {
-      loggingComplete = true;
-      logger.debug(`[extractRecords] Session 1: ═══ EXAMINING RECORDS ═══`);
-      logger.debug(`[extractRecords] Session 1: First 5 records in database:`);
-      firstRecordDetails.forEach(rec => {
-        logger.debug(`[extractRecords]   [${rec.idx}] ${rec.federation} | BW:${rec.bwRange} | Age:${rec.ageRange}(${rec.ageGrp}) | ${rec.gender} | ${rec.lift} | ${rec.name} ${rec.value}kg`);
-      });
-    }
+    // // Log first 5 records structure for Session 1
+    // if (isFirstSession && !loggingComplete) {
+    //   loggingComplete = true;
+    //   logger.debug(`[extractRecords] Session 1: ═══ EXAMINING RECORDS ═══`);
+    //   logger.debug(`[extractRecords] Session 1: First 5 records in database:`);
+    //   firstRecordDetails.forEach(rec => {
+    //     // Skipping log
+    //   });
+    // }
     
     // Check if record matches any athlete in session
     let matched = false;
@@ -956,13 +951,6 @@ function extractRecords(db, sessionCategories = [], isFirstSession = false) {
       
       if (federationMatch && genderMatch && bwMatch && ageMatch) {
         matched = true;
-        if (isFirstSession && matchedCount < 3) {
-          logger.debug(`[extractRecords] Session 1: ✓ MATCHED record [${idx}]: ${r.recordName} for ${athlete.name}`);
-          logger.debug(`[extractRecords]   Federation: ${r.recordFederation} (athlete accepts: ${athlete.recordFederations.join(', ') || 'ALL'})`);
-          logger.debug(`[extractRecords]   BW: ${athlete.bodyWeight} in [${r.bwCatLower}, ${r.bwCatUpper}]`);
-          logger.debug(`[extractRecords]   Age: ${athlete.age} in [${r.ageGrpLower}, ${r.ageGrpUpper}]`);
-          logger.debug(`[extractRecords]   Gender: ${athlete.gender} === ${r.gender}`);
-        }
         break;
       }
     }
@@ -985,13 +973,13 @@ function extractRecords(db, sessionCategories = [], isFirstSession = false) {
     }
   });
   
-  if (isFirstSession) {
-    logger.debug(`[extractRecords] Session 1: Matched ${matchedCount} records out of ${allRecords.length}`);
-    logger.debug(`[extractRecords] Session 1: Final recordMap has ${recordMap.size} unique records`);
-  }
+  // if (isFirstSession) {
+  //   logger.debug(`[extractRecords] Session 1: Matched ${matchedCount} records out of ${allRecords.length}`);
+  //   logger.debug(`[extractRecords] Session 1: Final recordMap has ${recordMap.size} unique records`);
+  // }
   
   // Convert map to array and format for display
-  const sessionRecords = sortRecordsList(
+  const sessionRecords = sortRecordsByFederation(
     Array.from(recordMap.values()).map(r => {
     const athleteTeam = getAthleteTeam(db, r.athleteName);
     const categoryString = r.bwCatString || '';
@@ -1012,14 +1000,14 @@ function extractRecords(db, sessionCategories = [], isFirstSession = false) {
     })
   );
   
-  if (isFirstSession) logger.debug(`[extractRecords] Session 1: Returning ${sessionRecords.length} formatted session records`);
+  // if (isFirstSession) logger.debug(`[extractRecords] Session 1: Returning ${sessionRecords.length} formatted session records`);
 
   return sessionRecords;
 }
 
 function extractNewRecords(db, sessionName) {
   const allRecords = db.records || [];
-  return sortRecordsList(
+  return sortRecordsByFederation(
     allRecords
       .filter(r => r.groupNameString === sessionName)
       .map(r => {
@@ -1180,26 +1168,6 @@ function formatSessionTime(timeArray) {
 function mapOfficials(session, db) {
   const officials = {};
   const toList = db.technicalOfficials || [];
-  
-  logger.error(`[mapOfficials] Called for session ${session.name}, technicalOfficials count: ${toList.length}`);
-  logger.error(`[mapOfficials] Session official fields:`, JSON.stringify({
-    referee1: session.referee1,
-    referee2: session.referee2,
-    referee3: session.referee3,
-    refereeReserve: session.refereeReserve,
-    marshall: session.marshall,
-    marshall2: session.marshall2,
-    timeKeeper: session.timeKeeper,
-    technicalController: session.technicalController,
-    technicalController2: session.technicalController2,
-    doctor: session.doctor,
-    doctor2: session.doctor2,
-    secretary: session.secretary,
-    juryPresident: session.juryPresident
-  }, null, 2));
-  if (toList.length > 0) {
-    logger.error(`[mapOfficials] First official sample:`, JSON.stringify(toList[0], null, 2));
-  }
 
   // Map session fields to officials
   const fieldMappings = {
@@ -1237,13 +1205,12 @@ function mapOfficials(session, db) {
       if (to) {
         const fullName = `${to.lastName?.toUpperCase() || ''} ${to.firstName || ''}`.trim();
         const federation = to.federation || '';
-        logger.error(`[mapOfficials] ${officialKey}: name=${officialNameOrId}, FOUND, fullName=${fullName}, federation='${federation}'`);
         officials[officialKey] = { 
           fullName,
           federation
         };
       } else {
-        logger.error(`[mapOfficials] ${officialKey}: name=${officialNameOrId} NOT FOUND in technicalOfficials list`);
+        // Fallback when the official can't be found in the technical officials list
         officials[officialKey] = { fullName: String(officialNameOrId), federation: '' };
       }
     }
@@ -1789,9 +1756,9 @@ function buildParticipationData(db) {
   }
 
   // Debug: check first few athletes
-  athletes.slice(0, 3).forEach((a, i) => {
-    logger.debug(`[Participation] Athlete ${i}: team=${a.team} (type: ${typeof a.team}), categoryCode=${a.categoryCode}, participations=${JSON.stringify(a.participations?.length || 0)}`);
-  });
+  // athletes.slice(0, 3).forEach((a, i) => {
+  //   logger.debug(`[Participation] Athlete ${i}: team=${a.team} (type: ${typeof a.team}), categoryCode=${a.categoryCode}, participations=${JSON.stringify(a.participations?.length || 0)}`);
+  // });
 
   // Process each athlete's participations
   athletes.forEach(a => {
@@ -1853,10 +1820,7 @@ function buildParticipationData(db) {
   }
 
   // Build output for each championship
-  logger.debug(`[Participation] Championship map size: ${championshipMap.size}`);
-  championshipMap.forEach((v, k) => {
-    logger.debug(`[Participation] Championship "${k}": ${v.teamCounts.size} teams, ${v.womenCatSet.size} women cats, ${v.menCatSet.size} men cats`);
-  });
+  // No debug logging
   
   const championships = Array.from(championshipMap.values()).map(champ => {
     // Sort by weight using the lookup
@@ -1867,8 +1831,8 @@ function buildParticipationData(db) {
     const womenCategories = womenCatCodes.map(code => ({ code, name: catToName.get(code) || code }));
     const menCategories = menCatCodes.map(code => ({ code, name: catToName.get(code) || code }));
     
-    logger.debug(`[Participation] Women categories: ${JSON.stringify(womenCategories)}`);
-    logger.debug(`[Participation] Men categories: ${JSON.stringify(menCategories)}`);
+    // logger.debug(`[Participation] Women categories: ${JSON.stringify(womenCategories)}`);
+    // logger.debug(`[Participation] Men categories: ${JSON.stringify(menCategories)}`);
 
     // Sort teams alphabetically
     const teams = Array.from(champ.teamCounts.keys()).sort((a, b) => a.localeCompare(b));
@@ -1913,7 +1877,6 @@ function buildParticipationData(db) {
 
   logger.debug(`[Participation] Returning ${championships.length} championships`);
   championships.forEach(c => {
-    logger.warn(`[Participation] Championship ${c.name}: rows=${c.rows?.length || 0}, womenCats=${c.womenCategories.length}, menCats=${c.menCategories.length}`);
   });
   if (championships.length > 0) {
     logger.debug(`[Participation] First championship has ${championships[0].rows?.length} rows`);

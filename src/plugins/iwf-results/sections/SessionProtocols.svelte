@@ -288,7 +288,7 @@
   }
 
   .session-page {
-    page-break-after: always;
+    page-break-before: always;
     padding: 20px;
     position: relative;
     background: white;
@@ -366,12 +366,15 @@
     margin-top: 15px;
     margin-bottom: 15px;
     page-break-inside: avoid;
+    break-inside: avoid;
   }
 
   .subsection-heading {
     font-size: 12pt;
     font-weight: bold;
     margin: 8px 0 5px 0;
+    page-break-after: avoid;
+    break-after: avoid;
   }
 
   .records-table {
@@ -381,6 +384,8 @@
     font-size: 9px;
     border: none;
     table-layout: auto;
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
 
   .records-table th,

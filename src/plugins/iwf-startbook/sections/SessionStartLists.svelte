@@ -280,7 +280,7 @@
 
   .session-page {
     padding: 0 20px 20px 20px;
-    page-break-after: always;
+    page-break-before: always;
   }
 
   .session-heading {
@@ -355,17 +355,20 @@
   :global(.records-section) {
     margin-top: 15px;
     margin-bottom: 15px;
-    page-break-inside: avoid;
     background: transparent;
     padding: 0;
     border: none;
     border-radius: 0;
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
 
   .subsection-heading {
     margin: 8px 0 5px 0;
     font-size: 12pt;
     font-weight: bold;
+    page-break-after: avoid;
+    break-after: avoid;
   }
 
   .records-table {
@@ -375,6 +378,8 @@
     font-size: 9px;
     border: none;
     table-layout: fixed;
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
 
   .records-table th,

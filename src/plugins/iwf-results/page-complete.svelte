@@ -146,14 +146,6 @@
     font-size: 14pt;
   }
 
-  /* Ensure tables don't break across pages */
-  :global(.protocol-table),
-  :global(.records-table),
-  :global(.officials-grid) {
-    page-break-inside: avoid;
-    break-inside: avoid;
-  }
-
   /* Print-specific styles */
   @media print {
     .document-container {

@@ -1,7 +1,51 @@
 import { competitionHub } from '$lib/server/competition-hub.js';
-import { logger, getHeaderLogoUrl, formatCategoryDisplay, sortRecordsList } from '@owlcms/tracker-core';
+import { logger, getHeaderLogoUrl, formatCategoryDisplay, sortRecordsByFederation, sortRecordsList } from '@owlcms/tracker-core';
 import { calculateTeamPoints } from '$lib/server/team-points-formula.js';
 import { registerCache } from '$lib/server/cache-epoch.js';
+
+const OFFICIAL_ROLE_TRANSLATION_KEYS = {
+  REFEREE: 'Referee',
+  CENTER_REFEREE: 'CenterReferee',
+  LEFT_REFEREE: 'SideReferee',
+  RIGHT_REFEREE: 'SideReferee',
+  REFEREE_RESERVE: 'ReserveReferee',
+  MARSHAL1: 'ChiefMarshal',
+  MARSHAL2: 'AssistantMarshal',
+  MARSHALL: 'Marshall',
+  MARSHAL: 'Marshall',
+  TIMEKEEPER: 'Timekeeper',
+  TECHNICAL_CONTROLLER: 'TechnicalController',
+  TECHNICAL_CONTROLLER1: 'TechnicalController',
+  TECHNICAL_CONTROLLER2: 'TechnicalController',
+  DOCTOR: 'Doctor',
+  DOCTOR2: 'Doctor',
+  DOCTOR3: 'Doctor',
+  COMPETITION_SECRETARY: 'CompetitionSecretary',
+  COMPETITION_SECRETARY2: 'CompetitionSecretary',
+  ANNOUNCER: 'Announcer',
+  WEIGHIN1: 'Weighin',
+  WEIGHIN2: 'Weighin',
+  JURY_PRESIDENT: 'JuryPresident',
+  JURY_MEMBER: 'JuryMember',
+  JURY_A: 'JuryMember',
+  JURY_B: 'JuryMember',
+  JURY_C: 'JuryMember',
+  JURY_D: 'JuryMember',
+  JURY_RESERVE: 'ReserveJury',
+  JURY: 'Jury'
+};
+
+const OFFICIAL_ROLE_PRESENTATION_ORDER = [
+  'JURY',
+  'JURY_PRESIDENT',
+  'JURY_MEMBER',
+  'REFEREE',
+  'MARSHAL',
+  'MARSHALL',
+  'TIMEKEEPER',
+  'TECHNICAL_CONTROLLER',
+  'DOCTOR'
+];
 
 /**
  * Plugin-specific cache to avoid recomputing on every browser request
@@ -9,7 +53,7 @@ import { registerCache } from '$lib/server/cache-epoch.js';
 const protocolCache = new Map();
 registerCache(protocolCache);
 
-export function getScoreboardData(fopName = '', options = {}, locale = 'en') {
+export async function getScoreboardData(fopName = '', options = {}, locale = 'en') {
   const databaseState = competitionHub.getDatabaseState();
   const translations = competitionHub.getTranslations(locale) || {};
 
@@ -17,6 +61,8 @@ export function getScoreboardData(fopName = '', options = {}, locale = 'en') {
   if (!competitionHub.isReady()) {
     return { status: 'waiting', message: 'Waiting for competition data...' };
   }
+
+  // Note: Resource requirements (logos_zip) are handled by registry before calling this helper
 
   // 🎯 FILTERING: If no session specified, use all sessions combined
   const sessionFilter = options.session;
@@ -167,16 +213,35 @@ export function getScoreboardData(fopName = '', options = {}, locale = 'en') {
   const participants = buildParticipationData(databaseState);
 
   // Cache and return
-  logger.warn('[getScoreboardData] allRecordsData:', {
-    hasRecords: allRecordsData.hasRecords,
-    newRecordsBroken: allRecordsData.newRecordsBroken,
-    recordsLength: allRecordsData.records?.length
-  });
+  // logger.warn('[getScoreboardData] allRecordsData:', {
+  //   hasRecords: allRecordsData.hasRecords,
+  //   newRecordsBroken: allRecordsData.newRecordsBroken,
+  //   recordsLength: allRecordsData.records?.length
+  // });
   
   // Resolve header logos (scan for available image formats)
   const headerLeftUrl = getHeaderLogoUrl({ baseNames: ['header_left', 'left'] });
   const headerRightUrl = getHeaderLogoUrl({ baseNames: ['header_right', 'right'] });
   const frontLogoUrl = getHeaderLogoUrl({ baseNames: ['front'] });
+  
+  // Get technical officials data and build role info for display
+  const technicalOfficials = competitionHub.getTechnicalOfficials?.() || [];
+  const uniqueRoleCategories = [...new Set(technicalOfficials.map(o => o.teamRole))];
+  
+  // Build role info ordered by presentation order (exclude JURY_PRESIDENT - it's handled within JURY team)
+  const orderedRoles = OFFICIAL_ROLE_PRESENTATION_ORDER.filter(r => uniqueRoleCategories.includes(r) && r !== 'JURY_PRESIDENT');
+  const extraRoles = uniqueRoleCategories.filter(r => !orderedRoles.includes(r) && r !== 'JURY_PRESIDENT').sort();
+  const technicalOfficialsTimetableRoles = [...orderedRoles, ...extraRoles].map(roleCategory => ({
+    roleCategory,
+    translationKey: OFFICIAL_ROLE_TRANSLATION_KEYS[roleCategory] || roleCategory
+  }));
+  
+  // Pre-translate official role names for client-side display
+  const officialRoleLabels = {};
+  uniqueRoleCategories.forEach(roleCategory => {
+    const translationKey = OFFICIAL_ROLE_TRANSLATION_KEYS[roleCategory] || roleCategory;
+    officialRoleLabels[roleCategory] = translations[translationKey] || roleCategory;
+  });
   
   const processedData = {
     competition: {
@@ -190,6 +255,9 @@ export function getScoreboardData(fopName = '', options = {}, locale = 'en') {
     newRecordsBroken: allRecordsData.newRecordsBroken,
     headerLeftUrl,
     headerRightUrl,
+    technicalOfficials,
+    technicalOfficialsTimetableRoles,
+    officialRoleLabels,
     medals,
     teamPoints,
     participants,
@@ -232,10 +300,10 @@ export function getScoreboardData(fopName = '', options = {}, locale = 'en') {
   };
 
   protocolCache.set(cacheKey, processedData);
-  logger.warn('[getScoreboardData] Returning data with allRecords length:', processedData.allRecords?.length || 0);
-  if (processedData.allRecords && processedData.allRecords.length > 0) {
-    logger.warn('[getScoreboardData] allRecords[0]:', processedData.allRecords[0]);
-  }
+  // logger.warn('[getScoreboardData] Returning data with allRecords length:', processedData.allRecords?.length || 0);
+  // if (processedData.allRecords && processedData.allRecords.length > 0) {
+  //   logger.warn('[getScoreboardData] allRecords[0]:', processedData.allRecords[0]);
+  // }
   return processedData;
 }
 
@@ -273,12 +341,12 @@ function extractRecords(db, categoryCodes) {
     });
   });
 
-  return sortRecordsList(sessionRecords);
+  return sortRecordsByFederation(sessionRecords);
 }
 
 function extractNewRecords(db, sessionName) {
   const allRecords = db.records || [];
-  return sortRecordsList(
+  return sortRecordsByFederation(
     allRecords
       .filter(r => r.groupNameString === sessionName)
       .map(r => {
@@ -787,11 +855,10 @@ function buildAllRecordsData(db) {
 function buildParticipationData(db) {
   logger.warn('[Participation] buildParticipationData: start');
   const athletes = db?.athletes || [];
-  logger.debug(`[Participation] Athletes count: ${athletes.length}`);
   if (athletes.length === 0) return { championships: [] };
 
   const ageGroups = db?.ageGroups || [];
-  logger.debug(`[Participation] Age groups count: ${ageGroups.length}`);
+  // logger.debug(`[Participation] Age groups count: ${ageGroups.length}`);
 
   // Build team ID to name lookup
   const teamIdToName = new Map();
@@ -800,8 +867,6 @@ function buildParticipationData(db) {
       teamIdToName.set(t.id, t.name);
     }
   });
-  logger.debug(`[Participation] Teams lookup size: ${teamIdToName.size}`);
-
   // Build category-to-championship lookup AND category name lookup
   const catToChampionship = new Map();
   const catToName = new Map();  // catCode -> categoryName for display
@@ -861,9 +926,7 @@ function buildParticipationData(db) {
   }
 
   // Debug: check first few athletes
-  athletes.slice(0, 3).forEach((a, i) => {
-    logger.debug(`[Participation] Athlete ${i}: team=${a.team} (type: ${typeof a.team}), categoryCode=${a.categoryCode}, participations=${JSON.stringify(a.participations?.length || 0)}`);
-  });
+  // Sample athletes debug removed
 
   // Process each athlete's participations
   athletes.forEach(a => {
@@ -925,10 +988,6 @@ function buildParticipationData(db) {
   }
 
   // Build output for each championship
-  logger.debug(`[Participation] Championship map size: ${championshipMap.size}`);
-  championshipMap.forEach((v, k) => {
-    logger.debug(`[Participation] Championship "${k}": ${v.teamCounts.size} teams, ${v.womenCatSet.size} women cats, ${v.menCatSet.size} men cats`);
-  });
   
   const championships = Array.from(championshipMap.values()).map(champ => {
     // Sort by weight using the lookup
@@ -938,9 +997,6 @@ function buildParticipationData(db) {
     // Build category objects with code and name
     const womenCategories = womenCatCodes.map(code => ({ code, name: catToName.get(code) || code }));
     const menCategories = menCatCodes.map(code => ({ code, name: catToName.get(code) || code }));
-    
-    logger.debug(`[Participation] Women categories: ${JSON.stringify(womenCategories)}`);
-    logger.debug(`[Participation] Men categories: ${JSON.stringify(menCategories)}`);
 
     // Sort teams alphabetically
     const teams = Array.from(champ.teamCounts.keys()).sort((a, b) => a.localeCompare(b));
@@ -985,11 +1041,8 @@ function buildParticipationData(db) {
 
   logger.debug(`[Participation] Returning ${championships.length} championships`);
   championships.forEach(c => {
-    logger.warn(`[Participation] Championship ${c.name}: rows=${c.rows?.length || 0}, womenCats=${c.womenCategories.length}, menCats=${c.menCategories.length}`);
+    logger.debug(`[Participation] Championship ${c.name}: rows=${c.rows?.length || 0}, womenCats=${c.womenCategories.length}, menCats=${c.menCategories.length}`);
   });
-  if (championships.length > 0) {
-    logger.debug(`[Participation] First championship has ${championships[0].rows?.length} rows`);
-  }
 
   logger.warn('[Participation] buildParticipationData: end');
 

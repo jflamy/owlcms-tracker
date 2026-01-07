@@ -13,6 +13,7 @@
  */
 
 import { bumpCacheEpoch } from './cache-epoch.js';
+import { competitionHub } from './competition-hub.js';
 
 // Eager imports so Vite includes all plugins at build time
 // Note: import.meta.glob is a Vite COMPILE-TIME feature - it gets transformed
@@ -130,6 +131,9 @@ class ScoreboardRegistry {
 
 	/**
 	 * Process data for a specific scoreboard type
+	 * 
+	 * Resource preconditions (config.requires) are checked only on cache miss.
+	 * If a valid cache entry exists, resources were already loaded when it was built.
 	 */
 	async processData(type, fopName, options = {}) {
 		const scoreboard = this.getScoreboard(type);
@@ -140,6 +144,21 @@ class ScoreboardRegistry {
 
 		if (!scoreboard.dataHelper) {
 			throw new Error(`Scoreboard ${type} has no data helper`);
+		}
+
+		// Resource preconditions are checked inside helpers on cache miss.
+		// Helpers call competitionHub methods which short-circuit if already loaded.
+		// We move the check here to centralize it, but helpers still have caching.
+		// 
+		// Note: ensurePluginPreconditions is fast when resources are loaded (flag check only).
+		// We could skip this on cache hit, but that requires helpers to return cache status.
+		// Current design: check every time (fast path) for simplicity.
+		const requires = scoreboard.config?.requires || [];
+		if (requires.length > 0) {
+			const ready = await competitionHub.ensurePluginPreconditions(requires);
+			if (!ready) {
+				return { status: 'waiting', message: 'Waiting for resources...' };
+			}
 		}
 
 		// Call the scoreboard's data processing function

@@ -201,6 +201,18 @@ if (!trackerCoreVersion) {
     if (!tagExists) {
       console.error(`❌ Error: tracker-core version '${trackerCoreVersion}' does not exist`);
       console.error('Available versions can be found at: https://github.com/owlcms/tracker-core/tags');
+      const runTrackerCoreRelease = await promptConfirmation('Do you want to run the tracker-core release script now?');
+      if (runTrackerCoreRelease) {
+        console.log('\n▶️  Running tracker-core release...');
+        try {
+          execSync(`cd ../tracker-core && npm run release -- ${trackerCoreVersion}`, { stdio: 'inherit' });
+          console.log('\n✅ tracker-core release finished. Please re-run this tracker release once the tracker-core release succeeds.');
+        } catch (error) {
+          console.error('\n❌ tracker-core release failed:', error.message);
+        }
+      } else {
+        console.log('\nℹ️  Skipping tracker-core release. Please run tracker-core/scripts/release.js before proceeding.');
+      }
       process.exit(1);
     }
     console.log(`✓ Version ${trackerCoreVersion} exists\n`);
