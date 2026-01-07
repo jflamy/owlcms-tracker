@@ -22,9 +22,11 @@
   }
 </script>
 
+<div class="title-page-category-participants">
+  <h1 class="title-page-header">Category Participants</h1>
+</div>
+
 <div class="section-page" id="category-participants">
-  <h1 class="section-header">Category Participants</h1>
-  
   {#each rankings as championship, champIndex}
     {@const firstCategory = { value: true }}
     {#each championship.genders as genderGroup, genderIndex}
@@ -73,6 +75,30 @@
 </div>
 
 <style>
+  .title-page-category-participants {
+    height: 167mm !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    background: white;
+    overflow: hidden;
+    break-inside: avoid;
+    break-after: page;
+    page-break-before: always;
+  }
+
+  .title-page-header {
+    font-size: 20pt;
+    font-weight: bold;
+    border-bottom: 2pt solid #333;
+    padding-bottom: 10pt;
+    /* stylelint-disable property-no-unknown */
+    bookmark-level: 1;
+    bookmark-label: "Category Participants";
+    /* stylelint-enable property-no-unknown */
+  }
+
   .section-page {
     background: white;
   }
@@ -87,8 +113,8 @@
     padding-bottom: 10pt;
     width: 100%;
     /* stylelint-disable property-no-unknown */
-    bookmark-level: 1; /* non-standard property for PDF bookmarks */
-    bookmark-label: "Category Participants"; /* non-standard property for PDF bookmarks */
+    bookmark-level: 1;
+    bookmark-label: "Category Participants";
     /* stylelint-enable property-no-unknown */
   }
 

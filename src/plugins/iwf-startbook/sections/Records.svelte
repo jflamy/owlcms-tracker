@@ -18,16 +18,18 @@
 </script>
 
 {#if hasRecords}
+<div class="title-page-records">
+  <h1 class="title-page-header">Records</h1>
+</div>
+
 <div class="records-section-page" id="records">
-  <h1 class="section-header">Records</h1>
-  
   {#if !newRecordsBroken}
     <div class="no-records">No records were broken.</div>
   {:else if !allRecords || allRecords.length === 0}
     <div class="no-records">No new records to display.</div>
   {:else}
-    {#each allRecords as fed}
-      <div class="federation-page">
+    {#each allRecords as fed, fedIndex}
+      <div class="federation-page" class:first-federation={fedIndex === 0}>
         {#each fed.genders as genderGroup}
           {#each genderGroup.ageGroups as ageGroup}
             <div class="record-block" id="records-{slugify(fed.federation)}-{slugify(genderGroup.genderName)}-{slugify(ageGroup.name)}">
@@ -69,6 +71,19 @@
 {/if}
 
 <style>
+  .title-page-records {
+    height: 167mm !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    background: white;
+    overflow: hidden;
+    break-inside: avoid;
+    break-after: page;
+    page-break-before: always;
+  }
+
   /* Column widths: holder column is 2x others */
   .records-table th,
   .records-table td {
@@ -77,6 +92,17 @@
   .records-table .holder-col {
     width: 28.56%;
   }
+  .title-page-header {
+    font-size: 20pt;
+    font-weight: bold;
+    border-bottom: 2pt solid #333;
+    padding-bottom: 10pt;
+    /* stylelint-disable-next-line property-no-unknown */
+    bookmark-level: 1;
+    /* stylelint-disable-next-line property-no-unknown */
+    bookmark-label: "Records";
+  }
+
   .section-header {
     font-size: 20pt;
     font-weight: bold;
@@ -95,11 +121,17 @@
     margin-bottom: 12pt;
     border-radius: 0;
     background: none;
-    page-break-before: always;
     page-break-inside: avoid;
     /* stylelint-disable-next-line property-no-unknown */
     bookmark-level: 2;
   }
+
+  /* Only break before 2nd+ federations */
+  .federation-page:not(.first-federation) {
+    page-break-before: always;
+    break-before: page;
+  }
+
   .record-title {
     font-size: 14pt;
     font-weight: bold;

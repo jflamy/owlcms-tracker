@@ -38,9 +38,11 @@
   }
 </script>
 
+<div class="title-page-rankings">
+  <h1 class="title-page-header">Rankings</h1>
+</div>
+
 <div class="section-page" id="rankings">
-  <h1 class="section-header">Rankings</h1>
-  
   {#each rankings as championship, champIndex}
     {@const firstCategory = { value: true }}
     {#each championship.genders as genderGroup, genderIndex}
@@ -109,8 +111,32 @@
 </div>
 
 <style>
+  .title-page-rankings {
+    height: 167mm !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    background: white;
+    overflow: hidden;
+    break-inside: avoid;
+    break-after: page;
+    page-break-before: always;
+  }
+
   .section-page {
     background: white;
+  }
+
+  .title-page-header {
+    font-size: 20pt;
+    font-weight: bold;
+    border-bottom: 2pt solid #333;
+    padding-bottom: 10pt;
+    /* stylelint-disable property-no-unknown */
+    bookmark-level: 1;
+    bookmark-label: "Rankings";
+    /* stylelint-enable property-no-unknown */
   }
 
   .section-header {
@@ -123,8 +149,8 @@
     padding-bottom: 10pt;
     width: 100%;
     /* stylelint-disable property-no-unknown */
-    bookmark-level: 1; /* non-standard property for PDF bookmarks */
-    bookmark-label: "Rankings"; /* non-standard property for PDF bookmarks */
+    bookmark-level: 1;
+    bookmark-label: "Rankings";
     /* stylelint-enable property-no-unknown */
   }
 

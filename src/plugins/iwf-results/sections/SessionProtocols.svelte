@@ -47,12 +47,15 @@
   }
 </script>
 
+<div class="title-page-protocols">
+  <h1 class="title-page-header">Session Protocols</h1>
+</div>
+
 <div class="protocols-section" id="protocols">
-  <h1 class="section-header">Session Protocols</h1>
-  
-  {#each sessions as session}
+  {#each sessions as session, sessionIndex}
     <div
       class="session-page"
+      class:first-session={sessionIndex === 0}
       id="session-{session.name}"
     >
       <h4 class="session-heading">Session {session.name} : {session.description} {session.startTime}</h4>
@@ -273,25 +276,55 @@
 </div>
 
 <style>
-  .section-header {
+  .title-page-protocols {
+    height: 167mm !important; /* A4 landscape height (210mm) minus margins (25mm+15mm) */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    background: white;
+    overflow: hidden;
+    break-inside: avoid;
+    break-after: page;
+    page-break-before: always;
+  }
+
+  .title-page-header {
     font-size: 20pt;
     font-weight: bold;
-    text-align: center;
-    margin: 30pt 0 20pt 0;
-    page-break-before: always;
     border-bottom: 2pt solid #333;
     padding-bottom: 10pt;
     /* stylelint-disable property-no-unknown */
-    bookmark-level: 1; /* non-standard property for PDF bookmarks */
-    bookmark-label: "Session Protocols"; /* non-standard property for PDF bookmarks */
+    bookmark-level: 1;
+    bookmark-label: "Session Protocols";
     /* stylelint-enable property-no-unknown */
   }
 
+  .section-header {
+    font-size: 20pt;
+    font-weight: bold;
+    border-bottom: 2pt solid #333;
+    padding-bottom: 10pt;
+    /* stylelint-disable property-no-unknown */
+    bookmark-level: 1;
+    bookmark-label: "Session Protocols";
+    /* stylelint-enable property-no-unknown */
+  }
+
+  .protocols-section {
+    background: white;
+  }
+
   .session-page {
-    page-break-before: always;
     padding: 20px;
     position: relative;
     background: white;
+  }
+
+  /* Only break before 2nd+ sessions */
+  .session-page:not(.first-session) {
+    page-break-before: always;
+    break-before: page;
   }
 
   .session-heading {

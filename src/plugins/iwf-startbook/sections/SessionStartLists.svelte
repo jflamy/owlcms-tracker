@@ -42,12 +42,15 @@
   }
 </script>
 
+<div class="title-page-session-start-lists">
+  <h1 class="title-page-header">Session Start Lists</h1>
+</div>
+
 <div class="session-start-lists-section" id="session-start-lists">
-  <h1 class="section-header">Session Start Lists</h1>
-  
-  {#each sessions as session}
+  {#each sessions as session, sessionIndex}
     <div
       class="session-page"
+      class:first-session={sessionIndex === 0}
       id="session-{session.name}"
     >
       <h4 class="session-heading">Session {session.name} : {session.description} {session.startTime}</h4>
@@ -259,8 +262,32 @@
 </div>
 
 <style>
+  .title-page-session-start-lists {
+    height: 167mm !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    background: white;
+    overflow: hidden;
+    break-inside: avoid;
+    break-after: page;
+    page-break-before: always;
+  }
+
   .session-start-lists-section {
     background: white;
+  }
+
+  .title-page-header {
+    font-size: 20pt;
+    font-weight: bold;
+    border-bottom: 2pt solid #333;
+    padding-bottom: 10pt;
+    /* stylelint-disable-next-line property-no-unknown */
+    bookmark-level: 1;
+    /* stylelint-disable-next-line property-no-unknown */
+    bookmark-label: "Session Start Lists";
   }
 
   .section-header {
@@ -280,7 +307,12 @@
 
   .session-page {
     padding: 0 20px 20px 20px;
+  }
+
+  /* Only break before 2nd+ sessions */
+  .session-page:not(.first-session) {
     page-break-before: always;
+    break-before: page;
   }
 
   .session-heading {
