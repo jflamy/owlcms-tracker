@@ -44,13 +44,15 @@
   {#each rankings as championship, champIndex}
     {@const firstCategory = { value: true }}
     {#each championship.genders as genderGroup, genderIndex}
-      <h2 class="championship-header" class:page-break-before={champIndex > 0 || genderIndex > 0}>{championship.name} - {genderGroup.genderName}</h2>
-
       {#each genderGroup.categories as category, catIndex}
         {@const athleteChunks = chunk(category.items, 20)}
         {@const totalChunks = athleteChunks.length}
         {#each athleteChunks as athleteChunk, chunkIndex}
+          {@const isFirstInGender = catIndex === 0 && chunkIndex === 0}
           <div class="category-block" class:page-break-before={!firstCategory.value} id="ranking-{slugify(championship.name)}-{slugify(genderGroup.genderName)}-{slugify(category.categoryName)}-{chunkIndex}">
+            {#if isFirstInGender}
+              <h2 class="championship-header">{championship.name} - {genderGroup.genderName}</h2>
+            {/if}
             <table class="protocol-table">
               <thead>
                 <tr>

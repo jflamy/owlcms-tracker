@@ -11,35 +11,49 @@
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/(^-|-$)/g, '');
   }
+
+  // Split array into chunks of max 20 items
+  function chunk(arr, size = 20) {
+    const chunks = [];
+    for (let i = 0; i < arr.length; i += size) {
+      chunks.push(arr.slice(i, i + size));
+    }
+    return chunks;
+  }
 </script>
 
 <div class="section-page" id="category-participants">
   <h1 class="section-header">Category Participants</h1>
   
   {#each rankings as championship, champIndex}
+    {@const firstCategory = { value: true }}
     {#each championship.genders as genderGroup, genderIndex}
-      <div class="participant-block" class:page-break={champIndex > 0 || genderIndex > 0}>
-        <h2 class="championship-header">{championship.name} - {genderGroup.genderName}</h2>
-
-        {#each genderGroup.categories as category, catIndex}
-          <div class="category-block" id="catparticipant-{slugify(championship.name)}-{slugify(genderGroup.genderName)}-{slugify(category.categoryName)}">
+      {#each genderGroup.categories as category, catIndex}
+        {@const athleteChunks = chunk(category.items, 20)}
+        {@const totalChunks = athleteChunks.length}
+        {#each athleteChunks as athleteChunk, chunkIndex}
+          {@const isFirstInGender = catIndex === 0 && chunkIndex === 0}
+          <div class="category-block" class:page-break-before={!firstCategory.value} id="catparticipant-{slugify(championship.name)}-{slugify(genderGroup.genderName)}-{slugify(category.categoryName)}-{chunkIndex}">
+            {#if isFirstInGender}
+              <h2 class="championship-header">{championship.name} - {genderGroup.genderName}</h2>
+            {/if}
             <table class="protocol-table">
-                <thead>
-                  <tr>
-                    <th class="col-lot">Lot</th>
-                    <th class="col-name">Last Name</th>
-                    <th class="col-firstname">First Name</th>
-                    <th class="col-team">Team</th>
-                    <th class="col-bw">B.W.</th>
-                    <th class="col-born">Born</th>
-                    <th class="col-total">Entry Total</th>
-                  </tr>
-                </thead>
+              <thead>
+                <tr>
+                  <th class="col-lot">Lot</th>
+                  <th class="col-name">Last Name</th>
+                  <th class="col-firstname">First Name</th>
+                  <th class="col-team">Team</th>
+                  <th class="col-bw">B.W.</th>
+                  <th class="col-born">Born</th>
+                  <th class="col-total">Entry Total</th>
+                </tr>
+              </thead>
               <tbody>
                 <tr class="category-row">
-                  <td colspan="7">{category.categoryName}</td>
+                  <td colspan="7">{category.categoryName}{totalChunks > 1 ? ` (${chunkIndex + 1}/${totalChunks})` : ''}{void (firstCategory.value = false)}</td>
                 </tr>
-                {#each category.items as athlete}
+                {#each athleteChunk as athlete}
                   <tr>
                     <td class="col-lot">{athlete.lotNumber}</td>
                     <td class="col-name">{athlete.lastName}</td>
@@ -53,10 +67,8 @@
               </tbody>
             </table>
           </div>
-          <!-- Spacer between categories for page break control -->
-          <div class="category-spacer"></div>
         {/each}
-      </div>
+      {/each}
     {/each}
   {/each}
 </div>
@@ -81,18 +93,9 @@
     bookmark-label: "Category Participants"; /* non-standard property for PDF bookmarks */
   }
 
-  .participant-block {
-    padding: 0 20px 20px 20px;
-    background: white;
-  }
-
   .category-block {
     /* stylelint-disable-next-line property-no-unknown */
     bookmark-level: 2; /* non-standard property for PDF bookmarks */
-  }
-  
-  .page-break {
-    page-break-before: always;
   }
 
   .championship-header {
@@ -162,8 +165,9 @@
     break-inside: avoid;
   }
 
-  /* Spacer between categories - this is where page breaks can occur */
-  .category-spacer {
-    height: 8pt;
+  /* Page break before 2nd+ category blocks */
+  .category-block.page-break-before {
+    break-before: page;
+    page-break-before: always;
   }
 </style>
