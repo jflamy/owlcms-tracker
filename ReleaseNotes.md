@@ -13,6 +13,7 @@
 > which as an option to do the connection.
 
 ## New in Release 2.5
+- 2.5.1: Fixed bookmark genearation in PDF.  Currently generating PDF requires `npm run build` and `node ./start-with-ws.js`
 - 2.5.0: Full versions of IWF-style start book and results book are available as examples when checking out
 - 2.5.0: Logos can be used (see the iwf-starbook and iwf-results), tracker-core used for asset resolution.)
 
