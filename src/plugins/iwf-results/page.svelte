@@ -78,40 +78,42 @@
       }
       window.__pagedjs_started = true;
       
-      // Set up Paged.js completion handler BEFORE loading the script
-      // Use auto: false and manually trigger after DOM is stable
+      // Disable auto-start - we'll trigger manually after DOM is stable
       window.PagedConfig = {
-        auto: false,
-        after: () => {
-          console.log('[Paged.js] Rendering complete, setting ready flag');
-          setTimeout(() => {
-            window.__pagedjs_ready = true;
-            console.log('[Paged.js] Ready flag set');
-          }, 500);
-        }
+        auto: false
       };
       
       const script = document.createElement('script');
       // Use locally bundled Paged.js (pinned to 0.4.3)
-      script.src = '/node_modules/pagedjs/dist/paged.polyfill.js';
+      script.src = '/paged.polyfill.js';
       script.onload = () => {
         // Wait for DOM to stabilize, then trigger Paged.js manually
         console.log('[Paged.js] Script loaded, waiting for DOM to stabilize...');
-        setTimeout(() => {
+        setTimeout(async () => {
           console.log('[Paged.js] Triggering preview...');
           if (window.PagedPolyfill) {
-            window.PagedPolyfill.preview();
+            try {
+              // preview() returns a Promise that resolves when rendering is complete
+              await window.PagedPolyfill.preview();
+              console.log('[Paged.js] Preview complete, setting ready flag');
+              window.__pagedjs_ready = true;
+            } catch (err) {
+              console.error('[Paged.js] Preview error:', err);
+              window.__pagedjs_ready = true; // Set anyway so PDF generation doesn't hang
+            }
           }
         }, 100);
       };
       document.head.appendChild(script);
       
-      // Safety timeout: if Paged.js takes more than 30 seconds, something is wrong
+      // Safety timeout: if Paged.js takes more than 3 minutes, something is wrong
+      // Large documents (80+ pages) can legitimately take 2+ minutes to render
       setTimeout(() => {
         if (!window.__pagedjs_ready) {
-          console.error('[Paged.js] Timeout - layout taking too long, may be stuck in loop');
+          console.error('[Paged.js] Timeout after 3 minutes - layout taking too long, may be stuck in loop');
+          window.__pagedjs_ready = true; // Force ready so PDF generation can proceed
         }
-      }, 30000);
+      }, 180000);
     }
   });
 </script>

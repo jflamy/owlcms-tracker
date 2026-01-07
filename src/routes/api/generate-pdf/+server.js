@@ -11,6 +11,23 @@ import puppeteer from 'puppeteer-core';
 import { findChrome } from '$lib/server/chrome-finder.js';
 
 export async function GET({ url }) {
+	// Check if we're in dev mode - self-requests cause deadlock
+	const isDev = process.env.NODE_ENV === 'development';
+	if (isDev) {
+		return new Response(JSON.stringify({
+			success: false,
+			error: 'PDF generation not available in dev mode',
+			message: 'The SvelteKit dev server cannot handle self-requests. To generate PDFs:\n\n' +
+				'1. Build the app: npm run build\n' +
+				'2. Run production: npm run preview\n' +
+				'3. Then use the PDF generation\n\n' +
+				'Or open the document in your browser and use Print → Save as PDF'
+		}), {
+			status: 503,
+			headers: { 'Content-Type': 'application/json' }
+		});
+	}
+	
 	try {
 		// Extract parameters
 		const type = url.searchParams.get('type') || 'iwf-results';
@@ -53,6 +70,10 @@ export async function GET({ url }) {
 		
 		const page = await browser.newPage();
 		
+		// Set a large viewport to ensure all content is visible
+		// Paged.js needs to see the full content to paginate correctly
+		await page.setViewport({ width: 1200, height: 800 });
+		
 		// Capture console messages from the browser for debugging
 		page.on('console', msg => {
 			console.log(`[Browser Console] ${msg.type()}: ${msg.text()}`);
@@ -62,21 +83,56 @@ export async function GET({ url }) {
 			console.error(`[Browser Error] ${err.message}`);
 		});
 		
-		// Navigate to the scoreboard page - use 'load' instead of 'networkidle0' for faster initial load
+		// Navigate to the scoreboard page
+		// Use 'domcontentloaded' - networkidle0 may never fire due to Vite HMR websocket
+		console.log(`[PDF Generator] Loading page: ${scoreboardUrl}`);
 		await page.goto(scoreboardUrl, {
-			waitUntil: 'load',
-			timeout: 30000
+			waitUntil: 'domcontentloaded',
+			timeout: 60000
 		});
+		console.log('[PDF Generator] DOM loaded, waiting for content to render...');
+		
+		// Give Svelte time to hydrate and render all content
+		await new Promise(resolve => setTimeout(resolve, 2000));
 		
 		// Wait for Paged.js to finish rendering
 		// Paged.js adds .pagedjs_pages class when done
-		await page.waitForSelector('.pagedjs_pages', { timeout: 60000 });
+		// Large documents (80+ pages) may take 2-3 minutes to render
+		console.log('[PDF Generator] Waiting for Paged.js to start (looking for .pagedjs_pages)...');
+		await page.waitForSelector('.pagedjs_pages', { timeout: 180000 });
+		console.log('[PDF Generator] Paged.js started, waiting for page count to stabilize...');
 		
-		// Wait for our custom ready flag set by Paged.js after hook
-		// This ensures target-counter() values are computed
-		console.log('[PDF Generator] Waiting for Paged.js ready flag...');
-		await page.waitForFunction(() => window.__pagedjs_ready === true, { timeout: 30000 });
-		console.log('[PDF Generator] Paged.js ready flag detected');
+		// Wait for page count to stabilize (no new pages for 2 seconds)
+		// This is more reliable than the after hook for large documents
+		let lastPageCount = 0;
+		let stableCount = 0;
+		const requiredStableChecks = 4; // 4 checks at 500ms = 2 seconds of stability
+		
+		while (stableCount < requiredStableChecks) {
+			await new Promise(resolve => setTimeout(resolve, 500));
+			const currentPageCount = await page.evaluate(() => {
+				return document.querySelectorAll('.pagedjs_page').length;
+			});
+			
+			if (currentPageCount === lastPageCount && currentPageCount > 0) {
+				stableCount++;
+				console.log(`[PDF Generator] Page count stable at ${currentPageCount} (${stableCount}/${requiredStableChecks})`);
+			} else {
+				stableCount = 0;
+				console.log(`[PDF Generator] Page count changed: ${lastPageCount} -> ${currentPageCount}`);
+			}
+			lastPageCount = currentPageCount;
+		}
+		
+		console.log(`[PDF Generator] Page count stabilized at ${lastPageCount} pages`);
+		
+		// Also wait for the ready flag if set (for TOC target-counter computation)
+		const hasReadyFlag = await page.evaluate(() => window.__pagedjs_ready === true);
+		if (!hasReadyFlag) {
+			console.log('[PDF Generator] Waiting additional time for target-counter() computation...');
+			await new Promise(resolve => setTimeout(resolve, 1000));
+		}
+		console.log('[PDF Generator] Paged.js rendering complete');
 		
 		// Log Paged.js page info for debugging
 		const pageInfo = await page.evaluate(() => {

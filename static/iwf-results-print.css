@@ -77,9 +77,9 @@
   object-fit: contain;
 }
 
-/* Page breaks */
+/* Page breaks - title page handles its own break-after */
 .title-section {
-  break-after: page;
+  /* break-after now handled by .title-page inside */
 }
 
 /* No forced break after TOC - let content flow naturally */

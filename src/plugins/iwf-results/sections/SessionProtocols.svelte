@@ -51,7 +51,11 @@
   <h1 class="section-header">Session Protocols</h1>
   
   {#each sessions as session}
-    <div class="session-page" id="session-{session.name}">
+    <div
+      class="session-page"
+      id="session-{session.name}"
+      data-bookmark={`Session ${session.name} : ${session.description}`}
+    >
       <div class="session-title">
         <p><strong>Session {session.name} : {session.description}</strong>     {session.startTime}</p>
       </div>
@@ -292,7 +296,9 @@
     position: relative;
     background: white;
     /* stylelint-disable-next-line property-no-unknown */
-    bookmark-level: 2; /* non-standard property for PDF bookmarks */
+    bookmark-level: 2;
+    /* stylelint-disable-next-line property-no-unknown */
+    bookmark-label: attr(data-bookmark);
   }
 
   .session-title {
@@ -370,9 +376,11 @@
   }
 
   .records-section h4 {
-    font-size: 14pt;
+    font-size: 12pt;
     font-weight: bold;
     margin: 8px 0 5px 0;
+    /* stylelint-disable-next-line property-no-unknown */
+    bookmark-level: none;
   }
 
   .records-table {
@@ -421,9 +429,11 @@
   }
 
   .officials-section h4 {
-    font-size: 14pt;
+    font-size: 12pt;
     font-weight: bold;
     margin-bottom: 10px;
+    /* stylelint-disable-next-line property-no-unknown */
+    bookmark-level: none;
   }
 
   .officials-grid {

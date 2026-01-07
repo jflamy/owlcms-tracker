@@ -35,3 +35,14 @@ try {
 	console.error('✗ Failed to copy runtime server files:', err.message);
 	process.exit(1);
 }
+
+// Copy Paged.js polyfill to static folder (needed for production builds)
+try {
+	const pagedSrc = 'node_modules/pagedjs/dist/paged.polyfill.js';
+	const pagedDest = 'static/paged.polyfill.js';
+	fs.copyFileSync(pagedSrc, pagedDest);
+	console.log(`✓ Copied ${pagedSrc} to ${pagedDest}`);
+} catch (err) {
+	console.error('✗ Failed to copy Paged.js polyfill:', err.message);
+	process.exit(1);
+}

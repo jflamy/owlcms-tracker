@@ -26,52 +26,47 @@
 
 <style>
   .title-page {
-    height: 100vh;
+    height: 167mm !important; /* A4 landscape height (210mm) minus margins (25mm+15mm) */
     display: flex;
     align-items: center;
     justify-content: center;
-    page-break-after: always;
     text-align: center;
     background: white;
+    overflow: hidden;
+    break-inside: avoid;
+    break-after: page;
   }
-
   .title-content {
     max-width: 80%;
-    margin-top: -55em;
+    margin-top: -2em;
   }
 
   .title-logo {
-    height: 80mm;
+    height: 60mm;
     width: auto;
-    max-width: 160mm;
-    margin-bottom: 30pt;
+    max-width: 140mm;
+    margin-bottom: 10pt;
   }
 
   h1 {
-    font-size: 32pt;
+    font-size: 28pt;
     font-weight: bold;
-    margin: 20pt 0;
+    margin: 15pt 0;
     line-height: 1.2;
   }
 
   h2 {
-    font-size: 18pt;
+    font-size: 16pt;
     font-weight: normal;
-    margin: 10pt 0;
+    margin: 8pt 0;
   }
 
   .organizer {
-    margin-top: 40pt;
-    font-size: 12pt;
+    margin-top: 30pt;
+    font-size: 11pt;
   }
 
   .organizer p {
-    margin: 5pt 0;
-  }
-
-  @media print {
-    .title-page {
-      height: 100vh;
-    }
+    margin: 4pt 0;
   }
 </style>

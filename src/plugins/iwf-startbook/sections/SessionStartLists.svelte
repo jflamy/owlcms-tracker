@@ -46,7 +46,11 @@
   <h1 class="section-header">Session Start Lists</h1>
   
   {#each sessions as session}
-    <div class="session-page" id="session-{session.name}">
+    <div
+      class="session-page"
+      id="session-{session.name}"
+      data-bookmark={`Session ${session.name} : ${session.description}`}
+    >
       <div class="session-title">
         <p><strong>Session {session.name} : {session.description}</strong>     {session.startTime}</p>
       </div>
@@ -280,6 +284,10 @@
   .session-page {
     padding: 0 20px 20px 20px;
     page-break-after: always;
+    /* stylelint-disable-next-line property-no-unknown */
+    bookmark-level: 2;
+    /* stylelint-disable-next-line property-no-unknown */
+    bookmark-label: attr(data-bookmark);
   }
 
   .session-title {
@@ -289,6 +297,10 @@
     margin: 10pt 0 10pt 0;
   }
 
+  .session-title p {
+    margin: 0;
+  }
+
   .protocol-table {
     width: 100%;
     border-collapse: collapse;
@@ -296,6 +308,8 @@
     margin-bottom: 15px;
     font-size: 10px;
     border: 1px solid black;
+    /* stylelint-disable-next-line property-no-unknown */
+    bookmark-level: none;
     table-layout: fixed;
     page-break-inside: auto;
   }
@@ -357,8 +371,10 @@
 
   .records-section h4 {
     margin: 8px 0 5px 0;
-    font-size: 14pt;
+    font-size: 12pt;
     font-weight: bold;
+    /* stylelint-disable-next-line property-no-unknown */
+    bookmark-level: none;
   }
 
   .records-table {
@@ -446,7 +462,7 @@
   }
 
   .officials-section h4 {
-    font-size: 14pt;
+    font-size: 12pt;
     font-weight: bold;
     margin-bottom: 10px;
   }

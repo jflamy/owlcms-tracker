@@ -49,7 +49,8 @@
         {@const totalChunks = athleteChunks.length}
         {#each athleteChunks as athleteChunk, chunkIndex}
           {@const isFirstInGender = catIndex === 0 && chunkIndex === 0}
-          <div class="category-block" class:page-break-before={!firstCategory.value} id="ranking-{slugify(championship.name)}-{slugify(genderGroup.genderName)}-{slugify(category.categoryName)}-{chunkIndex}">
+          {@const categoryId = `ranking-${slugify(championship.name)}-${slugify(genderGroup.genderName)}-${slugify(category.categoryName)}`}
+          <div class="category-block" class:page-break-before={!firstCategory.value} id="{chunkIndex === 0 ? categoryId : `${categoryId}-${chunkIndex}`}">
             {#if isFirstInGender}
               <h2 class="championship-header">{championship.name} - {genderGroup.genderName}</h2>
             {/if}
