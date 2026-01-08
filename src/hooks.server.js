@@ -49,14 +49,6 @@ console.log('   OWLCMS Competition Tracker - Ready');
 console.log('═══════════════════════════════════════════════════════');
 console.log('');
 console.log('WebSocket: ws://localhost:8096/ws');
-
-// Get list of supported message types
-const jsonMessageTypes = ['database', 'update', 'timer', 'decision'];
-const binaryMessageTypes = ['flags_zip', 'logos_zip', 'pictures', 'styles', 'translations_zip'];
-const allMessageTypes = [...jsonMessageTypes, ...binaryMessageTypes];
-
-console.log(`  JSON Messages: ${jsonMessageTypes.join(', ')}`);
-console.log(`  Binary Frames: ${binaryMessageTypes.join(', ')}`);
 console.log('');
 console.log('Web interface: http://localhost:8096');
 if (LEARNING_MODE) {

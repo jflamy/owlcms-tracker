@@ -222,11 +222,20 @@ if (!trackerCoreVersion) {
   }
 }
 
-// Update dependency using npm pkg set
+// Update version and dependency using npm pkg set
+console.log(`📝 Updating package.json version to ${version}...`);
+try {
+  execSync(`npm pkg set version=${version}`, { stdio: 'inherit' });
+  console.log('✓ Version updated');
+} catch (error) {
+  console.error('❌ Failed to update version:', error.message);
+  process.exit(1);
+}
+
 console.log(`📝 Updating package.json to use tracker-core@${trackerCoreVersion}...`);
 try {
   execSync(`npm pkg set dependencies.@owlcms/tracker-core=github:owlcms/tracker-core#${trackerCoreVersion}`, { stdio: 'inherit' });
-  console.log('✓ package.json updated');
+  console.log('✓ Dependency updated');
 } catch (error) {
   console.error('❌ Failed to update package.json:', error.message);
   process.exit(1);

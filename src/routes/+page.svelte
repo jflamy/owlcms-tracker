@@ -233,6 +233,9 @@
     if (dev) {
       event.preventDefault();
       showPdfModal = true;
+    } else {
+      // Production mode: show "please be patient" alert
+      alert("Please be patient, PDF generation can take over a minute.");
     }
   }
 
