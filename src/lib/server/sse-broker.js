@@ -11,7 +11,7 @@ import { competitionHub } from './competition-hub.js';
 
 class SSEBroker {
   constructor() {
-    this.clients = new Set(); // Set of { send, connectionId } objects
+    this.clients = new Set(); // Set of { send, connectionId, fopName } objects
     this.hubListenersAttached = false;
   }
 
@@ -28,6 +28,26 @@ class SSEBroker {
         type: 'fop_update',
         fop: eventData.fop,
         data: eventData.data,
+        timestamp: eventData.timestamp
+      });
+    });
+
+    competitionHub.on('timer', (eventData) => {
+      this.broadcast({
+        type: 'timer',
+        fop: eventData.fop,
+        timer: eventData.timer,
+        displayMode: eventData.displayMode,
+        timestamp: eventData.timestamp
+      });
+    });
+
+    competitionHub.on('decision', (eventData) => {
+      this.broadcast({
+        type: 'decision',
+        fop: eventData.fop,
+        decision: eventData.decision,
+        displayMode: eventData.displayMode,
         timestamp: eventData.timestamp
       });
     });
@@ -64,41 +84,143 @@ class SSEBroker {
    * Register a new SSE client connection
    * @param {Function} sendFn - Function to send data to this client
    * @param {string} connectionId - Unique connection identifier
+   * @param {string|null} fopName - FOP name to filter events (null = global events only)
    * @returns {Function} Unregister function
    */
-  registerClient(sendFn, connectionId) {
+  registerClient(sendFn, connectionId, fopName = null) {
     // Attach hub listeners on first client
     if (!this.hubListenersAttached) {
       this.attachHubListeners();
     }
     
-    const client = { send: sendFn, connectionId };
+    const client = { send: sendFn, connectionId, fopName };
     this.clients.add(client);
-    console.log(`[SSE Broker] Client ${connectionId} registered (${this.clients.size} active)`);
+    
+    const fopLabel = fopName ? `FOP ${fopName}` : 'GLOBAL';
+    console.log(`[SSE Broker] ✓ Client ${connectionId} CONNECTED to ${fopLabel}`);
+    this.logClientDistribution('After connect');
     
     return () => {
       this.clients.delete(client);
-      console.log(`[SSE Broker] Client ${connectionId} unregistered (${this.clients.size} active)`);
+      console.log(`[SSE Broker] ✗ Client ${connectionId} DISCONNECTED`);
+      this.logClientDistribution('After disconnect');
     };
   }
 
   /**
-   * Broadcast message to all connected clients
+   * Broadcast message to connected clients (optimized with FOP filtering)
+   * Serializes JSON once and encodes once, then sends same bytes to matching clients
+   * 
+   * FOP Filtering Rules:
+   * - message.fop is null (global event) → send to ALL clients
+   * - message.fop is set → send only to clients where client.fopName === message.fop
+   * - client.fopName is null → only receives global events (message.fop is null)
    */
   broadcast(message) {
+    if (this.clients.size === 0) return;
+
+    const eventFop = message.fop || null;  // null = global event
+
+    // Serialize JSON once for all clients
+    let jsonString;
+    try {
+      jsonString = JSON.stringify(message);
+    } catch (error) {
+      console.error('[SSE Broker] Failed to serialize message:', error.message);
+      return;
+    }
+
+    // Format SSE message once
+    const sseMessage = `data: ${jsonString}\n\n`;
+
+    // Encode to bytes once
+    const encoder = new TextEncoder();
+    const encodedBytes = encoder.encode(sseMessage);
+
+    // Track recipients per FOP for logging
+    const recipientsByFop = {};
+    let globalRecipients = 0;
+
+    // Send to matching clients only
     for (const client of this.clients) {
-      try {
-        client.send(message);
-      } catch (error) {
-        console.error(`[SSE Broker] Error sending to client ${client.connectionId}:`, error.message);
-        this.clients.delete(client);
+      // FOP filtering:
+      // - Global events (eventFop === null) go to everyone
+      // - FOP-specific events go only to clients subscribed to that FOP
+      const isGlobalEvent = eventFop === null;
+      const clientMatchesFop = client.fopName === eventFop;
+      
+      if (isGlobalEvent || clientMatchesFop) {
+        try {
+          client.send(encodedBytes);
+          
+          // Track for logging
+          if (client.fopName === null) {
+            globalRecipients++;
+          } else {
+            recipientsByFop[client.fopName] = (recipientsByFop[client.fopName] || 0) + 1;
+          }
+        } catch (error) {
+          console.error(`[SSE Broker] Error sending to client ${client.connectionId}:`, error.message);
+          this.clients.delete(client);
+        }
       }
+    }
+
+    // Log detailed delivery stats
+    const totalRecipients = Object.values(recipientsByFop).reduce((a, b) => a + b, 0) + globalRecipients;
+    if (totalRecipients > 0) {
+      const eventLabel = `${message.type}${eventFop ? ` [FOP ${eventFop}]` : ' [GLOBAL]'}`;
+      const recipientParts = [];
+      
+      if (globalRecipients > 0) {
+        recipientParts.push(`GLOBAL=${globalRecipients}`);
+      }
+      
+      const fopParts = Object.entries(recipientsByFop).sort(([a], [b]) => a.localeCompare(b));
+      for (const [fop, count] of fopParts) {
+        recipientParts.push(`${fop}=${count}`);
+      }
+      
+      console.log(`[SSE Broker] ➜ ${eventLabel}: ${totalRecipients}/${this.clients.size} clients (${recipientParts.join(', ')})`);
     }
   }
 
   /**
-   * Get current active client count
+   * Get detailed FOP distribution stats
+   * @returns {Object} Stats with fopCounts, globalCount, totalClients
    */
+  getClientStats() {
+    const fopCounts = {};
+    let globalCount = 0;
+
+    for (const client of this.clients) {
+      if (client.fopName === null) {
+        globalCount++;
+      } else {
+        fopCounts[client.fopName] = (fopCounts[client.fopName] || 0) + 1;
+      }
+    }
+
+    return {
+      totalClients: this.clients.size,
+      globalClients: globalCount,
+      fopClients: fopCounts,
+      fops: Object.keys(fopCounts).sort(),
+      fopClientSummary: Object.entries(fopCounts).map(([fop, count]) => `${fop}:${count}`).join(', ')
+    };
+  }
+
+  /**
+   * Log current client distribution
+   */
+  logClientDistribution(context = 'Current') {
+    const stats = this.getClientStats();
+    const parts = [`[SSE Broker] ${context} client distribution:`, `Total=${stats.totalClients}`, `Global=${stats.globalClients}`];
+    if (stats.fopClientSummary) {
+      parts.push(`FOPs=[${stats.fopClientSummary}]`);
+    }
+    console.log(parts.join(' | '));
+  }
   getActiveClientCount() {
     return this.clients.size;
   }

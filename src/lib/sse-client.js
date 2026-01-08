@@ -7,27 +7,31 @@ let eventSource = null;
 let subscribers = new Set();
 let connectionId = Math.random().toString(36).substr(2, 9);
 let language = 'en';
+let currentFop = null;
 let clientCount = 0;
 
 /**
  * Connect to SSE stream (called once, reused by all pages)
  * @param {string} lang - Language code (default: 'en')
+ * @param {string|null} fop - FOP name to filter events (null = global events only)
  */
-export function connectSSE(lang = 'en') {
+export function connectSSE(lang = 'en', fop = null) {
 	language = lang;
 	
-	// If already connected and language matches, reuse
-	if (eventSource && eventSource.readyState === EventSource.OPEN) {
+	// If already connected and language+FOP match, reuse
+	if (eventSource && eventSource.readyState === EventSource.OPEN && currentFop === fop) {
 		return eventSource;
 	}
 	
-	// Close old connection if language changed
+	// Close old connection if language or FOP changed
 	if (eventSource) {
 		eventSource.close();
 		eventSource = null;
 	}
 	
-	eventSource = new EventSource(`/api/client-stream?lang=${lang}`);
+	currentFop = fop;
+	const fopParam = fop ? `&fop=${encodeURIComponent(fop)}` : '';
+	eventSource = new EventSource(`/api/client-stream?lang=${lang}${fopParam}`);
 	
 	eventSource.onmessage = (event) => {
 		try {
@@ -63,11 +67,11 @@ export function connectSSE(lang = 'en') {
 export function subscribeSSE(callback) {
 	subscribers.add(callback);
 	clientCount++;
-	console.log(`[SSE] Client connected (${clientCount} active, lang=${language})`);
+	console.log(`[SSE] Client connected (${clientCount} active, lang=${language}, fop=${currentFop || 'global'})`);
 	
 	// Ensure connection is open
 	if (!eventSource || eventSource.readyState !== EventSource.OPEN) {
-		connectSSE(language);
+		connectSSE(language, currentFop);
 	}
 	
 	// Return unsubscribe function

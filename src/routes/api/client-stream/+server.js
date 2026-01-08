@@ -13,21 +13,30 @@ export async function GET({ request, url }) {
   
   // Get language preference from query parameter (default: 'en')
   const language = url.searchParams.get('lang') || 'en';
-  console.log(`[SSE] New client connection: ${connectionId} (language: ${language})`);
+  // Get FOP filter (null = global events only, specific FOP = that FOP + global)
+  const fopName = url.searchParams.get('fop') || null;
+  console.log(`[SSE] New client connection: ${connectionId} (language: ${language}, FOP: ${fopName || 'global'})`);
   
   const stream = new ReadableStream({
     start(controller) {
       const encoder = new TextEncoder();
       let isClosed = false;
       
-      const send = (data) => {
+      const send = (dataOrBytes) => {
         if (isClosed) {
           return;
         }
-        
+
         try {
-          const message = `data: ${JSON.stringify(data)}\n\n`;
-          controller.enqueue(encoder.encode(message));
+          // Check if we received pre-encoded bytes or raw data
+          if (dataOrBytes instanceof Uint8Array) {
+            // Pre-encoded from broker - send directly
+            controller.enqueue(dataOrBytes);
+          } else {
+            // Raw data (initial state, translations) - encode here
+            const message = `data: ${JSON.stringify(dataOrBytes)}\n\n`;
+            controller.enqueue(encoder.encode(message));
+          }
         } catch (error) {
           console.error(`[SSE] ${connectionId}: Error sending message:`, error.message);
           cleanup();
@@ -51,7 +60,8 @@ export async function GET({ request, url }) {
       };
       
       // Register client with broker - broker handles hub events and broadcasts
-      const unregisterClient = sseBroker.registerClient(send, connectionId);
+      // Pass fopName so broker can filter FOP-specific events
+      const unregisterClient = sseBroker.registerClient(send, connectionId, fopName);
       
       // Handle client disconnect
       request.signal.addEventListener('abort', cleanup);

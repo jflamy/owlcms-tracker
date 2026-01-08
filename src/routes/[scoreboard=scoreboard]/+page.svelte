@@ -46,15 +46,43 @@
 		
 		// Connect to shared SSE (browser only) - skip for document-type plugins
 		if (browser && !isDocument) {
-			connectSSE(language);
+			// Pass fopName so SSE broker only sends events for this FOP (+ global events)
+			connectSSE(language, data.fopName);
 			
 			// Subscribe to SSE messages
 			unsubscribeSSE = subscribeSSE((message) => {
-				console.log('[Scoreboard] SSE received:', message.type, message.fop || '');
+				console.log('[Scoreboard] SSE received:', message.type, message.fop || '', JSON.stringify(message.timer || message.decision || {}).substring(0, 100));
 				
 				// Handle translation updates
 				if (message.type === 'translations') {
 					translations.setLocale(message.locale, message.data);
+					return;
+				}
+				
+				// Handle timer events directly (no API fetch)
+				// Server provides displayMode computed with full FOP context
+				if (message.type === 'timer' && message.fop === data.fopName) {
+					if (scoreboardData) {
+						scoreboardData = {
+							...scoreboardData,
+							timer: message.timer,
+							displayMode: message.displayMode
+						};
+					}
+					return;
+				}
+				
+				// Handle decision events directly (no API fetch)
+				// Server provides displayMode computed with full FOP context
+				if (message.type === 'decision' && message.fop === data.fopName) {
+					if (scoreboardData) {
+						scoreboardData = {
+							...scoreboardData,
+							decision: message.decision,
+							displayMode: message.displayMode
+						};
+					}
+					return;
 				}
 				
 				// Refresh data on any competition update or hub ready
@@ -74,8 +102,8 @@
 	});
 	
 	// Reconnect SSE if language changes (browser only)
-	$: if (browser && language) {
-		connectSSE(language);
+	$: if (browser && language && !isDocument) {
+		connectSSE(language, data.fopName);
 	}
 </script>
 
