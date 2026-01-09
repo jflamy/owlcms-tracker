@@ -13,6 +13,11 @@
 > which as an option to do the connection.
 
 ## New in Release 2.5
+- 2.5.3: Network usage for the remote scoreboars radically reduced, general performance
+  - removed unneeded fields
+  - activated gzip compression
+  - removed callbacks to API when data was sent by SSE and not language sensitive
+  - fixed caching key to remove unneeded calls to tracker-core hub
 - 2.5.2: Harmonized and improved formatting for iwf-startbook and iwf-results
 - 2.5.2: Buttons for PDF geneaation explain that build version is needed
 - 2.5.1: Fixed bookmark genearation for iwf-results and iwf-startbook.

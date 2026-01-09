@@ -206,16 +206,36 @@ if (!trackerCoreVersion) {
         console.log('\n▶️  Running tracker-core release...');
         try {
           execSync(`cd ../tracker-core && npm run release -- ${trackerCoreVersion}`, { stdio: 'inherit' });
-          console.log('\n✅ tracker-core release finished. Please re-run this tracker release once the tracker-core release succeeds.');
+          console.log('\n✅ tracker-core release completed successfully!');
+          
+          // Wait a moment for GitHub to process the tag
+          console.log('⏳ Waiting 5 seconds for GitHub to process the new tag...');
+          await new Promise(resolve => setTimeout(resolve, 5000));
+          
+          // Verify the tag now exists
+          const tagNowExists = await checkTagExists('owlcms', 'tracker-core', trackerCoreVersion);
+          if (!tagNowExists) {
+            console.error('\n❌ Warning: Tag still not visible on GitHub. The release may need more time to propagate.');
+            console.error('You can either:');
+            console.error('  1. Wait a few moments and re-run this script');
+            console.error('  2. Check https://github.com/owlcms/tracker-core/tags to verify the release');
+            process.exit(1);
+          }
+          
+          console.log(`✅ Verified: tracker-core@${trackerCoreVersion} tag now exists`);
+          console.log('▶️  Continuing with tracker release...\n');
         } catch (error) {
           console.error('\n❌ tracker-core release failed:', error.message);
+          console.error('Please fix the tracker-core release issues and try again.');
+          process.exit(1);
         }
       } else {
         console.log('\nℹ️  Skipping tracker-core release. Please run tracker-core/scripts/release.js before proceeding.');
+        process.exit(1);
       }
-      process.exit(1);
+    } else {
+      console.log(`✓ Version ${trackerCoreVersion} exists\n`);
     }
-    console.log(`✓ Version ${trackerCoreVersion} exists\n`);
   } catch (error) {
     console.error(`❌ Failed to validate tracker-core version: ${error.message}`);
     process.exit(1);
