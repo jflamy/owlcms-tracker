@@ -188,7 +188,7 @@ export function getScoreboardData(scoreboardType, fopName = 'A', options = {}) {
 		start: translations['Scoreboard.Start'] || 'Start',
 		name: translations['Name'] || 'Name',
 		category: translations['Scoreboard.Category'] || 'Cat.',
-		birth: translations['Birth'] || 'Born',
+		birth: translations['Scoreboard.Birth'] || 'Born',
 		team: translations['Team'] || 'Team',
 		snatch: translations['Snatch'] || 'Snatch',
 		cleanJerk: translations['Clean_and_Jerk'] || 'Clean &amp; Jerk',
@@ -383,6 +383,7 @@ function stripToDisplayFields(athlete) {
 		key: athlete.key,
 		fullName: athlete.fullName,
 		startNumber: athlete.startNumber,
+		yearOfBirth: athlete.yearOfBirth,
 		
 		// Team & Category
 		teamName: athlete.teamName,
