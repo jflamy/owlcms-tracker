@@ -14,6 +14,7 @@ import { getFlagUrl } from '$lib/server/flag-resolver.js';
 import { buildCacheKey, registerCache } from '$lib/server/cache-utils.js';
 import { extractTimerAndDecisionState } from '$lib/server/timer-decision-helpers.js';
 import { computeAttemptBarVisibility } from '$lib/server/attempt-bar-visibility.js';
+import { formatMessage } from '@owlcms/tracker-core/utils';
 
 // Shared cache for all standard scoreboards (keyed by scoreboard type + fop + options)
 const scoreboardCache = new Map();
@@ -73,8 +74,12 @@ export function getScoreboardData(scoreboardType, fopName = 'A', options = {}) {
 	const learningMode = process.env.LEARNING_MODE === 'true' ? 'enabled' : 'disabled';
 	const sessionStatus = competitionHub.getSessionStatus(fopName);
 	
+	// Get translations for requested language
+	const lang = options.lang || 'en';
+	const translations = competitionHub.getTranslations({ locale: lang });
+	
 	// Extract timer, break timer, decision, and display mode using shared helper
-	const { timer, breakTimer, decision, displayMode, activeTimer } = extractTimerAndDecisionState(fopUpdate);
+	const { timer, breakTimer, decision, displayMode, activeTimer } = extractTimerAndDecisionState(fopUpdate, lang);
 	
 	// Determine if timer should be shown (active competition state)
 	const hasActiveSession = fopUpdate?.fopState && fopUpdate.fopState !== 'INACTIVE';
@@ -95,11 +100,11 @@ export function getScoreboardData(scoreboardType, fopName = 'A', options = {}) {
 	
 	const records = extractRecordsFromUpdate(fopUpdate);
 	
-	// Build cache key
+	// Build cache key - include all options (showRecords, lang, etc.)
 	const cacheKey = buildCacheKey({ fopName, includeFop: true, opts: { ...options, type: scoreboardType } });
 	
 	// Extract current athlete
-	let currentAttempt = extractCurrentAttempt(athleteEntries, fopUpdate);
+	let currentAttempt = extractCurrentAttempt(athleteEntries, fopUpdate, translations);
 	
 	// Compute sessionStatusMessage
 	let sessionStatusMessage = null;
@@ -178,6 +183,22 @@ export function getScoreboardData(scoreboardType, fopName = 'A', options = {}) {
 	// Compute attempt bar visibility based on session state
 	const attemptBarClass = computeAttemptBarVisibility(fopUpdate);
 
+	// Calculate headers (pre-translated)
+	const headers = {
+		start: translations['Scoreboard.Start'] || 'Start',
+		name: translations['Name'] || 'Name',
+		category: translations['Scoreboard.Category'] || 'Cat.',
+		birth: translations['Birth'] || 'Born',
+		team: translations['Team'] || 'Team',
+		snatch: translations['Snatch'] || 'Snatch',
+		cleanJerk: translations['Clean_and_Jerk'] || 'Clean &amp; Jerk',
+		total: translations['TOTAL'] || 'Total',
+		rank: translations['Rank'] || 'Rank',
+		best: translations['Best'] || '✔',
+		leaders: translations['Leaders'] || 'Leaders',
+		records: translations['Records'] || 'Records'
+	};
+
 	const result = {
 		scoreboardName: config.scoreboardName,
 		competition,
@@ -187,10 +208,10 @@ export function getScoreboardData(scoreboardType, fopName = 'A', options = {}) {
 		decision,
 		displayMode,
 		sessionStatusMessage,
-		sortedAthletes: athletesWithFlags,
-		liftingOrderAthletes: athletesWithFlags,
-		startOrderAthletes: athletesWithFlags,
-		rankedAthletes: athletesWithFlags,  // For rankings compatibility
+		sortedAthletes: athletesWithFlags, // Primary array for display
+		// liftingOrderAthletes: athletesWithFlags,  // Remove duplicate
+		// startOrderAthletes: athletesWithFlags,   // Remove duplicate  
+		// rankedAthletes: athletesWithFlags,       // Remove duplicate
 		leaders,
 		stats,
 		displaySettings: extractDisplaySettings(fopUpdate),
@@ -206,17 +227,19 @@ export function getScoreboardData(scoreboardType, fopName = 'A', options = {}) {
 		message,
 		attemptBarClass,
 		lastUpdate: fopUpdate?.lastUpdate || Date.now(),
-		options: { showRecords }
+		options: { showRecords },
+		// translations,  // Remove full translation dict - use headers instead
+		headers // Include pre-translated headers (only ~150 bytes)
 	};
 	
 	// Cache result (excluding volatile fields)
 	scoreboardCache.set(cacheKey, {
 		scoreboardName: result.scoreboardName,
 		competition: result.competition,
-		sortedAthletes: result.sortedAthletes,
-		liftingOrderAthletes: result.liftingOrderAthletes,
-		startOrderAthletes: result.startOrderAthletes,
-		rankedAthletes: result.rankedAthletes,
+		sortedAthletes: result.sortedAthletes, // Only cache primary array
+		// liftingOrderAthletes: result.liftingOrderAthletes,  // Remove duplicate
+		// startOrderAthletes: result.startOrderAthletes,     // Remove duplicate
+		// rankedAthletes: result.rankedAthletes,             // Remove duplicate
 		leaders: result.leaders,
 		records: result.records,
 		stats: result.stats,
@@ -231,7 +254,9 @@ export function getScoreboardData(scoreboardType, fopName = 'A', options = {}) {
 		resultRows: result.resultRows,
 		leaderRows: result.leaderRows,
 		lastUpdate: result.lastUpdate,
-		options: result.options
+		options: result.options,
+		// translations: result.translations,  // Remove full translation dict
+		headers: result.headers // Cache only pre-translated headers
 	});
 	
 	// Cleanup old cache entries
@@ -307,7 +332,7 @@ function getAthleteEntries(dataSource, fopName, fopUpdate) {
 /**
  * Extract current attempt from athlete entries
  */
-function extractCurrentAttempt(entries, fopUpdate) {
+function extractCurrentAttempt(entries, fopUpdate, translations) {
 	let currentEntry = entries.find(e => 
 		!e.isSpacer && (
 			(e.classname && e.classname.includes('current')) || 
@@ -324,6 +349,13 @@ function extractCurrentAttempt(entries, fopUpdate) {
 	if (!currentEntry) return null;
 	
 	const athleteObj = currentEntry.athlete || currentEntry;
+	
+	// Format attempt label if translation available
+	let attemptLabel = fopUpdate?.attempt || '';
+	if (fopUpdate?.attemptNumber && translations && translations['AttemptBoard_attempt_number']) {
+		attemptLabel = formatMessage(translations['AttemptBoard_attempt_number'], fopUpdate.attemptNumber);
+	}
+
 	return {
 		fullName: athleteObj.fullName || `${athleteObj.firstName || ''} ${athleteObj.lastName || ''}`.trim(),
 		name: athleteObj.fullName || `${athleteObj.firstName || ''} ${athleteObj.lastName || ''}`.trim(),
@@ -333,11 +365,46 @@ function extractCurrentAttempt(entries, fopUpdate) {
 		startNumber: athleteObj.startNumber,
 		categoryName: athleteObj.category || athleteObj.categoryName,
 		category: athleteObj.category || athleteObj.categoryName,
-		attempt: fopUpdate?.attempt || '',
+		attempt: attemptLabel,
 		attemptNumber: fopUpdate?.attemptNumber,
 		weight: fopUpdate?.weight || '-',
 		timeAllowed: fopUpdate?.timeAllowed,
 		startTime: null
+	};
+}
+
+/**
+ * Strip athlete object to only display fields needed by browser
+ * Reduces payload size by ~80% (from ~4KB to ~800 bytes per athlete)
+ */
+function stripToDisplayFields(athlete) {
+	return {
+		// Identity
+		key: athlete.key,
+		fullName: athlete.fullName,
+		startNumber: athlete.startNumber,
+		
+		// Team & Category
+		teamName: athlete.teamName,
+		category: athlete.category,
+		
+		// Attempts (display arrays)
+		sattempts: athlete.sattempts,
+		cattempts: athlete.cattempts,
+		
+		// Best lifts & totals
+		bestSnatch: athlete.bestSnatch,
+		bestCleanJerk: athlete.bestCleanJerk,
+		total: athlete.total,
+		
+		// Core ranks (shown by default)
+		snatchRank: athlete.snatchRank,
+		cleanJerkRank: athlete.cleanJerkRank,
+		totalRank: athlete.totalRank,
+		
+		// Visual state
+		classname: athlete.classname,
+		flagUrl: athlete.flagUrl
 	};
 }
 
@@ -355,13 +422,16 @@ function processAthletes(entries) {
 		while (sattempts.length < 3) sattempts.push(null);
 		while (cattempts.length < 3) cattempts.push(null);
 		
-		return {
+		const withFlags = {
 			...entry,
 			classname,
 			sattempts,
 			cattempts,
 			flagUrl: getFlagUrl(entry.teamName, true)
 		};
+		
+		// Strip to display fields only for cloud efficiency
+		return stripToDisplayFields(withFlags);
 	});
 }
 

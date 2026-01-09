@@ -37,7 +37,7 @@
 	<div class="records-section">
 		<div class="records-table-grid" style="--num-categories: {categories.length}">
 			<!-- Row 1: Category headers with title in top-left, spanning 2 rows for spacers and main headers -->
-			<div class="records-title-cell span-two">{translations.Records || 'Records'}</div>
+			<div class="records-title-cell span-two">{headers?.records || '!!Records'}</div>
 			{#each categories as category}
 				<div class="records-v-spacer records-v-spacer-header span-two" aria-hidden="true"></div>
 				<div class="records-category-header">{getCategoryDisplayName(records, category)}</div>

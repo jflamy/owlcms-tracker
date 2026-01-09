@@ -106,7 +106,7 @@
 			{/if}
 		{/if}
 		<div class="session-info">
-			{@html competition?.sessionInfo || (translations.session || 'Session')}
+			{@html competition?.sessionInfo || 'Session'}
 		</div>
 	</header>
 {:else}
@@ -178,7 +178,7 @@
 			{#if sessionStatus?.isDone}
 				{@html '&nbsp;'}
 			{:else}
-				{@html competition?.sessionInfo || (translations.session || 'Session')}
+				{@html competition?.sessionInfo || '!!Session'}
 			{/if}
 		</div>
 	</header>

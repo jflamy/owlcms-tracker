@@ -3,7 +3,7 @@
 	// Displays: headers, athlete rows with attempts, category spacers, and optional leaders section
 	
 	export let allAthletes = [];
-	export let translations = {};
+	export let headers = {}; // Pre-translated headers from server
 	export let showLeaders = false;
 	export let hasLeaders = false;
 	export let data = {};
@@ -78,34 +78,34 @@
 
 <div class="scoreboard-grid" role="grid">
 	<div class="grid-row header header-primary" role="row">
-		<div class="cell header col-start span-two" role="columnheader">{translations.Start || 'Start'}</div>
-		<div class="cell header col-name span-two" role="columnheader">{translations.Name || 'Name'}</div>
-		<div class="cell header col-cat span-two" role="columnheader">{translations['Scoreboard.Category'] || 'Cat.'}</div>
-		<div class="cell header col-born span-two" role="columnheader">{translations.Birth || 'Born'}</div>
-		<div class="cell header col-team span-two" role="columnheader">{translations.Team || 'Team'}</div>
+		<div class="cell header col-start span-two" role="columnheader">{headers.start || '!!Start'}</div>
+		<div class="cell header col-name span-two" role="columnheader">{headers.name || '!!Name'}</div>
+		<div class="cell header col-cat span-two" role="columnheader">{headers.category || '!!Cat.'}</div>
+		<div class="cell header col-born span-two" role="columnheader">{headers.birth || '!!Born'}</div>
+		<div class="cell header col-team span-two" role="columnheader">{headers.team || '!!Team'}</div>
 		<div class="cell header v-spacer v-spacer-snatch span-two" aria-hidden="true"></div>
-		<div class="cell header col-group col-group-snatch" role="columnheader">{translations.Snatch || 'Snatch'}</div>
+		<div class="cell header col-group col-group-snatch" role="columnheader">{headers.snatch || '!!Snatch'}</div>
 		<div class="cell header v-spacer v-spacer-middle span-two" aria-hidden="true"></div>
-		<div class="cell header col-group col-group-cj" role="columnheader">{@html translations.Clean_and_Jerk || 'Clean &amp; Jerk'}</div>
+		<div class="cell header col-group col-group-cj" role="columnheader">{@html headers.cleanJerk || '!!Clean &amp; Jerk'}</div>
 		<div class="cell header v-spacer v-spacer-total span-two" aria-hidden="true"></div>
-		<div class="cell header col-total span-two" role="columnheader">{translations.TOTAL || 'Total'}</div>
-		<div class="cell header col-rank span-two" role="columnheader">{translations.Rank || 'Rank'}</div>
+		<div class="cell header col-total span-two" role="columnheader">{headers.total || '!!Total'}</div>
+		<div class="cell header col-rank span-two" role="columnheader">{headers.rank || '!!Rank'}</div>
 	</div>
 	<div class="grid-row header header-secondary" role="row">
-		<div class="cell header col-name-portrait" role="columnheader">{translations.Name || 'Name'}</div>
+		<div class="cell header col-name-portrait" role="columnheader">{headers.name || '!!Name'}</div>
 		<div class="cell header v-spacer v-spacer-snatch" aria-hidden="true"></div>
 		<div class="cell header col-attempt snatch-1" role="columnheader">1</div>
 		<div class="cell header col-attempt snatch-2" role="columnheader">2</div>
 		<div class="cell header col-attempt snatch-3" role="columnheader">3</div>
-		<div class="cell header col-best snatch-best" role="columnheader">{translations.Best || '✔'}</div>
+		<div class="cell header col-best snatch-best" role="columnheader">{headers.best || '!!✔'}</div>
 		<div class="cell header v-spacer v-spacer-middle" aria-hidden="true"></div>
 		<div class="cell header col-attempt cj-1" role="columnheader">1</div>
 		<div class="cell header col-attempt cj-2" role="columnheader">2</div>
 		<div class="cell header col-attempt cj-3" role="columnheader">3</div>
-		<div class="cell header col-best cj-best" role="columnheader">{translations.Best || '✔'}</div>
+		<div class="cell header col-best cj-best" role="columnheader">{headers.best || '!!✓'}</div>
 		<div class="cell header v-spacer v-spacer-total" aria-hidden="true"></div>
-		<div class="cell header col-total-portrait" role="columnheader">{translations.TOTAL || 'Total'}</div>
-		<div class="cell header col-rank-portrait" role="columnheader">{translations.Rank || 'Rank'}</div>
+		<div class="cell header col-total-portrait" role="columnheader">{headers.total || '!!Total'}</div>
+		<div class="cell header col-rank-portrait" role="columnheader">{headers.rank || '!!Rank'}</div>
 	</div>
 
 	{#each allAthletes as athlete}
@@ -168,7 +168,7 @@
 		<!-- Leaders title row spanning all columns -->
 		<div class="grid-row leaders-header">
 			<div class="cell leaders-title-cell span-all">
-				{translations.Leaders || 'Leaders'}
+				{headers.leaders || '!!Leaders'}
 			</div>
 		</div>
 

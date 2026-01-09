@@ -1,6 +1,5 @@
 <script>
 	import { createTimer } from '$lib/timer-logic.js';
-	import { translations } from '$lib/stores.js';
 	import { page } from '$app/stores';
 	import { onMount, onDestroy } from 'svelte';
 	import RecordsSection from '$lib/components/RecordsSection.svelte';
@@ -19,11 +18,8 @@
 		timerState = state;
 	});
 	
-	// Current translations object (populated from store)
-	let t = {};
-	const unsubscribeTranslations = translations.subscribe(trans => {
-		t = trans.en || {};
-	});
+	// Use pre-translated headers from server (optimized for cloud)
+	$: headers = data.headers || {};
 	
 	onMount(() => {
 		timer.start(data.timer);
@@ -32,7 +28,6 @@
 	onDestroy(() => {
 		timer.stop();
 		unsubscribe();
-		unsubscribeTranslations();
 	});
 	
 	$: currentAttempt = data.currentAttempt;
@@ -113,13 +108,13 @@
 			</div>
 		{:else if data.attemptBarClass === 'hide-because-null-session'}
 			<div class="waiting">
-				<p>{t['Waiting for next session'] || 'Waiting for next session'}</p>
+				<p>!!Waiting for next session</p>
 			</div>
 		{:else}
 			<div class="grid-container" class:no-vfill={!vFill} style="--template-rows: {computedGridTemplateRows}">
 				<AthletesGrid 
 					allAthletes={allAthletes}
-					translations={t}
+					headers={headers} 
 					showLeaders={showLeaders}
 					hasLeaders={hasLeaders}
 					data={data}
@@ -128,7 +123,7 @@
 
 			<!-- Records Section (Below Grid, Not Part of Grid) -->
 			{#if showRecords && hasRecords}
-				<RecordsSection records={data.records} translations={t} />
+				<RecordsSection records={data.records} headers={headers} />
 			{/if}
 		{/if}
 	</main>
