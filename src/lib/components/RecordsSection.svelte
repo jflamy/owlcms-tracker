@@ -89,7 +89,7 @@
 		--header-primary-height: calc(1.2rem + (var(--header-primary-vpad) * 2));
 		--header-secondary-height: calc(1.1rem + (var(--header-secondary-vpad) * 2));
 		display: grid;
-		grid-template-columns: 30ch repeat(var(--num-categories), var(--col-spacer) var(--col-lift) var(--col-lift) var(--col-lift));
+		grid-template-columns: auto repeat(var(--num-categories), var(--col-spacer) var(--col-lift) var(--col-lift) var(--col-lift));
 		grid-template-rows: var(--header-primary-height) var(--header-secondary-height);
 		grid-auto-rows: var(--data-row-height);
 		width: fit-content;
@@ -102,7 +102,7 @@
 		grid-row: 1 / span 2;
 		display: flex;
 		align-items: flex-start;
-		justify-content: flex-start;
+		justify-content: flex-end;
 		padding: 0 0.15rem;
 		background: transparent;
 		font-weight: bold;
@@ -177,14 +177,14 @@
 		grid-column: 1;
 		display: flex;
 		align-items: center;
-		justify-content: flex-start;
+		justify-content: flex-end;
 		padding: 0.25rem 0.75rem;
-		background: #1a1a1a;
-		font-weight: bold;
+		background: transparent;
+		font-weight: normal;
 		font-size: 0.9rem;
 		color: #fff;
-		border-right: 1px solid #333;
-		border-bottom: 1px solid #333;
+		border-right: none;
+		border-bottom: none;
 		height: var(--data-row-height);
 	}
 
@@ -200,7 +200,7 @@
 		border-right: 1px solid #333;
 		border-bottom: 1px solid #333;
 		height: var(--data-row-height);
-		font-weight: 600;
+		font-weight: normal;
 	}
 
 	.records-cell.highlighted {
