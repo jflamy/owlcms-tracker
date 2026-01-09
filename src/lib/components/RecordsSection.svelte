@@ -1,6 +1,7 @@
 <script>
 	export let records = [];
 	export let translations = {};
+	export let headers = {};
 
 	function getAllRecordCategories(recordsData) {
 		if (!recordsData || recordsData.length === 0) return [];
@@ -151,7 +152,7 @@
 		justify-content: center;
 		padding: var(--header-primary-vpad) 0.15rem;
 		background: #3a3a3a;
-		font-size: 1.2rem;
+		font-size: 0.9rem;
 		color: #e0e0e0;
 		border: 1px solid #555;
 		text-transform: uppercase;
@@ -165,7 +166,7 @@
 		justify-content: center;
 		padding: var(--header-secondary-vpad) 0.15rem;
 		background: #2a2a2a;
-		font-size: 1.1rem;
+		font-size: 0.8rem;
 		color: #e0e0e0;
 		border: 1px solid #444;
 		min-height: 0;
@@ -180,7 +181,7 @@
 		padding: 0.25rem 0.75rem;
 		background: #1a1a1a;
 		font-weight: bold;
-		font-size: 1.1rem;
+		font-size: 0.9rem;
 		color: #fff;
 		border-right: 1px solid #333;
 		border-bottom: 1px solid #333;
@@ -194,7 +195,7 @@
 		justify-content: center;
 		padding: 0.25rem;
 		background: #1a1a1a;
-		font-size: 1.1rem;
+		font-size: 0.9rem;
 		color: #e0e0e0;
 		border-right: 1px solid #333;
 		border-bottom: 1px solid #333;
