@@ -8,6 +8,7 @@
 	export let data;
 	
 	let scoreboardData = null;
+	let scoreboardError = null;
 	let unsubscribeSSE = null;
 	
 	// Check if this is a document-type plugin (no live updates needed)
@@ -30,11 +31,14 @@
 			if (result.success) {
 				console.log('[Scoreboard] API returned:', result.data?.currentAttempt?.weight || result.data?.weight || 'no weight');
 				scoreboardData = result.data;
+				scoreboardError = null;
 			} else {
 				console.error('[Scoreboard] API error:', result.error);
+				scoreboardError = result.error || 'Scoreboard API error';
 			}
 		} catch (err) {
 			console.error('[Scoreboard] Fetch error:', err);
+			scoreboardError = err?.message || 'Network error fetching scoreboard data';
 		}
 	}
 	
@@ -48,8 +52,6 @@
 		if (browser && !isDocument) {
 			// Pass fopName so SSE broker only sends events for this FOP (+ global events)
 			connectSSE(language, data.fopName);
-			
-			// Subscribe to SSE messages
 			unsubscribeSSE = subscribeSSE((message) => {
 				console.log('[Scoreboard] SSE received:', message.type, message.fop || '', JSON.stringify(message.timer || message.decision || {}).substring(0, 100));
 				
@@ -128,6 +130,9 @@
 	<div class="loading">
 		<h1>Loading {data.scoreboardName}...</h1>
 		<p>FOP: {data.fopName}</p>
+		{#if scoreboardError}
+			<p class="error-note">{scoreboardError}</p>
+		{/if}
 	</div>
 {/if}
 
@@ -162,5 +167,16 @@
 	p {
 		font-size: 1.2rem;
 		color: #aaa;
+	}
+
+	.error-note {
+		margin-top: 0.75rem;
+		max-width: 60rem;
+		padding: 0.75rem 1rem;
+		background: #2a1a1a;
+		border: 1px solid #7f1d1d;
+		border-radius: 6px;
+		color: #fecaca;
+		font-size: 1rem;
 	}
 </style>

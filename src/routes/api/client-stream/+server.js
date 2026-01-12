@@ -85,6 +85,21 @@ export async function GET({ request, url }) {
           timestamp: Date.now()
         });
       }
+
+	  // If a protocol error was latched before this client connected, send it immediately
+	  const protocolError = typeof competitionHub.getProtocolError === 'function'
+		  ? competitionHub.getProtocolError()
+		  : null;
+	  if (protocolError) {
+		send({
+		  type: 'protocol_error',
+		  reason: protocolError.reason,
+		  received: protocolError.received,
+		  minimum: protocolError.minimum,
+		  source: protocolError.source,
+		  timestamp: protocolError.timestamp || Date.now()
+		});
+	  }
       
       // If hub is already ready, explicitly send hub_ready so browser knows to fetch data
       if (competitionHub.isReady()) {

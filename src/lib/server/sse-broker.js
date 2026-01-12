@@ -22,6 +22,24 @@ class SSEBroker {
     if (this.hubListenersAttached) return;
     
     console.log('[SSE Broker] Attaching hub event listeners');
+
+    competitionHub.on('protocol_error', (eventData) => {
+      this.broadcast({
+        type: 'protocol_error',
+        reason: eventData?.reason || 'Protocol error',
+        received: eventData?.received || null,
+        minimum: eventData?.minimum || null,
+        source: eventData?.source || null,
+        timestamp: eventData?.timestamp || Date.now()
+      });
+    });
+
+    competitionHub.on('protocol_ok', (eventData) => {
+      this.broadcast({
+        type: 'protocol_ok',
+        timestamp: eventData?.timestamp || Date.now()
+      });
+    });
     
     competitionHub.on('fop_update', (eventData) => {
       this.broadcast({

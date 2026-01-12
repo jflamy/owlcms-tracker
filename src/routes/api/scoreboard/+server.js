@@ -61,6 +61,20 @@ function variantHash({ type, fop, options }) {
 
 export async function GET({ url, request }) {
 	try {
+		// Check for protocol mismatch first - nothing works if versions don't match
+		const protocolError = typeof competitionHub.getProtocolError === 'function'
+			? competitionHub.getProtocolError()
+			: null;
+		if (protocolError) {
+			return json({
+				success: false,
+				error: 'protocol_mismatch',
+				message: `OWLCMS protocol version mismatch: ${protocolError.reason}`,
+				received: protocolError.received,
+				minimum: protocolError.minimum
+			}, { status: 503 });
+		}
+
 		// Initialize registry on first call
 		await scoreboardRegistry.initialize();
 

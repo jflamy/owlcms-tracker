@@ -18,7 +18,7 @@
     "latest": "node scripts/get-latest-versions.js",
     "versions": "node scripts/get-latest-versions.js",
     "release": "node scripts/release.js",
-    "relink-core": "cd ../tracker-core && npm link && cd ../owlcms-tracker && npm link @owlcms/tracker-core"
+    "relink": "cd ../tracker-core && npm link && cd ../owlcms-tracker && npm link @owlcms/tracker-core"
   },
   "devDependencies": {
     "@sveltejs/adapter-auto": "^3.2.5",
