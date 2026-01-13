@@ -460,14 +460,34 @@ function sleepSync(ms) {
   Atomics.wait(int32, 0, 0, ms);
 }
 
+// Get the most recent run ID for release.yaml workflow
 console.log('\n👀 Watching GitHub Actions run (via gh)...');
+let runId;
 try {
-  execSync('gh run watch --workflow release.yaml --exit-status', { stdio: 'inherit' });
+  const runsJson = execSync('gh run list --workflow=release.yaml --limit=1 --json databaseId', { encoding: 'utf8' });
+  const runs = JSON.parse(runsJson);
+  if (runs.length > 0) {
+    runId = runs[0].databaseId;
+  }
+} catch (e) {
+  console.error('⚠️  Could not get run ID - view manually at:');
+  console.error('    https://github.com/owlcms/owlcms-tracker/actions');
+  process.exit(1);
+}
+
+if (!runId) {
+  console.error('⚠️  No workflow runs found - view manually at:');
+  console.error('    https://github.com/owlcms/owlcms-tracker/actions');
+  process.exit(1);
+}
+
+try {
+  execSync(`gh run watch ${runId} --exit-status`, { stdio: 'inherit' });
 } catch (watchError) {
   console.error('\n❌ Workflow failed or was cancelled.');
   console.log('\n📋 Fetching failed job logs...');
   try {
-    execSync('gh run view --workflow release.yaml --log-failed', { stdio: 'inherit' });
+    execSync(`gh run view ${runId} --log-failed`, { stdio: 'inherit' });
   } catch (logError) {
     console.error('⚠️  Could not fetch logs - view manually at:');
     console.error('    https://github.com/owlcms/owlcms-tracker/actions');
