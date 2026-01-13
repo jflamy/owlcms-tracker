@@ -290,16 +290,25 @@ if (!trackerCoreVersion) {
           execSync(`cd ../tracker-core && npm run release -- ${trackerCoreVersion}`, { stdio: 'inherit' });
           console.log('\n✅ tracker-core release completed successfully!');
           
-          // Wait a moment for GitHub to process the tag
-          console.log('⏳ Waiting 5 seconds for GitHub to process the new tag...');
-          await new Promise(resolve => setTimeout(resolve, 5000));
-          
-          // Verify the tag now exists
-          const tagNowExists = await checkTagExists('owlcms', 'tracker-core', trackerCoreVersion);
+          // Wait/poll for GitHub to process the new tag (can take a while)
+          const maxWaitMs = 120_000;
+          const startedAt = Date.now();
+          let delayMs = 5_000;
+          let tagNowExists = false;
+
+          console.log('⏳ Waiting for GitHub to process the new tag...');
+          while (!tagNowExists && Date.now() - startedAt < maxWaitMs) {
+            tagNowExists = await checkTagExists('owlcms', 'tracker-core', trackerCoreVersion);
+            if (tagNowExists) break;
+            console.log(`   still not visible; retrying in ${Math.round(delayMs / 1000)}s...`);
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+            delayMs = Math.min(delayMs + 5_000, 20_000);
+          }
+
           if (!tagNowExists) {
-            console.error('\n❌ Warning: Tag still not visible on GitHub. The release may need more time to propagate.');
-            console.error('You can either:');
-            console.error('  1. Wait a few moments and re-run this script');
+            console.error(`\n❌ Warning: Tag '${trackerCoreVersion}' still not visible on GitHub after ${Math.round(maxWaitMs / 1000)}s.`);
+            console.error('The release may need more time to propagate. You can either:');
+            console.error('  1. Wait a bit and re-run this script');
             console.error('  2. Check https://github.com/owlcms/tracker-core/tags to verify the release');
             process.exit(1);
           }
