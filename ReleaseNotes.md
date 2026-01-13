@@ -13,6 +13,7 @@
 > which as an option to do the connection.
 
 ## New in Release 2.5
+- 2.5.4: Display protocol version mismatch between owlcms and tracker-core
 - 2.5.3: Network usage for the remote scoreboars radically reduced, general performance
   - removed unneeded fields
   - activated gzip compression
