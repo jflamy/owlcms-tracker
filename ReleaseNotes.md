@@ -1,80 +1,42 @@
 # OWLCMS Tracker Release Notes
 
-> owlcms-tracker requires version 64.0.0
->
-> Currently in prerelease
-> you need to install it from the control panel, using the "Click here
-> to install additional versions" at the bottom, and then selecting
-> the "Show Prereleases"
->
-> To connect owlcms to tracker, see OWLCMS Configuration below.
->
-> There is also the option of using the latest prerelease of the control panel,
-> which as an option to do the connection.
+> #### ⚠ To use Tracker, you need to use version 64 of OWLCMS (see Installing Locally below)
+
+## New in Release 2.6
+- When runnning locally, should be launched from control panel version 3.0 or later (see below)
+- Node.js not included in packaging
 
 ## New in Release 2.5
-- 2.5.4: Display protocol version mismatch between owlcms and tracker-core
+- 2.5.5: Display protocol version mismatch between owlcms and tracker-core
 - 2.5.3: Network usage for the remote scoreboars radically reduced, general performance
   - removed unneeded fields
   - activated gzip compression
   - removed callbacks to API when data was sent by SSE and not language sensitive
   - fixed caching key to remove unneeded calls to tracker-core hub
-- 2.5.2: Harmonized and improved formatting for iwf-startbook and iwf-results
-- 2.5.2: Buttons for PDF geneaation explain that build version is needed
-- 2.5.1: Fixed bookmark genearation for iwf-results and iwf-startbook.
-- 2.5.0: Full versions of IWF-style start book and results book are available as examples when checking out
-- 2.5.0: Logos can be used (see the iwf-starbook and iwf-results), tracker-core used for asset resolution.)
-
-## New in Release 2.4
-- 2.4.2: Fix standard scoreboards layout for phones
-- 2.4.2: Added a "refresh" end point on API clears all the plugin caches and triggers a reload from tracker-core data
-- 2.4.2: First release of an IWF start book (but no ITO timetable yet)
-- 2.4.1: fix flags and pictures handling
-- Internal change: Now built using the tracker-core module
-
-## New in Release 2.3.3
-- Team Points support in iwf-results plugin
-- Database is always sent in compressed format. Learning mode uncompresses the samples.
-- Fixed Raspberry Pi build to use 64-bit version of Node.js
-- Removed old behavior related to clicking on the header of the team scoreboard.
-
-## New in Release 2.2.0
-
-- Requires owlcms pre-release version 64.0.0-rc04 or newer
-- Initial handshake improved so owlcms-tracker can process plugins that don't require a running session
-- IWF-style result book available when running from source (protocol updated to 2.2.0)
-
-## New in Release 2.1.0
-
-- The team scoreboard now supports Sinclair, SMHF, Q-Points, Q-Masters, GAMX, GAMX-M, GAMX-A and GAMX-U
-- There is now an attempt-board screen emulating the OWLCMS one.
-- The local packaging (zip distributions) will open the default browser when started.
-- Responsive versions of the scoreboards.  The standard scoreboards also work in portrait mode.
+- When installed from source, demo applications for printing documents
 
 ## Installing Locally
 
-Extract the ZIP file appropriate for your operating system:
+- Install the latest version 3.0 of the (OWLCMS control-panel)[https://github.com/owlcms/owlcms-controlpanel/releases]
+  - There will be a Tracker tab where you can click to install Tracker
+  - This installs the normal plugins to support people watching remotely
+    - To access experimental or additional example plugins, see [Installing from Source](#installing-from-source).
 
-- **Windows**: `owlcms-tracker-windows_*.zip` - Double-click `tracker.bat` to run
-- **macOS (M-series/Apple Silicon)**: `owlcms-tracker-macos-arm64_*.zip` - Run `./tracker.sh`
-- **macOS (Intel)**: `owlcms-tracker-macos-x64_*.zip` - Run `./tracker.sh`
-- **Raspberry Pi**: `owlcms-tracker-rpi_*.zip` - Run `./tracker-rpi.sh`
+  - Also install the latest version 64 of OWLCMS (you may need to select it as a prerelease)
 
-All distributions include Node.js, so no additional installation is needed.
-You may also use [Docker](#docker-installation) to run the tracker with the standard plugins.
-The ZIP and Docker distributions contain the standard widely-used plugins for individual and team scoreboards.
-
-To access experimental or additional example plugins, see [Installing from Source](#installing-from-source).
 
 ## OWLCMS Configuration
 
 **Before using this tracker**, you must configure OWLCMS to send data via WebSocket:
 
-**In OWLCMS:** Prepare Competition → Language and System Settings → Connections → URL for Video Data
+- If you installed from the control panel, there is an option on the OWLCMS page to send the data to tracker, in the Options dropdown
 
-Set to: `ws://localhost:8096/ws` (or `wss://your-tracker-host:8096/ws` for secure connections)
+- Alternatively, you can configure in your database
 
-**That's it!** No code changes to OWLCMS needed - just this URL setting.
+  - **In OWLCMS:** Prepare Competition → Language and System Settings → Connections → URL for Video Data
+
+  - Set to: `ws://localhost:8096/ws` (or `wss://your-tracker-host:8096/ws` for secure connections)
+
 
 ## Docker Installation
 
