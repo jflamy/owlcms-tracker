@@ -83,6 +83,27 @@ function remoteTagExists(tag) {
   }
 }
 
+function getCurrentBranch() {
+  try {
+    const branch = execSync('git rev-parse --abbrev-ref HEAD', { encoding: 'utf8' }).trim();
+    if (!branch || branch === 'HEAD') return null;
+    return branch;
+  } catch {
+    return null;
+  }
+}
+
+function getRemoteHeadSha({ remote = 'origin', branch }) {
+  try {
+    const out = execSync(`git ls-remote ${remote} refs/heads/${branch}`, { encoding: 'utf8' }).trim();
+    // Format: <sha>\trefs/heads/<branch>
+    const sha = out.split(/\s+/)[0];
+    return sha || null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Prompt user for confirmation
  * @param {string} message - The confirmation message
@@ -389,13 +410,32 @@ try {
   // At this point, only fully clean is acceptable.
   assertCleanWorkingTree({ allowedDirty: [] });
 
+  const branch = getCurrentBranch();
+  if (!branch) {
+    console.error('❌ Cannot determine current branch (detached HEAD?).');
+    console.error('Please checkout a branch (e.g. main) and re-run.');
+    process.exit(1);
+  }
+
+  // Ensure the remote branch points to our current commit before triggering.
+  const localHead = tryGetHeadSha();
+  const remoteHead = getRemoteHeadSha({ remote: 'origin', branch });
+  if (!localHead || !remoteHead || localHead.toLowerCase() !== remoteHead.toLowerCase()) {
+    console.error(`❌ Refusing to trigger workflow: origin/${branch} is not at local HEAD.`);
+    console.error(`   local HEAD:  ${localHead || 'unknown'}`);
+    console.error(`   origin/${branch}: ${remoteHead || 'unknown'}`);
+    console.error('Push did not complete as expected. Fix and re-run.');
+    process.exit(1);
+  }
+
   if (remoteTagExists(version) || remoteReleaseExists(version)) {
     console.error(`❌ Refusing to run: tag or release already exists for ${version}`);
     console.error('Pick a new version number, or manually handle the existing release/tag.');
     process.exit(1);
   }
 
-  execSync(`gh workflow run release.yaml -f revision=${version}`, { stdio: 'inherit' });
+  // Trigger the workflow on the pushed branch ref (not the default branch implicitly).
+  execSync(`gh workflow run release.yaml --ref ${branch} -f revision=${version}`, { stdio: 'inherit' });
   console.log('✓ Workflow triggered');
 } catch (error) {
   console.error('⚠️  Failed to trigger workflow via gh CLI');
