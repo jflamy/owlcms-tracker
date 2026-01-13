@@ -27,18 +27,29 @@ import readline from 'readline';
 
 function getDirtyPaths() {
   try {
-    const out = execSync('git status --porcelain', { encoding: 'utf8' }).trim();
-    if (!out) return [];
+    const out = execSync('git status --porcelain', { encoding: 'utf8' });
+    if (!out.trim()) return [];
 
     return out
       .split(/\r?\n/)
       .map((line) => {
-        // Porcelain format: XY <path> (or XY <from> -> <to> for renames)
-        const arrowIndex = line.indexOf('->');
+        const trimmed = line.trim();
+        if (!trimmed) return null;
+        
+        // Porcelain format after trim: 'XY path' where X and Y are status codes
+        // Example: 'M package.json' (M, space, filename) or ' M package.json'
+        const arrowIndex = trimmed.indexOf('->');
         if (arrowIndex !== -1) {
-          return line.slice(arrowIndex + 2).trim();
+          // Rename: 'R  old -> new'
+          return trimmed.slice(arrowIndex + 2).trim();
         }
-        return line.slice(3).trim();
+        // Skip status code (1-2 chars) and following space(s)
+        // Find first non-space char after position 0
+        let i = 0;
+        while (i < trimmed.length && (trimmed[i] === ' ' || /[MADRCU?!]/.test(trimmed[i]))) {
+          i++;
+        }
+        return trimmed.substring(i);
       })
       .filter(Boolean);
   } catch {
@@ -254,8 +265,16 @@ if (!/^\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?(\+[a-zA-Z0-9.]+)?$/.test(version)) {
 
 console.log(`📦 Preparing release ${version}...\n`);
 
-// Safety: release must start from a clean working tree, except for release notes / helper script.
-assertCleanWorkingTree({ allowedDirty: ['ReleaseNotes.md', 'release.sh'] });
+// Safety: release must start from a clean working tree, except for files that the script will modify/commit.
+assertCleanWorkingTree({ allowedDirty: ['ReleaseNotes.md', 'package.json', 'package-lock.json'] });
+
+// Check for existing tag/release BEFORE modifying any files
+if (remoteTagExists(version) || remoteReleaseExists(version)) {
+  console.error(`❌ Refusing to start: tag or release already exists for ${version}`);
+  console.error('Pick a new version number, or manually handle the existing release/tag.');
+  console.error('If you need to delete the tag: git push --delete origin ${version} && git tag -d ${version}');
+  process.exit(1);
+}
 
 // Fetch latest tracker-core version if not provided
 if (!trackerCoreVersion) {
@@ -395,8 +414,7 @@ try {
 // Commit and push
 console.log('\n💾 Committing changes...');
 try {
-  // Include release notes and helper script if present.
-  execSync('git add package.json package-lock.json ReleaseNotes.md release.sh', { stdio: 'inherit' });
+  execSync('git add package.json package-lock.json ReleaseNotes.md', { stdio: 'inherit' });
   execSync(`git commit -m "chore: update tracker-core to ${trackerCoreVersion} for release ${version}"`, { stdio: 'inherit' });
   console.log('✓ Committed');
 } catch (error) {
@@ -437,15 +455,18 @@ try {
     process.exit(1);
   }
 
+  // Final check before triggering workflow (redundant safety - already checked at start)
   if (remoteTagExists(version) || remoteReleaseExists(version)) {
     console.error(`❌ Refusing to run: tag or release already exists for ${version}`);
-    console.error('Pick a new version number, or manually handle the existing release/tag.');
+    console.error('This should have been caught earlier - possible race condition.');
     process.exit(1);
   }
 
   // Trigger the workflow on the pushed branch ref (not the default branch implicitly).
   execSync(`gh workflow run release.yaml --ref ${branch} -f revision=${version}`, { stdio: 'inherit' });
   console.log('✓ Workflow triggered');
+  console.log('⏳ Waiting 15 seconds for GitHub to queue the run...');
+  sleepSync(15000);
 } catch (error) {
   console.error('⚠️  Failed to trigger workflow via gh CLI');
   console.error('Make sure GitHub CLI is installed and authenticated:');
@@ -453,24 +474,6 @@ try {
   console.error('\nYou can manually trigger the workflow at:');
   console.error('  https://github.com/owlcms/owlcms-tracker/actions/workflows/release.yaml');
   process.exit(1);
-}
-
-function tryGetHeadSha() {
-  try {
-    return execSync('git rev-parse HEAD', { encoding: 'utf8' }).trim();
-  } catch {
-    return null;
-  }
-}
-
-function findLatestRunIdForHeadSha({ workflowFile, headSha }) {
-  const raw = execSync(
-    `gh run list --workflow ${workflowFile} --limit 20 --json databaseId,headSha,url,createdAt,status,conclusion`,
-    { encoding: 'utf8' }
-  );
-  const runs = JSON.parse(raw);
-  const match = runs.find((r) => (r.headSha || '').toLowerCase() === headSha.toLowerCase());
-  return match || null;
 }
 
 function sleepSync(ms) {
@@ -483,43 +486,17 @@ function sleepSync(ms) {
 
 console.log('\n👀 Watching GitHub Actions run (via gh)...');
 try {
-  const headSha = tryGetHeadSha();
-
-  if (!headSha) {
-    console.log('⚠️  Could not determine git HEAD sha; watching latest run for release.yaml');
-    execSync('gh run watch --workflow release.yaml --exit-status', { stdio: 'inherit' });
-  } else {
-    let run = null;
-    const startedAt = Date.now();
-    const timeoutMs = 60_000;
-    const sleepMs = 2_000;
-
-    while (!run && Date.now() - startedAt < timeoutMs) {
-      try {
-        run = findLatestRunIdForHeadSha({ workflowFile: 'release.yaml', headSha });
-      } catch {
-        // Ignore transient gh/api failures while the run is being created.
-      }
-
-      if (!run) {
-        sleepSync(sleepMs);
-      }
-    }
-
-    if (!run) {
-      console.log('⚠️  Could not find the run for this commit yet; watching latest run for release.yaml');
-      execSync('gh run watch --workflow release.yaml --exit-status', { stdio: 'inherit' });
-    } else {
-      if (run.url) {
-        console.log(`   Run: ${run.url}`);
-      }
-      execSync(`gh run watch ${run.databaseId} --exit-status`, { stdio: 'inherit' });
-    }
+  execSync('gh run watch --workflow release.yaml --exit-status', { stdio: 'inherit' });
+} catch (watchError) {
+  console.error('\n❌ Workflow failed or was cancelled.');
+  console.log('\n📋 Fetching failed job logs...');
+  try {
+    execSync('gh run view --workflow release.yaml --log-failed', { stdio: 'inherit' });
+  } catch (logError) {
+    console.error('⚠️  Could not fetch logs - view manually at:');
+    console.error('    https://github.com/owlcms/owlcms-tracker/actions');
   }
-} catch (error) {
-  console.error('⚠️  Failed to watch workflow progress via gh.');
-  console.error('You can still monitor progress at: https://github.com/owlcms/owlcms-tracker/actions');
-  console.error(`Details: ${error?.message || error}`);
+  process.exit(1);
 }
 
 console.log(`\n✅ Release ${version} initiated!`);
