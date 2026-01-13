@@ -334,6 +334,71 @@ try {
   process.exit(1);
 }
 
+function tryGetHeadSha() {
+  try {
+    return execSync('git rev-parse HEAD', { encoding: 'utf8' }).trim();
+  } catch {
+    return null;
+  }
+}
+
+function findLatestRunIdForHeadSha({ workflowFile, headSha }) {
+  const raw = execSync(
+    `gh run list --workflow ${workflowFile} --limit 20 --json databaseId,headSha,htmlUrl,createdAt,status,conclusion`,
+    { encoding: 'utf8' }
+  );
+  const runs = JSON.parse(raw);
+  const match = runs.find((r) => (r.headSha || '').toLowerCase() === headSha.toLowerCase());
+  return match || null;
+}
+
+function sleepSync(ms) {
+  // Node.js synchronous sleep without spawning processes.
+  // Atomics.wait is supported in Node and is safe here.
+  const sab = new SharedArrayBuffer(4);
+  const int32 = new Int32Array(sab);
+  Atomics.wait(int32, 0, 0, ms);
+}
+
+console.log('\n👀 Watching GitHub Actions run (via gh)...');
+try {
+  const headSha = tryGetHeadSha();
+
+  if (!headSha) {
+    console.log('⚠️  Could not determine git HEAD sha; watching latest run for release.yaml');
+    execSync('gh run watch --workflow release.yaml --exit-status', { stdio: 'inherit' });
+  } else {
+    let run = null;
+    const startedAt = Date.now();
+    const timeoutMs = 60_000;
+    const sleepMs = 2_000;
+
+    while (!run && Date.now() - startedAt < timeoutMs) {
+      try {
+        run = findLatestRunIdForHeadSha({ workflowFile: 'release.yaml', headSha });
+      } catch {
+        // Ignore transient gh/api failures while the run is being created.
+      }
+
+      if (!run) {
+        sleepSync(sleepMs);
+      }
+    }
+
+    if (!run) {
+      console.log('⚠️  Could not find the run for this commit yet; watching latest run for release.yaml');
+      execSync('gh run watch --workflow release.yaml --exit-status', { stdio: 'inherit' });
+    } else {
+      console.log(`   Run: ${run.htmlUrl}`);
+      execSync(`gh run watch ${run.databaseId} --exit-status`, { stdio: 'inherit' });
+    }
+  }
+} catch (error) {
+  console.error('⚠️  Failed to watch workflow progress via gh.');
+  console.error('You can still monitor progress at: https://github.com/owlcms/owlcms-tracker/actions');
+  console.error(`Details: ${error?.message || error}`);
+}
+
 console.log(`\n✅ Release ${version} initiated!`);
 console.log(`   Tracker version: ${version}`);
 console.log(`   Tracker-core version: ${trackerCoreVersion}`);
