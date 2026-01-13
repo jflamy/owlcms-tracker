@@ -100,6 +100,13 @@ export async function GET({ request, url }) {
 		  timestamp: protocolError.timestamp || Date.now()
 		});
 	  }
+    else {
+    // Explicitly tell clients protocol is OK so they can clear any stale UI state
+    send({
+      type: 'protocol_ok',
+      timestamp: Date.now()
+    });
+    }
       
       // If hub is already ready, explicitly send hub_ready so browser knows to fetch data
       if (competitionHub.isReady()) {

@@ -147,6 +147,7 @@
   }
 
   let confirmedFops = data.hasConfirmedFops ?? false;
+  let protocolError = null;
 
   onMount(() => {
     if (!browser) return;
@@ -161,6 +162,22 @@
       try {
         const msg = JSON.parse(event.data || '{}');
 
+        // Handle protocol errors
+        if (msg?.type === 'protocol_error') {
+          protocolError = {
+            reason: msg.reason || 'Protocol version mismatch',
+            received: msg.received || null,
+            minimum: msg.minimum || null
+          };
+          return;
+        }
+
+        // Clear protocol error on protocol_ok
+        if (msg?.type === 'protocol_ok') {
+          protocolError = null;
+          return;
+        }
+
         // Normalize the message body - the hub sometimes uses `data`, sometimes `payload`.
         const body = msg?.data || msg?.payload || msg || {};
 
@@ -172,11 +189,15 @@
         const hasCompetition = !!body?.competition;
 
         if (okTypes.includes(msg?.type) && (hasFops || hasCompetition || msg?.type === 'fop_update')) {
+          // We are receiving valid hub data; clear any previously shown protocol error.
+          protocolError = null;
           markConfirmed();
         }
         // If the hub explicitly sent a 'waiting' message, ensure we reflect that
         // by marking `confirmedFops` false so the UI returns to the Waiting state.
+        // Also clear any stale protocol banner while disconnected.
         if (msg?.type === 'waiting' || body?.message?.toLowerCase?.().includes('waiting')) {
+          protocolError = null;
           confirmedFops = false;
         }
       } catch (error) {
@@ -253,7 +274,21 @@
     <h1><img src="/left.png" alt="OWLCMS" class="header-logo" /> OWLCMS Tracker</h1>
   </header>
 
-  {#if !confirmedFops}
+  {#if protocolError}
+    <div class="protocol-error">
+      <div class="protocol-error-content">
+        <h2>⚠️ Protocol Version Mismatch</h2>
+        <p class="error-reason">{protocolError.reason}</p>
+        {#if protocolError.received || protocolError.minimum}
+          <p class="error-details">
+            {#if protocolError.received}Received: <strong>{protocolError.received}</strong>{/if}
+            {#if protocolError.received && protocolError.minimum} | {/if}
+            {#if protocolError.minimum}Required: <strong>{protocolError.minimum}+</strong>{/if}
+          </p>
+        {/if}
+      </div>
+    </div>
+  {:else if !confirmedFops}
     <div class="waiting">
       <div class="waiting-content">
         <h2>⏳ Waiting for Competition Data</h2>
@@ -1335,6 +1370,42 @@
     margin: 0 0 0.75rem 0;
     text-transform: uppercase;
     letter-spacing: 0.05em;
+  }
+  
+  .protocol-error {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 0 2rem 0;
+    width: 100%;
+  }
+  
+  .protocol-error-content {
+    max-width: 700px;
+    text-align: center;
+    background: rgba(127, 29, 29, 0.3);
+    padding: 3rem;
+    border-radius: 12px;
+    border: 2px solid #7f1d1d;
+    color: #fecaca;
+  }
+  
+  .protocol-error-content h2 {
+    font-size: 2rem;
+    margin-bottom: 1rem;
+    color: #fecaca;
+  }
+  
+  .error-reason {
+    font-size: 1.2rem;
+    margin: 1rem 0;
+    font-weight: 500;
+  }
+  
+  .error-details {
+    font-size: 1rem;
+    margin: 1rem 0;
+    color: #fca5a5;
   }
   
   .waiting {

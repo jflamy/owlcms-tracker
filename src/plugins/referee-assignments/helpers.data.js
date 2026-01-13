@@ -37,7 +37,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		return {
 			status: 'no_data',
 			message: 'No competition data available',
-			sessions: [],
+			days: [],
 			header: {}
 		};
 	}
@@ -63,12 +63,10 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			status: 'ready',
 			header: {
 				competitionName: competition.competitionName || 'Competition',
-				site: competition.competitionSite || '',
-				competitionDate: competition.competitionDate ? formatDate(competition.competitionDate, language) : '',
-				city: competition.competitionCity || '',
+				locationLine: '',
 				title: translations['OfficialAssignments'] || `!${language}:OfficialAssignments`
 			},
-			sessions: [],
+			days: [],
 			totalSessions: 0,
 			labels: buildLabels(translations, language)
 		};
@@ -86,6 +84,25 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// Get competition info for header
 	const competition = databaseState.competition;
 	
+	// Build location line (combines site, city, and date range in ISO format)
+	function buildLocationLine() {
+		const parts = [];
+		if (competition.competitionSite) parts.push(competition.competitionSite);
+		if (competition.competitionCity) parts.push(competition.competitionCity);
+		
+		// Format dates in ISO format (yyyy-mm-dd)
+		const startDate = competition.competitionDate ? formatDateISO(competition.competitionDate) : '';
+		const endDate = competition.competitionEndDate ? formatDateISO(competition.competitionEndDate) : '';
+		
+		if (startDate && endDate) {
+			parts.push(`${startDate} - ${endDate}`);
+		} else if (startDate) {
+			parts.push(startDate);
+		}
+		
+		return parts.filter(p => p).join(', ');
+	}
+	
 	// Helper function to split names on " et " or " and "
 	function formatNames(value) {
 		if (!value || value.trim() === '') {
@@ -101,7 +118,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		};
 	}
 
-	// Build session columns data
+	// Build session columns data with ISO date extraction
 	const sessionColumns = sortedSessions.map((session, idx) => {
 		// Get category info if available - find athletes in this session
 		const sessionAthletes = (databaseState.athletes || []).filter(a => a.group === session.name);
@@ -113,6 +130,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			platformName: session.platformName || '',
 			weighInTime: session.weighInTime ? formatTime(session.weighInTime) : '',
 			competitionTime: session.competitionTime ? formatTime(session.competitionTime) : '',
+			competitionDay: session.competitionTime ? formatDateISO(session.competitionTime) : '',
 			athleteCount: sessionAthletes.length,
 			officials: {
 				weighIn1: formatNames(session.weighIn1),
@@ -143,20 +161,68 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			}
 		};
 	});
+	
+	// Group sessions by competition day (ISO date) then by platform
+	const dayPlatformGroups = new Map();
+	sessionColumns.forEach(session => {
+		const day = session.competitionDay || 'unknown';
+		const platform = session.platformName || 'Platform';
+		const key = `${day}|${platform}`;
+		
+		if (!dayPlatformGroups.has(key)) {
+			dayPlatformGroups.set(key, {
+				day,
+				platform,
+				sessions: []
+			});
+		}
+		dayPlatformGroups.get(key).sessions.push(session);
+	});
+	
+	// Convert to sorted array grouped by day, then by platform
+	const groupedByDay = new Map();
+	Array.from(dayPlatformGroups.values())
+		.sort((a, b) => {
+			// Sort by day first, then by platform
+			const dayCompare = a.day.localeCompare(b.day);
+			if (dayCompare !== 0) return dayCompare;
+			return a.platform.localeCompare(b.platform);
+		})
+		.forEach(group => {
+			if (!groupedByDay.has(group.day)) {
+				groupedByDay.set(group.day, []);
+			}
+			groupedByDay.get(group.day).push({
+				platform: group.platform,
+				sessions: group.sessions
+			});
+		});
+	
+	// Convert to final array structure with platform counts
+	const days = Array.from(groupedByDay.entries())
+		.map(([date, platforms]) => ({
+			date,
+			platforms,
+			hasMultiplePlatforms: platforms.length > 1
+		}));
 
 	// Build result with translations
 	const sideRefereeBase = translations['SideReferee'] || `!${language}:SideReferee`;
+	
+	// Check if there are multiple platforms across all days
+	const allPlatforms = new Set();
+	sessionColumns.forEach(s => allPlatforms.add(s.platformName || 'Platform'));
+	const hasMultiplePlatforms = allPlatforms.size > 1;
 	
 	const result = {
 		status: 'ready',
 		header: {
 			competitionName: competition.competitionName || 'Competition',
-			site: competition.competitionSite || '',
-			competitionDate: competition.competitionDate ? formatDate(competition.competitionDate, language) : '',
-			city: competition.competitionCity || '',
+			locationLine: buildLocationLine(),
 			title: translations['OfficialAssignments'] || `!${language}:OfficialAssignments`
 		},
-		sessions: sessionColumns,
+		days: days,
+		hasMultiplePlatforms,
 		totalSessions: sortedSessions.length,
 		// Pass translations and labels for use in component
 		labels: buildLabels(translations, language)
@@ -184,6 +250,15 @@ function formatTime(timeArray) {
 	if (!timeArray || timeArray.length < 5) return '';
 	const [, , , hour, minute] = timeArray;
 	return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
+
+/**
+ * Format competitionTime array [year, month, day, hour, minute] to ISO date string (yyyy-mm-dd)
+ */
+function formatDateISO(timeArray) {
+	if (!timeArray || timeArray.length < 3) return '';
+	const [year, month, day] = timeArray;
+	return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
 /**
