@@ -469,7 +469,12 @@ try {
   sleepSync(15000);
 } catch (error) {
   console.error('⚠️  Failed to trigger workflow via gh CLI');
-  console.error('Make sure GitHub CLI is installed and authenticated:');
+  console.error(`Error: ${error.message}`);
+  if (error.stderr) {
+    console.error('stderr:', error.stderr.toString());
+  }
+  console.error('\nMake sure GitHub CLI is installed and authenticated:');
+  console.error('  gh auth status');
   console.error('  gh auth login');
   console.error('\nYou can manually trigger the workflow at:');
   console.error('  https://github.com/owlcms/owlcms-tracker/actions/workflows/release.yaml');
