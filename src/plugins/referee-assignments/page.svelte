@@ -536,11 +536,6 @@
 		line-height: 1.2;
 		white-space: pre-line;
 	}
-
-	.indent {
-		margin-left: 1rem;
-	}
-
 	.empty {
 		color: #999;
 	}
