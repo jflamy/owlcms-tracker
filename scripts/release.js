@@ -104,17 +104,6 @@ function getCurrentBranch() {
   }
 }
 
-function getRemoteHeadSha({ remote = 'origin', branch }) {
-  try {
-    const out = execSync(`git ls-remote ${remote} refs/heads/${branch}`, { encoding: 'utf8' }).trim();
-    // Format: <sha>\trefs/heads/<branch>
-    const sha = out.split(/\s+/)[0];
-    return sha || null;
-  } catch {
-    return null;
-  }
-}
-
 /**
  * Prompt user for confirmation
  * @param {string} message - The confirmation message
@@ -434,24 +423,12 @@ try {
 console.log(`\n▶️  Triggering release workflow for version ${version}...`);
 try {
   // Ensure we don't trigger a workflow from a dirty working tree.
-  // At this point, only fully clean is acceptable.
   assertCleanWorkingTree({ allowedDirty: [] });
 
   const branch = getCurrentBranch();
   if (!branch) {
     console.error('❌ Cannot determine current branch (detached HEAD?).');
     console.error('Please checkout a branch (e.g. main) and re-run.');
-    process.exit(1);
-  }
-
-  // Ensure the remote branch points to our current commit before triggering.
-  const localHead = tryGetHeadSha();
-  const remoteHead = getRemoteHeadSha({ remote: 'origin', branch });
-  if (!localHead || !remoteHead || localHead.toLowerCase() !== remoteHead.toLowerCase()) {
-    console.error(`❌ Refusing to trigger workflow: origin/${branch} is not at local HEAD.`);
-    console.error(`   local HEAD:  ${localHead || 'unknown'}`);
-    console.error(`   origin/${branch}: ${remoteHead || 'unknown'}`);
-    console.error('Push did not complete as expected. Fix and re-run.');
     process.exit(1);
   }
 
@@ -462,7 +439,7 @@ try {
     process.exit(1);
   }
 
-  // Trigger the workflow on the pushed branch ref (not the default branch implicitly).
+  // Trigger the workflow on the pushed branch ref
   execSync(`gh workflow run release.yaml --ref ${branch} -f revision=${version}`, { stdio: 'inherit' });
   console.log('✓ Workflow triggered');
   console.log('⏳ Waiting 15 seconds for GitHub to queue the run...');
@@ -470,20 +447,14 @@ try {
 } catch (error) {
   console.error('⚠️  Failed to trigger workflow via gh CLI');
   console.error(`Error: ${error.message}`);
-  if (error.stderr) {
-    console.error('stderr:', error.stderr.toString());
-  }
   console.error('\nMake sure GitHub CLI is installed and authenticated:');
   console.error('  gh auth status');
-  console.error('  gh auth login');
   console.error('\nYou can manually trigger the workflow at:');
   console.error('  https://github.com/owlcms/owlcms-tracker/actions/workflows/release.yaml');
   process.exit(1);
 }
 
 function sleepSync(ms) {
-  // Node.js synchronous sleep without spawning processes.
-  // Atomics.wait is supported in Node and is safe here.
   const sab = new SharedArrayBuffer(4);
   const int32 = new Int32Array(sab);
   Atomics.wait(int32, 0, 0, ms);
