@@ -25,6 +25,64 @@ import https from 'https';
 import { gt } from 'semver';
 import readline from 'readline';
 
+function getDirtyPaths() {
+  try {
+    const out = execSync('git status --porcelain', { encoding: 'utf8' }).trim();
+    if (!out) return [];
+
+    return out
+      .split(/\r?\n/)
+      .map((line) => {
+        // Porcelain format: XY <path> (or XY <from> -> <to> for renames)
+        const arrowIndex = line.indexOf('->');
+        if (arrowIndex !== -1) {
+          return line.slice(arrowIndex + 2).trim();
+        }
+        return line.slice(3).trim();
+      })
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+function assertCleanWorkingTree({ allowedDirty = [] }) {
+  const dirty = getDirtyPaths();
+  if (dirty.length === 0) return;
+
+  const allowedSet = new Set(allowedDirty);
+  const notAllowed = dirty.filter((p) => !allowedSet.has(p));
+
+  if (notAllowed.length > 0) {
+    console.error('❌ Working tree has uncommitted changes.');
+    console.error('Please commit or stash these files before running release:');
+    for (const p of notAllowed) console.error(`  - ${p}`);
+    console.error('');
+    console.error('Allowed (can be dirty at start):');
+    for (const p of allowedDirty) console.error(`  - ${p}`);
+    process.exit(1);
+  }
+}
+
+function remoteReleaseExists(tag) {
+  try {
+    execSync(`gh release view "${tag}"`, { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function remoteTagExists(tag) {
+  try {
+    // Uses the current repo context; returns non-zero if the ref doesn't exist.
+    execSync(`gh api repos/owlcms/owlcms-tracker/git/ref/tags/${tag}`, { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Prompt user for confirmation
  * @param {string} message - The confirmation message
@@ -175,6 +233,9 @@ if (!/^\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?(\+[a-zA-Z0-9.]+)?$/.test(version)) {
 
 console.log(`📦 Preparing release ${version}...\n`);
 
+// Safety: release must start from a clean working tree, except for release notes / helper script.
+assertCleanWorkingTree({ allowedDirty: ['ReleaseNotes.md', 'release.sh'] });
+
 // Fetch latest tracker-core version if not provided
 if (!trackerCoreVersion) {
   console.log('🔍 Fetching latest tracker-core version from GitHub...');
@@ -304,7 +365,8 @@ try {
 // Commit and push
 console.log('\n💾 Committing changes...');
 try {
-  execSync('git add package.json package-lock.json ReleaseNotes.md', { stdio: 'inherit' });
+  // Include release notes and helper script if present.
+  execSync('git add package.json package-lock.json ReleaseNotes.md release.sh', { stdio: 'inherit' });
   execSync(`git commit -m "chore: update tracker-core to ${trackerCoreVersion} for release ${version}"`, { stdio: 'inherit' });
   console.log('✓ Committed');
 } catch (error) {
@@ -323,6 +385,16 @@ try {
 // Trigger GitHub Actions workflow using gh CLI
 console.log(`\n▶️  Triggering release workflow for version ${version}...`);
 try {
+  // Ensure we don't trigger a workflow from a dirty working tree.
+  // At this point, only fully clean is acceptable.
+  assertCleanWorkingTree({ allowedDirty: [] });
+
+  if (remoteTagExists(version) || remoteReleaseExists(version)) {
+    console.error(`❌ Refusing to run: tag or release already exists for ${version}`);
+    console.error('Pick a new version number, or manually handle the existing release/tag.');
+    process.exit(1);
+  }
+
   execSync(`gh workflow run release.yaml -f revision=${version}`, { stdio: 'inherit' });
   console.log('✓ Workflow triggered');
 } catch (error) {
@@ -344,7 +416,7 @@ function tryGetHeadSha() {
 
 function findLatestRunIdForHeadSha({ workflowFile, headSha }) {
   const raw = execSync(
-    `gh run list --workflow ${workflowFile} --limit 20 --json databaseId,headSha,htmlUrl,createdAt,status,conclusion`,
+    `gh run list --workflow ${workflowFile} --limit 20 --json databaseId,headSha,url,createdAt,status,conclusion`,
     { encoding: 'utf8' }
   );
   const runs = JSON.parse(raw);
@@ -389,7 +461,9 @@ try {
       console.log('⚠️  Could not find the run for this commit yet; watching latest run for release.yaml');
       execSync('gh run watch --workflow release.yaml --exit-status', { stdio: 'inherit' });
     } else {
-      console.log(`   Run: ${run.htmlUrl}`);
+      if (run.url) {
+        console.log(`   Run: ${run.url}`);
+      }
       execSync(`gh run watch ${run.databaseId} --exit-status`, { stdio: 'inherit' });
     }
   }

@@ -18,6 +18,26 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Fail if tag or release already exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          echo "Checking if tag/release already exists for: ${REVISION}"
+
+          if git ls-remote --tags origin "refs/tags/${REVISION}" | grep -q .; then
+            echo "❌ Git tag already exists on origin: ${REVISION}"
+            echo "Stop: choose a new version or delete the tag/release manually (not recommended)."
+            exit 1
+          fi
+
+          if gh release view "${REVISION}" >/dev/null 2>&1; then
+            echo "❌ GitHub Release already exists: ${REVISION}"
+            echo "Stop: choose a new version or manually manage the existing release assets."
+            exit 1
+          fi
+          echo "✓ Tag and release do not exist yet"
       
       - name: Verify Docker Credentials
         run: |
@@ -157,6 +177,16 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -x
+          # Re-check just before tagging/releasing (race condition safety)
+          if git ls-remote --tags origin "refs/tags/${{ env.REVISION }}" | grep -q .; then
+            echo "❌ Git tag already exists on origin: ${{ env.REVISION }}"
+            exit 1
+          fi
+          if gh release view "${{ env.REVISION }}" >/dev/null 2>&1; then
+            echo "❌ GitHub Release already exists: ${{ env.REVISION }}"
+            exit 1
+          fi
+
           # Tag the current commit
           git config user.email "${{ github.actor }}@users.noreply.github.com"
           git config user.name "${{ github.actor }}"
