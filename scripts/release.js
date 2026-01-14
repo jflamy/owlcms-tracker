@@ -36,20 +36,18 @@ function getDirtyPaths() {
         const trimmed = line.trim();
         if (!trimmed) return null;
         
-        // Porcelain format after trim: 'XY path' where X and Y are status codes
-        // Example: 'M package.json' (M, space, filename) or ' M package.json'
+        // Porcelain format: 'XY path' where X and Y are status codes (2 chars)
+        // Example: ' M package.json' or 'M  package.json' or 'MM package.json'
         const arrowIndex = trimmed.indexOf('->');
         if (arrowIndex !== -1) {
           // Rename: 'R  old -> new'
           return trimmed.slice(arrowIndex + 2).trim();
         }
-        // Skip status code (1-2 chars) and following space(s)
-        // Find first non-space char after position 0
-        let i = 0;
-        while (i < trimmed.length && (trimmed[i] === ' ' || /[MADRCU?!]/.test(trimmed[i]))) {
-          i++;
-        }
-        return trimmed.substring(i);
+        
+        // Skip first 2 characters (status codes) and any following spaces
+        // Status codes are always exactly 2 characters followed by space(s)
+        let path = trimmed.substring(2).trim();
+        return path;
       })
       .filter(Boolean);
   } catch {

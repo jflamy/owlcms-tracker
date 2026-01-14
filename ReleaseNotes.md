@@ -3,6 +3,8 @@
 > #### ⚠ To use Tracker, you need to use version 64 of OWLCMS (see Installing Locally below)
 
 ## New in Release 2.6
+- Scoreboards and attempt boards now track the break and ceremony status same as OWLCMS
+- Now uses a shared component for all attempt bars in all scoreboards
 - When runnning locally, should be launched from control panel version 3.0 or later (see below)
 - Node.js not included in packaging
 
