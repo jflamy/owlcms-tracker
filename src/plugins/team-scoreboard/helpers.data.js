@@ -26,6 +26,7 @@ import { computeGamx, Variant } from '$lib/gamx2.js';
 import { buildCacheKey, registerCache } from '$lib/server/cache-utils.js';
 import { extractTimers, computeDisplayMode, extractDecisionState } from '$lib/server/timer-decision-helpers.js';
 import { computeAttemptBarVisibility, hasCurrentAthlete, logAttemptBarDebug } from '$lib/server/attempt-bar-visibility.js';
+import { isBreakMode, inferGroupName, inferBreakMessage, extractCurrentAttempt, buildSessionInfo } from '$lib/server/standard-scoreboard-helpers.js';
 
 // =============================================================================
 // CACHE
@@ -1603,21 +1604,19 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		
 		logAttemptBarDebug(fopUpdate, sessionStatus, 'Team helpers [cache HIT]');
 
+		// Extract current attempt using shared function (handles break mode)
+		const currentAttempt = extractCurrentAttempt(fopUpdate, translations);
+		const mode = fopUpdate?.mode || 'WAIT';
+		const breakTitle = isBreakMode(mode) ? inferGroupName(fopUpdate, translations) : null;
+
 		// Build fresh competition object (never cached) with current session info
 		// Need to determine lift type for sessionInfo
 		const liftTypeKey = fopUpdate?.liftTypeKey || 'Snatch';
 		const liftType = liftTypeKey === 'Snatch' ? 'snatch' : 'cleanJerk';
-		const liftTypeLabel = translations[liftType === 'snatch' ? 'Snatch' : 'CleanJerk'] || (liftType === 'snatch' ? 'Snatch' : 'Clean & Jerk');
-		const session = translations['Tracker.Session'] || translations.Session || 'Session';
 		
-		let sessionInfo;
-		// Only show session info if a session is actually selected (sessionName is reliable)
+		// Use shared buildSessionInfo for consistent formatting across all scoreboards
 		const hasSessionName = fopUpdate?.sessionName != null && fopUpdate?.sessionName !== '';
-		if (hasSessionName && fopUpdate?.sessionName) {
-			sessionInfo = `${session} ${fopUpdate?.sessionName || 'A'}${liftTypeLabel ? ' - ' + liftTypeLabel : ''}`;
-		} else {
-			sessionInfo = '&nbsp;';
-		}
+		const sessionInfo = hasSessionName ? buildSessionInfo(fopUpdate, translations) : '&nbsp;';
 
 		// Determine if there's a current athlete in the cache hit path
 		const hasCurrentAthleteForCompetition = hasCurrentAthlete(fopUpdate, sessionStatus);
@@ -1636,6 +1635,8 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 				showTimer: hasActiveSession,
 				showLiftType: hasActiveSession
 			},
+			currentAttempt,
+			breakTitle,
 			timer: activeTimer,
 			breakTimer,
 			displayMode,
@@ -1643,6 +1644,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			decision,
 			sessionStatus,
 			sessionStatusMessage,
+			isBreak: fopUpdate?.break === 'true' || isBreakMode(mode),
 			hasCurrentAthlete: hasCurrentAthleteFlag,
 			attemptBarClass,
 			learningMode
@@ -1769,14 +1771,10 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	const hasSessionSelected = hasCurrentAthleteKey || (platformState !== 'INACTIVE');
 	
 	// Build sessionInfo only when session is selected; otherwise blank
-	let sessionInfo;
-	if (hasSessionSelected && fopUpdate?.sessionName) {
-		// Build from sessionName + lift type - never use OWLCMS-provided sessionInfo as it can be stale/wrong
-		sessionInfo = `${headers.session} ${fopUpdate?.sessionName || 'A'}${liftTypeLabel ? ' - ' + liftTypeLabel : ''}`;
-	} else {
-		// No active session and no session selected - don't show platform name for one-platform competitions
-		sessionInfo = '&nbsp;';
-	}
+	// Use shared buildSessionInfo for consistent formatting across all scoreboards
+	const sessionInfo = (hasSessionSelected && fopUpdate?.sessionName)
+		? buildSessionInfo(fopUpdate, translations)
+		: '&nbsp;';
 	
 	// Extract competition info
 	const competition = {
@@ -1802,30 +1800,14 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			});
 		});
 	}
-	// Extract current attempt - only if there's actually an athlete lifting
-	let currentAttempt = null;
-	let sessionStatusMessage = null;
 	
-	if (hasCurrentAthleteFlag && fopUpdate?.fullName) {
-		const cleanFullName = (fopUpdate.fullName || '').replace(/&ndash;/g, '–').replace(/&mdash;/g, '—');
-		
-		currentAttempt = {
-			fullName: cleanFullName,
-			name: cleanFullName,
-			teamName: fopUpdate.teamName,
-			team: fopUpdate.teamName,
-			startNumber: fopUpdate.startNumber,
-			categoryName: fopUpdate.categoryName,
-			category: fopUpdate.categoryName,
-			attempt: fopUpdate.attempt,
-			attemptNumber: fopUpdate.attemptNumber,
-			weight: fopUpdate.weight,
-			timeAllowed: fopUpdate.timeAllowed,
-			startTime: null
-		};
-	}
+	// Extract current attempt using shared function (handles break mode)
+	const currentAttempt = extractCurrentAttempt(fopUpdate, translations);
+	const mode = fopUpdate?.mode || 'WAIT';
+	const breakTitle = isBreakMode(mode) ? inferGroupName(fopUpdate, translations) : null;
 	
 	// Session done message (separate from currentAttempt)
+	let sessionStatusMessage = null;
 	if (sessionStatus.isDone && fopUpdate?.fullName) {
 		sessionStatusMessage = (fopUpdate.fullName || '').replace(/&ndash;/g, '–').replace(/&mdash;/g, '—');
 	}
@@ -1863,6 +1845,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		currentAttempt,
 		hasCurrentAthlete: hasCurrentAthleteFlag,
 		attemptBarClass,
+		breakTitle,  // Group name during breaks
 		detectedAthlete: {
 			fullName: helperDetectedAthlete?.fullName || helperDetectedAthlete?.startNumber || null,
 			gender: helperDetectedGender || null
@@ -1882,7 +1865,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			showLiftRanks: fopUpdate.showLiftRanks === 'true',
 			showSinclairRank: fopUpdate.showSinclairRank === 'true'
 		} : {},
-		isBreak: fopUpdate?.break === 'true' || false,
+		isBreak: fopUpdate?.break === 'true' || isBreakMode(mode),
 		breakType: fopUpdate?.breakType,
 		sessionStatus,
 		compactTeamColumn,

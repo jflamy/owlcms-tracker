@@ -1,7 +1,17 @@
 <script>
 	/**
 	 * Attempt Board - Full screen layout
-	 * Matches OWLCMS Attempt Board design
+	 * Matches OWLCMS Attempt Board design and mode handling
+	 * 
+	 * Modes (from OWLCMS):
+	 * - WAIT: No session, show competition name + waiting message
+	 * - INTRO_COUNTDOWN: Break before introduction, show break timer
+	 * - LIFT_COUNTDOWN: Break before lift type, show break timer
+	 * - LIFT_COUNTDOWN_CEREMONY: Break before lift with ceremony
+	 * - CURRENT_ATHLETE: Normal lifting, show athlete info + athlete timer
+	 * - INTERRUPTION: Technical break, show STOP
+	 * - SESSION_DONE: Session complete
+	 * - CEREMONY: Medal/introduction ceremony
 	 */
 	import CountdownTimer from '$lib/components/CountdownTimer.svelte';
 	import PlatesElement from '$lib/components/PlatesElement.svelte';
@@ -17,15 +27,42 @@
 	$: currentAttempt = data.currentAttempt;
 	$: plates = data.plates || [];
 	$: decision = data.decision || {};
-	$: displayMode = data.displayMode || 'none';
 	$: options = data.options || {};
 	
-	// Decision display logic
-	$: showDecisionArea = displayMode === 'decision' && options.showDecisions;
+	// Board mode from OWLCMS
+	$: mode = data.mode || 'WAIT';
+	$: breakType = data.breakType;
+	
+	// Mode-based display logic (mirrors OWLCMS AttemptBoard.js)
+	$: isBreak = data.isBreak || false;
+	$: isCountdown = data.isCountdown || false;
+	$: isWaitMode = mode === 'WAIT';
+	$: isCurrentAthlete = mode === 'CURRENT_ATHLETE';
+	$: decisionVisible = decision?.visible && isCurrentAthlete;
+	
+	// Break content (computed by tracker using its own translations)
+	$: breakTitle = data.breakTitle || '';
+	$: breakMessage = data.breakMessage || '';
+	
+	// What to show in name areas
+	$: displayLastName = isBreak ? breakTitle : (currentAttempt?.lastName || '');
+	$: displayFirstName = isBreak ? breakMessage : (currentAttempt?.firstName || '');
+	
+	// Element visibility based on mode (matching OWLCMS)
+	$: showTeamName = !isBreak && !decisionVisible;
+	$: showTeamFlag = !isBreak && isCurrentAthlete;
+	$: showAthletePicture = isCurrentAthlete && !decisionVisible;
+	$: showStartNumber = !isBreak;
+	$: showAttempt = !isBreak && !decisionVisible;
+	$: showWeight = mode === 'LIFT_COUNTDOWN' || isCurrentAthlete || (mode === 'INTERRUPTION' && breakType === 'TECHNICAL');
+	$: showBarbell = (mode === 'LIFT_COUNTDOWN' || (isCurrentAthlete && !decisionVisible) || (mode === 'INTERRUPTION' && breakType === 'TECHNICAL'));
+	$: showAthleteTimer = isCurrentAthlete && !decisionVisible;
+	$: showBreakTimer = isCountdown;
+	$: showDecisionArea = isCurrentAthlete && decisionVisible && options.showDecisions;
 	$: showDownSignal = decision?.down && !decision?.ref1 && !decision?.ref2 && !decision?.ref3;
 	
 	// Long name handling (matches owlcms AbstractAttemptBoard.java)
-	$: isLongLastName = (currentAttempt?.lastName?.length || 0) > 18;
+	$: isLongLastName = (displayLastName?.length || 0) > 18;
 	$: lastNameStyle = isLongLastName 
 		? 'font-size: 8vh; line-height: 8vh; text-wrap: balance; overflow: hidden;' 
 		: '';
@@ -33,11 +70,11 @@
 		? 'font-size: 8vh; line-height: 12vh; text-wrap: wrap; overflow: hidden;' 
 		: '';
 	
-	// Flag display
-	$: hasFlag = !!currentAttempt?.flagUrl;
+	// Flag display (only when not in break)
+	$: hasFlag = !isBreak && !!currentAttempt?.flagUrl;
 	
-	// Picture display
-	$: hasPicture = !!currentAttempt?.pictureUrl;
+	// Picture display (only when not in break)
+	$: hasPicture = !isBreak && !!currentAttempt?.pictureUrl;
 	
 	// Referee decision class
 	function getRefClass(value) {
@@ -52,7 +89,8 @@
 </svelte:head>
 
 <div class="wrapper">
-	{#if data.status === 'waiting' || !currentAttempt}
+	{#if isWaitMode}
+		<!-- WAIT mode: Show competition name and waiting message -->
 		<div class="waiting-message">
 			<div class="big-title">
 				<div class="competition-name">{data.competition?.name || ''}</div>
@@ -60,43 +98,52 @@
 			</div>
 		</div>
 	{:else}
+		<!-- Active mode: Show attempt board (athlete or break) -->
 		<div class="attempt-board">
-			<!-- Last Name -->
-			<div class="last-name" class:with-picture={hasPicture} style={lastNameStyle}>{currentAttempt.lastName || ''}</div>
+			<!-- Last Name (or break title during breaks) -->
+			<div class="last-name" class:with-picture={hasPicture} style={lastNameStyle}>{displayLastName}</div>
 			
-			<!-- First Name -->
-			<div class="first-name" class:with-flag={hasFlag} class:with-picture={hasPicture} style={firstNameStyle}>{currentAttempt.firstName || ''}</div>
+			<!-- First Name (or break message during breaks) -->
+			<div class="first-name" class:with-flag={hasFlag} class:with-picture={hasPicture} style={firstNameStyle}>{displayFirstName}</div>
 			
-			<!-- Team Flag -->
-			{#if hasFlag}
+			<!-- Team Flag (hidden during breaks) -->
+			{#if hasFlag && showTeamFlag}
 				<div class="flag" class:with-picture={hasPicture}>
 					<img src={currentAttempt.flagUrl} alt="" />
 				</div>
 			{/if}
 			
-			<!-- Athlete Picture -->
-			{#if hasPicture}
+			<!-- Athlete Picture (hidden during breaks and decisions) -->
+			{#if hasPicture && showAthletePicture}
 				<div class="picture">
 					<img src={currentAttempt.pictureUrl} alt="" />
 				</div>
 			{/if}
 			
-			<!-- Team Name -->
-			<div class="team-name">{currentAttempt.teamName || ''}</div>
+			<!-- Team Name (hidden during breaks) -->
+			{#if showTeamName}
+				<div class="team-name">{currentAttempt?.teamName || ''}</div>
+			{/if}
 			
-			<!-- Start Number -->
-			<div class="start-number">
-				<span>{currentAttempt.startNumber || ''}</span>
-			</div>
+			<!-- Start Number (hidden during breaks) -->
+			{#if showStartNumber}
+				<div class="start-number">
+					<span>{currentAttempt?.startNumber || ''}</span>
+				</div>
+			{/if}
 			
-			<!-- Category -->
-			<div class="category">{currentAttempt.categoryName || ''}</div>
+			<!-- Category (hidden during breaks) -->
+			{#if showAttempt}
+				<div class="category">{currentAttempt?.categoryName || ''}</div>
+			{/if}
 			
-			<!-- Weight -->
-			<div class="weight">
-				<span class="weight-value">{currentAttempt.weight || ''}</span>
-				<span class="weight-unit">kg</span>
-			</div>
+			<!-- Weight (visible during lift countdowns, current athlete, and technical breaks) -->
+			{#if showWeight}
+				<div class="weight">
+					<span class="weight-value">{currentAttempt?.weight || ''}</span>
+					<span class="weight-unit">kg</span>
+				</div>
+			{/if}
 			
 			<!-- Barbell / Decision Area -->
 			{#if showDecisionArea}
@@ -115,29 +162,27 @@
 						</div>
 					{/if}
 				</div>
-			{:else if options.showPlates && data.platform}
+			{:else if showBarbell && options.showPlates && data.platform}
 				<div class="barbell">
-					<!-- Debug: weight={currentAttempt.weight}, barWeight={currentAttempt.barWeight}, platform={!!data.platformPlates} -->
 					<PlatesElement 
-						weight={currentAttempt.weight || 0}
-						barWeight={currentAttempt.barWeight || 20}
+						weight={currentAttempt?.weight || 0}
+						barWeight={currentAttempt?.barWeight || 20}
 						platform={data.platformPlates}
 					/>
 				</div>
-			{:else}
-				<!-- DEBUG: showPlates={options.showPlates}, platform={!!data.platform} -->
+			{:else if !isBreak}
 				<div class="barbell-placeholder"></div>
 			{/if}
 			
-			<!-- Attempt Label (hidden when decisions shown) -->
-			{#if !showDecisionArea}
-				<div class="attempt">{@html currentAttempt.attempt || ''}</div>
+			<!-- Attempt Label (hidden during breaks and decisions) -->
+			{#if showAttempt}
+				<div class="attempt">{@html currentAttempt?.attempt || ''}</div>
 			{/if}
 			
 			<!-- Timer -->
 			{#if options.showTimer}
 				<div class="timer-area">
-					{#if displayMode === 'break'}
+					{#if showBreakTimer}
 						<div class="timer break-time">
 							<CountdownTimer 
 								timerData={data.breakTimer}
@@ -145,7 +190,7 @@
 								warningColor={BREAK_TIMER_COLOR}
 							/>
 						</div>
-					{:else if displayMode === 'athlete' || displayMode === 'none'}
+					{:else if showAthleteTimer}
 						<div class="timer athlete-timer">
 							<CountdownTimer 
 								timerData={data.timer}

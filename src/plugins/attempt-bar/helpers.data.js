@@ -37,6 +37,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		sessionStatusMessage: scoreboardData.sessionStatusMessage,
 		isBreak: fopUpdate?.break === 'true' || false,
 		breakType: fopUpdate?.breakType,
+		breakTitle: scoreboardData.breakTitle,  // Group name during breaks
 		status: scoreboardData.status,
 		message: scoreboardData.message,
 		attemptBarClass,

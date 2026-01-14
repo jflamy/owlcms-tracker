@@ -25,7 +25,7 @@ registerCache(scoreboardCache);
  * @param {string} mode - Board mode from fopUpdate
  * @returns {boolean}
  */
-function isBreakMode(mode) {
+export function isBreakMode(mode) {
 	return mode === 'INTERRUPTION' || 
 	       mode === 'INTRO_COUNTDOWN' || 
 	       mode === 'LIFT_COUNTDOWN' || 
@@ -35,13 +35,55 @@ function isBreakMode(mode) {
 }
 
 /**
+ * Build sessionInfo string using tracker translations (not OWLCMS sessionInfo which uses OWLCMS language)
+ * Format: "Session M1 – Snatch" (using en-dash)
+ * @param {Object} fopUpdate - FOP update object
+ * @param {Object} translations - Translation map
+ * @returns {string} - Session info string or empty string if no session
+ */
+export function buildSessionInfo(fopUpdate, translations) {
+	const hasSessionName = fopUpdate?.sessionName != null && fopUpdate?.sessionName !== '';
+	if (!hasSessionName) {
+		return '';
+	}
+	const sessionLabel = translations?.['Tracker.Session'] || translations?.Session || 'Session';
+	const liftTypeKey = fopUpdate?.liftTypeKey || 'Snatch';
+	const liftTypeLabel = liftTypeKey === 'Snatch' || liftTypeKey === 'SNATCH'
+		? (translations?.Snatch || 'Snatch')
+		: (translations?.CleanJerk || 'Clean & Jerk');
+	return `${sessionLabel} ${fopUpdate.sessionName} – ${liftTypeLabel}`;
+}
+
+/**
+ * Build attempt label using tracker translations
+ * Format: "Snatch #2" or "C&J #1" based on liftTypeKey and attemptNumber
+ * @param {Object} fopUpdate - FOP update object
+ * @param {Object} translations - Translation map
+ * @returns {string} - Attempt label or empty string
+ */
+export function buildAttemptLabel(fopUpdate, translations) {
+	const liftTypeKey = fopUpdate?.liftTypeKey || '';
+	const attemptNumber = fopUpdate?.attemptNumber || '';
+	if (!liftTypeKey || !attemptNumber || !translations) {
+		return '';
+	}
+	let template;
+	if (liftTypeKey === 'Snatch' || liftTypeKey === 'SNATCH') {
+		template = translations.Snatch_number || translations['Snatch_number'] || 'Snatch #{0}';
+	} else {
+		template = translations.C_and_J_number || translations['C_and_J_number'] || 'C&J #{0}';
+	}
+	return template.replace('{0}', attemptNumber);
+}
+
+/**
  * Infer the group/session name for break display
  * Mirrors OWLCMS BreakDisplay.inferGroupName()
  * @param {Object} fopUpdate - FOP update object
  * @param {Object} translations - Translation map
  * @returns {string}
  */
-function inferGroupName(fopUpdate, translations) {
+export function inferGroupName(fopUpdate, translations) {
 	const sessionName = fopUpdate?.sessionName || fopUpdate?.groupName || '';
 	if (!sessionName) {
 		return '';
@@ -59,7 +101,7 @@ function inferGroupName(fopUpdate, translations) {
  * @param {Object} translations - Translation map
  * @returns {string}
  */
-function inferBreakMessage(breakType, ceremonyType, translations) {
+export function inferBreakMessage(breakType, ceremonyType, translations) {
 	// Match OWLCMS BreakDisplay.java::inferMessage logic:
 	// 1. If both null -> "Competition Paused"
 	// 2. If ceremonyType != null (and breakType == CEREMONY) -> ceremony message  
@@ -182,12 +224,15 @@ export function getScoreboardData(scoreboardType, fopName = 'A', options = {}) {
 	// Determine if timer should be shown (active competition state)
 	const hasActiveSession = fopUpdate?.fopState && fopUpdate.fopState !== 'INACTIVE';
 	
+	// Build sessionInfo using shared function (tracker translations, not OWLCMS sessionInfo)
+	const sessionInfo = buildSessionInfo(fopUpdate, translations);
+	
 	const competition = {
 		name: fopUpdate?.competitionName || databaseState?.competition?.name || 'Competition',
 		fop: fopName,
 		state: fopUpdate?.fopState || 'INACTIVE',
 		session: fopUpdate?.sessionName || 'A',
-		sessionInfo: (fopUpdate?.sessionInfo || '').replace(/&ndash;/g, '\u2013').replace(/&mdash;/g, '\u2014'),
+		sessionInfo,
 		liftsDone: fopUpdate?.liftsDone || '',
 		showTimer: hasActiveSession,
 		showWeight: true
@@ -201,8 +246,8 @@ export function getScoreboardData(scoreboardType, fopName = 'A', options = {}) {
 	// Build cache key - include all options (showRecords, lang, etc.)
 	const cacheKey = buildCacheKey({ fopName, includeFop: true, opts: { ...options, type: scoreboardType } });
 	
-	// Extract current athlete
-	let currentAttempt = extractCurrentAttempt(athleteEntries, fopUpdate, translations);
+	// Extract current athlete using shared function
+	let currentAttempt = extractCurrentAttempt(fopUpdate, translations);
 	
 	// Compute break title (group name) for break mode display
 	const mode = fopUpdate?.mode || 'WAIT';
@@ -437,7 +482,14 @@ function getAthleteEntries(dataSource, fopName, fopUpdate) {
  * Extract current attempt from athlete entries
  * During breaks/ceremonies, returns break info instead of athlete info
  */
-function extractCurrentAttempt(entries, fopUpdate, translations) {
+/**
+ * Extract current attempt info from fopUpdate
+ * Uses fopUpdate fields directly (currentAthleteKey, fullName, teamName, etc.)
+ * @param {Object} fopUpdate - FOP update object (required)
+ * @param {Object} translations - Translation map
+ * @returns {Object|null} - Current attempt info or null if no current athlete
+ */
+export function extractCurrentAttempt(fopUpdate, translations) {
 	// Check if we're in break mode - show break info instead of athlete
 	const mode = fopUpdate?.mode || 'WAIT';
 	const breakType = fopUpdate?.breakType || null;
@@ -466,50 +518,30 @@ function extractCurrentAttempt(entries, fopUpdate, translations) {
 		};
 	}
 	
-	let currentEntry = entries.find(e => 
-		!e.isSpacer && (
-			(e.classname && e.classname.includes('current')) || 
-			(e.athlete && e.athlete.classname && e.athlete.classname.includes('current'))
-		)
-	);
-	
-	if (!currentEntry && Array.isArray(entries)) {
-		currentEntry = entries.find(e => 
-			e && e.athlete && e.athlete.classname && e.athlete.classname.includes('current')
-		) || null;
+	// Check if there's a current athlete using currentAthleteKey
+	if (!fopUpdate?.currentAthleteKey || !fopUpdate?.fullName) {
+		return null;
 	}
 	
-	if (!currentEntry) return null;
+	// Clean HTML entities in fullName
+	const cleanFullName = (fopUpdate.fullName || '').replace(/&ndash;/g, '–').replace(/&mdash;/g, '—');
 	
-	const athleteObj = currentEntry.athlete || currentEntry;
-	
-	// Format attempt label using Snatch_number / C_and_J_number translations
-	let attemptLabel = '';
-	const liftTypeKey = fopUpdate?.liftTypeKey || '';
-	const attemptNumber = fopUpdate?.attemptNumber || '';
-	if (liftTypeKey && attemptNumber && translations) {
-		let template;
-		if (liftTypeKey === 'Snatch' || liftTypeKey === 'SNATCH') {
-			template = translations.Snatch_number || translations['Snatch_number'] || 'Snatch #{0}';
-		} else {
-			template = translations.C_and_J_number || translations['C_and_J_number'] || 'C&J #{0}';
-		}
-		attemptLabel = template.replace('{0}', attemptNumber);
-	}
+	// Format attempt label using shared helper
+	const attemptLabel = buildAttemptLabel(fopUpdate, translations);
 
 	return {
-		fullName: athleteObj.fullName || `${athleteObj.firstName || ''} ${athleteObj.lastName || ''}`.trim(),
-		name: athleteObj.fullName || `${athleteObj.firstName || ''} ${athleteObj.lastName || ''}`.trim(),
-		teamName: athleteObj.teamName || athleteObj.team || null,
-		team: athleteObj.teamName || athleteObj.team || null,
-		flagUrl: getFlagUrl(athleteObj.teamName || athleteObj.team, true),
-		startNumber: athleteObj.startNumber,
-		categoryName: athleteObj.category || athleteObj.categoryName,
-		category: athleteObj.category || athleteObj.categoryName,
+		fullName: cleanFullName,
+		name: cleanFullName,
+		teamName: fopUpdate.teamName || null,
+		team: fopUpdate.teamName || null,
+		flagUrl: getFlagUrl(fopUpdate.teamName, true),
+		startNumber: fopUpdate.startNumber,
+		categoryName: fopUpdate.categoryName,
+		category: fopUpdate.categoryName,
 		attempt: attemptLabel,
-		attemptNumber: fopUpdate?.attemptNumber,
-		weight: fopUpdate?.weight || '-',
-		timeAllowed: fopUpdate?.timeAllowed,
+		attemptNumber: fopUpdate.attemptNumber,
+		weight: fopUpdate.weight || '-',
+		timeAllowed: fopUpdate.timeAllowed,
 		startTime: null,
 		isBreak: false
 	};
