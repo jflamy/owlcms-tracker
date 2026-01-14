@@ -94,6 +94,7 @@
 			scoreboardName={data.scoreboardName}
 			sessionStatus={data.sessionStatus}
 			competition={data.competition}
+			breakTitle={data.breakTitle}
 			showDecisionLights={true}
 			showTimer={true}
 			compactMode={false}

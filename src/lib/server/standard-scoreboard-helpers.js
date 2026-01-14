@@ -21,6 +21,99 @@ const scoreboardCache = new Map();
 registerCache(scoreboardCache);
 
 /**
+ * Check if we're in a break mode
+ * @param {string} mode - Board mode from fopUpdate
+ * @returns {boolean}
+ */
+function isBreakMode(mode) {
+	return mode === 'INTERRUPTION' || 
+	       mode === 'INTRO_COUNTDOWN' || 
+	       mode === 'LIFT_COUNTDOWN' || 
+	       mode === 'LIFT_COUNTDOWN_CEREMONY' || 
+	       mode === 'SESSION_DONE' || 
+	       mode === 'CEREMONY';
+}
+
+/**
+ * Infer the group/session name for break display
+ * Mirrors OWLCMS BreakDisplay.inferGroupName()
+ * @param {Object} fopUpdate - FOP update object
+ * @param {Object} translations - Translation map
+ * @returns {string}
+ */
+function inferGroupName(fopUpdate, translations) {
+	const sessionName = fopUpdate?.sessionName || fopUpdate?.groupName || '';
+	if (!sessionName) {
+		return '';
+	}
+	// Use translation key "Group_number" with session name, or fallback
+	const template = translations?.Group_number || translations?.['Group_number'] || '!Group_number {0}';
+	return template.replace('{0}', sessionName);
+}
+
+/**
+ * Infer the break message for break display
+ * Mirrors OWLCMS BreakDisplay.inferMessage()
+ * @param {string} breakType - Break type from fopUpdate
+ * @param {string} ceremonyType - Ceremony type if applicable
+ * @param {Object} translations - Translation map
+ * @returns {string}
+ */
+function inferBreakMessage(breakType, ceremonyType, translations) {
+	// Match OWLCMS BreakDisplay.java::inferMessage logic:
+	// 1. If both null -> "Competition Paused"
+	// 2. If ceremonyType != null (and breakType == CEREMONY) -> ceremony message  
+	// 3. Otherwise use breakType
+	
+	if (!breakType && !ceremonyType) {
+		return translations?.['PublicMsg.CompetitionPaused'] || '!PublicMsg.CompetitionPaused';
+	}
+	
+	// Handle ceremony during a break (breakType == "CEREMONY" means we're in a ceremony)
+	// Only use ceremonyType when breakType indicates a ceremony is active
+	if (breakType === 'CEREMONY' && ceremonyType) {
+		switch (ceremonyType) {
+			case 'INTRODUCTION':
+				return translations?.['BreakMgmt.IntroductionOfAthletes'] || '!BreakMgmt.IntroductionOfAthletes';
+			case 'MEDALS':
+				return translations?.['PublicMsg.Medals'] || '!PublicMsg.Medals';
+			case 'OFFICIALS_INTRODUCTION':
+				return translations?.['BreakMgmt.IntroductionOfOfficials'] || '!BreakMgmt.IntroductionOfOfficials';
+		}
+	}
+	
+	// Handle regular break types
+	if (breakType) {
+		switch (breakType) {
+			case 'FIRST_CJ':
+				return translations?.['BreakType.FIRST_CJ'] || '!BreakType.FIRST_CJ';
+			case 'FIRST_SNATCH':
+				return translations?.['BreakType.FIRST_SNATCH'] || '!BreakType.FIRST_SNATCH';
+			case 'BEFORE_INTRODUCTION':
+				return translations?.['BreakType.BEFORE_INTRODUCTION'] || '!BreakType.BEFORE_INTRODUCTION';
+			case 'TECHNICAL':
+				return translations?.['PublicMsg.CompetitionPaused'] || '!PublicMsg.CompetitionPaused';
+			case 'JURY':
+				return translations?.['PublicMsg.JuryDeliberation'] || '!PublicMsg.JuryDeliberation';
+			case 'CHALLENGE':
+				return translations?.['PublicMsg.CHALLENGE'] || '!PublicMsg.CHALLENGE';
+			case 'GROUP_DONE':
+				return translations?.['PublicMsg.GroupDone'] || '!PublicMsg.GroupDone';
+			case 'MARSHAL':
+				return translations?.['PublicMsg.CompetitionPaused'] || '!PublicMsg.CompetitionPaused';
+			case 'CEREMONY':
+				// breakType is CEREMONY but no ceremonyType - fall through to default
+				break;
+			default:
+				return `!BreakType.${breakType}`;
+		}
+	}
+	
+	// Fallback
+	return translations?.['PublicMsg.CompetitionPaused'] || '!PublicMsg.CompetitionPaused';
+}
+
+/**
  * Configuration for standard scoreboard types
  */
 export const SCOREBOARD_CONFIGS = {
@@ -38,6 +131,11 @@ export const SCOREBOARD_CONFIGS = {
 		scoreboardName: 'Rankings',
 		dataSource: 'startOrder',
 		sortStrategy: 'byRank'  // Re-sort by totalRank or snatchRank
+	},
+	'attempt-bar': {
+		scoreboardName: 'Attempt Bar',
+		dataSource: 'liftingOrder',
+		sortStrategy: 'none'  // Only needs current athlete
 	}
 };
 
@@ -106,6 +204,10 @@ export function getScoreboardData(scoreboardType, fopName = 'A', options = {}) {
 	// Extract current athlete
 	let currentAttempt = extractCurrentAttempt(athleteEntries, fopUpdate, translations);
 	
+	// Compute break title (group name) for break mode display
+	const mode = fopUpdate?.mode || 'WAIT';
+	const breakTitle = isBreakMode(mode) ? inferGroupName(fopUpdate, translations) : null;
+	
 	// Compute sessionStatusMessage
 	let sessionStatusMessage = null;
 	if (sessionStatus.isDone && fopUpdate?.fullName) {
@@ -124,6 +226,7 @@ export function getScoreboardData(scoreboardType, fopName = 'A', options = {}) {
 			displayMode,
 			sessionStatus,
 			sessionStatusMessage,
+			breakTitle,
 			learningMode
 		};
 	}
@@ -208,6 +311,7 @@ export function getScoreboardData(scoreboardType, fopName = 'A', options = {}) {
 		decision,
 		displayMode,
 		sessionStatusMessage,
+		breakTitle,
 		sortedAthletes: athletesWithFlags, // Primary array for display
 		// liftingOrderAthletes: athletesWithFlags,  // Remove duplicate
 		// startOrderAthletes: athletesWithFlags,   // Remove duplicate  
@@ -331,8 +435,37 @@ function getAthleteEntries(dataSource, fopName, fopUpdate) {
 
 /**
  * Extract current attempt from athlete entries
+ * During breaks/ceremonies, returns break info instead of athlete info
  */
 function extractCurrentAttempt(entries, fopUpdate, translations) {
+	// Check if we're in break mode - show break info instead of athlete
+	const mode = fopUpdate?.mode || 'WAIT';
+	const breakType = fopUpdate?.breakType || null;
+	const ceremonyType = fopUpdate?.ceremonyType || null;
+	
+	if (isBreakMode(mode)) {
+		// During break: show break message as name, clear team, show session info
+		const breakMessage = inferBreakMessage(breakType, ceremonyType, translations);
+		const groupInfo = inferGroupName(fopUpdate, translations);
+		
+		return {
+			fullName: breakMessage,
+			name: breakMessage,
+			teamName: null,  // Clear team during break
+			team: null,
+			flagUrl: null,
+			startNumber: null,
+			categoryName: groupInfo,  // Show session/group in category slot
+			category: groupInfo,
+			attempt: '',
+			attemptNumber: null,
+			weight: null,
+			timeAllowed: fopUpdate?.timeAllowed,
+			startTime: null,
+			isBreak: true  // Flag for components to know this is break info
+		};
+	}
+	
 	let currentEntry = entries.find(e => 
 		!e.isSpacer && (
 			(e.classname && e.classname.includes('current')) || 
@@ -350,10 +483,18 @@ function extractCurrentAttempt(entries, fopUpdate, translations) {
 	
 	const athleteObj = currentEntry.athlete || currentEntry;
 	
-	// Format attempt label if translation available
-	let attemptLabel = fopUpdate?.attempt || '';
-	if (fopUpdate?.attemptNumber && translations && translations['AttemptBoard_attempt_number']) {
-		attemptLabel = formatMessage(translations['AttemptBoard_attempt_number'], fopUpdate.attemptNumber);
+	// Format attempt label using Snatch_number / C_and_J_number translations
+	let attemptLabel = '';
+	const liftTypeKey = fopUpdate?.liftTypeKey || '';
+	const attemptNumber = fopUpdate?.attemptNumber || '';
+	if (liftTypeKey && attemptNumber && translations) {
+		let template;
+		if (liftTypeKey === 'Snatch' || liftTypeKey === 'SNATCH') {
+			template = translations.Snatch_number || translations['Snatch_number'] || 'Snatch #{0}';
+		} else {
+			template = translations.C_and_J_number || translations['C_and_J_number'] || 'C&J #{0}';
+		}
+		attemptLabel = template.replace('{0}', attemptNumber);
 	}
 
 	return {
@@ -369,7 +510,8 @@ function extractCurrentAttempt(entries, fopUpdate, translations) {
 		attemptNumber: fopUpdate?.attemptNumber,
 		weight: fopUpdate?.weight || '-',
 		timeAllowed: fopUpdate?.timeAllowed,
-		startTime: null
+		startTime: null,
+		isBreak: false
 	};
 }
 

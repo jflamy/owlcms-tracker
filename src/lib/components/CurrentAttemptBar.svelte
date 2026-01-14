@@ -22,6 +22,7 @@
 	export let compactMode = false;
 	export let showLifterInfo = true;
 	export let translations = {};
+	export let breakTitle = null;     // Group name during breaks (e.g., "Group M1")
     
 	// Timer colors (no state, just constants)
 	const ATHLETE_TIMER_COLOR = '#4ade80';    // Green
@@ -39,6 +40,10 @@
 	$: showAthleteTimer = displayMode === 'athlete' && showTimer && competition?.showTimer;
 	$: showBreakTimer = displayMode === 'break' && showTimer && competition?.showTimer;
 	$: showDecisions = displayMode === 'decision' && showDecisionLights;
+	
+	// During breaks, show breakTitle instead of sessionInfo
+	$: isBreak = currentAttempt?.isBreak || false;
+	$: displaySessionInfo = isBreak && breakTitle ? breakTitle : (competition?.sessionInfo || 'Session');
 </script>
 
 {#if compactMode}
@@ -178,7 +183,7 @@
 			{#if sessionStatus?.isDone}
 				{@html '&nbsp;'}
 			{:else}
-				{@html competition?.sessionInfo || '!!Session'}
+				{@html displaySessionInfo}
 			{/if}
 		</div>
 	</header>
@@ -200,7 +205,7 @@
 		display: flex;
 		align-items: center;
 		gap: 1rem;
-		margin-bottom: 0.25rem;
+		margin-bottom: 0;
 	}
 
 	.name-and-team {
@@ -345,7 +350,7 @@
 		font-size: 1.2rem;
 		color: #ccc;
 		font-weight: bold;
-		padding: 0.25rem 0;
+		padding: 0;
 	}
 
 	/* Responsive adjustments for landscape mode */
