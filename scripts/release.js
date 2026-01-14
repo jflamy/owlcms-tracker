@@ -495,11 +495,6 @@ try {
   process.exit(1);
 }
 
-console.log(`\n✅ Release ${version} initiated!`);
+console.log(`\n✅ Release ${version} complete!`);
 console.log(`   Tracker version: ${version}`);
 console.log(`   Tracker-core version: ${trackerCoreVersion}`);
-console.log('\nGitHub Actions will now build and create the release.');
-console.log('Monitor progress at: https://github.com/owlcms/owlcms-tracker/actions');
-console.log('\nNote: package-lock.json has been committed with the release dependency.');
-console.log('      Next git pull will restore it (it is gitignored for local links).');
-
