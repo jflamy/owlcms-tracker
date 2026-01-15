@@ -18,8 +18,10 @@ import { competitionHub } from './competition-hub.js';
 // Eager imports so Vite includes all plugins at build time
 // Note: import.meta.glob is a Vite COMPILE-TIME feature - it gets transformed
 // into actual imports during build. It does NOT exist as a function at runtime.
-const configModules = import.meta.glob('../../plugins/*/config.js', { eager: true });
-const helperModules = import.meta.glob('../../plugins/*/helpers.data.js', { eager: true });
+// 
+// Uses ** to support nested plugins (e.g., books/iwf-startbook, books/iwf-results)
+const configModules = import.meta.glob('../../plugins/**/config.js', { eager: true });
+const helperModules = import.meta.glob('../../plugins/**/helpers.data.js', { eager: true });
 
 class ScoreboardRegistry {
 	constructor() {
@@ -53,17 +55,23 @@ class ScoreboardRegistry {
 	}
 
 	async _doInitialize() {
-		const discovered = new Set();
+		const discovered = new Map(); // pluginPath -> folderName
 
 		for (const configPath of Object.keys(configModules)) {
-			const parts = configPath.split('/');
-			if (parts.length < 3) continue;
-			const folderName = parts[parts.length - 2]; // plugins/<folder>/config.js
-			discovered.add(folderName);
+			// Extract plugin path relative to plugins/ directory
+			// Examples:
+			//   ../../plugins/lifting-order/config.js -> "lifting-order"
+			//   ../../plugins/books/iwf-startbook/config.js -> "books/iwf-startbook"
+			const match = configPath.match(/\.\.\/\.\.\/plugins\/(.+)\/config\.js$/);
+			if (!match) continue;
+			
+			const pluginPath = match[1]; // e.g., "lifting-order" or "books/iwf-startbook"
+			const folderName = pluginPath.split('/').pop(); // e.g., "iwf-startbook"
+			discovered.set(pluginPath, folderName);
 		}
 
-		for (const folderName of discovered) {
-			await this.registerScoreboard(folderName);
+		for (const [pluginPath, folderName] of discovered) {
+			await this.registerScoreboard(pluginPath, folderName);
 		}
 
 		this.initialized = true;
@@ -71,35 +79,46 @@ class ScoreboardRegistry {
 
 	/**
 	 * Register a single scoreboard plugin
+	 * @param {string} pluginPath - Path relative to plugins/ (e.g., "books/iwf-startbook")
+	 * @param {string} folderName - Folder name (e.g., "iwf-startbook")
 	 */
-	async registerScoreboard(folderName) {
+	async registerScoreboard(pluginPath, folderName = null) {
+		// Support legacy calls with just folderName
+		if (!folderName) {
+			folderName = pluginPath;
+		}
+		
 		try {
-			const configModule = configModules[`../../plugins/${folderName}/config.js`];
+			const configModule = configModules[`../../plugins/${pluginPath}/config.js`];
 			if (!configModule) {
-				console.warn(`[ScoreboardRegistry] Skipping ${folderName}: no config.js`);
+				console.warn(`[ScoreboardRegistry] Skipping ${pluginPath}: no config.js`);
 				return;
 			}
 			const config = configModule.default || configModule;
 
-			const helpersModule = helperModules[`../../plugins/${folderName}/helpers.data.js`];
+			const helpersModule = helperModules[`../../plugins/${pluginPath}/helpers.data.js`];
 			const dataHelper = helpersModule
 				? helpersModule.getScoreboardData || helpersModule.default
 				: null;
 
-			// Extract scoreboard type from folder name
-			// Folder name IS the type (e.g., "lifting-order")
-			const type = folderName;
+			// Determine type with _new suffix for subtree plugins
+			// Subtree plugins are under books/ (e.g., "books/iwf-startbook")
+			// Original plugins are at root level (e.g., "iwf-startbook")
+			const isSubtreePlugin = pluginPath.startsWith('books/');
+			const type = isSubtreePlugin ? `${folderName}_new` : folderName;
 
 			this.scoreboards.set(type, {
 				type,
 				folderName,
+				pluginPath,  // Store full path for component loading
 				config,
 				dataHelper,
-				path: `../../plugins/${folderName}`
+				path: `../../plugins/${pluginPath}`
 			});
 
+			console.log(`[ScoreboardRegistry] Registered: ${type} (path: ${pluginPath})`);
 		} catch (err) {
-			console.error(`[ScoreboardRegistry] Failed to register ${folderName}:`, err);
+			console.error(`[ScoreboardRegistry] Failed to register ${pluginPath}:`, err);
 		}
 	}
 

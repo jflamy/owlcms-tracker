@@ -5,6 +5,10 @@
 	import { subscribeSSE, connectSSE } from '$lib/sse-client.js';
 	import { onMount, onDestroy } from 'svelte';
 	
+	// Pre-import all page.svelte files using glob (supports nested plugins)
+	// Vite transforms this at build time into a map of path -> dynamic import function
+	const pageModules = import.meta.glob('../../plugins/**/page.svelte');
+	
 	export let data;
 	
 	let scoreboardData = null;
@@ -114,18 +118,30 @@
 </svelte:head>
 
 {#if scoreboardData}
-	<!-- Dynamically import the scoreboard component -->
-	{#await import(`../../plugins/${data.scoreboardType}/page.svelte`)}
-		<div class="loading">Loading scoreboard...</div>
-	{:then module}
-		<svelte:component this={module.default} data={scoreboardData} config={data.config} options={data.options} />
-	{:catch error}
+	<!-- Dynamically import the scoreboard component using pluginPath -->
+	<!-- Uses glob map to support nested plugins (e.g., books/iwf-startbook) -->
+	{@const modulePath = `../../plugins/${data.pluginPath}/page.svelte`}
+	{@const moduleLoader = pageModules[modulePath]}
+	{#if moduleLoader}
+		{#await moduleLoader()}
+			<div class="loading">Loading scoreboard...</div>
+		{:then module}
+			<svelte:component this={module.default} data={scoreboardData} config={data.config} options={data.options} />
+		{:catch error}
+			<div class="error">
+				<h1>Error Loading Scoreboard</h1>
+				<p>{error.message}</p>
+				<p>Scoreboard type: <code>{data.scoreboardType}</code></p>
+				<p>Plugin path: <code>{data.pluginPath}</code></p>
+			</div>
+		{/await}
+	{:else}
 		<div class="error">
-			<h1>Error Loading Scoreboard</h1>
-			<p>{error.message}</p>
+			<h1>Scoreboard Component Not Found</h1>
+			<p>No page.svelte at path: <code>{modulePath}</code></p>
 			<p>Scoreboard type: <code>{data.scoreboardType}</code></p>
 		</div>
-	{/await}
+	{/if}
 {:else}
 	<div class="loading">
 		<h1>Loading {data.scoreboardName}...</h1>

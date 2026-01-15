@@ -54,6 +54,7 @@ export async function load({ params, url }) {
 		// Return metadata for the page
 		return {
 			scoreboardType: type,
+			pluginPath: scoreboard.pluginPath || scoreboard.folderName,  // For component loading
 			scoreboardName: scoreboard.config.name,
 			scoreboardDescription: scoreboard.config.description,
 			fopName,
