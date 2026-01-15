@@ -76,27 +76,6 @@ jobs:
           echo "📋 Checking @owlcms/tracker-core version:"
           npm list @owlcms/tracker-core || true
       
-      - name: Prepare standard plugins only
-        if: ${{ inputs.includeSubmodules != 'true' }}
-        run: |
-          echo "Removing all plugins except standard ones..."
-          rm -rf src/plugins/*
-          git checkout src/plugins/attempt-board
-          git checkout src/plugins/lifting-order
-          git checkout src/plugins/rankings
-          git checkout src/plugins/start-order
-          git checkout src/plugins/team-scoreboard
-          echo "✓ Standard plugins restored"
-          ls -la src/plugins/
-
-      - name: Initialize submodules (books, etc.)
-        if: ${{ inputs.includeSubmodules == 'true' }}
-        run: |
-          echo "Initializing submodules..."
-          git submodule update --init --recursive
-          echo "✓ Submodules initialized"
-          ls -la src/plugins/
-      
       - name: Build application
         run: npm run build
         env:
