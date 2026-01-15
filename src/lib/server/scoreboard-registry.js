@@ -101,11 +101,8 @@ class ScoreboardRegistry {
 				? helpersModule.getScoreboardData || helpersModule.default
 				: null;
 
-			// Determine type with _new suffix for subtree plugins
-			// Subtree plugins are under books/ (e.g., "books/iwf-startbook")
-			// Original plugins are at root level (e.g., "iwf-startbook")
-			const isSubtreePlugin = pluginPath.startsWith('books/');
-			const type = isSubtreePlugin ? `${folderName}_new` : folderName;
+			// Use folder name as type (no special suffix for subtree plugins)
+			const type = folderName;
 
 			this.scoreboards.set(type, {
 				type,
