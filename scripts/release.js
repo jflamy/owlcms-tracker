@@ -231,15 +231,20 @@ function fetchLatestGitHubTag(owner, repo) {
 }
 
 // Parse arguments
-const version = process.argv[2];
-let trackerCoreVersion = process.argv[3]; // Optional
+const args = process.argv.slice(2);
+const includeSubmodules = args.includes('--submodules');
+const positional = args.filter((arg) => arg !== '--submodules');
+const version = positional[0];
+let trackerCoreVersion = positional[1]; // Optional
 
 if (!version) {
   console.error('❌ Error: Version number required');
-  console.error('Usage: npm run release -- <tracker-version> [tracker-core-version]');
+  console.error('Usage: npm run release -- <tracker-version> [tracker-core-version] [--submodules]');
   console.error('Examples:');
   console.error('  npm run release -- 2.4.0');
   console.error('  npm run release -- 2.4.0 1.0.0-beta02');
+  console.error('  npm run release -- 2.4.0 --submodules');
+  console.error('  npm run release -- 2.4.0 1.0.0-beta02 --submodules');
   process.exit(1);
 }
 
@@ -438,7 +443,8 @@ try {
   }
 
   // Trigger the workflow on the pushed branch ref
-  execSync(`gh workflow run release.yaml --ref ${branch} -f revision=${version}`, { stdio: 'inherit' });
+  const submodulesArg = includeSubmodules ? ' -f includeSubmodules=true' : ' -f includeSubmodules=false';
+  execSync(`gh workflow run release.yaml --ref ${branch} -f revision=${version}${submodulesArg}`, { stdio: 'inherit' });
   console.log('✓ Workflow triggered');
   console.log('⏳ Waiting 15 seconds for GitHub to queue the run...');
   sleepSync(15000);
