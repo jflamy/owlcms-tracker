@@ -1,6 +1,6 @@
 <script>
 	export let records = [];
-	export let translations = {};
+	export const translations = {};
 	export let headers = {};
 
 	function getAllRecordCategories(recordsData) {
