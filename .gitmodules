@@ -1,0 +1,3 @@
+[submodule "src/plugins/books"]
+	path = src/plugins/books
+	url = https://github.com/jflamy/tracker-books.git
