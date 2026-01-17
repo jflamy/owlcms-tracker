@@ -76,19 +76,14 @@ jobs:
           echo "📋 Checking @owlcms/tracker-core version:"
           npm list @owlcms/tracker-core || true
       
-      - name: Build application
-        run: npm run build
-        env:
-          NODE_OPTIONS: "--max-old-space-size=4096"
-      
-      - name: Remove pre-compressed files (server-side only)
+      - name: Clean experimental plugins
         run: |
-          find build/client -name '*.gz' -delete
-          find build/client -name '*.br' -delete
-          echo "✓ Removed .gz and .br files from build"
+          echo "Removing experimental plugins before build..."
+          rm -rf src/plugins/experiments
+          echo "✓ Experimental plugins removed"
       
       - name: Build universal package
-        run: node scripts/build-package.js
+        run: node scripts/build-package.js "${{ env.REVISION }}"
       
       - name: Setup Docker buildx
         uses: docker/setup-buildx-action@v3
@@ -110,14 +105,6 @@ jobs:
             ${{ vars.DOCKER_REG }}/owlcms/tracker:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      
-      - name: Rename package with version
-        run: |
-          echo "Generated package:"
-          ls -lh dist/*.zip
-          mv dist/owlcms-tracker.zip dist/owlcms-tracker_${{ env.REVISION }}.zip
-          echo "Renamed package:"
-          ls -lh dist/*.zip
       
       - name: Upload package artifact
         uses: actions/upload-artifact@v4

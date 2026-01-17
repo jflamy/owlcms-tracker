@@ -14,17 +14,11 @@ COPY package*.json ./
 RUN npm ci
 
 # Copy source code (plugins included via static import.meta.glob)
+# Note: experiments/ removed by workflow before Docker build
+# Note: books/ included only if --submodules flag used in release workflow
 COPY . .
 
-# Explicitly copy only the required plugins to reduce bundle size
-RUN rm -rf src/plugins/*
-COPY src/plugins/attempt-board ./src/plugins/attempt-board
-COPY src/plugins/lifting-order ./src/plugins/lifting-order
-COPY src/plugins/rankings ./src/plugins/rankings
-COPY src/plugins/start-order ./src/plugins/start-order
-COPY src/plugins/team-scoreboard ./src/plugins/team-scoreboard
-
-# Build the application (will only include remaining plugins)
+# Build the application (will include all plugins in source)
 # Increase Node.js heap size to prevent OOM during build
 ENV NODE_OPTIONS="--max-old-space-size=4096"
 RUN npm run build

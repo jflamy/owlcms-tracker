@@ -3,6 +3,7 @@ import path from 'path';
 import { execSync } from 'child_process';
 
 const DIST_DIR = 'dist/package';
+const VERSION = process.argv[2];
 
 console.log('📦 Building universal tracker package...\n');
 
@@ -16,7 +17,28 @@ try {
   }
   fs.mkdirSync(DIST_DIR, { recursive: true });
 
-  // 2. Copy required files
+  // 2. Remove experimental plugins (manual runs)
+  if (fs.existsSync('src/plugins/experiments')) {
+    fs.rmSync('src/plugins/experiments', { recursive: true });
+    console.log('✓ Removed src/plugins/experiments');
+  }
+
+  // 3. Build application
+  console.log('\n🏗️  Building application...');
+  execSync('npm run build', {
+    stdio: 'inherit',
+    env: {
+      ...process.env,
+      NODE_OPTIONS: process.env.NODE_OPTIONS || '--max-old-space-size=4096'
+    }
+  });
+
+  // 4. Remove pre-compressed files (server-side only)
+  execSync("find build/client -name '*.gz' -delete", { stdio: 'inherit' });
+  execSync("find build/client -name '*.br' -delete", { stdio: 'inherit' });
+  console.log('✓ Removed .gz and .br files from build');
+
+  // 5. Copy required files
   const filesToCopy = [
     'start-with-ws.js',
     'package.json'
@@ -29,7 +51,7 @@ try {
     }
   });
 
-  // 3. Copy build directory
+  // 6. Copy build directory
   function copyDir(src, dest) {
     fs.mkdirSync(dest, { recursive: true });
     const files = fs.readdirSync(src);
@@ -47,11 +69,23 @@ try {
   copyDir('build', path.join(DIST_DIR, 'build'));
   console.log('✓ Copied build/');
 
-  // 4. Install production dependencies only
+  // 7. Install production dependencies only
   console.log('\n📥 Installing production dependencies...');
-  execSync(`npm install --omit=dev --prefix ${DIST_DIR}`, { stdio: 'inherit' });
+  execSync(`npm install --omit=dev --prefix ${DIST_DIR} --no-package-lock --no-save`, { stdio: 'inherit' });
 
-  // 5. Create README
+  // Remove any accidental self-dependency (prevents recursive packaging)
+  const selfDepPath = path.join(DIST_DIR, 'node_modules', 'owlcms-tracker');
+  if (fs.existsSync(selfDepPath)) {
+    fs.rmSync(selfDepPath, { recursive: true });
+    console.log('✓ Removed nested node_modules/owlcms-tracker');
+  }
+  const lockPath = path.join(DIST_DIR, 'package-lock.json');
+  if (fs.existsSync(lockPath)) {
+    fs.rmSync(lockPath);
+    console.log('✓ Removed package-lock.json from package');
+  }
+
+  // 8. Create README
   const readme = `OWLCMS Competition Tracker
 ==========================
 
@@ -80,21 +114,24 @@ The tracker will receive competition data automatically.
   fs.writeFileSync(path.join(DIST_DIR, 'README.txt'), readme);
   console.log('✓ Created README.txt');
 
-  // 6. Create zip
+  // 9. Create zip
   console.log('\n📦 Creating ZIP archive...');
-  const zipName = 'owlcms-tracker.zip';
+  const zipName = VERSION ? `owlcms-tracker_${VERSION}.zip` : 'owlcms-tracker.zip';
   
   // Remove old zip if exists
   if (fs.existsSync(`dist/${zipName}`)) {
     fs.unlinkSync(`dist/${zipName}`);
   }
 
-  // Use 7zip on Windows CI, zip on Linux/macOS
+  // Use 7zip on Windows, zip on Linux/macOS
   const isWindows = process.platform === 'win32';
   if (isWindows) {
-    // Try 7zip first, fall back to PowerShell
+    // Try 7zip on PATH, then Program Files, fall back to PowerShell
+    const sevenZipPath = fs.existsSync('C:/Program Files/7-Zip/7z.exe')
+      ? '"C:/Program Files/7-Zip/7z.exe"'
+      : '7z';
     try {
-      execSync(`7z a -tzip ../dist/${zipName} .`, { cwd: DIST_DIR, stdio: 'inherit' });
+      execSync(`${sevenZipPath} a -tzip ../${zipName} .`, { cwd: DIST_DIR, stdio: 'inherit' });
     } catch {
       execSync(`powershell -Command "Compress-Archive -Path '${DIST_DIR}/*' -DestinationPath 'dist/${zipName}' -Force"`, { stdio: 'inherit' });
     }
