@@ -98,6 +98,11 @@ Learning mode is useful when developing custom scoreboards. It captures every We
 
 ## Configure OWLCMS (One-time Setup)
 
+### Method 1
+
+Use the control panel; on the OWLCMS Tab, in the options dropdown, enable the connection to Tracker
+
+### Method 2
 Before creating scoreboards, configure OWLCMS to send data:
 
 In OWLCMS, navigate to:

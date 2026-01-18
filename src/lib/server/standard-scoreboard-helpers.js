@@ -38,19 +38,19 @@ export function isBreakMode(mode) {
  * Build sessionInfo string using tracker translations (not OWLCMS sessionInfo which uses OWLCMS language)
  * Format: "Session M1 – Snatch" (using en-dash)
  * @param {Object} fopUpdate - FOP update object
- * @param {Object} translations - Translation map
+ * @param {string} locale - Language locale code
  * @returns {string} - Session info string or empty string if no session
  */
-export function buildSessionInfo(fopUpdate, translations) {
+export function buildSessionInfo(fopUpdate, locale = 'en') {
 	const hasSessionName = fopUpdate?.sessionName != null && fopUpdate?.sessionName !== '';
 	if (!hasSessionName) {
 		return '';
 	}
-	const sessionLabel = translations?.['Tracker.Session'] || translations?.Session || 'Session';
+	const sessionLabel = competitionHub.translate('Tracker.Session', locale) || competitionHub.translate('Session', locale);
 	const liftTypeKey = fopUpdate?.liftTypeKey || 'Snatch';
 	const liftTypeLabel = liftTypeKey === 'Snatch' || liftTypeKey === 'SNATCH'
-		? (translations?.Snatch || 'Snatch')
-		: (translations?.CleanJerk || 'Clean & Jerk');
+		? competitionHub.translate('Snatch', locale)
+		: competitionHub.translate('CleanJerk', locale);
 	return `${sessionLabel} ${fopUpdate.sessionName} – ${liftTypeLabel}`;
 }
 
@@ -58,20 +58,20 @@ export function buildSessionInfo(fopUpdate, translations) {
  * Build attempt label using tracker translations
  * Format: "Snatch #2" or "C&J #1" based on liftTypeKey and attemptNumber
  * @param {Object} fopUpdate - FOP update object
- * @param {Object} translations - Translation map
+ * @param {string} locale - Language locale code
  * @returns {string} - Attempt label or empty string
  */
-export function buildAttemptLabel(fopUpdate, translations) {
+export function buildAttemptLabel(fopUpdate, locale = 'en') {
 	const liftTypeKey = fopUpdate?.liftTypeKey || '';
 	const attemptNumber = fopUpdate?.attemptNumber || '';
-	if (!liftTypeKey || !attemptNumber || !translations) {
+	if (!liftTypeKey || !attemptNumber) {
 		return '';
 	}
 	let template;
 	if (liftTypeKey === 'Snatch' || liftTypeKey === 'SNATCH') {
-		template = translations.Snatch_number || translations['Snatch_number'] || 'Snatch #{0}';
+		template = competitionHub.translate('Snatch_number', locale);
 	} else {
-		template = translations.C_and_J_number || translations['C_and_J_number'] || 'C&J #{0}';
+		template = competitionHub.translate('C_and_J_number', locale);
 	}
 	return template.replace('{0}', attemptNumber);
 }
@@ -80,16 +80,16 @@ export function buildAttemptLabel(fopUpdate, translations) {
  * Infer the group/session name for break display
  * Mirrors OWLCMS BreakDisplay.inferGroupName()
  * @param {Object} fopUpdate - FOP update object
- * @param {Object} translations - Translation map
+ * @param {string} locale - Language locale code
  * @returns {string}
  */
-export function inferGroupName(fopUpdate, translations) {
+export function inferGroupName(fopUpdate, locale = 'en') {
 	const sessionName = fopUpdate?.sessionName || fopUpdate?.groupName || '';
 	if (!sessionName) {
 		return '';
 	}
-	// Use translation key "Group_number" with session name, or fallback
-	const template = translations?.Group_number || translations?.['Group_number'] || '!Group_number {0}';
+	// Use translation key "Group_number" with session name (translate handles !Key fallback)
+	const template = competitionHub.translate('Group_number', locale);
 	return template.replace('{0}', sessionName);
 }
 
@@ -98,17 +98,17 @@ export function inferGroupName(fopUpdate, translations) {
  * Mirrors OWLCMS BreakDisplay.inferMessage()
  * @param {string} breakType - Break type from fopUpdate
  * @param {string} ceremonyType - Ceremony type if applicable
- * @param {Object} translations - Translation map
+ * @param {string} locale - Language locale code
  * @returns {string}
  */
-export function inferBreakMessage(breakType, ceremonyType, translations) {
+export function inferBreakMessage(breakType, ceremonyType, locale = 'en') {
 	// Match OWLCMS BreakDisplay.java::inferMessage logic:
 	// 1. If both null -> "Competition Paused"
 	// 2. If ceremonyType != null (and breakType == CEREMONY) -> ceremony message  
 	// 3. Otherwise use breakType
 	
 	if (!breakType && !ceremonyType) {
-		return translations?.['PublicMsg.CompetitionPaused'] || '!PublicMsg.CompetitionPaused';
+		return competitionHub.translate('PublicMsg.CompetitionPaused', locale);
 	}
 	
 	// Handle ceremony during a break (breakType == "CEREMONY" means we're in a ceremony)
@@ -116,11 +116,11 @@ export function inferBreakMessage(breakType, ceremonyType, translations) {
 	if (breakType === 'CEREMONY' && ceremonyType) {
 		switch (ceremonyType) {
 			case 'INTRODUCTION':
-				return translations?.['BreakMgmt.IntroductionOfAthletes'] || '!BreakMgmt.IntroductionOfAthletes';
+				return competitionHub.translate('BreakMgmt.IntroductionOfAthletes', locale);
 			case 'MEDALS':
-				return translations?.['PublicMsg.Medals'] || '!PublicMsg.Medals';
+				return competitionHub.translate('PublicMsg.Medals', locale);
 			case 'OFFICIALS_INTRODUCTION':
-				return translations?.['BreakMgmt.IntroductionOfOfficials'] || '!BreakMgmt.IntroductionOfOfficials';
+				return competitionHub.translate('BreakMgmt.IntroductionOfOfficials', locale);
 		}
 	}
 	
@@ -128,21 +128,21 @@ export function inferBreakMessage(breakType, ceremonyType, translations) {
 	if (breakType) {
 		switch (breakType) {
 			case 'FIRST_CJ':
-				return translations?.['BreakType.FIRST_CJ'] || '!BreakType.FIRST_CJ';
+				return competitionHub.translate('BreakType.FIRST_CJ', locale);
 			case 'FIRST_SNATCH':
-				return translations?.['BreakType.FIRST_SNATCH'] || '!BreakType.FIRST_SNATCH';
+				return competitionHub.translate('BreakType.FIRST_SNATCH', locale);
 			case 'BEFORE_INTRODUCTION':
-				return translations?.['BreakType.BEFORE_INTRODUCTION'] || '!BreakType.BEFORE_INTRODUCTION';
+				return competitionHub.translate('BreakType.BEFORE_INTRODUCTION', locale);
 			case 'TECHNICAL':
-				return translations?.['PublicMsg.CompetitionPaused'] || '!PublicMsg.CompetitionPaused';
+				return competitionHub.translate('PublicMsg.CompetitionPaused', locale);
 			case 'JURY':
-				return translations?.['PublicMsg.JuryDeliberation'] || '!PublicMsg.JuryDeliberation';
+				return competitionHub.translate('PublicMsg.JuryDeliberation', locale);
 			case 'CHALLENGE':
-				return translations?.['PublicMsg.CHALLENGE'] || '!PublicMsg.CHALLENGE';
+				return competitionHub.translate('PublicMsg.CHALLENGE', locale);
 			case 'GROUP_DONE':
-				return translations?.['PublicMsg.GroupDone'] || '!PublicMsg.GroupDone';
+				return competitionHub.translate('PublicMsg.GroupDone', locale);
 			case 'MARSHAL':
-				return translations?.['PublicMsg.CompetitionPaused'] || '!PublicMsg.CompetitionPaused';
+				return competitionHub.translate('PublicMsg.CompetitionPaused', locale);
 			case 'CEREMONY':
 				// breakType is CEREMONY but no ceremonyType - fall through to default
 				break;
@@ -152,7 +152,7 @@ export function inferBreakMessage(breakType, ceremonyType, translations) {
 	}
 	
 	// Fallback
-	return translations?.['PublicMsg.CompetitionPaused'] || '!PublicMsg.CompetitionPaused';
+	return competitionHub.translate('PublicMsg.CompetitionPaused', locale);
 }
 
 /**
@@ -225,7 +225,7 @@ export function getScoreboardData(scoreboardType, fopName = 'A', options = {}) {
 	const hasActiveSession = fopUpdate?.fopState && fopUpdate.fopState !== 'INACTIVE';
 	
 	// Build sessionInfo using shared function (tracker translations, not OWLCMS sessionInfo)
-	const sessionInfo = buildSessionInfo(fopUpdate, translations);
+	const sessionInfo = buildSessionInfo(fopUpdate, lang);
 	
 	const competition = {
 		name: fopUpdate?.competitionName || databaseState?.competition?.name || 'Competition',
@@ -247,11 +247,11 @@ export function getScoreboardData(scoreboardType, fopName = 'A', options = {}) {
 	const cacheKey = buildCacheKey({ fopName, includeFop: true, opts: { ...options, type: scoreboardType } });
 	
 	// Extract current athlete using shared function
-	let currentAttempt = extractCurrentAttempt(fopUpdate, translations);
+	let currentAttempt = extractCurrentAttempt(fopUpdate, lang);
 	
 	// Compute break title (group name) for break mode display
 	const mode = fopUpdate?.mode || 'WAIT';
-	const breakTitle = isBreakMode(mode) ? inferGroupName(fopUpdate, translations) : null;
+	const breakTitle = isBreakMode(mode) ? inferGroupName(fopUpdate, lang) : null;
 	
 	// Compute sessionStatusMessage
 	let sessionStatusMessage = null;
@@ -331,20 +331,20 @@ export function getScoreboardData(scoreboardType, fopName = 'A', options = {}) {
 	// Compute attempt bar visibility based on session state
 	const attemptBarClass = computeAttemptBarVisibility(fopUpdate);
 
-	// Calculate headers (pre-translated)
+	// Calculate headers (pre-translated using hub's translate method with automatic !Key fallback)
 	const headers = {
-		start: translations['Scoreboard.Start'] || 'Start',
-		name: translations['Name'] || 'Name',
-		category: translations['Scoreboard.Category'] || 'Cat.',
-		birth: translations['Scoreboard.Birth'] || 'Born',
-		team: translations['Team'] || 'Team',
-		snatch: translations['Snatch'] || 'Snatch',
-		cleanJerk: translations['Clean_and_Jerk'] || 'Clean &amp; Jerk',
-		total: translations['TOTAL'] || 'Total',
-		rank: translations['Rank'] || 'Rank',
-		best: translations['Best'] || '✔',
-		leaders: translations['Leaders'] || 'Leaders',
-		records: translations['Records'] || 'Records'
+		start: competitionHub.translate('Scoreboard.Start', lang),
+		name: competitionHub.translate('Name', lang),
+		category: competitionHub.translate('Scoreboard.Category', lang),
+		birth: competitionHub.translate('Scoreboard.Birth', lang),
+		team: competitionHub.translate('Team', lang),
+		snatch: competitionHub.translate('Snatch', lang),
+		cleanJerk: competitionHub.translate('Clean_and_Jerk', lang),
+		total: competitionHub.translate('TOTAL', lang),
+		rank: competitionHub.translate('Rank', lang),
+		best: competitionHub.translate('Best', lang),
+		leaders: competitionHub.translate('Leaders', lang),
+		records: competitionHub.translate('Records', lang)
 	};
 
 	const result = {
@@ -486,10 +486,10 @@ function getAthleteEntries(dataSource, fopName, fopUpdate) {
  * Extract current attempt info from fopUpdate
  * Uses fopUpdate fields directly (currentAthleteKey, fullName, teamName, etc.)
  * @param {Object} fopUpdate - FOP update object (required)
- * @param {Object} translations - Translation map
+ * @param {string} locale - Language locale code
  * @returns {Object|null} - Current attempt info or null if no current athlete
  */
-export function extractCurrentAttempt(fopUpdate, translations) {
+export function extractCurrentAttempt(fopUpdate, locale = 'en') {
 	// Check if we're in break mode - show break info instead of athlete
 	const mode = fopUpdate?.mode || 'WAIT';
 	const breakType = fopUpdate?.breakType || null;
@@ -497,8 +497,8 @@ export function extractCurrentAttempt(fopUpdate, translations) {
 	
 	if (isBreakMode(mode)) {
 		// During break: show break message as name, clear team, show session info
-		const breakMessage = inferBreakMessage(breakType, ceremonyType, translations);
-		const groupInfo = inferGroupName(fopUpdate, translations);
+		const breakMessage = inferBreakMessage(breakType, ceremonyType, locale);
+		const groupInfo = inferGroupName(fopUpdate, locale);
 		
 		return {
 			fullName: breakMessage,
@@ -527,7 +527,7 @@ export function extractCurrentAttempt(fopUpdate, translations) {
 	const cleanFullName = (fopUpdate.fullName || '').replace(/&ndash;/g, '–').replace(/&mdash;/g, '—');
 	
 	// Format attempt label using shared helper
-	const attemptLabel = buildAttemptLabel(fopUpdate, translations);
+	const attemptLabel = buildAttemptLabel(fopUpdate, locale);
 
 	return {
 		fullName: cleanFullName,

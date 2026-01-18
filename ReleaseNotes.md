@@ -2,6 +2,11 @@
 
 > #### ⚠ To use Tracker, you need to use version 64 of OWLCMS (see Installing Locally below)
 
+## New in Release 2.7
+- Plugins reorganized in subfolders to facilitate connecting submodules with additional plugins (e.g. IWF Books)
+  - Plugins still shown on entry page based on the category in config.js
+- Missing translation keys from owlcms will show as !key (same as owlcms)
+
 ## New in Release 2.6
 - 2.6.2: Scoreboards and attempt boards now track the break and ceremony status same as OWLCMS
 - Now uses a shared component for all attempt bars in all scoreboards
