@@ -42,7 +42,8 @@
 		// Handle plain number (legacy format from old OWLCMS)
 		if (typeof attempt === 'number') {
 			if (attempt === 0) return '-';
-			return String(Math.abs(attempt));
+			const absValue = String(Math.abs(attempt));
+			return attempt < 0 ? `(${absValue})` : absValue;
 		}
 		
 		// Handle string (shouldn't happen but be safe)
@@ -54,6 +55,7 @@
 		// V2 from OWLCMS: { value: 85, status: "good" }
 		// Normalized hub format: { stringValue: "85", liftStatus: "good" }
 		const val = attempt.stringValue ?? attempt.value;
+		const status = attempt.liftStatus || attempt.status;
 		
 		// Safety check: if val is an object, it will render as [object Object]
 		if (typeof val === 'object' && val !== null) {
@@ -69,10 +71,11 @@
 		// Handle negative values (failed lifts) - show absolute value
 		const numVal = parseInt(val, 10);
 		if (!isNaN(numVal) && numVal < 0) {
-			return String(Math.abs(numVal));
+			return `(${Math.abs(numVal)})`;
 		}
 		
-		return String(val);
+		const displayValue = String(val);
+		return status === 'bad' ? `(${displayValue})` : displayValue;
 	}
 </script>
 
@@ -453,7 +456,7 @@
 	}
 
 	.attempt.failed {
-		background: #dc2626 !important;
+		background: darkred !important;
 		color: #fff;
 	}
 

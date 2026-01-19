@@ -61,7 +61,8 @@
 		}
 
 		if (attempt.liftStatus === 'empty') return '\u00A0';
-		return val.replace(/[()]/g, '');
+		const sanitized = val.replace(/[()]/g, '');
+		return attempt.liftStatus === 'bad' ? `(${sanitized})` : sanitized;
 	}
 
 	function parseFormattedNumber(value) {
@@ -472,7 +473,7 @@ export function shouldRenderFlag(url) {
 	.attempt.empty { background: transparent; color: #aaa !important; }
 	.attempt.request { background: transparent; color: #aaa !important; }
 	.attempt.good { background: #fff !important; color: #000; }
-	.attempt.bad { background: #dc2626 !important; color: #fff; }
+	.attempt.bad { background: darkred !important; color: #fff; }
 	.attempt.next { background: transparent; color: #f97316 !important; }
 
 	/* Current attempt - highlighted and blinking (text only) */

@@ -340,11 +340,11 @@ export function getScoreboardData(scoreboardType, fopName = 'A', options = {}) {
 		team: competitionHub.translate('Team', lang),
 		snatch: competitionHub.translate('Snatch', lang),
 		cleanJerk: competitionHub.translate('Clean_and_Jerk', lang),
-		total: competitionHub.translate('TOTAL', lang),
+		total: competitionHub.translate('Total', lang),
 		rank: competitionHub.translate('Rank', lang),
-		best: competitionHub.translate('Best', lang),
+		best: competitionHub.translate('Scoreboard.Best', lang),
 		leaders: competitionHub.translate('Leaders', lang),
-		records: competitionHub.translate('Records', lang)
+		records: competitionHub.translate('Scoreboard.records', lang)
 	};
 
 	const result = {

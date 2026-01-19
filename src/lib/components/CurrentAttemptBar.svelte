@@ -290,7 +290,7 @@
 
 	.timer-slot,
 	.break-slot {
-		background: #1a1a1a;
+		background: transparent;
 		font-weight: bold;
 		--timer-font-size: 1.5rem;
 	}
@@ -303,7 +303,7 @@
 	}
 
 	.decision-slot {
-		background: rgba(26, 26, 26, 0.95);
+		background: transparent;
 	}
 
 	.down-signal {

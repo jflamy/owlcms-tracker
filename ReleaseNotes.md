@@ -3,6 +3,9 @@
 > #### ⚠ To use Tracker, you need to use version 64 of OWLCMS (see Installing Locally below)
 
 ## New in Release 2.7
+- Improved contrast and additional visual cues for bad lifts on scoreboards
+- Transparent background on shared clock/decision component
+- Scoreboard translations come from owlcms (no fallbacks)
 - Plugins reorganized in subfolders to facilitate connecting submodules with additional plugins (e.g. IWF Books)
   - Plugins still shown on entry page based on the category in config.js
 - Missing translation keys from owlcms will show as !key (same as owlcms)
