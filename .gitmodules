@@ -1,3 +1,6 @@
 [submodule "src/plugins/books"]
 	path = src/plugins/books
 	url = https://github.com/jflamy/tracker-books.git
+[submodule "src/plugins/tracker-France"]
+	path = src/plugins/tracker-France
+	url = https://github.com/jflamy/tracker-France.git
