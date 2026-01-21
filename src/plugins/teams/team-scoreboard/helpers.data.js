@@ -18,15 +18,38 @@
 
 import { competitionHub } from '$lib/server/competition-hub.js';
 import { logger } from '@owlcms/tracker-core';
+import { parseFormattedNumber } from '@owlcms/tracker-core/utils';
 import { getFlagUrl } from '$lib/server/flag-resolver.js';
 import { calculateTeamPoints } from '$lib/server/team-points-formula.js';
-import { CalculateSinclair2024, CalculateSinclair2020, getMastersAgeFactor } from '$lib/sinclair-coefficients.js';
-import { CalculateQPoints } from '$lib/qpoints-coefficients.js';
-import { computeGamx, Variant } from '$lib/gamx2.js';
+// Import scoring functions from tracker-core (works at runtime for derivative plugins)
+import { 
+	calculateSinclair2024 as CalculateSinclair2024, 
+	calculateSinclair2020 as CalculateSinclair2020, 
+	getMastersAgeFactor,
+	calculateQPoints as CalculateQPoints,
+	calculateGamx as computeGamx,
+	Variant
+} from '@owlcms/tracker-core/scoring';
 import { buildCacheKey, registerCache } from '$lib/server/cache-utils.js';
 import { extractTimers, computeDisplayMode, extractDecisionState } from '$lib/server/timer-decision-helpers.js';
 import { computeAttemptBarVisibility, hasCurrentAthlete, logAttemptBarDebug } from '$lib/server/attempt-bar-visibility.js';
 import { isBreakMode, inferGroupName, inferBreakMessage, extractCurrentAttempt, buildSessionInfo } from '$lib/server/standard-scoreboard-helpers.js';
+
+// Re-export utilities and scoring functions for derivative plugins (from tracker-core)
+export { parseFormattedNumber };
+export { CalculateSinclair2024, CalculateSinclair2020, getMastersAgeFactor };
+export { CalculateQPoints };
+export { computeGamx, Variant };
+
+// =============================================================================
+// CUSTOM SCORE CALCULATOR (set via createHelpers)
+// =============================================================================
+
+/**
+ * Custom score calculator injected via createHelpers()
+ * If null, defaultCalculateScore is used
+ */
+let _customCalculateScore = null;
 
 // =============================================================================
 // CACHE
@@ -51,22 +74,7 @@ const lastKnownGenderByFop = new Map();
 // UTILITY FUNCTIONS
 // =============================================================================
 
-/**
- * Parse a formatted number that may be a string with decimal comma or point
- * @param {*} value - Value to parse
- * @returns {number} Parsed number or 0 if invalid
- */
-function parseFormattedNumber(value) {
-	if (value === null || value === undefined || value === '' || value === '-') {
-		return 0;
-	}
-	if (typeof value === 'number') {
-		return value;
-	}
-	const normalized = String(value).replace(',', '.');
-	const parsed = parseFloat(normalized);
-	return isNaN(parsed) ? 0 : parsed;
-}
+// parseFormattedNumber imported from @owlcms/tracker-core/utils
 
 /**
  * Normalize athlete key to string for consistent lookups
@@ -106,7 +114,7 @@ function normalizeLotNumber(value) {
 }
 
 /**
- * Calculate score based on selected scoring system
+ * Calculate score based on selected scoring system (default implementation)
  * @param {number} total - Athlete total
  * @param {number} bw - Body weight
  * @param {string} gender - 'M' or 'F'
@@ -114,7 +122,7 @@ function normalizeLotNumber(value) {
  * @param {string} system - Scoring system name
  * @returns {number} Calculated score
  */
-function calculateScore(total, bw, gender, age, system = 'Sinclair') {
+function defaultCalculateScore(total, bw, gender, age, system = 'Sinclair') {
 	if (!total || total <= 0 || !bw || bw <= 0 || !gender) return 0;
 	
 	const normalizedGender = gender === 'M' || gender === 'F' ? gender : (gender.startsWith('M') ? 'M' : 'F');
@@ -138,6 +146,34 @@ function calculateScore(total, bw, gender, age, system = 'Sinclair') {
 		default:
 			return CalculateSinclair2024(total, bw, normalizedGender);
 	}
+}
+
+/**
+ * Calculate score using custom calculator (if provided) or default
+ * Custom calculators return null to defer to default scoring
+ * 
+ * @param {number} total - Athlete total (actual or predicted, already computed)
+ * @param {number} bw - Body weight
+ * @param {string} gender - 'M' or 'F'
+ * @param {number} age - Athlete age
+ * @param {string} system - Scoring system name
+ * @param {Object} context - Extended context for custom scoring
+ * @param {Object} context.athlete - Full athlete object
+ * @param {Object} context.hub - Competition hub reference
+ * @param {Function|null} customCalculateScore - Injected custom calculator (null = use default)
+ * @returns {number} Calculated score
+ */
+function calculateScoreWithContext(total, bw, gender, age, system, context, customCalculateScore) {
+	// If custom calculator provided, try it first
+	if (customCalculateScore) {
+		const customResult = customCalculateScore(total, bw, gender, age, system, context);
+		// If custom returns a number (not null), use it
+		if (customResult !== null) {
+			return customResult;
+		}
+	}
+	// Fall back to default scoring
+	return defaultCalculateScore(total, bw, gender, age, system);
 }
 
 /**
@@ -429,11 +465,12 @@ function teamAthleteFromSession(sessionAthlete, context = {}) {
 	const hasResults = bestSnatchValue > 0 || bestCleanJerkValue > 0;
 	
 	// Calculate actual score
-	const actualScore = calculateScore(actualTotal, athleteBodyWeight, normalizedGender, age, scoringSystem);
+	const scoreContext = { athlete: sessionAthlete, hub: competitionHub };
+	const actualScore = calculateScoreWithContext(actualTotal, athleteBodyWeight, normalizedGender, age, scoringSystem, scoreContext, _customCalculateScore);
 	
 	// Calculate predicted total if next lift succeeds
 	const predictedTotal = calculatePredictedTotal(sessionAthlete, includeCjDeclaration);
-	const predictedScore = calculateScore(predictedTotal, athleteBodyWeight, normalizedGender, age, scoringSystem);
+	const predictedScore = calculateScoreWithContext(predictedTotal, athleteBodyWeight, normalizedGender, age, scoringSystem, scoreContext, _customCalculateScore);
 	
 	// Extract rank fields from displayInfo (OWLCMS V2 format)
 	const snatchRank = parseInt(sessionAthlete.snatchRank || 0);
@@ -708,7 +745,7 @@ function teamAthleteFromDatabase(dbAthlete, context = {}) {
 	const fullName = lastName && firstName ? `${lastName}, ${firstName}` : lastName || firstName || '';
 	
 	// Use teamName from V2 parser (already resolved) or fall back to resolving from team ID
-	const teamName = dbAthlete.teamName || competitionHub.getTeamNameById(dbAthlete.team) || '';
+	const teamName = dbAthlete.teamName || competitionHub.getTeamNameById({ teamId: dbAthlete.team }) || '';
 	
 	// Extract ranks from participations array (OWLCMS stores per-championship ranks here)
 	// Use first participation for now (team scoreboard uses first championship)
@@ -763,11 +800,12 @@ function teamAthleteFromDatabase(dbAthlete, context = {}) {
 	const hasResults = bestSnatch > 0 || bestCleanJerk > 0;
 	
 	// Calculate actual score
-	const actualScore = calculateScore(actualTotal, athleteBodyWeight, normalizedGender, age, scoringSystem);
+	const scoreContext = { athlete: { ...dbAthlete, ...normalizedAthlete }, hub: competitionHub };
+	const actualScore = calculateScoreWithContext(actualTotal, athleteBodyWeight, normalizedGender, age, scoringSystem, scoreContext, _customCalculateScore);
 	
 	// Calculate predicted total if next lift succeeds
 	const predictedTotal = calculatePredictedTotal(normalizedAthlete, includeCjDeclaration);
-	const predictedScore = calculateScore(predictedTotal, athleteBodyWeight, normalizedGender, age, scoringSystem);
+	const predictedScore = calculateScoreWithContext(predictedTotal, athleteBodyWeight, normalizedGender, age, scoringSystem, scoreContext, _customCalculateScore);
 	
 	// Determine if total is definitively zero
 	const definitiveZero = isDefinitiveTotalZero(normalizedAthlete);
@@ -2011,4 +2049,49 @@ export function getTopAthletes(competitionState, limit = 10) {
  */
 export function getTeamRankings() {
 	return competitionHub.getTeamRankings();
+}
+
+// =============================================================================
+// FACTORY FUNCTION FOR PLUGIN INHERITANCE
+// =============================================================================
+
+/**
+ * Create helpers with optional custom score calculator
+ * 
+ * Derivative plugins can provide a custom calculateScore function that:
+ * - Receives: (total, bw, gender, age, system, context)
+ * - context contains: { athlete, hub }
+ * - Returns: number (use custom score) or null (defer to default scoring)
+ * 
+ * Example derivative plugin:
+ * ```javascript
+ * import { createHelpers } from '../../teams/team-scoreboard/helpers.data.js';
+ * 
+ * function calculateScore(total, bw, gender, age, system, context) {
+ *   if (system === 'PDC') {
+ *     const bestSnatch = parseFloat(context.athlete.bestSnatch) || 0;
+ *     return bw > 0 ? (bestSnatch + total) / bw : 0;
+ *   }
+ *   return null; // Defer to base for other systems
+ * }
+ * 
+ * export const { getScoreboardData, getDatabaseState, getFopUpdate, getCompetitionStats, getTopAthletes, getTeamRankings } = createHelpers(calculateScore);
+ * ```
+ * 
+ * @param {Function|null} customCalculateScore - Custom score calculator or null
+ * @returns {Object} Object with all exported helper functions
+ */
+export function createHelpers(customCalculateScore = null) {
+	// Set the module-level custom calculator
+	_customCalculateScore = customCalculateScore;
+	
+	// Return all public functions
+	return {
+		getScoreboardData,
+		getDatabaseState,
+		getFopUpdate,
+		getCompetitionStats,
+		getTopAthletes,
+		getTeamRankings
+	};
 }

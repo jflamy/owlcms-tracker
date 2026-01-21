@@ -97,6 +97,17 @@ export async function GET({ url, request }) {
 
 		// Extract all other parameters as options
 		const options = {};
+		
+		// First, apply defaults from scoreboard config options
+		if (scoreboard?.config?.options && Array.isArray(scoreboard.config.options)) {
+			for (const opt of scoreboard.config.options) {
+				if (opt.key && opt.default !== undefined) {
+					options[opt.key] = opt.default;
+				}
+			}
+		}
+		
+		// Then, override with URL parameters
 		for (const [key, value] of url.searchParams.entries()) {
 			if (key !== 'type' && key !== 'fop') {
 				// Try to parse as boolean/number

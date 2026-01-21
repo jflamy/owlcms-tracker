@@ -120,7 +120,11 @@
 {#if scoreboardData}
 	<!-- Dynamically import the scoreboard component using pluginPath -->
 	<!-- Uses glob map to support nested plugins (e.g., books/iwf-startbook) -->
-	{@const modulePath = `../../plugins/${data.pluginPath}/page.svelte`}
+	<!-- Runtime plugins can use delegateTo to use a built-in plugin's page component -->
+	{@const delegatePath = data.config?.delegateTo}
+	{@const modulePath = delegatePath 
+		? `../../plugins/${delegatePath}/page.svelte`
+		: `../../plugins/${data.pluginPath}/page.svelte`}
 	{@const moduleLoader = pageModules[modulePath]}
 	{#if moduleLoader}
 		{#await moduleLoader()}
