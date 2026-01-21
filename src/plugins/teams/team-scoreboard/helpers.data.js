@@ -16,11 +16,25 @@
  *   - Computes team totals, top contributors, etc.
  */
 
-import { competitionHub } from '$lib/server/competition-hub.js';
-import { logger } from '@owlcms/tracker-core';
-import { parseFormattedNumber } from '@owlcms/tracker-core/utils';
-import { getFlagUrl } from '$lib/server/flag-resolver.js';
-import { calculateTeamPoints } from '$lib/server/team-points-formula.js';
+import { competitionHub, logger } from '@owlcms/tracker-core';
+import { 
+	parseFormattedNumber, 
+	getFlagUrl,
+	buildCacheKey, 
+	registerCache,
+	extractTimers, 
+	computeDisplayMode, 
+	extractDecisionState,
+	computeAttemptBarVisibility, 
+	hasCurrentAthlete,
+	logAttemptBarDebug,
+	isBreakMode, 
+	inferGroupName, 
+	inferBreakMessage, 
+	extractCurrentAttempt as _extractCurrentAttempt, 
+	buildSessionInfo as _buildSessionInfo
+} from '@owlcms/tracker-core/utils';
+import { calculateTeamPoints } from '@owlcms/tracker-core/scoring';
 // Import scoring functions from tracker-core (works at runtime for derivative plugins)
 import { 
 	calculateSinclair2024 as CalculateSinclair2024, 
@@ -30,10 +44,23 @@ import {
 	calculateGamx as computeGamx,
 	Variant
 } from '@owlcms/tracker-core/scoring';
-import { buildCacheKey, registerCache } from '$lib/server/cache-utils.js';
-import { extractTimers, computeDisplayMode, extractDecisionState } from '$lib/server/timer-decision-helpers.js';
-import { computeAttemptBarVisibility, hasCurrentAthlete, logAttemptBarDebug } from '$lib/server/attempt-bar-visibility.js';
-import { isBreakMode, inferGroupName, inferBreakMessage, extractCurrentAttempt, buildSessionInfo } from '$lib/server/standard-scoreboard-helpers.js';
+
+// Create hub-bound wrappers for presentation helpers
+// These helpers need a hub with translate(), we bind it to competitionHub
+
+/**
+ * Extract current attempt with hub bound to competitionHub
+ */
+function extractCurrentAttempt(fopUpdate, locale = 'en') {
+	return _extractCurrentAttempt(fopUpdate, competitionHub, getFlagUrl, locale);
+}
+
+/**
+ * Build session info with hub bound to competitionHub
+ */
+function buildSessionInfo(fopUpdate, locale = 'en') {
+	return _buildSessionInfo(fopUpdate, competitionHub, locale);
+}
 
 // Re-export utilities and scoring functions for derivative plugins (from tracker-core)
 export { parseFormattedNumber };
