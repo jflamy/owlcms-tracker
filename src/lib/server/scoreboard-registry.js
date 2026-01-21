@@ -175,12 +175,12 @@ class ScoreboardRegistry {
 		}
 		
 		try {
-			let config, dataHelper;
+			let config, configModule, dataHelper;
 			
 			if (runtimePaths) {
 				// Runtime-discovered plugin - use dynamic import
 				try {
-					const configModule = await import(/* @vite-ignore */ 'file://' + runtimePaths.configPath);
+					configModule = await import(/* @vite-ignore */ 'file://' + runtimePaths.configPath);
 					config = configModule.default || configModule;
 					
 					if (runtimePaths.helpersPath) {
@@ -193,7 +193,7 @@ class ScoreboardRegistry {
 				}
 			} else {
 				// Build-time plugin - use pre-imported modules
-				const configModule = configModules[`../../plugins/${pluginPath}/config.js`];
+				configModule = configModules[`../../plugins/${pluginPath}/config.js`];
 				if (!configModule) {
 					console.warn(`[ScoreboardRegistry] Skipping ${pluginPath}: no config.js`);
 					return;
@@ -204,6 +204,47 @@ class ScoreboardRegistry {
 				dataHelper = helpersModule
 					? helpersModule.getScoreboardData || helpersModule.default
 					: null;
+			}
+
+			// Handle delegateTo pattern: config-only plugins that extend a base plugin
+			// If no dataHelper but config has delegateTo, load base plugin's createHelpers
+			if (!dataHelper && config.delegateTo) {
+				try {
+					const basePluginPath = config.delegateTo;
+					console.log(`[ScoreboardRegistry] ${folderName}: delegating to ${basePluginPath}`);
+					
+					// Get base plugin's helpers module
+					let baseHelpersModule;
+					const baseGlobKey = `../../plugins/${basePluginPath}/helpers.data.js`;
+					
+					if (helperModules[baseGlobKey]) {
+						// Build-time: use pre-imported module
+						baseHelpersModule = helperModules[baseGlobKey];
+					} else {
+						// Runtime: try dynamic import from src/plugins
+						const baseHelpersPath = resolve(process.cwd(), `src/plugins/${basePluginPath}/helpers.data.js`);
+						if (existsSync(baseHelpersPath)) {
+							baseHelpersModule = await import(/* @vite-ignore */ 'file://' + baseHelpersPath);
+						}
+					}
+					
+					if (baseHelpersModule?.createHelpers) {
+						// Check if config exports a custom calculateScore function
+						const customCalculateScore = configModule.calculateScore || null;
+						
+						if (customCalculateScore) {
+							console.log(`[ScoreboardRegistry] ${folderName}: using custom calculateScore from config`);
+						}
+						
+						// Create helpers with custom scoring (or null for default)
+						const derivedHelpers = baseHelpersModule.createHelpers(customCalculateScore);
+						dataHelper = derivedHelpers.getScoreboardData;
+					} else {
+						console.warn(`[ScoreboardRegistry] ${folderName}: base plugin ${basePluginPath} has no createHelpers export`);
+					}
+				} catch (delegateErr) {
+					console.error(`[ScoreboardRegistry] ${folderName}: delegation failed:`, delegateErr.message);
+				}
 			}
 
 			const type = folderName;

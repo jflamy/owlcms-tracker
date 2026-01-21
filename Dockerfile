@@ -37,11 +37,8 @@ RUN apk add --no-cache dumb-init
 # Copy package files from builder
 COPY --from=builder /build/package*.json ./
 
-# Copy built application
+# Copy built application (includes build/lib/server with transformed imports from copy-runtime-server-files.js)
 COPY --from=builder /build/build ./build
-
-# Copy source server modules for websocket-server (needed by start-with-ws.js at runtime)
-COPY --from=builder /build/src/lib/server ./build/lib/server
 
 # Copy startup script that attaches WebSocket server
 COPY --from=builder /build/start-with-ws.js ./start-with-ws.js
