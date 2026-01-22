@@ -19,7 +19,7 @@ import { bumpCacheEpoch } from './cache-epoch.js';
 import { competitionHub } from './competition-hub.js';
 import { existsSync, readdirSync, statSync } from 'fs';
 import { resolve, join } from 'path';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 
 // Eager imports so Vite includes all plugins at build time
 // Note: import.meta.glob is a Vite COMPILE-TIME feature - it gets transformed
@@ -40,6 +40,17 @@ function findPackageRoot(startDir) {
 		current = parent;
 	}
 	return startDir;
+}
+
+function toFileUrl(filePath) {
+	if (!filePath) return null;
+	const normalized = filePath.replace(/\\/g, '/');
+	return `file:///${normalized}`;
+}
+
+async function importFromFileUrl(fileUrl) {
+	const dynamicImport = new Function('u', 'return import(u)');
+	return dynamicImport(fileUrl);
 }
 
 /**
@@ -210,12 +221,15 @@ class ScoreboardRegistry {
 			
 			if (runtimePaths) {
 				// Runtime-discovered plugin - use dynamic import
+				// Use direct file URL strings (no percent-encoding) for accented paths on Windows
 				try {
-					configModule = await import(/* @vite-ignore */ 'file://' + runtimePaths.configPath);
+					const configUrl = toFileUrl(runtimePaths.configPath) || pathToFileURL(runtimePaths.configPath).href;
+					configModule = await importFromFileUrl(configUrl);
 					config = configModule.default || configModule;
 					
 					if (runtimePaths.helpersPath) {
-						const helpersModule = await import(/* @vite-ignore */ 'file://' + runtimePaths.helpersPath);
+						const helpersUrl = toFileUrl(runtimePaths.helpersPath) || pathToFileURL(runtimePaths.helpersPath).href;
+						const helpersModule = await importFromFileUrl(helpersUrl);
 						dataHelper = helpersModule.getScoreboardData || helpersModule.default;
 					}
 				} catch (importErr) {
