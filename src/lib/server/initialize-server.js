@@ -16,10 +16,22 @@ import { logger } from '@owlcms/tracker-core';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+// Track if WebSocket server is already attached to prevent double initialization
+// Use globalThis so both bundled and copied server files share the same flag.
+const WS_ATTACHED_FLAG = '__websocketServerAttached';
+
 /**
  * Initialize WebSocket server on the given HTTP server
  */
 export async function initializeWebSocketServer(httpServer) {
+  // Prevent double initialization - this can happen when both start-with-ws.js
+  // and hooks.server.js try to initialize the WebSocket server
+  if (globalThis[WS_ATTACHED_FLAG]) {
+    logger.debug('[WebSocket] Already initialized, skipping duplicate init');
+    return true;
+  }
+  globalThis[WS_ATTACHED_FLAG] = true;
+
   try {
     attachWebSocketToServer({
       server: httpServer,

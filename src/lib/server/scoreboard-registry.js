@@ -19,6 +19,7 @@ import { bumpCacheEpoch } from './cache-epoch.js';
 import { competitionHub } from './competition-hub.js';
 import { existsSync, readdirSync, statSync } from 'fs';
 import { resolve, join } from 'path';
+import { fileURLToPath } from 'url';
 
 // Eager imports so Vite includes all plugins at build time
 // Note: import.meta.glob is a Vite COMPILE-TIME feature - it gets transformed
@@ -27,6 +28,19 @@ import { resolve, join } from 'path';
 // Uses ** to support nested plugins (e.g., books/iwf-startbook, books/iwf-results)
 const configModules = import.meta.glob('../../plugins/**/config.js', { eager: true });
 const helperModules = import.meta.glob('../../plugins/**/helpers.data.js', { eager: true });
+
+function findPackageRoot(startDir) {
+	let current = startDir;
+	for (let i = 0; i < 6; i += 1) {
+		if (existsSync(join(current, 'package.json'))) {
+			return current;
+		}
+		const parent = resolve(current, '..');
+		if (parent === current) break;
+		current = parent;
+	}
+	return startDir;
+}
 
 /**
  * Discover plugins at runtime that weren't included in the build
@@ -43,16 +57,9 @@ async function discoverRuntimePlugins() {
 	}
 	
 	try {
-		// Determine plugins directory
-		// In development: src/plugins
-		// In production: may vary based on build output
-		const pluginsDir = resolve(process.cwd(), 'src/plugins');
-		
-		if (!existsSync(pluginsDir)) {
-			console.log('[ScoreboardRegistry] Runtime discovery: src/plugins not found, skipping');
-			return runtimePlugins;
-		}
-		
+		const moduleDir = fileURLToPath(new URL('.', import.meta.url));
+		const moduleRoot = findPackageRoot(moduleDir);
+
 		// Recursively find plugin folders (folders containing config.js)
 		const findPlugins = (dir, prefix = '') => {
 			const entries = readdirSync(dir);
@@ -89,7 +96,31 @@ async function discoverRuntimePlugins() {
 			}
 		};
 		
-		findPlugins(pluginsDir);
+		// Scan multiple plugin directories
+		// In development: src/plugins (bundled plugins)
+		// In production: plugins (user-added runtime plugins)
+		// Use both process.cwd() and the module root to handle different launchers
+		const pluginsDirs = [
+			resolve(process.cwd(), 'src/plugins'),
+			resolve(process.cwd(), 'plugins'),
+			resolve(moduleRoot, 'src/plugins'),
+			resolve(moduleRoot, 'plugins')
+		];
+		const uniquePluginDirs = Array.from(new Set(pluginsDirs));
+		
+		let foundAnyDir = false;
+		for (const pluginsDir of uniquePluginDirs) {
+			if (!existsSync(pluginsDir)) {
+				continue;
+			}
+			foundAnyDir = true;
+			console.log(`[ScoreboardRegistry] Runtime discovery: scanning ${pluginsDir}`);
+			findPlugins(pluginsDir);
+		}
+		
+		if (!foundAnyDir) {
+			console.log('[ScoreboardRegistry] Runtime discovery: no plugin directories found, skipping');
+		}
 		
 	} catch (err) {
 		console.error('[ScoreboardRegistry] Runtime discovery error:', err.message);
