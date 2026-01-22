@@ -20,3 +20,6 @@ compliance/*
 !compliance/README.md
 local/pictures
 local/logos/
+
+# Runtime plugins - managed separately in tracker-* repos
+plugins/
