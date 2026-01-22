@@ -5,6 +5,10 @@
  * so the /ws endpoint accepts OWLCMS WebSocket connections in production.
  */
 
+// Mark that start-with-ws.js is handling WebSocket - MUST be before handler import
+// This prevents hooks.server.js from also trying to init WebSocket
+globalThis.__startWithWsActive = true;
+
 import { createServer } from 'http';
 import { handler } from './build/handler.js';
 
