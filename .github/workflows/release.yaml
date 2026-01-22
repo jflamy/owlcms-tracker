@@ -83,7 +83,7 @@ jobs:
           echo "✓ Experimental plugins removed"
       
       - name: Build universal package
-        run: node scripts/build-package.js "${{ env.REVISION }}"
+        run: node scripts/build-zip.js "${{ env.REVISION }}"
       
       - name: Setup Docker buildx
         uses: docker/setup-buildx-action@v3
