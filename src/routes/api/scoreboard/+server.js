@@ -248,10 +248,49 @@ export async function POST({ request }) {
 			});
 		}
 		
+		// Display control actions (from display-control plugin)
+		if (action === 'display_pause') {
+			const { pauseAutomation } = await import('../../../plugins/video-overlays/display-control/helpers.data.js');
+			const result = pauseAutomation(body.fop || 'A');
+			return json({ success: true, ...result });
+		}
+		
+		if (action === 'display_resume') {
+			const { resumeAutomation } = await import('../../../plugins/video-overlays/display-control/helpers.data.js');
+			const result = resumeAutomation(body.fop || 'A');
+			return json({ success: true, ...result });
+		}
+		
+		if (action === 'display_show_iframe') {
+			const { manualShowIframe } = await import('../../../plugins/video-overlays/display-control/helpers.data.js');
+			const result = manualShowIframe(body.fop || 'A', body.url);
+			return json({ success: true, ...result });
+		}
+		
+		if (action === 'display_show_video') {
+			const { manualShowVideo } = await import('../../../plugins/video-overlays/display-control/helpers.data.js');
+			const result = manualShowVideo(body.fop || 'A', body.url);
+			return json({ success: true, ...result });
+		}
+		
+		if (action === 'display_config') {
+			const { updateConfig } = await import('../../../plugins/video-overlays/display-control/helpers.data.js');
+			// Extract config from body (all properties except action and fop)
+			const { action: _, fop: __, ...config } = body;
+			const result = updateConfig(body.fop || 'A', config);
+			return json({ success: true, ...result });
+		}
+		
+		if (action === 'display_state') {
+			const { getState } = await import('../../../plugins/video-overlays/display-control/helpers.data.js');
+			const result = getState(body.fop || 'A');
+			return json({ success: true, ...result });
+		}
+		
 		return json({
 			success: false,
 			error: 'unknown_action',
-			message: 'Valid actions: list_scoreboards, list_fops'
+			message: 'Valid actions: list_scoreboards, list_fops, display_pause, display_resume, display_show_iframe, display_show_video, display_config, display_state'
 		}, { status: 400 });
 		
 	} catch (error) {

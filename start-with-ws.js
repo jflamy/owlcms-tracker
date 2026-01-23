@@ -37,8 +37,25 @@ process.on('unhandledRejection', (reason, promise) => {
     // Set port for adapter-node (default 5173, but we want 8096)
     const PORT = process.env.PORT || '8096';
 
-    // Create HTTP server to serve SvelteKit app
-    const httpServer = createServer(handler);
+    // Import OWLCMS proxy middleware
+    let proxyMiddleware = null;
+    try {
+      const { createOwlcmsProxyMiddleware } = await import('./build/lib/server/owlcms-proxy.js');
+      proxyMiddleware = createOwlcmsProxyMiddleware();
+      console.log('[Startup] OWLCMS proxy middleware loaded');
+    } catch (err) {
+      console.warn('[Startup] OWLCMS proxy not available:', err?.message || err);
+    }
+
+    // Create HTTP server with proxy middleware before SvelteKit handler
+    const httpServer = createServer((req, res) => {
+      // Route /proxy requests through OWLCMS proxy
+      if (proxyMiddleware && req.url.startsWith('/proxy')) {
+        return proxyMiddleware(req, res, () => handler(req, res));
+      }
+      // All other requests go to SvelteKit
+      handler(req, res);
+    });
 
     // Attach WebSocket server for OWLCMS connections
     try {

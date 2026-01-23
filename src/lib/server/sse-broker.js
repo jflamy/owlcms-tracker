@@ -103,15 +103,17 @@ class SSEBroker {
    * @param {Function} sendFn - Function to send data to this client
    * @param {string} connectionId - Unique connection identifier
    * @param {string|null} fopName - FOP name to filter events (null = global events only)
+   * @param {string[]|null} types - Optional list of event types to receive (null = all)
    * @returns {Function} Unregister function
    */
-  registerClient(sendFn, connectionId, fopName = null) {
+  registerClient(sendFn, connectionId, fopName = null, types = null) {
     // Attach hub listeners on first client
     if (!this.hubListenersAttached) {
       this.attachHubListeners();
     }
     
-    const client = { send: sendFn, connectionId, fopName };
+    const typeSet = Array.isArray(types) && types.length > 0 ? new Set(types) : null;
+    const client = { send: sendFn, connectionId, fopName, types: typeSet };
     this.clients.add(client);
     
     const fopLabel = fopName ? `FOP ${fopName}` : 'GLOBAL';
@@ -166,8 +168,9 @@ class SSEBroker {
       // - FOP-specific events go only to clients subscribed to that FOP
       const isGlobalEvent = eventFop === null;
       const clientMatchesFop = client.fopName === eventFop;
+      const clientWantsType = !client.types || client.types.has(message.type);
       
-      if (isGlobalEvent || clientMatchesFop) {
+      if (clientWantsType && (isGlobalEvent || clientMatchesFop)) {
         try {
           client.send(encodedBytes);
           

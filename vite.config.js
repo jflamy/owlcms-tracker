@@ -32,6 +32,13 @@ export default defineConfig({
 						});
 					});
 					
+					// Add OWLCMS reverse proxy for Vaadin pages
+					import('./src/lib/server/owlcms-proxy.js').then(({ attachProxyToViteServer }) => {
+						attachProxyToViteServer(server);
+					}).catch(err => {
+						console.warn('[OWLCMS Proxy] Failed to attach:', err.message);
+					});
+					
 					// Serve /local directory (flags, pictures, styles)
 					server.middlewares.use('/local', (req, res, next) => {
 						// Decode URL-encoded paths (e.g., "AK%20Bj%C3%B8rgvin.png" → "AK Bjørgvin.png")

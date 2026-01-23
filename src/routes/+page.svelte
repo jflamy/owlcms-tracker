@@ -114,12 +114,29 @@
     modalFop = null;
   }
   
-  function openScoreboard(type, fop, withOptions = false) {
+  async function openScoreboard(type, fop, withOptions = false) {
     const options = scoreboardOptions[type]?.[fop] || {};
     const params = new URLSearchParams();
     
     // Find the scoreboard config to get default values
     const scoreboard = data.scoreboards.find(s => s.type === type);
+    
+    // For display-control, save the config to the server first
+    if (type === 'display-control' && Object.keys(options).length > 0) {
+      try {
+        await fetch('/api/scoreboard', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'display_config',
+            fop: fop || 'A',
+            ...options
+          })
+        });
+      } catch (err) {
+        console.error('[openScoreboard] Failed to save display-control config:', err);
+      }
+    }
     
     // Only add FOP if it's required or optional (not for fopRequired: false)
     if (fop && scoreboard?.fopRequired !== false) {

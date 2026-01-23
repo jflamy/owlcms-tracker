@@ -9,6 +9,8 @@ let connectionId = Math.random().toString(36).substr(2, 9);
 let language = 'en';
 let currentFop = null;
 let clientCount = 0;
+let reconnectTimer = null;
+let reconnectDelayMs = 2000;
 
 /**
  * Connect to SSE stream (called once, reused by all pages)
@@ -27,6 +29,10 @@ export function connectSSE(lang = 'en', fop = null) {
 	if (eventSource) {
 		eventSource.close();
 		eventSource = null;
+	}
+	if (reconnectTimer) {
+		clearTimeout(reconnectTimer);
+		reconnectTimer = null;
 	}
 	
 	currentFop = fop;
@@ -53,6 +59,12 @@ export function connectSSE(lang = 'en', fop = null) {
 		console.error('[SSE] Connection error:', error);
 		if (eventSource.readyState === EventSource.CLOSED) {
 			eventSource = null;
+			if (!reconnectTimer && subscribers.size > 0) {
+				reconnectTimer = setTimeout(() => {
+					reconnectTimer = null;
+					connectSSE(language, currentFop);
+				}, reconnectDelayMs);
+			}
 		}
 	};
 	

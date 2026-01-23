@@ -264,16 +264,21 @@ export function initWebSocketServer(httpServer) {
 	
 	// Handle upgrade requests
 	httpServer.on('upgrade', (request, socket, head) => {
+		// Skip if already handled by proxy
+		if (request._proxyHandled) return;
+		
 		const { pathname } = new URL(request.url, `http://${request.headers.host}`);
 		
-		const localPort = request.socket.localPort;
-		console.log(`[WebSocket] Upgrade request received for: ${pathname} from ${request.socket.remoteAddress} on local port ${localPort}`);
-
 		if (pathname !== '/ws') {
-			console.log(`[WebSocket] Ignoring upgrade for ${pathname} (not /ws)`);
+			// Don't log proxy paths - they're handled elsewhere
+			if (!pathname.startsWith('/proxy')) {
+				console.log(`[WebSocket] Ignoring upgrade for ${pathname} (not /ws)`);
+			}
 			return; // Allow other upgrade listeners (e.g., Vite HMR) to handle
 		}
 
+		const localPort = request.socket.localPort;
+		console.log(`[WebSocket] Upgrade request received for: ${pathname} from ${request.socket.remoteAddress} on local port ${localPort}`);
 		console.log('[WebSocket] Handling upgrade for /ws');
 		wss.handleUpgrade(request, socket, head, (ws) => {
 			wss.emit('connection', ws, request);

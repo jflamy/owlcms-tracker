@@ -15,9 +15,12 @@
 	let scoreboardError = null;
 	let unsubscribeSSE = null;
 	
-	// Check if this is a document-type plugin (no live updates needed)
+	// Check if this plugin manages its own SSE or doesn't need live updates
+	// - documents: static content, no live updates needed
+	// - customSSE: plugin has its own SSE connection (e.g., display-output, display-control)
 	// Use direct property access since this is needed at mount time
-	const isDocument = data.config?.category === 'documents';
+	const skipRouteSSE = data.config?.category === 'documents' || 
+	                      data.config?.customSSE === true;
 	
 	// Get language preference from URL parameter or config default or fallback to 'en'
 	$: language = $page.url.searchParams.get('lang') || $page.url.searchParams.get('language') || data.config?.options?.find(o => o.key === 'language')?.default || 'en';
@@ -47,13 +50,21 @@
 	}
 	
 	onMount(() => {
-		console.log('[Scoreboard] Mount - isDocument:', isDocument, 'category:', data.config?.category);
+		console.log('[Scoreboard] Mount - skipRouteSSE:', skipRouteSSE, 'category:', data.config?.category);
 		
-		// Initial fetch
+		// For plugins with customSSE or category=documents, use server load data directly
+		// These plugins either manage their own data fetching or are static content
+		if (skipRouteSSE) {
+			console.log('[Scoreboard] Using server load data (skipRouteSSE=true)');
+			scoreboardData = data;  // Pass the entire server load data object
+			return;
+		}
+		
+		// Initial fetch for regular scoreboards
 		fetchData();
 		
-		// Connect to shared SSE (browser only) - skip for document-type plugins
-		if (browser && !isDocument) {
+		// Connect to shared SSE (browser only) - skip for plugins that manage their own SSE
+		if (browser && !skipRouteSSE) {
 			// Pass fopName so SSE broker only sends events for this FOP (+ global events)
 			connectSSE(language, data.fopName);
 			unsubscribeSSE = subscribeSSE((message) => {
@@ -108,7 +119,7 @@
 	});
 	
 	// Reconnect SSE if language changes (browser only)
-	$: if (browser && language && !isDocument) {
+	$: if (browser && language && !skipRouteSSE) {
 		connectSSE(language, data.fopName);
 	}
 </script>

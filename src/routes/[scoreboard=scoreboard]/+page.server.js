@@ -51,16 +51,32 @@ export async function load({ params, url }) {
 			}
 		}
 		
+		// Get live data from plugin helpers (includes current config with overrides)
+		let liveData = null;
+		if (scoreboard.dataHelper) {
+			try {
+				liveData = await scoreboard.dataHelper(fopName, options);
+				console.log(`[Scoreboard Route] ${type} liveData:`, JSON.stringify(liveData, null, 2));
+			} catch (err) {
+				console.warn(`[Scoreboard Route] Failed to get live data for ${type}:`, err.message);
+			}
+		} else {
+			console.log(`[Scoreboard Route] ${type} has no dataHelper`);
+		}
+		
 		// Return metadata for the page
-		return {
+		const returnData = {
 			scoreboardType: type,
 			pluginPath: scoreboard.pluginPath || scoreboard.folderName,  // For component loading
 			scoreboardName: scoreboard.config.name,
 			scoreboardDescription: scoreboard.config.description,
 			fopName,
 			options,
-			config: scoreboard.config
+			config: scoreboard.config,  // Static config with defaults
+			liveConfig: liveData?.config  // Current config with overrides (if available)
 		};
+		console.log(`[Scoreboard Route] Returning liveConfig:`, returnData.liveConfig);
+		return returnData;
 		
 	} catch (err) {
 		console.error('[Scoreboard Route] Error:', err);

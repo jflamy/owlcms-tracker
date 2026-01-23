@@ -38,6 +38,11 @@ if (!globalThis.__hooksServerListenersAttached) {
 
   // Detect unhandled exceptions (crashes)
   process.on('uncaughtException', (error) => {
+    // Ignore ECONNRESET from socket hangups (common with proxy/WebSocket disconnects)
+    if (error && (error.code === 'ECONNRESET' || error.message === 'read ECONNRESET')) {
+      console.warn('[Crash] Ignored ECONNRESET:', error.message);
+      return;
+    }
     console.error('');
     console.error('❌ ═══════════════════════════════════════════════════════');
     console.error('❌ UNCAUGHT EXCEPTION - SERVER CRASHING');

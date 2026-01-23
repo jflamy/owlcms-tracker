@@ -15,7 +15,10 @@ export async function GET({ request, url }) {
   const language = url.searchParams.get('lang') || 'en';
   // Get FOP filter (null = global events only, specific FOP = that FOP + global)
   const fopName = url.searchParams.get('fop') || null;
-  console.log(`[SSE] New client connection: ${connectionId} (language: ${language}, FOP: ${fopName || 'global'})`);
+  const mode = url.searchParams.get('mode') || null;
+
+  const modeLabel = mode ? `, mode: ${mode}` : '';
+  console.log(`[SSE] New client connection: ${connectionId} (language: ${language}, FOP: ${fopName || 'global'}${modeLabel})`);
   
   const stream = new ReadableStream({
     start(controller) {
@@ -61,7 +64,15 @@ export async function GET({ request, url }) {
       
       // Register client with broker - broker handles hub events and broadcasts
       // Pass fopName so broker can filter FOP-specific events
-      const unregisterClient = sseBroker.registerClient(send, connectionId, fopName);
+      // Pass optional type filters to isolate control/display SSE
+      let typeFilter = null;
+      if (mode === 'display') {
+        typeFilter = ['display_command'];
+      } else if (mode === 'control') {
+        typeFilter = ['display_state'];
+      }
+
+      const unregisterClient = sseBroker.registerClient(send, connectionId, fopName, typeFilter);
       
       // Handle client disconnect
       request.signal.addEventListener('abort', cleanup);
@@ -70,75 +81,77 @@ export async function GET({ request, url }) {
         return;
       }
 
-      // Send initial state if available
-      const currentState = competitionHub.getState();
-      if (currentState) {
-        send({
-          type: 'state_update',
-          data: currentState,
-          timestamp: Date.now()
-        });
-      } else {
-        send({
-          type: 'waiting',
-          message: 'No competition data available yet',
-          timestamp: Date.now()
-        });
-      }
-
-	  // If a protocol error was latched before this client connected, send it immediately
-	  const protocolError = typeof competitionHub.getProtocolError === 'function'
-		  ? competitionHub.getProtocolError()
-		  : null;
-	  if (protocolError) {
-		send({
-		  type: 'protocol_error',
-		  reason: protocolError.reason,
-		  received: protocolError.received,
-		  minimum: protocolError.minimum,
-		  source: protocolError.source,
-		  timestamp: protocolError.timestamp || Date.now()
-		});
-	  }
-    else {
-    // Explicitly tell clients protocol is OK so they can clear any stale UI state
-    send({
-      type: 'protocol_ok',
-      timestamp: Date.now()
-    });
-    }
-      
-      // If hub is already ready, explicitly send hub_ready so browser knows to fetch data
-      if (competitionHub.isReady()) {
-        send({
-          type: 'hub_ready',
-          message: 'Hub ready - reconnected with data available',
-          timestamp: Date.now()
-        });
-      }
-
-      // Send translations for the requested language
-      const translations = competitionHub.getTranslations(language);
-      if (translations && Object.keys(translations).length > 0) {
-        send({
-          type: 'translations',
-          locale: language,
-          data: translations,
-          keyCount: Object.keys(translations).length,
-          timestamp: Date.now()
-        });
-      } else if (language !== 'en') {
-        // Fallback to English if requested language not available
-        const enTranslations = competitionHub.getTranslations('en');
-        if (enTranslations && Object.keys(enTranslations).length > 0) {
-          console.log(`[SSE] ${connectionId}: Language '${language}' not available, falling back to 'en'`);
+      // For display/control modes, skip hub/init payloads to keep SSE minimal
+      if (!mode) {
+        // Send initial state if available
+        const currentState = competitionHub.getState();
+        if (currentState) {
           send({
-            type: 'translations',
-            locale: 'en',
-            data: enTranslations,
-            keyCount: Object.keys(enTranslations).length,
+            type: 'state_update',
+            data: currentState,
             timestamp: Date.now()
           });
+        } else {
+          send({
+            type: 'waiting',
+            message: 'No competition data available yet',
+            timestamp: Date.now()
+          });
+        }
+
+		// If a protocol error was latched before this client connected, send it immediately
+		const protocolError = typeof competitionHub.getProtocolError === 'function'
+			? competitionHub.getProtocolError()
+			: null;
+		if (protocolError) {
+			send({
+				type: 'protocol_error',
+				reason: protocolError.reason,
+				received: protocolError.received,
+				minimum: protocolError.minimum,
+				source: protocolError.source,
+				timestamp: protocolError.timestamp || Date.now()
+			});
+		} else {
+			// Explicitly tell clients protocol is OK so they can clear any stale UI state
+			send({
+				type: 'protocol_ok',
+				timestamp: Date.now()
+			});
+		}
+        
+        // If hub is already ready, explicitly send hub_ready so browser knows to fetch data
+        if (competitionHub.isReady()) {
+          send({
+            type: 'hub_ready',
+            message: 'Hub ready - reconnected with data available',
+            timestamp: Date.now()
+          });
+        }
+
+        // Send translations for the requested language
+        const translations = competitionHub.getTranslations(language);
+        if (translations && Object.keys(translations).length > 0) {
+          send({
+            type: 'translations',
+            locale: language,
+            data: translations,
+            keyCount: Object.keys(translations).length,
+            timestamp: Date.now()
+          });
+        } else if (language !== 'en') {
+          // Fallback to English if requested language not available
+          const enTranslations = competitionHub.getTranslations('en');
+          if (enTranslations && Object.keys(enTranslations).length > 0) {
+            console.log(`[SSE] ${connectionId}: Language '${language}' not available, falling back to 'en'`);
+            send({
+              type: 'translations',
+              locale: 'en',
+              data: enTranslations,
+              keyCount: Object.keys(enTranslations).length,
+              timestamp: Date.now()
+            });
+          }
         }
       }
     }
