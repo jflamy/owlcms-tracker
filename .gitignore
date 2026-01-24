@@ -22,4 +22,4 @@ local/pictures
 local/logos/
 
 # Runtime plugins - managed separately in tracker-* repos
-plugins/
+/plugins/
