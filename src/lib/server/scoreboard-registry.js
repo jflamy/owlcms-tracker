@@ -109,13 +109,13 @@ async function discoverRuntimePlugins() {
 		
 		// Scan multiple plugin directories
 		// In development: src/plugins (bundled plugins)
-		// In production: plugins (user-added runtime plugins)
+		// In production: extensions (user-added runtime plugins)
 		// Use both process.cwd() and the module root to handle different launchers
 		const pluginsDirs = [
 			resolve(process.cwd(), 'src/plugins'),
-			resolve(process.cwd(), 'plugins'),
+			resolve(process.cwd(), 'extensions'),
 			resolve(moduleRoot, 'src/plugins'),
-			resolve(moduleRoot, 'plugins')
+			resolve(moduleRoot, 'extensions')
 		];
 		const uniquePluginDirs = Array.from(new Set(pluginsDirs));
 		

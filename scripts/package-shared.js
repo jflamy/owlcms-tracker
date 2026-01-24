@@ -229,11 +229,11 @@ export function buildAndPackage({
     console.log('✓ Removed src/plugins/experiments');
   }
 
-  // Move plugins/ aside temporarily (will restore after build)
-  const hasPlugins = fs.existsSync('plugins');
-  if (hasPlugins) {
-    fs.renameSync('plugins', 'plugins.backup');
-    console.log('✓ Moved plugins/ aside temporarily');
+  // Move extensions/ aside temporarily (will restore after build)
+  const hasExtensions = fs.existsSync('extensions');
+  if (hasExtensions) {
+    fs.renameSync('extensions', 'extensions.backup');
+    console.log('✓ Moved extensions/ aside temporarily');
   }
 
   // Build application
@@ -288,14 +288,14 @@ export function buildAndPackage({
   copyDir('build', path.join(DIST_DIR, 'build'));
   console.log('✓ Copied build/');
 
-  // Restore and copy plugins directory (runtime plugins)
-  if (fs.existsSync('plugins.backup')) {
-    fs.renameSync('plugins.backup', 'plugins');
-    console.log('✓ Restored plugins/');
-    copyDir('plugins', path.join(DIST_DIR, 'plugins'));
-    console.log('✓ Copied plugins/ to package');
+  // Restore and copy extensions directory (runtime plugins)
+  if (fs.existsSync('extensions.backup')) {
+    fs.renameSync('extensions.backup', 'extensions');
+    console.log('✓ Restored extensions/');
+    copyDir('extensions', path.join(DIST_DIR, 'extensions'));
+    console.log('✓ Copied extensions/ to package');
   } else {
-    console.log('⚠ No runtime plugins to include');
+    console.log('⚠ No runtime extensions to include');
   }
 
   // Install production dependencies only
