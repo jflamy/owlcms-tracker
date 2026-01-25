@@ -1,9 +1,19 @@
 import { buildAndPackage, runVersionChecks } from './package-shared.js';
 
+// Parse arguments
 const args = process.argv.slice(2);
-const VERSION = args.find(arg => !arg.startsWith('--'));
-const trackerCoreArg = args.find(arg => arg.startsWith('--tracker-core='));
-const trackerCoreRequested = trackerCoreArg ? trackerCoreArg.split('=')[1] : null;
+const positional = args.filter((arg) => !arg.startsWith('--'));
+const VERSION = positional[0];
+let trackerCoreRequested = positional[1]; // Optional
+
+if (!VERSION) {
+  console.error('❌ Error: Version number required');
+  console.error('Usage: npm run zip -- <tracker-version> [tracker-core-version]');
+  console.error('Examples:');
+  console.error('  npm run zip -- 2.4.0');
+  console.error('  npm run zip -- 2.4.0 1.0.0-beta02');
+  process.exit(1);
+}
 
 console.log('📦 Building universal tracker package...\n');
 
