@@ -1,4 +1,5 @@
 # OWLCMS Tracker Release Notes
+<!-- markdownlint-disable -->
 
 > #### ⚠ To use Tracker, you need to use version 64 of OWLCMS (see Installing Locally below)
 
