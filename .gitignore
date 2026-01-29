@@ -21,5 +21,5 @@ compliance/*
 local/pictures
 local/logos/
 
-# Runtime extensions - managed separately in tracker-* repos
-/extensions/
+# Note: extensions/ now contains git submodules (e.g., tracker-France)
+# Submodules are tracked by git even though their contents are from other repos
