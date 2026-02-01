@@ -394,6 +394,7 @@
 		transform: scale(1.5);
 		transform-origin: left center;
 		margin-right: 0.5rem;
+		filter: drop-shadow(0 0 0.5px white) drop-shadow(0 0 0.5px white);
 	}
 
 	/* Hide any data: URI flags (covers legacy 1x1 transparent PNG placeholders) */
