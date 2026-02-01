@@ -3,14 +3,13 @@
 
 > #### ⚠ To use Tracker, you need to use version 64 of OWLCMS (see Installing Locally below)
 
-##### New in Release 2.8
-- Various bug fixes
-- Support for extensions to the team scoreboard for additional scoring formulas
+##### Release log
+- 2.8.1: Fixed flags for teams scoreboard and standard scoreboards
+- 2.8.0: Support for extensions to the team scoreboard for additional scoring formulas
 
-##### New in Release 2.7
-- Improved contrast and additional visual cues for bad lifts on scoreboards
-- Scoreboard translations come from owlcms (no fallbacks)
-- Plugins reorganized in subfolders to facilitate connecting submodules with additional plugins (e.g. IWF Books)
+- 2.7: Improved contrast and additional visual cues for bad lifts on scoreboards
+- 2.7: Scoreboard translations come from owlcms (no fallbacks)
+- 2.7: Plugins reorganized in subfolders to facilitate connecting submodules with additional plugins (e.g. IWF Books)
   - Plugins are still shown on entry page based on the category in config.js
 
 ## Installing Locally

@@ -56,12 +56,9 @@ export async function load({ params, url }) {
 		if (scoreboard.dataHelper) {
 			try {
 				liveData = await scoreboard.dataHelper(fopName, options);
-				console.log(`[Scoreboard Route] ${type} liveData:`, JSON.stringify(liveData, null, 2));
 			} catch (err) {
 				console.warn(`[Scoreboard Route] Failed to get live data for ${type}:`, err.message);
 			}
-		} else {
-			console.log(`[Scoreboard Route] ${type} has no dataHelper`);
 		}
 		
 		// Return metadata for the page
@@ -75,7 +72,6 @@ export async function load({ params, url }) {
 			config: scoreboard.config,  // Static config with defaults
 			liveConfig: liveData?.config  // Current config with overrides (if available)
 		};
-		console.log(`[Scoreboard Route] Returning liveConfig:`, returnData.liveConfig);
 		return returnData;
 		
 	} catch (err) {

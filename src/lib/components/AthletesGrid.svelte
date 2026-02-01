@@ -391,6 +391,9 @@
 		height: 1.2rem;
 		max-width: 1.5rem;
 		object-fit: contain;
+		transform: scale(1.5);
+		transform-origin: left center;
+		margin-right: 0.5rem;
 	}
 
 	/* Hide any data: URI flags (covers legacy 1x1 transparent PNG placeholders) */

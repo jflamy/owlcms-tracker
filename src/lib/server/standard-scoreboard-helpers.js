@@ -50,7 +50,7 @@ export function buildSessionInfo(fopUpdate, locale = 'en') {
 	const liftTypeKey = fopUpdate?.liftTypeKey || 'Snatch';
 	const liftTypeLabel = liftTypeKey === 'Snatch' || liftTypeKey === 'SNATCH'
 		? competitionHub.translate('Snatch', locale)
-		: competitionHub.translate('CleanJerk', locale);
+		: competitionHub.translate('Clean_and_Jerk', locale);
 	return `${sessionLabel} ${fopUpdate.sessionName} – ${liftTypeLabel}`;
 }
 

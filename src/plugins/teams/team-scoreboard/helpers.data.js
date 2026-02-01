@@ -1353,7 +1353,7 @@ function groupByTeams(teamAthletes, gender, headers, topCounts = {}, includeAllA
 		
 		return {
 			teamName,
-			flagUrl: getFlagUrl(teamName, true),
+			flagUrl: getFlagUrl({ teamName }),
 			athletes: athletesWithHighlighting,
 			athleteCount: athletes.length,
 			// Label describing which athletes contribute to the team total
