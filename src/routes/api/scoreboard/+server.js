@@ -98,7 +98,17 @@ export async function GET({ url, request }) {
 		// Extract all other parameters as options
 		const options = {};
 		
-		// First, apply defaults from scoreboard config options
+		// First, apply defaults from BASE plugin config (if this is a delegating extension)
+		const baseScoreboard = scoreboardRegistry.getBaseScoreboard(type);
+		if (baseScoreboard?.config?.options && Array.isArray(baseScoreboard.config.options)) {
+			for (const opt of baseScoreboard.config.options) {
+				if (opt.key && opt.default !== undefined) {
+					options[opt.key] = opt.default;
+				}
+			}
+		}
+		
+		// Then, apply defaults from extension/current scoreboard config (overrides base)
 		if (scoreboard?.config?.options && Array.isArray(scoreboard.config.options)) {
 			for (const opt of scoreboard.config.options) {
 				if (opt.key && opt.default !== undefined) {
