@@ -4,6 +4,8 @@
 > #### ⚠ To use Tracker, you need to use version 64 of OWLCMS (see Installing Locally below)
 
 ##### Release log
+- 2.8.2: Share attempt bar presentation and backend for unified translations on all scoreboards
+- 2.8.2: Thin border on scoreboard flags for when there is black on the flags
 - 2.8.1: Fixed flags for teams scoreboard and standard scoreboards
 - 2.8.0: Support for extensions to the team scoreboard for additional scoring formulas
 
