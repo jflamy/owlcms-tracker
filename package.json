@@ -1,15 +1,11 @@
 {
   "name": "owlcms-tracker",
-  "version": "2.8.2",
+  "version": "2.8.3",
   "private": true,
   "scripts": {
     "dev": "node node_modules/vite/bin/vite.js dev --port 8096",
     "dev:learning": "cross-env LEARNING_MODE=true node node_modules/vite/bin/vite.js dev --port 8096",
     "build": "svelte-kit sync && vite build && node scripts/copy-runtime-server-files.js",
-    "build:windows": "npm run build && node scripts/build-windows.js",
-    "build:macos": "npm run build && node scripts/build-macos.js",
-    "build:rpi": "npm run build && node scripts/build-rpi.js",
-    "build:all": "npm run build:windows && npm run build:macos && npm run build:rpi",
     "preview": "node start-with-ws.js",
     "check": "svelte-kit sync && svelte-check --tsconfig ./jsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./jsconfig.json --watch",
