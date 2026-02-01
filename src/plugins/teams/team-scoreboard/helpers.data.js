@@ -302,6 +302,60 @@ function countCompletedCleanJerks(athlete) {
 }
 
 /**
+ * Check if athlete has bombed out (failed all 3 attempts in snatch or C&J)
+ * Bombout means the athlete completed all 3 attempts in a lift phase with zero successful lifts
+ * 
+ * NOTE: This function checks the raw condition. Whether to apply the bombout rule
+ * for scoring/display is determined by the enforceBombout option at display time.
+ * 
+ * @param {Object} athlete - Athlete with sattempts and cattempts arrays
+ * @returns {boolean} True if athlete bombed out (all 3 failed in snatch OR all 3 failed in C&J)
+ */
+function hasBombedOut(athlete) {
+	if (!athlete) return false;
+	
+	// Check snatch bombout: all 3 snatch attempts completed, all failed
+	if (Array.isArray(athlete.sattempts) && athlete.sattempts.length >= 3) {
+		let completedCount = 0;
+		let successCount = 0;
+		for (let i = 0; i < 3; i++) {
+			const a = athlete.sattempts[i];
+			if (!a) continue;
+			const status = (a.liftStatus || a.status || '').toString().toLowerCase();
+			if (status === 'good' || status === 'bad') {
+				completedCount++;
+				if (status === 'good') successCount++;
+			}
+		}
+		// Bombed out in snatch if all 3 completed with zero successes
+		if (completedCount === 3 && successCount === 0) {
+			return true;
+		}
+	}
+	
+	// Check C&J bombout: all 3 C&J attempts completed, all failed
+	if (Array.isArray(athlete.cattempts) && athlete.cattempts.length >= 3) {
+		let completedCount = 0;
+		let successCount = 0;
+		for (let i = 0; i < 3; i++) {
+			const a = athlete.cattempts[i];
+			if (!a) continue;
+			const status = (a.liftStatus || a.status || '').toString().toLowerCase();
+			if (status === 'good' || status === 'bad') {
+				completedCount++;
+				if (status === 'good') successCount++;
+			}
+		}
+		// Bombed out in C&J if all 3 completed with zero successes
+		if (completedCount === 3 && successCount === 0) {
+			return true;
+		}
+	}
+	
+	return false;
+}
+
+/**
  * Get the next requested weight from an attempts array (first attempt with pending status)
  * @param {Array} attempts - Array of attempt objects
  * @returns {number} Next requested weight or 0
@@ -455,14 +509,19 @@ function isDefinitiveTotalZero(athlete) {
  * Session athletes already have OWLCMS-computed fields (bestSnatch, bestCleanJerk, sattempts/cattempts with status)
  * Does NOT mutate the original DTO - returns a new TeamAthlete object
  * 
+ * NOTE: This function extracts RAW data. The bombout rule is NOT applied here.
+ * Bombout is applied later at display/scoring time based on the scoreboard's enforceBombout option.
+ * This allows the same competition to show different totals for IWF results vs team scoreboards.
+ * 
  * @param {Object} sessionAthlete - Raw session athlete from hub (already flattened)
  * @param {Object} context - Context for enrichment
  * @param {number|null} context.liftingOrder - Position in lifting order
  * @param {number|null} context.bodyWeight - Body weight (from database if not in session)
- * @returns {Object} TeamAthlete with uniform structure for team scoring
+ * @param {boolean} context.includeCjDeclaration - Include C&J declaration in predictions (default: true)
+ * @returns {Object} TeamAthlete with uniform structure for team scoring (raw values only)
  */
 function teamAthleteFromSession(sessionAthlete, context = {}) {
-	const { liftingOrder = null, bodyWeight = null, includeCjDeclaration = true, scoringSystem = 'Sinclair' } = context;
+	const { liftingOrder = null, bodyWeight = null, includeCjDeclaration = true } = context;
 	
 	// Use body weight from context (merged from database) or from session athlete
 	const athleteBodyWeight = bodyWeight ?? sessionAthlete.bodyWeight ?? 0;
@@ -473,41 +532,29 @@ function teamAthleteFromSession(sessionAthlete, context = {}) {
 	const currentYear = new Date().getFullYear();
 	const age = birthYear > 0 ? currentYear - birthYear : 0;
 
-	// Calculate actual values from session athlete data
+	// Check if athlete bombed out (store the raw condition, NOT applied yet)
+	// The enforceBombout option is applied later at display/scoring time
+	const bombed = hasBombedOut(sessionAthlete);
+	
+	// Calculate RAW actual values from session athlete data (bombout NOT applied)
 	const bestSnatchValue = parseFormattedNumber(sessionAthlete.bestSnatch);
 	const bestCleanJerkValue = parseFormattedNumber(sessionAthlete.bestCleanJerk);
-	const actualTotal = bestSnatchValue + bestCleanJerkValue;
+	const rawTotal = bestSnatchValue + bestCleanJerkValue;
 	const hasResults = bestSnatchValue > 0 || bestCleanJerkValue > 0;
 	
-	// Calculate actual score
-	const scoreContext = { athlete: sessionAthlete, hub: competitionHub };
-	const actualScore = calculateScoreWithContext(actualTotal, athleteBodyWeight, normalizedGender, age, scoringSystem, scoreContext, _customCalculateScore);
-	
-	// Calculate predicted total if next lift succeeds
-	const predictedTotal = calculatePredictedTotal(sessionAthlete, includeCjDeclaration);
-	const predictedScore = calculateScoreWithContext(predictedTotal, athleteBodyWeight, normalizedGender, age, scoringSystem, scoreContext, _customCalculateScore);
+	// Calculate RAW predicted total if next lift succeeds (bombout NOT applied)
+	const rawPredictedTotal = calculatePredictedTotal(sessionAthlete, includeCjDeclaration);
 	
 	// Extract rank fields from displayInfo (OWLCMS V2 format)
 	const snatchRank = parseInt(sessionAthlete.snatchRank || 0);
 	const cleanJerkRank = parseInt(sessionAthlete.cleanJerkRank || 0);
 	const totalRank = parseInt(sessionAthlete.totalRank || 0);
 	
-	// Calculate team points (used when scoringSystem === 'TeamPoints')
-	const athleteTeamPoints = calculateAthleteTeamPoints(
-		{ snatchRank, cleanJerkRank, totalRank },
-		{ teamPoints1st: 28, teamPoints2nd: 26, snatchCJTotalMedals: false } // Defaults, will be overridden in groupByTeams
-	);
-	
 	// Determine if total is definitively zero
 	const definitiveZero = isDefinitiveTotalZero(sessionAthlete);
 	
-	// Format display values
-	const displayTotal = hasResults ? actualTotal : '-';
-	const displayScore = actualScore > 0 ? actualScore.toFixed(2) : (definitiveZero ? '0.00' : '-');
-	const displayPredictedScore = predictedScore > 0 ? predictedScore.toFixed(2) : (definitiveZero ? '0.00' : '-');
-	const displayTeamPoints = athleteTeamPoints > 0 ? String(athleteTeamPoints) : '-';
-	
 	// Return wrapped athlete - original DTO is preserved, enrichments are added
+	// NOTE: actualTotal, actualScore, etc. are computed later when enforceBombout is known
 	const athleteKey = normalizeKey(sessionAthlete.key ?? sessionAthlete.athleteKey);
 	return {
 		// Original session athlete data (spread to preserve all fields)
@@ -522,27 +569,24 @@ function teamAthleteFromSession(sessionAthlete, context = {}) {
 		
 		// Body weight (may be enriched from database)
 		bodyWeight: athleteBodyWeight,
+		gender: normalizedGender,
+		age,
 		
-		// Enrichment: actual computed values
-		actualTotal,
-		actualScore,
-		
-		// Enrichment: predicted values (if next lift succeeds)
-		nextTotal: predictedTotal,
-		nextScore: predictedScore,
-		
-		// Enrichment: display values
-		displayTotal,
-		displayScore,
-		displayNextScore: displayPredictedScore,
-		displayTeamPoints,
+		// Raw values (bombout NOT applied - that's done at display/scoring time)
+		rawTotal,
+		rawPredictedTotal,
+		bombed, // Flag indicating if athlete bombed out (for enforceBombout to use)
+		hasResults,
 		isDefinitiveZero: definitiveZero,
+		
+		// Best lift values for reference
+		bestSnatchValue,
+		bestCleanJerkValue,
 		
 		// Enrichment: rank fields (for team points)
 		snatchRank,
 		cleanJerkRank,
 		totalRank,
-		teamPoints: athleteTeamPoints,
 		
 		// Enrichment: ordering
 		liftingOrder,
@@ -736,13 +780,17 @@ function mapAttemptsToDisplayInfo(formattedAttempts) {
  * Database athletes lack OWLCMS-computed fields, so we compute them here
  * Does NOT mutate the original DTO - returns a new TeamAthlete object
  * 
+ * NOTE: This function extracts RAW data. The bombout rule is NOT applied here.
+ * Bombout is applied later at display/scoring time based on the scoreboard's enforceBombout option.
+ * This allows the same competition to show different totals for IWF results vs team scoreboards.
+ * 
  * @param {Object} dbAthlete - Raw database athlete from databaseState.athletes
  * @param {Object} context - Context for enrichment
  * @param {number|null} context.liftingOrder - Position in lifting order (if known)
  * @returns {Object} TeamAthlete with uniform structure for team scoring (same as teamAthleteFromSession)
  */
 function teamAthleteFromDatabase(dbAthlete, context = {}) {
-	const { liftingOrder = null, includeCjDeclaration = true, scoringSystem = 'Sinclair' } = context;
+	const { liftingOrder = null, includeCjDeclaration = true } = context;
 	
 	if (!dbAthlete) return null;
 	
@@ -810,25 +858,19 @@ function teamAthleteFromDatabase(dbAthlete, context = {}) {
 		bestCleanJerk
 	};
 	
-	// Calculate actual total
-	const actualTotal = bestSnatch + bestCleanJerk;
+	// Check if athlete bombed out (store the raw condition, NOT applied yet)
+	// The enforceBombout option is applied later at display/scoring time
+	const bombed = hasBombedOut(normalizedAthlete);
+	
+	// Calculate RAW total (bombout NOT applied)
+	const rawTotal = bestSnatch + bestCleanJerk;
 	const hasResults = bestSnatch > 0 || bestCleanJerk > 0;
 	
-	// Calculate actual score
-	const scoreContext = { athlete: { ...dbAthlete, ...normalizedAthlete }, hub: competitionHub };
-	const actualScore = calculateScoreWithContext(actualTotal, athleteBodyWeight, normalizedGender, age, scoringSystem, scoreContext, _customCalculateScore);
-	
-	// Calculate predicted total if next lift succeeds
-	const predictedTotal = calculatePredictedTotal(normalizedAthlete, includeCjDeclaration);
-	const predictedScore = calculateScoreWithContext(predictedTotal, athleteBodyWeight, normalizedGender, age, scoringSystem, scoreContext, _customCalculateScore);
+	// Calculate RAW predicted total if next lift succeeds (bombout NOT applied)
+	const rawPredictedTotal = calculatePredictedTotal(normalizedAthlete, includeCjDeclaration);
 	
 	// Determine if total is definitively zero
 	const definitiveZero = isDefinitiveTotalZero(normalizedAthlete);
-	
-	// Format display values
-	const displayTotal = hasResults ? actualTotal : '-';
-	const displayScore = actualScore > 0 ? actualScore.toFixed(2) : (definitiveZero ? '0.00' : '-');
-	const displayPredictedScore = predictedScore > 0 ? predictedScore.toFixed(2) : (definitiveZero ? '0.00' : '-');
 	
 	// Return TeamAthlete - same structure as teamAthleteFromSession
 	const athleteKey = normalizeKey(dbAthlete.key);
@@ -836,41 +878,13 @@ function teamAthleteFromDatabase(dbAthlete, context = {}) {
 	// Format category for display - replace underscores with spaces
 	const categoryDisplay = (dbAthlete.categoryCode || '').replace(/_/g, ' ');
 	
-	const displayInfoSattempts = mapAttemptsToDisplayInfo(sattempts);
-	const displayInfoCattempts = mapAttemptsToDisplayInfo(cattempts);
-	
-	const displayInfo = {
-		fullName,
-		teamName,
-		yearOfBirth: extractYearOfBirth(dbAthlete.fullBirthDate),
-		gender: dbAthlete.gender,
-		startNumber: String(dbAthlete.startNumber || ''),
-		lotNumber: String(dbAthlete.lotNumber || ''),
-		category: categoryDisplay,
-		sattempts: displayInfoSattempts,
-		cattempts: displayInfoCattempts,
-		bestSnatch: bestSnatch > 0 ? String(bestSnatch) : '-',
-		bestCleanJerk: bestCleanJerk > 0 ? String(bestCleanJerk) : '-',
-		total: displayTotal,
-		sinclairRank: '-',
-		classname: '',
-		session: dbAthlete.sessionName || '',
-		subCategory: '',
-		flagURL: '',
-		flagClass: '',
-		teamLength: teamName.length,
-		custom1: '',
-		custom2: '',
-		membership: ''
-	};
+	// Note: displayInfo will be populated at display/scoring time after bombout is applied
+	// For now, we only store raw values
 	
 	return {
 		// Key for lookups (OWLCMS unique identifier)
 		key: dbAthlete.key,
 		athleteKey,
-		
-		// displayInfo (computed equivalent for database athlete)
-		displayInfo,
 		
 		// Computed display fields (matching session athlete format)
 		fullName,
@@ -891,28 +905,28 @@ function teamAthleteFromDatabase(dbAthlete, context = {}) {
 		sattempts,
 		cattempts,
 		
-		// Computed best lifts
-		bestSnatch,
-		bestCleanJerk,
-		total: actualTotal,
-		
 		// Mark source
 		_source: 'database',
 		_originalDto: dbAthlete,
 		
-		// Enrichment: actual computed values
-		actualTotal,
-		actualScore,
+		// Body weight (may be enriched from database)
+		// gender already included above
+		age, // Computed from birth year
 		
-		// Enrichment: predicted values (if next lift succeeds)
-		nextTotal: predictedTotal,
-		nextScore: predictedScore,
-		
-		// Enrichment: display values
-		displayTotal,
-		displayScore,
-		displayNextScore: displayPredictedScore,
+		// Raw values (bombout NOT applied - that's done at display/scoring time)
+		rawTotal,
+		rawPredictedTotal,
+		bombed, // Flag indicating if athlete bombed out (for enforceBombout to use)
+		hasResults,
 		isDefinitiveZero: definitiveZero,
+		
+		// Best lift values for reference
+		bestSnatchValue: bestSnatch,
+		bestCleanJerkValue: bestCleanJerk,
+		
+		// Legacy aliases for compatibility
+		bestSnatch,
+		bestCleanJerk,
 		
 		// Enrichment: rank fields (from first participation - for team points)
 		snatchRank,
@@ -932,6 +946,181 @@ function teamAthleteFromDatabase(dbAthlete, context = {}) {
 export { calculatePredictedIfNext, calculatePredictedTotal, teamAthleteFromSession, teamAthleteFromDatabase };
 
 // =============================================================================
+// LAYER 2.5: SCORING COMPUTATION (applies bombout rule)
+// =============================================================================
+
+/**
+ * Compute score using the specified scoring system
+ * Uses custom calculateScore if provided, otherwise falls back to default
+ * 
+ * @param {number} total - Athlete total (with or without bombout applied)
+ * @param {number} bodyWeight - Body weight
+ * @param {string} gender - 'M' or 'F'
+ * @param {string} scoringSystem - Scoring system name
+ * @param {number} age - Athlete age (for masters systems)
+ * @param {Object} athlete - Full athlete object for context (optional)
+ * @returns {number} Calculated score
+ */
+function computeScore(total, bodyWeight, gender, scoringSystem, age = 0, athlete = null) {
+	if (!total || total <= 0 || !bodyWeight || bodyWeight <= 0) return 0;
+	const normalizedGender = normalizeGender(gender) || 'M';
+	
+	// Build context for custom scoring
+	const context = {
+		athlete: athlete || {},
+		hub: competitionHub
+	};
+	
+	// Use custom calculator if available, otherwise default
+	return calculateScoreWithContext(total, bodyWeight, normalizedGender, age, scoringSystem, context, _customCalculateScore);
+}
+
+/**
+ * Format score for display based on scoring system
+ * @param {number} score - Calculated score value
+ * @param {string} scoringSystem - Scoring system name
+ * @returns {string} Formatted score string
+ */
+function formatScore(score, scoringSystem) {
+	if (!score || score <= 0 || !Number.isFinite(score)) return '-';
+	
+	// PDC (Points de Classement) uses 2 decimal places
+	// Most other systems use 3 decimal places
+	if (scoringSystem === 'PDC') {
+		return score.toFixed(2);
+	}
+	
+	return score.toFixed(3);
+}
+
+/**
+ * Compute actual and display values from raw extracted athlete data
+ * This is where the enforceBombout rule is applied.
+ * 
+ * NOTE: This separation allows the same competition to show:
+ * - IWF official results with bombout enforced (total = 0 for bombed athletes)
+ * - Team scoreboard with bombout NOT enforced (total = best lifts sum)
+ * 
+ * @param {Object} athlete - TeamAthlete with raw values (from teamAthleteFromSession/Database)
+ * @param {Object} context - Scoring context
+ * @param {boolean} context.enforceBombout - Apply IWF bombout rule (default: false)
+ * @param {string} context.scoringSystem - Scoring system to use
+ * @returns {Object} Athlete with computed actual/display values
+ */
+function computeAthleteScoring(athlete, context = {}) {
+	if (!athlete) return athlete;
+	
+	const {
+		enforceBombout = false,
+		scoringSystem = 'Sinclair'
+	} = context;
+	
+	const { rawTotal = 0, rawPredictedTotal = 0, bombed = false, bodyWeight = 0, gender = 'M', age = 0 } = athlete;
+	
+	// Apply bombout rule to get actual totals
+	const actualTotal = (enforceBombout && bombed) ? 0 : rawTotal;
+	const predictedTotal = (enforceBombout && bombed) ? 0 : rawPredictedTotal;
+	
+	// Compute scores based on scoring system (pass athlete for custom scoring context)
+	const actualScore = computeScore(actualTotal, bodyWeight, gender, scoringSystem, age, athlete);
+	const nextScore = computeScore(predictedTotal, bodyWeight, gender, scoringSystem, age, athlete);
+	
+	// Format display values
+	const displayTotal = actualTotal > 0 ? String(actualTotal) : '-';
+	const displayScore = actualScore > 0 ? formatScore(actualScore, scoringSystem) : '-';
+	const displayNextScore = nextScore > 0 ? formatScore(nextScore, scoringSystem) : '-';
+	
+	// Build displayInfo for session athletes (if not already present)
+	// For database athletes, displayInfo was deferred until now
+	let displayInfo = athlete.displayInfo;
+	if (!displayInfo || athlete._source === 'database') {
+		displayInfo = buildDisplayInfo(athlete, displayTotal);
+	}
+	
+	return {
+		...athlete,
+		// Computed totals (bombout applied if enforced)
+		total: actualTotal,
+		actualTotal,
+		predictedTotal,
+		nextTotal: predictedTotal, // Legacy alias
+		
+		// Computed scores
+		actualScore,
+		nextScore,
+		
+		// Display values
+		displayTotal,
+		displayScore,
+		displayNextScore,
+		displayInfo
+	};
+}
+
+/**
+ * Build displayInfo object for an athlete
+ * Used primarily for database athletes where displayInfo was deferred
+ * @param {Object} athlete - TeamAthlete
+ * @param {string} displayTotal - Formatted total string
+ * @returns {Object} displayInfo object
+ */
+function buildDisplayInfo(athlete, displayTotal) {
+	const mapAttemptsToDisplayInfo = (attempts) => {
+		return (attempts || []).map((attempt) => {
+			if (!attempt || !attempt.stringValue || attempt.stringValue === '-' || attempt.stringValue === '\u00A0') {
+				return { value: null, status: null };
+			}
+			const status = attempt.liftStatus === 'empty' ? null : attempt.liftStatus;
+			return {
+				value: attempt.stringValue,
+				status
+			};
+		});
+	};
+	
+	const displayInfoSattempts = mapAttemptsToDisplayInfo(athlete.sattempts);
+	const displayInfoCattempts = mapAttemptsToDisplayInfo(athlete.cattempts);
+	
+	return {
+		fullName: athlete.fullName || '',
+		teamName: athlete.teamName || '',
+		yearOfBirth: athlete.yearOfBirth || '',
+		gender: athlete.gender || '',
+		startNumber: String(athlete.startNumber || ''),
+		lotNumber: String(athlete.lotNumber || ''),
+		category: athlete.category || athlete.categoryName || '',
+		sattempts: displayInfoSattempts,
+		cattempts: displayInfoCattempts,
+		bestSnatch: (athlete.bestSnatchValue || athlete.bestSnatch) > 0 ? String(athlete.bestSnatchValue || athlete.bestSnatch) : '-',
+		bestCleanJerk: (athlete.bestCleanJerkValue || athlete.bestCleanJerk) > 0 ? String(athlete.bestCleanJerkValue || athlete.bestCleanJerk) : '-',
+		total: displayTotal,
+		sinclairRank: '-',
+		classname: athlete.classname || '',
+		session: athlete.sessionName || athlete.group || '',
+		subCategory: '',
+		flagURL: athlete.flagURL || '',
+		flagClass: athlete.flagClass || '',
+		teamLength: (athlete.teamName || '').length,
+		custom1: '',
+		custom2: '',
+		membership: ''
+	};
+}
+
+/**
+ * Apply scoring computation to an array of athletes
+ * @param {Array} athletes - Array of TeamAthletes with raw values
+ * @param {Object} context - Scoring context (enforceBombout, scoringSystem)
+ * @returns {Array} Athletes with computed actual/display values
+ */
+function applyScoring(athletes, context = {}) {
+	return athletes.map(a => computeAthleteScoring(a, context));
+}
+
+// Export for testing
+export { computeAthleteScoring, applyScoring };
+
+// =============================================================================
 // LAYER 3: TEAM GROUPING AND SCORING
 // =============================================================================
 
@@ -939,7 +1128,7 @@ export { calculatePredictedIfNext, calculatePredictedTotal, teamAthleteFromSessi
  * Get score from TeamAthlete for team scoring
  * Uses actualScore (computed Sinclair) or teamPoints (when scoringSystem is TeamPoints)
  * Note: scoringSystem check happens in groupByTeams via scoringFunction
- * @param {Object} athlete - TeamAthlete
+ * @param {Object} athlete - TeamAthlete (must have been processed by applyScoring)
  * @returns {number}
  */
 function getAthleteScore(athlete) {
@@ -1389,19 +1578,24 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	const fopUpdate = getFopUpdate(fopName);
 	const databaseState = getDatabaseState();
 	
-	// Options
+	// Options - defaults are applied by the API from config.js
+	// Fallbacks (using ??) are only for options that an extension might not define
 	const showRecords = options.showRecords ?? false;
 	const sortBy = 'score';
 	const currentAttemptInfo = options.currentAttemptInfo ?? true;
 	const scoringSystem = options.scoringSystem || 'Sinclair';
-	const includeCjDeclaration = Boolean(options.cjDecl ?? true);
-	// showPredicted defaults to false (config.js default: false)
+	// cjDecl: fallback to true if extension doesn't define it
+	const includeCjDeclaration = options.cjDecl ?? true;
+	// showPredicted: fallback to false if extension doesn't define it
 	// When TeamPoints is selected, force showPredicted to false (team points don't have predicted values)
-	const showPredicted = scoringSystem === 'TeamPoints' ? false : (options.showPredicted === 'true' || options.showPredicted === true);
+	const showPredicted = scoringSystem === 'TeamPoints' ? false : (options.showPredicted ?? false);
 	const topN = options.topN ?? 0;
 	const language = options.lang || options.language || 'no';
 	const translations = competitionHub.getTranslations(language);
 	const learningMode = process.env.LEARNING_MODE === 'true' ? 'enabled' : 'disabled';
+	
+	// enforceBombout: fallback to false if extension doesn't define it
+	const enforceBombout = options.enforceBombout ?? false;
 	
 	// Check if any topN options are explicitly provided in the URL
 	const hasTopNOptions = options.topM !== undefined || options.topF !== undefined || 
@@ -1732,6 +1926,9 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// Session athletes have live data, database athletes have historical data
 	// =========================================================================
 	
+	// enforceBombout is read from URL parameters (see above)
+	// When true (IWF rule), athletes who fail all 3 attempts in snatch or C&J get total=0
+	
 	// Build session athletes map by key (for merging)
 	const sessionAthletesByKey = new Map();
 	
@@ -1769,16 +1966,16 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 					liftType,
 					liftingOrder: liftingOrderMap.get(athleteKey) ?? null,
 					bodyWeight: dbAthlete.bodyWeight || sessionAthlete.bodyWeight || 0,
-					includeCjDeclaration,
-					scoringSystem
+					includeCjDeclaration
+					// NOTE: enforceBombout and scoringSystem are applied in Layer 2.5 (applyScoring)
 				});
 				allTeamAthletes.push(wrapped);
 			} else {
 				// Athlete is NOT in current session - use database data
 				const wrapped = teamAthleteFromDatabase(dbAthlete, {
 					liftingOrder: null, // Not in current lifting order
-					includeCjDeclaration,
-					scoringSystem
+					includeCjDeclaration
+					// NOTE: enforceBombout and scoringSystem are applied in Layer 2.5 (applyScoring)
 				});
 				if (wrapped) {
 					allTeamAthletes.push(wrapped);
@@ -1791,8 +1988,20 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	
 	logger.debug(`[Team helpers] Built ${allTeamAthletes.length} team athletes from database`);
 	
+	// =========================================================================
+	// LAYER 2.5: Apply scoring (bombout rule + score computation)
+	// This is where enforceBombout is applied to convert raw values to actual/display
+	// =========================================================================
+	const scoringContext = {
+		enforceBombout,
+		scoringSystem
+	};
+	const scoredAthletes = applyScoring(allTeamAthletes, scoringContext);
+	
+	logger.debug(`[Team helpers] Applied scoring to ${scoredAthletes.length} athletes (enforceBombout=${enforceBombout})`);
+	
 	// Add flag URLs
-	const athletesWithFlags = allTeamAthletes.map(athlete => ({
+	const athletesWithFlags = scoredAthletes.map(athlete => ({
 		...athlete,
 		flagUrl: getFlagUrl(athlete.teamName || athlete.team, true)
 	}));
@@ -1802,7 +2011,8 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		teamPoints1st: databaseState?.competition?.teamPoints1st || 28,
 		teamPoints2nd: databaseState?.competition?.teamPoints2nd || 26,
 		teamPoints3rd: databaseState?.competition?.teamPoints3rd || 23,
-		snatchCJTotalMedals: databaseState?.competition?.snatchCJTotalMedals || false
+		snatchCJTotalMedals: databaseState?.competition?.snatchCJTotalMedals || false,
+		enforceBombout // Passed for reference (already applied in scoring)
 	};
 	
 	// =========================================================================

@@ -73,9 +73,17 @@ export default {
 			key: 'cjDecl',
 			label: 'Include CJ Declaration',
 			type: 'boolean',
-			default: false,
+			default: true,
 			group: 'display',
 			description: 'Include first C&J attempt in predicted total'
+		},
+		{
+			key: 'enforceBombout',
+			label: 'Bomb-out on Snatch or CJ implies 0 Total',
+			type: 'boolean',
+			default: false,
+			group: 'scoring',
+			description: 'IWF rule: If an athlete fails all 3 attempts in snatch or C&J, their total is 0 (and thus their score is also 0)'
 		},
 		{
 			key: 'allAthletes',
