@@ -318,6 +318,24 @@ class ScoreboardRegistry {
 	}
 
 	/**
+	 * Get base scoreboard if this scoreboard delegates to another
+	 * Returns null if no delegation or base not found
+	 */
+	getBaseScoreboard(type) {
+		const scoreboard = this.scoreboards.get(type);
+		if (!scoreboard?.config?.delegateTo) return null;
+		
+		// Find the base plugin by its path
+		const basePath = scoreboard.config.delegateTo;
+		for (const [baseType, baseScoreboard] of this.scoreboards) {
+			if (baseScoreboard.pluginPath === basePath) {
+				return baseScoreboard;
+			}
+		}
+		return null;
+	}
+
+	/**
 	 * Get all registered scoreboards
 	 */
 	getAllScoreboards() {
