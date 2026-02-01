@@ -27,13 +27,18 @@ import {
 	extractDecisionState,
 	computeAttemptBarVisibility, 
 	hasCurrentAthlete,
-	logAttemptBarDebug,
+	logAttemptBarDebug
+} from '@owlcms/tracker-core/utils';
+
+// Import hub-bound presentation helpers from shared module
+import { 
 	isBreakMode, 
 	inferGroupName, 
 	inferBreakMessage, 
-	extractCurrentAttempt as _extractCurrentAttempt, 
-	buildSessionInfo as _buildSessionInfo
-} from '@owlcms/tracker-core/utils';
+	extractCurrentAttempt,
+	buildSessionInfo
+} from '$lib/server/attempt-bar-helpers.js';
+
 import { calculateTeamPoints } from '@owlcms/tracker-core/scoring';
 // Import scoring functions from tracker-core (works at runtime for derivative plugins)
 import { 
@@ -44,23 +49,6 @@ import {
 	calculateGamx as computeGamx,
 	Variant
 } from '@owlcms/tracker-core/scoring';
-
-// Create hub-bound wrappers for presentation helpers
-// These helpers need a hub with translate(), we bind it to competitionHub
-
-/**
- * Extract current attempt with hub bound to competitionHub
- */
-function extractCurrentAttempt(fopUpdate, locale = 'en') {
-	return _extractCurrentAttempt(fopUpdate, competitionHub, getFlagUrl, locale);
-}
-
-/**
- * Build session info with hub bound to competitionHub
- */
-function buildSessionInfo(fopUpdate, locale = 'en') {
-	return _buildSessionInfo(fopUpdate, competitionHub, locale);
-}
 
 // Re-export utilities and scoring functions for derivative plugins (from tracker-core)
 export { parseFormattedNumber };
@@ -1670,9 +1658,9 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		logAttemptBarDebug(fopUpdate, sessionStatus, 'Team helpers [cache HIT]');
 
 		// Extract current attempt using shared function (handles break mode)
-		const currentAttempt = extractCurrentAttempt(fopUpdate, translations);
+		const currentAttempt = extractCurrentAttempt(fopUpdate, language);
 		const mode = fopUpdate?.mode || 'WAIT';
-		const breakTitle = isBreakMode(mode) ? inferGroupName(fopUpdate, translations) : null;
+		const breakTitle = isBreakMode(mode) ? inferGroupName(fopUpdate, language) : null;
 
 		// Build fresh competition object (never cached) with current session info
 		// Need to determine lift type for sessionInfo
@@ -1681,7 +1669,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		
 		// Use shared buildSessionInfo for consistent formatting across all scoreboards
 		const hasSessionName = fopUpdate?.sessionName != null && fopUpdate?.sessionName !== '';
-		const sessionInfo = hasSessionName ? buildSessionInfo(fopUpdate, translations) : '&nbsp;';
+		const sessionInfo = hasSessionName ? buildSessionInfo(fopUpdate, language) : '&nbsp;';
 
 		// Determine if there's a current athlete in the cache hit path
 		const hasCurrentAthleteForCompetition = hasCurrentAthlete(fopUpdate, sessionStatus);
@@ -1838,7 +1826,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// Build sessionInfo only when session is selected; otherwise blank
 	// Use shared buildSessionInfo for consistent formatting across all scoreboards
 	const sessionInfo = (hasSessionSelected && fopUpdate?.sessionName)
-		? buildSessionInfo(fopUpdate, translations)
+		? buildSessionInfo(fopUpdate, language)
 		: '&nbsp;';
 	
 	// Extract competition info
@@ -1867,9 +1855,9 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	}
 	
 	// Extract current attempt using shared function (handles break mode)
-	const currentAttempt = extractCurrentAttempt(fopUpdate, translations);
+	const currentAttempt = extractCurrentAttempt(fopUpdate, language);
 	const mode = fopUpdate?.mode || 'WAIT';
-	const breakTitle = isBreakMode(mode) ? inferGroupName(fopUpdate, translations) : null;
+	const breakTitle = isBreakMode(mode) ? inferGroupName(fopUpdate, language) : null;
 	
 	// Session done message (separate from currentAttempt)
 	let sessionStatusMessage = null;

@@ -15,7 +15,6 @@ import {
 	getLiftingOrder,
 	getCompetitionStats
 } from '$lib/server/standard-scoreboard-helpers.js';
-import { getCompetitionState } from './helpers.js';
 
 /**
  * Get formatted scoreboard data for SSR/API (SERVER-SIDE ONLY)
