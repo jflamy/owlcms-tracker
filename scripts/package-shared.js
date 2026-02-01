@@ -229,14 +229,7 @@ export function buildAndPackage({
     console.log('✓ Removed src/plugins/experiments');
   }
 
-  // Move extensions/ aside temporarily (will restore after build)
-  const hasExtensions = fs.existsSync('extensions');
-  if (hasExtensions) {
-    fs.renameSync('extensions', 'extensions.backup');
-    console.log('✓ Moved extensions/ aside temporarily');
-  }
-
-  // Build application
+  // Build application (extensions/ is not processed by Vite, no need to move it)
   console.log('\n🏗️  Building application...');
   execSync('npm run build', {
     stdio: 'inherit',
@@ -288,10 +281,8 @@ export function buildAndPackage({
   copyDir('build', path.join(DIST_DIR, 'build'));
   console.log('✓ Copied build/');
 
-  // Restore and copy extensions directory (runtime plugins)
-  if (fs.existsSync('extensions.backup')) {
-    fs.renameSync('extensions.backup', 'extensions');
-    console.log('✓ Restored extensions/');
+  // Copy extensions directory (runtime plugins) if it exists
+  if (fs.existsSync('extensions')) {
     copyDir('extensions', path.join(DIST_DIR, 'extensions'));
     console.log('✓ Copied extensions/ to package');
   } else {
