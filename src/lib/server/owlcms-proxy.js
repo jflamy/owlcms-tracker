@@ -12,7 +12,6 @@
  */
 
 import { createProxyMiddleware } from 'http-proxy-middleware';
-import { getDisplayControlConfig } from './display-control-config.js';
 
 // Default OWLCMS target - can be overridden via environment variable
 const DEFAULT_OWLCMS_URL = 'http://localhost:8080';
@@ -65,24 +64,36 @@ export function createOwlcmsProxyMiddleware(options = {}) {
       '^/proxy': ''
     },
     
-    // Dynamically set target based on FOP parameter
+    // Dynamically set target based on _target query parameter
+    // Plugins provide their target via: /proxy/path?_target=http://server:port
     router: (req) => {
       try {
         const url = new URL(req.url, `http://${req.headers.host}`);
-        const fop = url.searchParams.get('fop') || url.searchParams.get('fopName') || 'A';
         
-        // Try to get FOP-specific owlcmsUrl from display-control config
-        const controlConfig = getDisplayControlConfig(fop);
-        const owlcmsUrl = controlConfig?.owlcmsUrl;
-      
-        // Only log page requests, not assets
+        // Plugin provides explicit target via _target query param
+        const explicitTarget = url.searchParams.get('_target');
+        if (explicitTarget) {
+          // Remove _target before forwarding to OWLCMS
+          url.searchParams.delete('_target');
+          req.url = url.pathname + url.search;
+          
+          // Only log page requests, not assets
+          const isAsset = req.url.includes('/VAADIN/') || req.url.includes('/icons/') || 
+                          req.url.includes('/local/') || req.url.includes('v-r=uidl');
+          if (!isAsset) {
+            console.log(`[OWLCMS Proxy] ${req.url} → ${explicitTarget}`);
+          }
+          return explicitTarget;
+        }
+        
+        // Fallback to default target
         const isAsset = req.url.includes('/VAADIN/') || req.url.includes('/icons/') || 
                         req.url.includes('/local/') || req.url.includes('v-r=uidl');
         if (!isAsset) {
-          console.log(`[OWLCMS Proxy] ${req.url} → ${owlcmsUrl || defaultTarget} (FOP ${fop})`);
+          console.log(`[OWLCMS Proxy] ${req.url} → ${defaultTarget} (default)`);
         }
         
-        return owlcmsUrl || defaultTarget;
+        return defaultTarget;
       } catch (error) {
         console.error(`[OWLCMS Proxy] Router error:`, error);
         return defaultTarget;

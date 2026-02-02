@@ -121,23 +121,6 @@
     // Find the scoreboard config to get default values
     const scoreboard = data.scoreboards.find(s => s.type === type);
     
-    // For display-control, save the config to the server first
-    if (type === 'display-control' && Object.keys(options).length > 0) {
-      try {
-        await fetch('/api/scoreboard', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'display_config',
-            fop: fop || 'A',
-            ...options
-          })
-        });
-      } catch (err) {
-        console.error('[openScoreboard] Failed to save display-control config:', err);
-      }
-    }
-    
     // Only add FOP if it's required or optional (not for fopRequired: false)
     if (fop && scoreboard?.fopRequired !== false) {
       params.append('fop', fop);
@@ -516,6 +499,7 @@
                             >
                               Generate
                             </a>
+                            {#if scoreboard.additionalDependencies?.includes('puppeteer-core')}
                             <div class="pdf-btn-container">
                               <a 
                                 href="/api/generate-pdf?type={scoreboard.type}"
@@ -532,6 +516,7 @@
                                 <span class="pdf-tooltip">In dev mode, you have to use the browser print<br/>Automated generation requires a build version, click for details</span>
                               {/if}
                             </div>
+                            {/if}
                             {#if scoreboard.options && scoreboard.options.length > 0}
                               <button
                                 class="options-btn"
