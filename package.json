@@ -15,6 +15,9 @@
     "versions": "node scripts/get-latest-versions.js",
     "release": "node scripts/release.js",
     "zip": "node scripts/build-zip.js",
+    "clean": "node scripts/clean-plugin.js",
+    "init": "node scripts/init-submodule.js",
+    "deinit": "node scripts/deinit-submodule.js",
     "relink": "cd ../tracker-core && npm link && cd ../owlcms-tracker && npm link @owlcms/tracker-core"
   },
   "devDependencies": {
