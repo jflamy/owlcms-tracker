@@ -7,6 +7,43 @@ import fs from 'fs';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const IS_VITEST = process.env.VITEST === 'true';
 
+// Scan plugins for additionalDependencies to mark as external
+function collectAdditionalDependencies() {
+	const deps = new Set();
+	const pluginDirs = ['src/plugins', 'extensions'];
+	
+	function scanDir(dir) {
+		if (!fs.existsSync(dir)) return;
+		const entries = fs.readdirSync(dir, { withFileTypes: true });
+		for (const entry of entries) {
+			if (!entry.isDirectory()) continue;
+			const configPath = path.join(dir, entry.name, 'config.js');
+			if (fs.existsSync(configPath)) {
+				try {
+					const content = fs.readFileSync(configPath, 'utf8');
+					const match = content.match(/additionalDependencies\s*:\s*\[([^\]]*)\]/);
+					if (match) {
+						match[1].split(',')
+							.map(s => s.trim().replace(/['"]/g, ''))
+							.filter(s => s.length > 0)
+							.forEach(dep => deps.add(dep));
+					}
+				} catch (e) { /* ignore */ }
+			}
+			// Recurse into subdirectories (nested plugin structure)
+			scanDir(path.join(dir, entry.name));
+		}
+	}
+	
+	pluginDirs.forEach(d => scanDir(path.join(__dirname, d)));
+	return Array.from(deps);
+}
+
+const externalDeps = collectAdditionalDependencies();
+if (externalDeps.length > 0) {
+	console.log(`[Vite] External dependencies from plugins: ${externalDeps.join(', ')}`);
+}
+
 // Startup banner is shown by hooks.server.js instead to avoid duplication
 
 export default defineConfig({
@@ -92,6 +129,17 @@ export default defineConfig({
 	preview: {
 		port: 8096,
 		host: true
+	},
+	ssr: {
+		// Don't bundle plugin additionalDependencies - loaded dynamically at runtime
+		external: externalDeps,
+		noExternal: []
+	},
+	build: {
+		rollupOptions: {
+			// Don't bundle plugin additionalDependencies - loaded dynamically at runtime
+			external: externalDeps
+		}
 	},
 	test: {
 		environment: 'node',

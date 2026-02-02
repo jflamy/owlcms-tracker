@@ -206,6 +206,77 @@ export function updatePackageJsonDependency(filePath, trackerCoreVersion) {
   fs.writeFileSync(filePath, JSON.stringify(pkg, null, 2) + '\n');
 }
 
+/**
+ * Scan plugins for additional dependencies declared in config.js
+ * Looks in src/plugins/ (source) and extensions/ (runtime)
+ * @returns {string[]} Array of npm package specifiers to install
+ */
+function scanPluginDependencies() {
+  const deps = new Set();
+  
+  // Scan source plugins (nested: src/plugins/category/plugin-name/)
+  const srcPlugins = 'src/plugins';
+  if (fs.existsSync(srcPlugins)) {
+    const categories = fs.readdirSync(srcPlugins);
+    for (const category of categories) {
+      const categoryPath = path.join(srcPlugins, category);
+      if (fs.statSync(categoryPath).isDirectory()) {
+        scanPluginDir(categoryPath, deps);
+      }
+    }
+  }
+  
+  // Scan extensions (nested structure: extensions/RepoName/plugin-name/)
+  const extensionsDir = 'extensions';
+  if (fs.existsSync(extensionsDir)) {
+    const repos = fs.readdirSync(extensionsDir);
+    for (const repo of repos) {
+      const repoPath = path.join(extensionsDir, repo);
+      if (fs.statSync(repoPath).isDirectory()) {
+        scanPluginDir(repoPath, deps);
+      }
+    }
+  }
+  
+  return Array.from(deps);
+}
+
+/**
+ * Scan a directory for plugins with config.js containing additionalDependencies
+ */
+function scanPluginDir(dir, deps) {
+  if (!fs.existsSync(dir)) return;
+  
+  const entries = fs.readdirSync(dir);
+  for (const entry of entries) {
+    const entryPath = path.join(dir, entry);
+    if (!fs.statSync(entryPath).isDirectory()) continue;
+    
+    const configPath = path.join(entryPath, 'config.js');
+    if (!fs.existsSync(configPath)) continue;
+    
+    try {
+      const configContent = fs.readFileSync(configPath, 'utf8');
+      
+      // Look for additionalDependencies array in the config
+      const match = configContent.match(/additionalDependencies\s*:\s*\[([^\]]*)\]/);
+      if (match) {
+        const depsArray = match[1]
+          .split(',')
+          .map(s => s.trim().replace(/['"]/g, ''))
+          .filter(s => s.length > 0);
+        
+        for (const dep of depsArray) {
+          deps.add(dep);
+          console.log(`  📎 ${entry} requires: ${dep}`);
+        }
+      }
+    } catch (err) {
+      console.log(`  ⚠️ Could not parse ${entry}/config.js: ${err.message}`);
+    }
+  }
+}
+
 export function buildAndPackage({
   distDir,
   version,
@@ -292,6 +363,13 @@ export function buildAndPackage({
   // Install production dependencies only
   console.log('\n📥 Installing production dependencies...');
   execSync(`npm install --omit=dev --prefix ${DIST_DIR} --no-package-lock --no-save`, { stdio: 'inherit' });
+
+  // Scan source plugins for additional dependencies and install them
+  const additionalDeps = scanPluginDependencies();
+  if (additionalDeps.length > 0) {
+    console.log(`\n📦 Installing plugin additional dependencies: ${additionalDeps.join(', ')}`);
+    execSync(`npm install --omit=dev --prefix ${DIST_DIR} --no-package-lock --no-save ${additionalDeps.join(' ')}`, { stdio: 'inherit' });
+  }
 
   // Remove any accidental self-dependency (prevents recursive packaging)
   const selfDepPath = path.join(DIST_DIR, 'node_modules', 'owlcms-tracker');

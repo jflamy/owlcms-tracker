@@ -39,7 +39,6 @@
     "gsap": "^3.13.0",
     "http-proxy-middleware": "^3.0.5",
     "pagedjs": "0.4.3",
-    "puppeteer-core": "^24.34.0",
     "ws": "^8.18.3"
   }
 }
