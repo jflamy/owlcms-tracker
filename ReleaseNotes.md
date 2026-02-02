@@ -1,9 +1,13 @@
 # OWLCMS Tracker Release Notes
 <!-- markdownlint-disable -->
 
-> #### ⚠ To use Tracker, you need to use version 64 of OWLCMS (see Installing Locally below)
+> #### ⚠ To use Tracker, you need to use version 64 or newer of OWLCMS (see Installing Locally below)
 
 ##### Release log
+- 2.9.0: Clean-up of unnecessary dependencies
+- 2.9.0: Plugins and extensions can specify additional dependencies that are not part of the base build
+- 2.9.0: Additional dependencies are included in zip distributions
+
 - 2.8.3: extensions now inherit the default values of the base scoreboard
 - 2.8.3: refactored the team-scoreboard extension mechanism
 - 2.8.2: Share attempt bar presentation and backend for unified translations on all scoreboards
