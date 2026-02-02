@@ -5,12 +5,38 @@
  * Uses system Chrome installation via puppeteer-core (lightweight).
  * 
  * URL: /api/generate-pdf?type=iwf-results&option1=value1
+ * 
+ * OPTIONAL DEPENDENCY: puppeteer-core must be installed for PDF generation.
+ * If not installed, this endpoint returns a helpful error message.
  */
 
-import puppeteer from 'puppeteer-core';
+// Dynamic import - puppeteer-core is optional
+let puppeteer = null;
+try {
+	puppeteer = (await import('puppeteer-core')).default;
+} catch {
+	// puppeteer-core not installed - will return error in handler
+}
+
 import { findChrome } from '$lib/server/chrome-finder.js';
 
 export async function GET({ url }) {
+	// Check if puppeteer is available
+	if (!puppeteer) {
+		return new Response(JSON.stringify({
+			success: false,
+			error: 'PDF generation not available',
+			message: 'puppeteer-core is not installed.\n\n' +
+				'To enable PDF generation:\n' +
+				'  npm install puppeteer-core\n\n' +
+				'You also need Chrome or Chromium installed on the system.\n\n' +
+				'Alternative: Open the document in your browser and use Print → Save as PDF'
+		}), {
+			status: 503,
+			headers: { 'Content-Type': 'application/json' }
+		});
+	}
+
 	// Check if we're in dev mode - self-requests cause deadlock
 	const isDev = process.env.NODE_ENV === 'development';
 	if (isDev) {

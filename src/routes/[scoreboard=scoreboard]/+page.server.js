@@ -62,6 +62,8 @@ export async function load({ params, url }) {
 		}
 		
 		// Return metadata for the page
+		// For plugins with category=documents or customSSE=true, include full liveData
+		// since they use server load data directly (skipRouteSSE=true in +page.svelte)
 		const returnData = {
 			scoreboardType: type,
 			pluginPath: scoreboard.pluginPath || scoreboard.folderName,  // For component loading
@@ -70,7 +72,8 @@ export async function load({ params, url }) {
 			fopName,
 			options,
 			config: scoreboard.config,  // Static config with defaults
-			liveConfig: liveData?.config  // Current config with overrides (if available)
+			liveConfig: liveData?.config,  // Current config with overrides (if available)
+			...(liveData || {})  // Include all data for skipRouteSSE plugins
 		};
 		return returnData;
 		
