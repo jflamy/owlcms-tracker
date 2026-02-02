@@ -1,41 +1,49 @@
 <!-- markdownlint-disable -->
 # Extensions Directory
 
-This directory contains **extensions** (git submodules) for federation-specific scoreboards that can be added without modifying the owlcms-tracker source code.
+This directory contains **extensions** (git submodules) - runtime add-ons that customize existing bundled plugins without modifying the owlcms-tracker source code.
 
-## Extensions vs. Bundled Plugins
+**What are extensions?** Extensions are NOT standalone plugins. They are configuration overlays that add custom scoring logic and options to existing bundled plugins.
+
+## How Extensions Work
 
 **Bundled plugins** (`src/plugins/`):
-- Part of the owlcms-tracker source code, compiled during build
-- Can contain `.svelte` files
+- Complete scoreboard implementations compiled into owlcms-tracker
+- Contain UI components (`.svelte` files) and data processing logic
 - Examples: `lifting-order`, `team-scoreboard`, `iwf-results`
 
 **Extensions** (`extensions/`):
+- Runtime add-ons that customize bundled plugins
 - Separate git repositories added as submodules
-- **Cannot contain `.svelte` files** (no runtime compilation)
-- Must use `delegateTo` to reuse compiled components from bundled plugins
+- **Do NOT contain `.svelte` files** (no UI code)
+- Use `delegateTo` to specify which bundled plugin they extend
+- Provide custom `calculateScore()` functions and options
 - Ideal for federation-specific customizations
 - Each country/federation maintains their own git repository
 
 ## Creating an Extension
 
-Extensions are **config-only derivatives** that:
-1. Delegate rendering to a bundled plugin via `delegateTo`
-2. Provide custom scoring logic via `calculateScore()` function
-3. Define their own options and metadata
+Extensions are **runtime add-ons** that extend bundled plugins by:
+1. Specifying which bundled plugin to extend via `delegateTo`
+2. Adding custom scoring logic via `calculateScore()` function
+3. Defining additional options and metadata
+
+**Key concept:** An extension is NOT a new scoreboard - it's a customization layer on top of an existing bundled plugin.
 
 ### Directory Structure
 
 ```
 extensions/
   your-country-name/
-    your-plugin-name/
-      config.js         # Required - plugin configuration
+    your-extension-name/
+      config.js         # Required - extension configuration (adds to bundled plugin)
 ```
+
+**Note:** Each extension folder contains a single `config.js` file that extends a bundled plugin.
 
 ### Minimal Example
 
-Here's a simplified version of a `federationScores` plugin that demonstrates the pattern:
+Here's a simplified `federationScores` extension that adds custom scoring to the `team-scoreboard` plugin:
 
 ```javascript
 /**
@@ -133,7 +141,7 @@ export function calculateScore(total, bw, gender, age, system, context = {}) {
 
 ### 1. Must Use `delegateTo`
 
-Runtime plugins cannot render their own UI - they must delegate to a bundled plugin:
+Extensions cannot render their own UI - they must specify which bundled plugin they extend:
 
 ```javascript
 delegateTo: 'teams/team-scoreboard'  // Use team-scoreboard's compiled page.svelte
@@ -204,13 +212,84 @@ options: [
 ]
 ```
 
+### 5. Declare Additional Dependencies (Optional)
+
+If your extension requires npm packages beyond tracker-core, declare them in `additionalDependencies`:
+
+```javascript
+export default {
+  name: 'My Plugin',
+  delegateTo: 'teams/team-scoreboard',
+  
+  // NPM packages required by this plugin (installed during packaging)
+  additionalDependencies: [
+    'moment@^2.29.4',           // Specific version
+    'lodash',                    // Latest version
+    'some-package@1.2.3'        // Exact version
+  ],
+  
+  options: [...]
+};
+```
+
+**When to use:**
+- Custom scoring libraries not in tracker-core
+- Specialized data processing packages
+- Third-party utilities
+
+**How it works:**
+- During `npm run zip`, the packaging script scans all extension `config.js` files
+- Packages declared in `additionalDependencies` are installed into `node_modules/`
+- They're available for import in your extension's `config.js` scoring functions
+
+**⚠️ Manual Installation:**
+If you copy an extension to an already-deployed tracker (not built from source), you must manually install dependencies:
+
+```bash
+# Navigate to the tracker installation directory
+cd /path/to/owlcms-tracker
+
+# Install the required packages
+npm install moment@^2.29.4 lodash some-package@1.2.3
+
+# Restart the tracker
+node start-with-ws.js
+```
+
+**Recommendation:** Extensions with additional dependencies should include installation instructions in their README.
+
+**Example with external library:**
+
+```javascript
+// config.js
+import customScoring from 'my-federation-scoring-lib';
+
+export default {
+  name: 'Federation Scores',
+  delegateTo: 'teams/team-scoreboard',
+  
+  additionalDependencies: [
+    'my-federation-scoring-lib@^2.0.0'
+  ],
+  
+  options: [...]
+};
+
+export function calculateScore(total, bw, gender, age, system, context) {
+  if (system === 'FederationFormula') {
+    return customScoring.calculate(total, bw, gender);
+  }
+  return null;
+}
+```
+
 ## How It Works
 
-1. **Plugin Discovery**: The scoreboard registry recursively scans both `src/plugins/` and `extensions/`
+1. **Discovery**: The scoreboard registry recursively scans both `src/plugins/` (bundled) and `extensions/` (add-ons)
 2. **Git Submodules**: Extensions are tracked as git submodules (separate repositories)
-3. **Delegation**: When an extension plugin is requested, it loads the delegate plugin's compiled page
-4. **Score Calculation**: The `calculateScore()` function is called for each athlete
-5. **Options**: User-selected options are passed to both the score calculation and base plugin
+3. **Extension Resolution**: When an extension is requested, it loads the bundled plugin specified in `delegateTo`
+4. **Score Calculation**: The extension's `calculateScore()` function is called for each athlete
+5. **Options Merging**: The extension's options are merged with the base plugin's options
 
 ## Adding an Extension
 
@@ -238,9 +317,11 @@ See [Git Submodule Workflow](#git-submodule-workflow) below for managing local m
 ## Testing Your Extension
 
 1. Add your extension as a submodule in `extensions/your-country/`
-2. Create plugin folders with `config.js` files
+2. Create extension folders with `config.js` files
 3. Run tracker: `npm run dev`
-4. Access your plugin: `http://localhost:8096/your-country/your-plugin-name?fop=A`
+4. Access your extension: `http://localhost:8096/your-country/your-extension-name?fop=A`
+
+**The extension will use the UI from the bundled plugin specified in `delegateTo`, but with your custom scoring and options.**
 
 ## Git Submodule Workflow
 

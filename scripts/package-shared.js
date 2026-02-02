@@ -281,7 +281,8 @@ export function buildAndPackage({
   distDir,
   version,
   trackerCoreVersion,
-  updateDistDependency = true
+  updateDistDependency = true,
+  includeExtensions = false
 }) {
   const DIST_DIR = distDir || 'dist/package';
 
@@ -352,12 +353,21 @@ export function buildAndPackage({
   copyDir('build', path.join(DIST_DIR, 'build'));
   console.log('✓ Copied build/');
 
-  // Copy extensions directory (runtime plugins) if it exists
-  if (fs.existsSync('extensions')) {
+  // Copy extensions directory (runtime plugins) if requested and exists
+  if (includeExtensions && fs.existsSync('extensions')) {
     copyDir('extensions', path.join(DIST_DIR, 'extensions'));
     console.log('✓ Copied extensions/ to package');
-  } else {
+  } else if (includeExtensions) {
     console.log('⚠ No runtime extensions to include');
+  } else {
+    // Create empty extensions folder with just the README
+    fs.mkdirSync(path.join(DIST_DIR, 'extensions'), { recursive: true });
+    if (fs.existsSync('extensions/README.md')) {
+      fs.copyFileSync('extensions/README.md', path.join(DIST_DIR, 'extensions/README.md'));
+      console.log('✓ Created extensions/ with README.md (plugins excluded for release)');
+    } else {
+      console.log('✓ Created empty extensions/ folder (plugins excluded for release)');
+    }
   }
 
   // Install production dependencies only
