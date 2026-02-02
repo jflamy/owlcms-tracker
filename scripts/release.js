@@ -227,7 +227,8 @@ try {
 
   // Trigger the workflow on the pushed branch ref
   const submodulesArg = includeSubmodules ? ' -f includeSubmodules=true' : ' -f includeSubmodules=false';
-  execSync(`gh workflow run release.yaml --ref ${branch} -f revision=${version}${submodulesArg}`, { stdio: 'inherit' });
+  const trackerCoreArg = trackerCoreVersion ? ` -f trackerCoreVersion=${trackerCoreVersion}` : '';
+  execSync(`gh workflow run release.yaml --ref ${branch} -f revision=${version}${trackerCoreArg}${submodulesArg}`, { stdio: 'inherit' });
   console.log('✓ Workflow triggered');
   console.log('⏳ Waiting 15 seconds for GitHub to queue the run...');
   sleepSync(15000);
