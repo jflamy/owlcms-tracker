@@ -40,8 +40,13 @@ function collectAdditionalDependencies() {
 }
 
 const externalDeps = collectAdditionalDependencies();
-if (externalDeps.length > 0) {
-	console.log(`[Vite] External dependencies from plugins: ${externalDeps.join(', ')}`);
+// Optional dependencies that may not be installed
+const optionalDeps = ['puppeteer-core'];
+
+// Combine with plugin additional dependencies
+const allExternalDeps = [...externalDeps, ...optionalDeps];
+if (allExternalDeps.length > 0) {
+	console.log(`[Vite] External dependencies: ${allExternalDeps.join(', ')}`);
 }
 
 // Startup banner is shown by hooks.server.js instead to avoid duplication
@@ -132,13 +137,13 @@ export default defineConfig({
 	},
 	ssr: {
 		// Don't bundle plugin additionalDependencies - loaded dynamically at runtime
-		external: externalDeps,
+		external: allExternalDeps,
 		noExternal: []
 	},
 	build: {
 		rollupOptions: {
 			// Don't bundle plugin additionalDependencies - loaded dynamically at runtime
-			external: externalDeps
+			external: allExternalDeps
 		}
 	},
 	test: {
