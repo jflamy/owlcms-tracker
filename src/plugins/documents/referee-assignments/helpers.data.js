@@ -23,7 +23,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	
 	// Get language from options (same pattern as team-scoreboard)
 	const language = options.lang || options.language || 'en';
-	const translations = competitionHub.getTranslations(language);
+	const translations = competitionHub.getTranslations({ locale: language });
 	
 	// Include translations checksum in cache key so cache invalidates when translations change
 	const translationsChecksum = competitionHub.lastTranslationsChecksum || 'none';

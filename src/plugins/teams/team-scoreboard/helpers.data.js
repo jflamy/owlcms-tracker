@@ -222,7 +222,7 @@ export function getDatabaseState() {
  * @returns {Object|null} Latest UPDATE message with precomputed data
  */
 export function getFopUpdate(fopName = 'A') {
-	return competitionHub.getFopUpdate(fopName);
+	return competitionHub.getFopUpdate({ fopName });
 }
 
 /**
@@ -232,7 +232,7 @@ export function getFopUpdate(fopName = 'A') {
  * @returns {Array} Array of flat athlete objects (no spacers)
  */
 function getSessionAthletes(fopName) {
-	return competitionHub.getSessionAthletes(fopName) || [];
+	return competitionHub.getSessionAthletes({ fopName }) || [];
 }
 
 /**
@@ -241,7 +241,7 @@ function getSessionAthletes(fopName) {
  * @returns {Array} Array of athlete objects and spacer markers
  */
 function getSessionEntries(fopName) {
-	return competitionHub.getStartOrderEntries(fopName, { includeSpacers: true }) || [];
+	return competitionHub.getStartOrderEntries({ fopName, includeSpacers: true }) || [];
 }
 
 // =============================================================================
@@ -1591,7 +1591,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	const showPredicted = scoringSystem === 'TeamPoints' ? false : (options.showPredicted ?? false);
 	const topN = options.topN ?? 0;
 	const language = options.lang || options.language || 'no';
-	const translations = competitionHub.getTranslations(language);
+	const translations = competitionHub.getTranslations({ locale: language });
 	const learningMode = process.env.LEARNING_MODE === 'true' ? 'enabled' : 'disabled';
 	
 	// enforceBombout: fallback to false if extension doesn't define it
@@ -1648,7 +1648,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		topMFm: parseInt(options.topMFm, 10) || 2,  // MF mode: top N men
 		topMFf: parseInt(options.topMFf, 10) || 2   // MF mode: top N women
 	};
-	const sessionStatus = competitionHub.getSessionStatus(fopName);
+	const sessionStatus = competitionHub.getSessionStatus({ fopName });
 
 	// Detect session gender from session athletes
 	let helperDetectedGender = 'unknown';
@@ -1942,6 +1942,11 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 					sessionAthletesByKey.set(athleteKey, sessionAthlete);
 				}
 			});
+		// DEBUG: Log first few session keys to compare with database keys
+		const sessionKeys = Array.from(sessionAthletesByKey.keys()).slice(0, 3);
+		logger.warn(`[Team DEBUG] Session athlete keys (first 3): ${JSON.stringify(sessionKeys)}`);
+	} else {
+		logger.warn(`[Team DEBUG] hasActiveSession is FALSE, platformState=${platformState}`);
 	}
 	
 	// Process ALL database athletes - use session data if available, else database data
@@ -1950,6 +1955,10 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	logger.debug(`[Team helpers] Database has ${databaseState?.athletes?.length || 0} athletes, session has ${sessionAthletesByKey.size} athletes`);
 	
 	if (databaseState?.athletes && Array.isArray(databaseState.athletes)) {
+		// DEBUG: Log first few database keys
+		const dbKeys = databaseState.athletes.slice(0, 3).map(a => normalizeKey(a.key));
+		logger.warn(`[Team DEBUG] Database athlete keys (first 3): ${JSON.stringify(dbKeys)}`);
+		
 		for (const dbAthlete of databaseState.athletes) {
 			const athleteKey = normalizeKey(dbAthlete.key);
 			if (!athleteKey) {
@@ -1961,6 +1970,10 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			const sessionAthlete = sessionAthletesByKey.get(athleteKey);
 			
 			if (sessionAthlete) {
+				// DEBUG: Check if classname is present in session athlete
+				if (sessionAthlete.classname && sessionAthlete.classname !== '') {
+					logger.warn(`[Team DEBUG] Session athlete ${sessionAthlete.fullName} has classname: "${sessionAthlete.classname}", liftingOrder: ${liftingOrderMap.get(athleteKey)}`);
+				}
 				// Athlete is in current session - use session data (has live updates)
 				const wrapped = teamAthleteFromSession(sessionAthlete, {
 					liftType,

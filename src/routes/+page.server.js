@@ -50,7 +50,7 @@ export async function load() {
 	}
 	const localePattern = /^[A-Za-z0-9_-]+$/;
 	for (const locale of availableLocales) {
-		const translations = competitionHub.getTranslations(locale);
+		const translations = competitionHub.getTranslations({ locale });
 		const translated = translations?.['Tracker.LocaleName'];
 		let intlName = null;
 		if (displayNames && localePattern.test(locale)) {

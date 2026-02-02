@@ -23,7 +23,7 @@ export function getDatabaseState() {
  * Get the latest UPDATE message for a specific FOP - SERVER-SIDE ONLY
  */
 export function getFopUpdate(fopName = 'A') {
-	return competitionHub.getFopUpdate(fopName);
+	return competitionHub.getFopUpdate({ fopName });
 }
 
 /**
@@ -339,7 +339,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	}
 
 	// Get session status
-	const sessionStatus = competitionHub.getSessionStatus(fopName);
+	const sessionStatus = competitionHub.getSessionStatus({ fopName });
 
 	// Extract basic competition info
 	const competition = {
@@ -368,7 +368,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	let barWeight = 20;
 	
 	// Get session athletes from competition hub
-	const sessionAthletes = competitionHub.getSessionAthletes(fopName) || [];
+	const sessionAthletes = competitionHub.getSessionAthletes({ fopName }) || [];
 	
 	const currentAthlete = sessionAthletes.find(a => 
 		a.classname && a.classname.includes('current')

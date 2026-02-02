@@ -8,9 +8,9 @@ const lowerThirdCache = new Map();
 registerCache(lowerThirdCache);
 
 export function getScoreboardData(fopName = 'A', options = {}) {
-	const fopUpdate = competitionHub.getFopUpdate(fopName);
+	const fopUpdate = competitionHub.getFopUpdate({ fopName });
 	const databaseState = competitionHub.getDatabaseState();
-	const sessionStatus = competitionHub.getSessionStatus(fopName);
+	const sessionStatus = competitionHub.getSessionStatus({ fopName });
 	const learningMode = process.env.LEARNING_MODE === 'true';
 
 	// Parse options

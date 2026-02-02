@@ -11,9 +11,9 @@ export async function GET({ url }) {
 
 	try {
 		// Call the new getter methods
-		const currentAthlete = competitionHub.getCurrentAthlete(fopName);
-		const nextAthlete = competitionHub.getNextAthlete(fopName);
-		const previousAthlete = competitionHub.getPreviousAthlete(fopName);
+		const currentAthlete = competitionHub.getCurrentAthlete({ fopName });
+		const nextAthlete = competitionHub.getNextAthlete({ fopName });
+		const previousAthlete = competitionHub.getPreviousAthlete({ fopName });
 
 		return json({
 			success: true,

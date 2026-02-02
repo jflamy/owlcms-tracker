@@ -130,7 +130,7 @@ export async function GET({ request, url }) {
         }
 
         // Send translations for the requested language
-        const translations = competitionHub.getTranslations(language);
+        const translations = competitionHub.getTranslations({ locale: language });
         if (translations && Object.keys(translations).length > 0) {
           send({
             type: 'translations',
@@ -141,7 +141,7 @@ export async function GET({ request, url }) {
           });
         } else if (language !== 'en') {
           // Fallback to English if requested language not available
-          const enTranslations = competitionHub.getTranslations('en');
+          const enTranslations = competitionHub.getTranslations({ locale: 'en' });
           if (enTranslations && Object.keys(enTranslations).length > 0) {
             console.log(`[SSE] ${connectionId}: Language '${language}' not available, falling back to 'en'`);
             send({

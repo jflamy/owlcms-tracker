@@ -70,7 +70,7 @@ export function getDatabaseState() {
  * Get the latest UPDATE message for a specific FOP - SERVER-SIDE ONLY
  */
 export function getFopUpdate(fopName = 'A') {
-	return competitionHub.getFopUpdate(fopName);
+	return competitionHub.getFopUpdate({ fopName });
 }
 
 /**
@@ -90,7 +90,7 @@ export function getScoreboardData(scoreboardType, fopName = 'A', options = {}) {
 	const databaseState = getDatabaseState();
 	const showRecords = options.showRecords ?? true;
 	const learningMode = process.env.LEARNING_MODE === 'true' ? 'enabled' : 'disabled';
-	const sessionStatus = competitionHub.getSessionStatus(fopName);
+	const sessionStatus = competitionHub.getSessionStatus({ fopName });
 	
 	// Get translations for requested language
 	const lang = options.lang || 'en';
@@ -314,9 +314,9 @@ function getAthleteEntries(dataSource, fopName, fopUpdate) {
 	
 	try {
 		if (dataSource === 'liftingOrder') {
-			entries = competitionHub.getLiftingOrderEntries(fopName, { includeSpacers: true }) || [];
+			entries = competitionHub.getLiftingOrderEntries({ fopName, includeSpacers: true }) || [];
 		} else {
-			entries = competitionHub.getStartOrderEntries(fopName, { includeSpacers: true }) || [];
+			entries = competitionHub.getStartOrderEntries({ fopName, includeSpacers: true }) || [];
 		}
 	} catch (err) {
 		entries = [];
