@@ -121,62 +121,77 @@ export async function GET({ url }) {
 		// Give Svelte time to hydrate and render all content
 		await new Promise(resolve => setTimeout(resolve, 2000));
 		
-		// Wait for Paged.js to finish rendering
-		// Paged.js adds .pagedjs_pages class when done
-		// Large documents (80+ pages) may take 2-3 minutes to render
-		console.log('[PDF Generator] Waiting for Paged.js to start (looking for .pagedjs_pages)...');
-		await page.waitForSelector('.pagedjs_pages', { timeout: 180000 });
-		console.log('[PDF Generator] Paged.js started, waiting for page count to stabilize...');
+		// Check if this document uses Paged.js (has script tag loading pagedjs)
+		const usesPagedJs = await page.evaluate(() => {
+			// Check for Paged.js script or existing pagedjs elements
+			const scripts = document.querySelectorAll('script[src*="paged"]');
+			const pagedElements = document.querySelector('.pagedjs_pages');
+			return scripts.length > 0 || pagedElements !== null;
+		});
 		
-		// Wait for page count to stabilize (no new pages for 2 seconds)
-		// This is more reliable than the after hook for large documents
-		let lastPageCount = 0;
-		let stableCount = 0;
-		const requiredStableChecks = 4; // 4 checks at 500ms = 2 seconds of stability
-		
-		while (stableCount < requiredStableChecks) {
-			await new Promise(resolve => setTimeout(resolve, 500));
-			const currentPageCount = await page.evaluate(() => {
-				return document.querySelectorAll('.pagedjs_page').length;
-			});
+		if (usesPagedJs) {
+			// Wait for Paged.js to finish rendering
+			// Paged.js adds .pagedjs_pages class when done
+			// Large documents (80+ pages) may take 2-3 minutes to render
+			console.log('[PDF Generator] Waiting for Paged.js to start (looking for .pagedjs_pages)...');
+			await page.waitForSelector('.pagedjs_pages', { timeout: 180000 });
+			console.log('[PDF Generator] Paged.js started, waiting for page count to stabilize...');
 			
-			if (currentPageCount === lastPageCount && currentPageCount > 0) {
-				stableCount++;
-				console.log(`[PDF Generator] Page count stable at ${currentPageCount} (${stableCount}/${requiredStableChecks})`);
-			} else {
-				stableCount = 0;
-				console.log(`[PDF Generator] Page count changed: ${lastPageCount} -> ${currentPageCount}`);
+			// Wait for page count to stabilize (no new pages for 2 seconds)
+			// This is more reliable than the after hook for large documents
+			let lastPageCount = 0;
+			let stableCount = 0;
+			const requiredStableChecks = 4; // 4 checks at 500ms = 2 seconds of stability
+			
+			while (stableCount < requiredStableChecks) {
+				await new Promise(resolve => setTimeout(resolve, 500));
+				const currentPageCount = await page.evaluate(() => {
+					return document.querySelectorAll('.pagedjs_page').length;
+				});
+				
+				if (currentPageCount === lastPageCount && currentPageCount > 0) {
+					stableCount++;
+					console.log(`[PDF Generator] Page count stable at ${currentPageCount} (${stableCount}/${requiredStableChecks})`);
+				} else {
+					stableCount = 0;
+					console.log(`[PDF Generator] Page count changed: ${lastPageCount} -> ${currentPageCount}`);
+				}
+				lastPageCount = currentPageCount;
 			}
-			lastPageCount = currentPageCount;
-		}
-		
-		console.log(`[PDF Generator] Page count stabilized at ${lastPageCount} pages`);
-		
-		// Also wait for the ready flag if set (for TOC target-counter computation)
-		const hasReadyFlag = await page.evaluate(() => window.__pagedjs_ready === true);
-		if (!hasReadyFlag) {
-			console.log('[PDF Generator] Waiting additional time for target-counter() computation...');
-			await new Promise(resolve => setTimeout(resolve, 1000));
-		}
-		console.log('[PDF Generator] Paged.js rendering complete');
-		
-		// Log Paged.js page info for debugging
-		const pageInfo = await page.evaluate(() => {
-			const pages = document.querySelectorAll('.pagedjs_page');
-			return Array.from(pages).map((p, i) => {
-				const style = window.getComputedStyle(p);
-				return {
-					index: i + 1,
-					width: style.width,
-					height: style.height,
-					classes: p.className
-				};
+			
+			console.log(`[PDF Generator] Page count stabilized at ${lastPageCount} pages`);
+			
+			// Also wait for the ready flag if set (for TOC target-counter computation)
+			const hasReadyFlag = await page.evaluate(() => window.__pagedjs_ready === true);
+			if (!hasReadyFlag) {
+				console.log('[PDF Generator] Waiting additional time for target-counter() computation...');
+				await new Promise(resolve => setTimeout(resolve, 1000));
+			}
+			console.log('[PDF Generator] Paged.js rendering complete');
+			
+			// Log Paged.js page info for debugging
+			const pageInfo = await page.evaluate(() => {
+				const pages = document.querySelectorAll('.pagedjs_page');
+				return Array.from(pages).map((p, i) => {
+					const style = window.getComputedStyle(p);
+					return {
+						index: i + 1,
+						width: style.width,
+						height: style.height,
+						classes: p.className
+					};
+				});
 			});
-		});
-		console.log(`[PDF Generator] Paged.js generated ${pageInfo.length} pages`);
-		pageInfo.slice(0, 3).forEach(p => {
-			console.log(`  Page ${p.index}: ${p.width} x ${p.height}`);
-		});
+			console.log(`[PDF Generator] Paged.js generated ${pageInfo.length} pages`);
+			pageInfo.slice(0, 3).forEach(p => {
+				console.log(`  Page ${p.index}: ${p.width} x ${p.height}`);
+			});
+		} else {
+			// Simple document without Paged.js - just wait a bit for any async rendering
+			console.log('[PDF Generator] Simple document (no Paged.js), waiting for content...');
+			await new Promise(resolve => setTimeout(resolve, 1000));
+			console.log('[PDF Generator] Content ready');
+		}
 		
 		// Extract page title for the filename
 		const pageTitle = await page.title();
