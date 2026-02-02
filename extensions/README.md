@@ -300,11 +300,13 @@ export function calculateScore(total, bw, gender, age, system, context) {
 git clone https://github.com/owlcms/owlcms-tracker.git
 cd owlcms-tracker
 
-# Add your extension as a submodule
-git submodule add https://github.com/your-org/tracker-yourCountry.git extensions/yourCountry
+# Install dependencies
+npm install
 
-# Initialize the submodule
-git submodule update --init extensions/yourCountry
+# Initialize an extension submodule
+npm run init
+# You'll be prompted for the git URL: https://github.com/your-org/tracker-yourCountry.git
+# And the extension name: yourCountry
 
 # Run tracker
 npm run dev
@@ -327,13 +329,32 @@ See [Git Submodule Workflow](#git-submodule-workflow) below for managing local m
 
 **For federation developers maintaining private extensions:**
 
+### Adding a Private Extension
+
+```bash
+# Add your private extension (interactive prompts)
+npm run init
+# Enter: https://github.com/myorg/tracker-myCountry.git
+# Enter: myCountry
+
+# The extension works locally
+npm run dev
+```
+
+### Removing an Extension
+
+```bash
+# Remove an extension submodule
+npm run deinit
+# You'll be prompted for the extension name: myCountry
+```
+
+**Managing local-only extensions:**
+
 If you need to keep your submodules private and don't want to commit them to the main repo:
 
 ```bash
-# Add your private submodule locally
-git submodule add https://github.com/myorg/tracker-myCountry.git extensions/myCountry
-
-# Tell git to ignore your local .gitmodules changes
+# After running npm run init, tell git to ignore .gitmodules changes
 git update-index --skip-worktree .gitmodules
 
 # Your extension works locally but won't be committed upstream
