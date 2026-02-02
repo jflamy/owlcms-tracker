@@ -1,6 +1,8 @@
 [submodule "src/plugins/books"]
 	path = src/plugins/books
 	url = https://github.com/jflamy/tracker-books.git
+	branch = master
 [submodule "extensions/France"]
 	path = extensions/France
 	url = https://github.com/jflamy/tracker-France.git
+	branch = master
