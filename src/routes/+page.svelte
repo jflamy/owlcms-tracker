@@ -623,7 +623,30 @@
                   <p class="description">{@html scoreboard.description}</p>
                   
                   <div class="fop-links">
-                    {#if confirmedFops}
+                    {#if scoreboard.standalone}
+                      <!-- Standalone plugin - no FOP needed -->
+                      <div class="fop-list">
+                        <div class="fop-row">
+                          <a 
+                            href={getScoreboardUrl(scoreboard.type, '')}
+                            class="fop-link"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            Open
+                          </a>
+                          {#if scoreboard.options && scoreboard.options.length > 0}
+                            <button
+                              class="options-btn"
+                              on:click={() => openOptionsModal(scoreboard, '')}
+                              title="Configure options"
+                            >
+                              ⚙️
+                            </button>
+                          {/if}
+                        </div>
+                      </div>
+                    {:else if confirmedFops}
                       <h4>Select Platform:</h4>
                       <div class="fop-list">
                         {#each data.fops as fop}

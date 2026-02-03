@@ -19,6 +19,7 @@ export async function load() {
 		category: sb.config.category || 'standard',
 		order: sb.config.order || 999,
 		fopRequired: sb.config.fopRequired !== false, // Default to true if not specified
+		standalone: sb.config.standalone || false, // Plugin works without OWLCMS data
 		additionalDependencies: sb.config.additionalDependencies || []
 	}));
 	
