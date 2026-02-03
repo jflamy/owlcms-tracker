@@ -99,6 +99,17 @@ class SSEBroker {
   }
 
   /**
+   * Register an external event source (e.g., OBS controller)
+   * @param {EventEmitter} emitter - EventEmitter that emits events
+   * @param {string} eventName - Event name to listen for
+   */
+  registerExternalSource(emitter, eventName) {
+    emitter.on(eventName, (eventData) => {
+      this.broadcast(eventData);
+    });
+  }
+
+  /**
    * Register a new SSE client connection
    * @param {Function} sendFn - Function to send data to this client
    * @param {string} connectionId - Unique connection identifier

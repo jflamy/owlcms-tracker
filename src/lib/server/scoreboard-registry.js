@@ -217,7 +217,7 @@ class ScoreboardRegistry {
 		}
 		
 		try {
-			let config, configModule, dataHelper;
+			let config, configModule, dataHelper, actionHandler;
 			
 			if (runtimePaths) {
 				// Runtime-discovered plugin - use dynamic import
@@ -230,7 +230,8 @@ class ScoreboardRegistry {
 					if (runtimePaths.helpersPath) {
 						const helpersUrl = toFileUrl(runtimePaths.helpersPath) || pathToFileURL(runtimePaths.helpersPath).href;
 						const helpersModule = await importFromFileUrl(helpersUrl);
-						dataHelper = helpersModule.getScoreboardData || helpersModule.default;
+						dataHelper = helpersModule.getScoreboardData || helpersModule.processData || helpersModule.default;
+						actionHandler = helpersModule.handleAction || null;
 					}
 				} catch (importErr) {
 					console.error(`[ScoreboardRegistry] Failed to import runtime plugin ${pluginPath}:`, importErr.message);
@@ -247,8 +248,9 @@ class ScoreboardRegistry {
 
 				const helpersModule = helperModules[`../../plugins/${pluginPath}/helpers.data.js`];
 				dataHelper = helpersModule
-					? helpersModule.getScoreboardData || helpersModule.default
+					? helpersModule.getScoreboardData || helpersModule.processData || helpersModule.default
 					: null;
+				actionHandler = helpersModule?.handleAction || null;
 			}
 
 			// Handle delegateTo pattern: config-only plugins that extend a base plugin
@@ -300,11 +302,12 @@ class ScoreboardRegistry {
 				pluginPath,
 				config,
 				dataHelper,
+				handleAction: actionHandler,
 				path: `../../plugins/${pluginPath}`,
 				runtime: !!runtimePaths
 			});
 
-			console.log(`[ScoreboardRegistry] Registered: ${type} (path: ${pluginPath}${runtimePaths ? ', runtime' : ''})`);
+			console.log(`[ScoreboardRegistry] Registered: ${type} (path: ${pluginPath}${runtimePaths ? ', runtime' : ''}${actionHandler ? ', has actions' : ''})`);
 		} catch (err) {
 			console.error(`[ScoreboardRegistry] Failed to register ${pluginPath}:`, err);
 		}

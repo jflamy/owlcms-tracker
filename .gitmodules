@@ -6,3 +6,6 @@
 	path = extensions/France
 	url = https://github.com/jflamy/tracker-France.git
 	branch = master
+[submodule "src/plugins/OBS"]
+	path = src/plugins/OBS
+	url = file:///c/Dev/git/tracker-obs
