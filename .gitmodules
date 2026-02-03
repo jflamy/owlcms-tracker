@@ -9,3 +9,4 @@
 [submodule "src/plugins/OBS"]
 	path = src/plugins/OBS
 	url = https://github.com/owlcms/tracker-obs.git
+	branch = master
