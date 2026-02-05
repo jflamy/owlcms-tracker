@@ -4,11 +4,20 @@
  */
 
 import { competitionHub } from '$lib/server/competition-hub.js';
+import { scoreboardRegistry } from '$lib/server/scoreboard-registry.js';
 
 const LEARNING_MODE = process.env.LEARNING_MODE === 'true';
 
 // Force competition hub initialization (this triggers the constructor and learning mode banner)
 const _ = competitionHub;
+
+// Initialize scoreboard registry at startup to register all plugin event listeners
+// This ensures OBS/mainScreen event listeners are active before any requests
+scoreboardRegistry.initialize().then(() => {
+  console.log('[Hooks] Scoreboard registry initialized - plugin event listeners active');
+}).catch(err => {
+  console.error('[Hooks] Failed to initialize scoreboard registry:', err.message);
+});
 
 // NOTE: WebSocket initialization is handled by:
 // - Development: vite.config.js configureServer() plugin

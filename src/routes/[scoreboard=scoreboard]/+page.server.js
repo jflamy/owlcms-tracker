@@ -8,6 +8,7 @@
  */
 
 import { scoreboardRegistry } from '$lib/server/scoreboard-registry.js';
+import { competitionHub } from '$lib/server/competition-hub.js';
 import { error } from '@sveltejs/kit';
 
 export async function load({ params, url }) {
@@ -30,13 +31,26 @@ export async function load({ params, url }) {
 		// Check if FOP is required for this scoreboard type
 		const fopRequired = scoreboard.config?.fopRequired !== false; // Default to required if not specified
 		
-		// Extract FOP from query string
-		const fopName = url.searchParams.get('fop');
+		// Extract FOP from query string, or auto-select if only one FOP exists
+		let fopName = url.searchParams.get('fop');
 		if (!fopName && fopRequired) {
-			throw error(400, {
-				message: 'FOP parameter is required',
-				example: `/${type}?fop=Platform_A`
-			});
+			// Try to auto-select if only one FOP is available
+			const availableFOPs = competitionHub.getAvailableFOPs();
+			if (availableFOPs.length === 1) {
+				fopName = availableFOPs[0];
+				console.log(`[Scoreboard Route] Auto-selected single FOP: ${fopName}`);
+			} else if (availableFOPs.length > 1) {
+				throw error(400, {
+					message: 'FOP parameter is required (multiple FOPs available)',
+					example: `/${type}?fop=Platform_A`,
+					availableFOPs
+				});
+			} else {
+				throw error(400, {
+					message: 'FOP parameter is required (no FOPs available yet - waiting for OWLCMS connection)',
+					example: `/${type}?fop=Platform_A`
+				});
+			}
 		}
 		
 		// Extract all other parameters as options

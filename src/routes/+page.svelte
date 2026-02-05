@@ -54,16 +54,30 @@
     return (a.order || 999) - (b.order || 999);
   }
   
-  // Categorize scoreboards
-  $: standardScoreboards = data.scoreboards.filter(s => s.category === 'standard').sort(sortScoreboards);
+  // Filter out hidden plugins (order === -1) and categorize scoreboards
+  $: visibleScoreboards = data.scoreboards.filter(s => s.order !== -1);
   
-  $: videoOverlayScoreboards = data.scoreboards.filter(s => s.category === 'video-overlay').sort(sortScoreboards);
-
-  $: documentsScoreboards = data.scoreboards.filter(s => s.category === 'documents').sort(sortScoreboards);
+  $: standardScoreboards = visibleScoreboards.filter(s => s.category === 'standard').sort(sortScoreboards);
   
-  $: teamScoreboards = data.scoreboards.filter(s => s.category === 'team').sort(sortScoreboards);
+  $: videoOverlayScoreboards = visibleScoreboards.filter(s => s.category === 'video-overlay').sort(sortScoreboards);
 
-  $: attemptBoardScoreboards = data.scoreboards.filter(s => s.category === 'attempt-board').sort(sortScoreboards);
+  $: remoteControlScoreboards = visibleScoreboards.filter(s => s.category === 'remote-control').sort(sortScoreboards);
+
+  $: documentsScoreboards = visibleScoreboards.filter(s => s.category === 'documents').sort(sortScoreboards);
+  
+  $: teamScoreboards = visibleScoreboards.filter(s => s.category === 'team').sort(sortScoreboards);
+
+  $: attemptBoardScoreboards = visibleScoreboards.filter(s => s.category === 'attempt-board').sort(sortScoreboards);
+  
+  // Define category order
+  const defaultCategoryOrder = ['standard', 'team', 'attempt-board', 'documents', 'remote-control', 'video-overlay'];
+  
+  // Compute CSS order for each category: expanded one gets order 0, others keep default order
+  $: categoryOrder = (cat) => {
+    if (!expandedCategory) return defaultCategoryOrder.indexOf(cat);
+    if (cat === expandedCategory) return -1;  // Expanded goes first
+    return defaultCategoryOrder.indexOf(cat);
+  };
   
   // Toggle function for accordion behavior
   function toggleCategory(category) {
@@ -263,6 +277,45 @@
   function closePdfModal() {
     showPdfModal = false;
   }
+
+  /**
+   * Call a plugin action (e.g., configureOBS)
+   * @param {string} pluginType - The plugin type (e.g., 'mainScreen')
+   * @param {string} action - The action to call (e.g., 'configureOBS')
+   * @param {string} fop - The FOP name
+   */
+  async function callPluginAction(pluginType, action, fop) {
+    const options = scoreboardOptions[pluginType]?.[fop] || {};
+    const params = new URLSearchParams();
+    
+    params.append('plugin', pluginType);
+    params.append('action', action);
+    
+    // Add all configured options
+    Object.entries(options).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        params.append(key, value);
+      }
+    });
+    
+    // Add platform from the FOP parameter
+    if (fop) {
+      params.append('platform', fop);
+    }
+    
+    try {
+      const response = await fetch(`/api/plugin-action?${params.toString()}`);
+      const result = await response.json();
+      
+      if (result.success) {
+        alert(`✅ ${result.message || 'Action completed successfully'}`);
+      } else {
+        alert(`❌ ${result.message || 'Action failed'}`);
+      }
+    } catch (error) {
+      alert(`❌ Error: ${error.message}`);
+    }
+  }
 </script>
 
 <svelte:head>
@@ -299,7 +352,7 @@
 
     <main class="main">
       <!-- Standard Scoreboards -->
-      <section class="scoreboard-category collapsible">
+      <section class="scoreboard-category collapsible" style:order={categoryOrder('standard')}>
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
         <h2 class="category-title clickable" on:click={() => toggleCategory('standard')}>
@@ -355,14 +408,14 @@
 
       <!-- Team Scoreboards -->
       {#if teamScoreboards.length > 0}
-        <section class="scoreboard-category collapsible">
+        <section class="scoreboard-category collapsible" style:order={categoryOrder('team')}>
           <!-- svelte-ignore a11y-click-events-have-key-events -->
           <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
-          <h2 class="category-title clickable" on:click={() => toggleCategory('teams')}>
-            <span class="toggle-icon">{expandedCategory === 'teams' ? '▼' : '▶'}</span>
+          <h2 class="category-title clickable" on:click={() => toggleCategory('team')}>
+            <span class="toggle-icon">{expandedCategory === 'team' ? '▼' : '▶'}</span>
             Team Scoreboards
           </h2>
-          {#if expandedCategory === 'teams'}
+          {#if expandedCategory === 'team'}
             <div class="scoreboards-grid">
               {#each teamScoreboards as scoreboard}
                 <div class="scoreboard-card">
@@ -412,14 +465,14 @@
 
       <!-- Attempt Boards -->
       {#if attemptBoardScoreboards.length > 0}
-        <section class="scoreboard-category collapsible">
+        <section class="scoreboard-category collapsible" style:order={categoryOrder('attempt-board')}>
           <!-- svelte-ignore a11y-click-events-have-key-events -->
           <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
-          <h2 class="category-title clickable" on:click={() => toggleCategory('attempt-boards')}>
-            <span class="toggle-icon">{expandedCategory === 'attempt-boards' ? '▼' : '▶'}</span>
+          <h2 class="category-title clickable" on:click={() => toggleCategory('attempt-board')}>
+            <span class="toggle-icon">{expandedCategory === 'attempt-board' ? '▼' : '▶'}</span>
             Attempt Boards
           </h2>
-          {#if expandedCategory === 'attempt-boards'}
+          {#if expandedCategory === 'attempt-board'}
             <div class="scoreboards-grid">
               {#each attemptBoardScoreboards as scoreboard}
                 <div class="scoreboard-card">
@@ -470,7 +523,7 @@
 
 
       {#if documentsScoreboards.length > 0}
-        <section class="scoreboard-category documents-section collapsible">
+        <section class="scoreboard-category documents-section collapsible" style:order={categoryOrder('documents')}>
           <!-- svelte-ignore a11y-click-events-have-key-events -->
           <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
           <h2 class="category-title clickable" on:click={() => toggleCategory('documents')}>
@@ -606,9 +659,89 @@
         </section>
       {/if}
 
+      <!-- Remote Control -->
+      {#if remoteControlScoreboards.length > 0}
+        <section class="scoreboard-category collapsible" style:order={categoryOrder('remote-control')}>
+          <!-- svelte-ignore a11y-click-events-have-key-events -->
+          <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+          <h2 class="category-title clickable" on:click={() => toggleCategory('remote-control')}>
+            <span class="toggle-icon">{expandedCategory === 'remote-control' ? '▼' : '▶'}</span>
+            Remote Control
+          </h2>
+          {#if expandedCategory === 'remote-control'}
+            <div class="scoreboards-grid">
+              {#each remoteControlScoreboards as scoreboard}
+                <div class="scoreboard-card">
+                  <h3>{scoreboard.name}</h3>
+                  <p class="description">{@html scoreboard.description}</p>
+                  
+                  <div class="fop-links">
+                    {#if scoreboard.standalone}
+                      <!-- Standalone plugin - no FOP needed -->
+                      <div class="fop-list">
+                        <div class="fop-row">
+                          <a 
+                            href={getScoreboardUrl(scoreboard.type, '')}
+                            class="fop-link"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            Open
+                          </a>
+                          {#if scoreboard.options && scoreboard.options.length > 0}
+                            <button
+                              class="options-btn"
+                              on:click={() => openOptionsModal(scoreboard, '')}
+                              title="Configure options"
+                            >
+                              ⚙️ Options
+                            </button>
+                          {/if}
+                        </div>
+                      </div>
+                    {:else if confirmedFops}
+                      <h4>Select Platform:</h4>
+                      <div class="fop-list">
+                        {#each data.fops as fop}
+                          <div class="fop-row">
+                            <a 
+                              href={getScoreboardUrl(scoreboard.type, fop)}
+                              class="fop-link"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              Platform {fop}
+                            </a>
+                            {#if scoreboard.options && scoreboard.options.length > 0}
+                              <button
+                                class="options-btn"
+                                on:click={() => openOptionsModal(scoreboard, fop)}
+                                title="Configure options for Platform {fop}"
+                              >
+                                ⚙️ Options
+                              </button>
+                            {/if}
+                          </div>
+                        {/each}
+                      </div>
+                    {:else}
+                      <div class="fop-list">
+                        <div class="fop-link disabled">
+                          <span class="fop-wait">Awaiting OWLCMS connection...</span>
+                        </div>
+                      </div>
+                    {/if}
+                  </div>
+                </div>
+              {/each}
+            </div>
+          {/if}
+        </section>
+      {/if}
+
       <!-- Video Overlays -->
       {#if videoOverlayScoreboards.length > 0}
-        <section class="scoreboard-category collapsible">
+        <section class="scoreboard-category collapsible" style:order={categoryOrder('video-overlay')}>
           <!-- svelte-ignore a11y-click-events-have-key-events -->
           <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
           <h2 class="category-title clickable" on:click={() => toggleCategory('video-overlay')}>
@@ -641,7 +774,7 @@
                               on:click={() => openOptionsModal(scoreboard, '')}
                               title="Configure options"
                             >
-                              ⚙️
+                              ⚙️ Options
                             </button>
                           {/if}
                         </div>
@@ -665,7 +798,7 @@
                                 on:click={() => openOptionsModal(scoreboard, fop)}
                                 title="Configure options for Platform {fop}"
                               >
-                                ⚙️
+                                ⚙️ Options
                               </button>
                             {/if}
                           </div>
@@ -873,6 +1006,15 @@
       </div>
       
       <div class="modal-footer">
+        {#if modalScoreboard?.type === 'mainScreen'}
+          <button 
+            class="action-btn" 
+            on:click={() => callPluginAction(modalScoreboard.type, 'configureOBS', modalFop)}
+            title="Configure OBS sources with these settings"
+          >
+            🔧 Configure OBS
+          </button>
+        {/if}
         <button class="btn-secondary" on:click={closeModal}>Cancel</button>
         <button class="btn-primary" on:click={() => openScoreboard(modalScoreboard.type, modalFop, true)}>
           Open Scoreboard
@@ -950,22 +1092,24 @@
   
   .main {
     flex: 1;
+    display: flex;
+    flex-direction: column;
   }
   
   .description {
     color: #a0aec0;
-    font-size: 1.1rem;
+    font-size: 0.95rem;
   }
   
   .scoreboard-category {
-    margin-bottom: 3rem;
+    margin-bottom: 1.5rem;
   }
   
   .category-title {
-    font-size: 1.8rem;
-    margin-bottom: 1rem;
+    font-size: 1.4rem;
+    margin-bottom: 0.5rem;
     color: #e2e8f0;
-    padding-bottom: 0.5rem;
+    padding-bottom: 0.25rem;
     border-bottom: 2px solid rgba(102, 126, 234, 0.3);
   }
   
@@ -983,25 +1127,25 @@
   }
   
   .toggle-icon {
-    font-size: 1.2rem;
+    font-size: 1rem;
     transition: transform 0.3s;
   }
   
   .scoreboards-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 1.5rem;
-    margin-top: 2rem;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1rem;
+    margin-top: 0.75rem;
   }
   
   .documents-section .scoreboards-grid {
-    margin-top: 1.25rem;
+    margin-top: 0.75rem;
   }
 
   .scoreboard-card {
     background: rgba(255, 255, 255, 0.05);
-    border-radius: 12px;
-    padding: 2rem;
+    border-radius: 8px;
+    padding: 1rem;
     border: 1px solid rgba(255, 255, 255, 0.1);
     transition: transform 0.2s, box-shadow 0.2s;
   }
@@ -1095,6 +1239,29 @@
   .options-btn:hover {
     background: rgba(102, 126, 234, 0.3);
     border-color: #667eea;
+    transform: scale(1.05);
+  }
+  
+  .action-btn {
+    width: auto;
+    height: 2.5rem;
+    padding: 0 1rem;
+    background: rgba(102, 234, 126, 0.2);
+    border: 1px solid rgba(102, 234, 126, 0.4);
+    border-radius: 8px;
+    color: white;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+  
+  .action-btn:hover {
+    background: rgba(102, 234, 126, 0.4);
+    border-color: #66ea7e;
     transform: scale(1.05);
   }
   
