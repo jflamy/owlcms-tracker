@@ -10,6 +10,7 @@ This scoreboard displays the current lifter and upcoming lifting order with a co
 - **Attempt tracking** with symbols: ✓ (good), ✗ (failed), − (not lifted)
 - **Category separators** (horizontal spacer rows when `athlete.isSpacer === true`)
 
+**Note:** `lifting-order` is a display-focused scoreboard. It is *not* an extension-capable base — for examples of `delegateTo` and extension patterns see `src/plugins/teams/team-scoreboard/`.
 ## Current Implementation Summary
 
 ### Visual Layout

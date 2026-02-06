@@ -8,7 +8,8 @@ graph TD
     OWLCMS([OWLCMS Java Backend])
 
     subgraph Client[Client]
-        Browser[Browser Display page.svelte]
+        Browser[Browser / Scoreboard]
+        Admin[Competition Secretary]
     end
 
     subgraph Core[Tracker Core Package]
@@ -18,28 +19,34 @@ graph TD
 
     subgraph Tracker[OWLCMS Tracker]
         Broker[SSE Broker]
-        subgraph Plugin[Scoreboard Plugin]
-            Helpers[Plugin Helpers helpers.data.js]
-            Cacheot [Plugin Cache]
-            API[API Endpoint /api/scoreboard]
+        subgraph PluginSystem[Plugin System]
+            Registry[Scoreboard Registry]
+            BasePlugin[Base Plugin]
+            Extension[Extension Plugin]
         end
+        ActionAPI[Action API /api/plugin-action]
+        ScoreboardAPI[Scoreboard API /api/scoreboard]
     end
 
     OWLCMS -- Competition Data via WebSocket --> WSS
     WSS --> Hub
-    Helpers -. Fetches database and session data .-> Hub
     Hub -- Events --> Broker
-    Hub ~~~ Helpers
-    Helpers -- Stores/Retrieves --> Cache
-    API -. Fetches (cached) formatted data .-> Helpers
-    Helpers ~~~ API
-    Browser -- Fetches data --> API
+    
+    Extension -. Inherits behavior via delegateTo .-> BasePlugin
+    Registry -- Discovers --> BasePlugin
+    Registry -- Discovers --> Extension
+    
+    ScoreboardAPI -. Fetches data .-> BasePlugin
+    ActionAPI -. Triggers export/print .-> BasePlugin
+    
+    Browser -- Views Scoreboard --> ScoreboardAPI
+    Admin -- Requests Excel/Print --> ActionAPI
     Broker -. SSE Push notification .-> Browser
 ```
 
 ## Overview
 
-This system targts **15+ different scoreboard types** with **up to 6 simultaneous FOPs** for each scoreboard type. 
+This system targets **15+ different scoreboard types** with **up to 6 simultaneous FOPs**. It supports both **Live Scoreboards** (real-time displays) and **Documents** (Start Books, Results, Excel Exports).
 
 **OWLCMS Integration:**
 - OWLCMS sends data via WebSocket connection to `ws://localhost:8096/ws`
@@ -47,16 +54,13 @@ This system targts **15+ different scoreboard types** with **up to 6 simultaneou
 - Competition Hub stores per-FOP data from WebSocket messages
 - Scoreboards pull processed data via `/api/scoreboard?type=...&fop=...`
 
-> **Terminology update:** The OWLCMS update payload now exposes the ordered session list as `startOrderAthletes` (formerly `groupAthletes`). Existing references to `groupAthletes` in this document describe the same structure.
-
 **Key Design Principles:**
 1. **Modular** - Each scoreboard type is self-contained in its folder
-2. **Server-side processing** - Process data once, serve hundreds of browsers
-3. **Plugin-level caching** - Each scoreboard caches processed results
-4. **URL-based configuration** - FOP selection and options via query parameters
-5. **AI-assisted development** - Easy for novices to create/modify scoreboards
+2. **Extensible** - Create custom variants (e.g., "France Team Scoreboard") that inherit from a base plugin (currently `teams/team-scoreboard` is the only extension-capable base in this repository). Other plugins may support delegation in future if they export `createHelpers()`.
+3. **Server-side processing** - Process data once, serve hundreds of browsers
+4. **Action-Oriented** - Support for generating files (Excel, PDF) via `handleAction()`
+5. **URL-based configuration** - FOP selection and options via query parameters
 6. **No OWLCMS changes required** - Works with existing data flow
-7. **Session Athletes First, Always** - Use `groupAthletes` from WebSocket type="update" as primary data source; only access `databaseState` for athletes NOT in current session
 
 ## Data Source Priority
 
@@ -298,6 +302,93 @@ T=1s:   OWLCMS recomputes rankings
 
 **Implementation Status:** 🚧 Not yet implemented - design documented for future development.
 
+## Extensions & Inheritance
+
+The system supports a powerful **extension mechanism** that allows creating custom scoreboards without duplicating code.
+
+### The `delegateTo` Pattern
+
+An extension plugin can inherit all logic from a base plugin by using the `delegateTo` property in its `config.js`.
+
+> Note: in this repository **only** `teams/team-scoreboard` currently functions as a delegated base (see examples below). A plugin can act as a delegation target only if it exports the factory-style helpers (e.g. `createHelpers`).
+
+**Example: Custom Team Scoreboard**
+```javascript
+// src/plugins/extensions/france-teams/config.js
+export default {
+    name: 'France Team Scoreboard',
+    description: 'Standard team scoreboard with French formatting',
+    delegateTo: 'teams/team-scoreboard', // Inherit from base plugin
+    
+    // Override specific options or add new ones
+    options: [
+        { key: 'showRegion', default: true }
+    ]
+};
+```
+
+**What is inherited?**
+- **Data Processing:** The extension uses `helpers.data.js` from the base plugin.
+- **Display Component:** It uses `page.svelte` from the base plugin (unless overridden).
+- **Actions:** It inherits `handleAction` for exports/printing.
+- **Custom Scoring:** Extensions can inject custom scoring logic (e.g., specific team point formulas) into the base helper.
+
+### Custom Scoring Injection
+
+Base plugins (like `team-scoreboard`) export a factory function `createHelpers(customScoreFn)` instead of a static object. This allows extensions to inject their own logic.
+
+```javascript
+// Base Plugin (helpers.data.js)
+export function createHelpers(customCalculateScore = null) {
+    function getScoreboardData(...) {
+        // ... uses customCalculateScore if provided ...
+    }
+    return { getScoreboardData, handleAction };
+}
+```
+
+```javascript
+// Extension Plugin (runtime injection)
+// The registry automatically handles the wiring when delegateTo is used
+```
+
+## Actions & Document Generation
+
+Beyond live displays, plugins can perform **Actions** such as generating Excel files, printing specific formats, or producing PDFs.
+
+### Action API Flow
+
+1. **User Request:**
+   User clicks "Export Excel" in the scoreboard UI.
+   Browser sends POST to `/api/plugin-action`.
+
+2. **Dispatcher:**
+   The API identifies the target plugin based on the `plugin` parameter.
+   It calls the plugin's `handleAction(action, fop, data, params)` function.
+
+3. **Processing:**
+   The `handleAction` function (usually in the base plugin) processes the request (e.g., generates an Excel buffer).
+
+4. **Response:**
+   The server returns the file download or action result.
+
+**Example: Excel Export**
+```javascript
+// src/plugins/teams/team-scoreboard/helpers.data.js
+export async function handleAction(action, fop, data, params) {
+    if (action === 'export-excel') {
+        const workbook = await generateExcel(data);
+        return {
+            success: true,
+            binary: true,
+            filename: 'teams.xlsx',
+            contentType: 'application/vnd.openxmlformats...',
+            buffer: await workbook.xlsx.writeBuffer()
+        };
+    }
+}
+```
+
 ### Cache Management & Manual Refresh
 
 **Cache Registry Pattern**
@@ -391,6 +482,12 @@ curl -X POST http://localhost:8096/api/refresh?fullRefresh=true
 ## Directory Structure
 
 ```
+extensions/                 # User-created extensions (Runtime discovery)
+├── my-custom-board/
+│   ├── config.js           # delegateTo: 'teams/team-scoreboard'
+│   └── (optional override files)
+
+# Note: extensions are typically small config-only plugins that delegate to `teams/team-scoreboard` in this repo.
 src/
 ├── lib/server/
 │   ├── competition-hub.js          # Stores per-FOP data from OWLCMS
@@ -405,20 +502,123 @@ src/
 │       ├── scoreboard/+server.js   # Unified API endpoint
 │       └── refresh/+server.js      # Manual cache flush endpoint
 └── plugins/
-    ├── lifting-order/   # Scoreboard type 1
+    ├── lifting-order/   # Scoreboard type (display-only)
     │   ├── config.js               # Metadata, options
     │   ├── helpers.data.js         # Server-side data processing
     │   ├── page.svelte             # Display component
     │   └── README.md               # AI prompts
+    ├── team-scoreboard/  # Base plugin (extension-capable)
+    │   ├── config.js               # Metadata, options (supports delegateTo)
+    │   ├── helpers.data.js         # Server-side data processing (exports createHelpers)
+    │   ├── page.svelte             # Display component
+    │   └── README.md               # AI prompts
+    ├── extensions/      # Bundled Extensions
+    │   └── france-teams/
+    │       ├── config.js           # delegateTo: 'teams/team-scoreboard'
+    │       └── helpers.data.js     # (optional) custom scoring logic
     ├── results/         # Scoreboard type 2
     │   └── ...
     └── team-rankings/   # Scoreboard type 3
         └── ...
 ```
 
+---
+
+## Packaging & Deployment
+
+The tracker supports two packaging formats: **Release** (public distribution) and **Zip** (custom builds with optional plugins).
+
+### Release Package (`npm run release`)
+
+**Purpose:** Production-ready distribution for general users.
+
+**What's included:**
+- ✅ All core bundled plugins from `src/plugins/` (compiled into build)
+- ✅ Empty `extensions/` directory with README.md (for user-added plugins)
+- ✅ Production dependencies only
+
+**What's excluded:**
+- ❌ Git submodules (`src/plugins/books`, `extensions/France`, `src/plugins/OBS`)
+- ❌ Experimental plugins (`src/plugins/experiments`)
+- ❌ Development dependencies
+
+**Command:**
+```bash
+npm run release -- 2.9.0
+```
+
+**GitHub Actions workflow:**
+- Checks out code **without submodules** (`submodules: false`)
+- Runs `build-zip.js` with `--no-extensions` flag
+- Creates Docker image
+- Publishes GitHub release with ZIP file
+
+**Why exclude submodules?**
+- Submodules may contain proprietary/federation-specific code (e.g., France scoring)
+- IWF protocol books may have licensing restrictions
+- Keeps release package minimal and universally applicable
+
+### Zip Package (`npm run zip`)
+
+**Purpose:** Custom builds for specific use cases (testing, specialized deployments).
+
+**Flexible inclusion via explicit initialization:**
+
+```bash
+# Standard build (no submodules)
+npm run zip -- 2.9.0
+
+# With IWF books plugin
+npm run init books
+npm run zip -- 2.9.0
+npm run deinit books
+
+# With France extension + books
+npm run init France
+npm run init books
+npm run zip -- 2.9.0 --no-extensions  # Extensions excluded despite being initialized
+npm run deinit France
+npm run deinit books
+```
+
+**Available submodules (from `.gitmodules`):**
+1. `books` → `src/plugins/books` (IWF Start Book, Results Book)
+2. `France` → `extensions/France` (French federation team scoreboard)
+3. `OBS` → `src/plugins/OBS` (OBS automation)
+
+**Submodule management:**
+- `npm run init <name>` - Clone and track submodule at specified branch
+- `npm run deinit <name>` - Remove working files but preserve README/LICENSE
+
+**Flags:**
+- `--no-extensions` - Exclude runtime `extensions/` directory from package
+- (Default) - Include `extensions/` if it exists and contains plugins
+
+**Examples:**
+```bash
+# Public release equivalent (no submodules)
+npm run zip -- 2.9.0 --no-extensions
+
+# Books-enabled build
+npm run init books
+npm run zip -- 2.9.0
+npm run deinit books
+
+# Internal testing with France extension
+npm run init France
+npm run zip -- 2.9.0  # includes extensions/France
+npm run deinit France
+```
+
+**Key Difference:**
+- **Release**: Never includes submodules (controlled by GitHub Actions)
+- **Zip**: Developer manually controls what's included via init/deinit
+
+---
+
 ## Plugin Structure & Principles
 
-Each scoreboard plugin is a self-contained unit in `src/plugins/<plugin-name>/` consisting of three key files.
+Each scoreboard plugin is a self-contained unit in `src/plugins/<plugin-name>/` consisting of three key files. (Only some plugins are extension-capable — currently `teams/team-scoreboard`.)
 
 ### 1. `config.js` (Metadata)
 Defines the plugin's identity and configurable options.
@@ -656,5 +856,56 @@ curl -X POST http://localhost:8096/api/refresh?fullRefresh=true
 | `/api/refresh` | POST | Flush caches + notify browsers | Developers, CI/CD |
 | `/api/health` | GET | Detailed health metrics | Monitoring systems |
 | `/api/status` | GET | Simple readiness check | Healthcheck probes |
+
+---
+
+# Appendix: Packaging & Release (detailed)
+
+This appendix contains the full, actionable packaging instructions that were previously embedded earlier in the document. Keep these steps when you need to produce a ZIP with federation-specific plugins or to understand what the public release contains.
+
+## Quick summary
+- Release (`npm run release`) — public distribution. **Never** includes submodules or runtime `extensions/`; built with `--no-extensions` in CI.
+- Zip (`npm run zip`) — custom package for testing or internal builds. Developer controls inclusion of submodules/extensions via `npm run init` / `npm run deinit`.
+
+## Release (public) — mechanics
+- Command: `npm run release -- <version>`
+- Scripts involved: `scripts/release.js` → triggers GitHub Actions `release.yaml`.
+- CI behavior:
+  - Checkout does **not** fetch submodules by default (workflow input `includeSubmodules=false`).
+  - Build uses `build-zip.js` with `--no-extensions` to exclude runtime extensions.
+  - Result: a minimal, redistributable ZIP and Docker images.
+
+**Why:** submodules may contain federation-specific or licensed content that cannot be bundled into the public release.
+
+## Zip (developer/custom) — mechanics
+- Command: `npm run zip -- <version> [--no-extensions]`
+- By default `zip` will include **only** what exists in the working tree. To include submodule content you must initialize it explicitly:
+  - `npm run init books` — pulls `src/plugins/books` submodule
+  - `npm run init France` — pulls `extensions/France` submodule
+  - After the build, restore repo state with `npm run deinit <name>`
+
+**Notes:**
+- `--no-extensions` causes the packaged ZIP to contain an empty `extensions/` folder (README only).
+- `buildAndPackage({ includeExtensions })` controls whether `extensions/` is copied into the packaged `dist` directory.
+
+## Submodules & files of interest
+- `.gitmodules` contains: `src/plugins/books`, `extensions/France`, `src/plugins/OBS`.
+- `scripts/init-submodule.js` and `scripts/deinit-submodule.js` — helper scripts to manage submodules locally.
+
+## Examples
+- Public release (no submodules):
+  - `npm run release -- 2.9.0`
+- ZIP including books plugin (developer flow):
+  - `npm run init books`
+  - `npm run zip -- 2.9.0`
+  - `npm run deinit books`
+- ZIP including France extension (developer flow):
+  - `npm run init France`
+  - `npm run zip -- 2.9.0`
+  - `npm run deinit France`
+
+## TL;DR
+- Use **Release** for public distributions (CI will never include submodules/extensions).
+- Use **Zip + init/deinit** when you need federation-specific plugins or to produce a custom testing package.
 
 

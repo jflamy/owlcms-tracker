@@ -2,6 +2,8 @@
 
 This document describes the rules for computing predicted totals in the team scoreboard, based on the **CJ Declaration** and **Bombout** options.
 
+**Note:** This document targets the `teams/team-scoreboard` plugin — the repository's extension-capable base. Extensions that delegate to `team-scoreboard` (via `delegateTo`) inherit these rules unless they explicitly override them.
+
 ---
 
 ## Configuration Options

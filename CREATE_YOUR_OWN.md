@@ -231,7 +231,9 @@ You can also describe a scoreboard from scratch.
 > 5. Add a URL parameter `limit` to control how many athletes to show (default 5)
 > 
 > Look at the existing lifting-order plugin for styling patterns.
-
+>
+> **Note:** delegation examples (using `delegateTo` / `createHelpers`) live in `src/plugins/teams/team-scoreboard/` — currently **only** `teams/team-scoreboard` supports being an extension-capable base. Other scoreboards (including `lifting-order`) are display-focused and do not provide `delegateTo`-style extension points.
+>
 **What the agent creates:**
 1. `src/plugins/top-lifters/config.js` - With the `limit` option
 2. `src/plugins/top-lifters/helpers.data.js` - Sorting and filtering logic
