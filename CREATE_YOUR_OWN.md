@@ -355,23 +355,6 @@ http://localhost:8096/{plugin-name}?fop=A
 
 Replace `{plugin-name}` with your plugin folder name.
 
-### Load Test Data
-
-If you don't have OWLCMS running:
-
-```bash
-./tests/test-sample-data.sh
-```
-
-This loads sample competition data for testing.
-
-### Check for Errors
-
-1. Open browser Developer Tools (F12)
-2. Check the Console tab for JavaScript errors
-3. Check the Network tab for failed API requests
-4. Check the VS Code terminal for server-side errors
-
 ---
 
 ## Troubleshooting
