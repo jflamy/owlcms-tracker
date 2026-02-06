@@ -12,6 +12,7 @@ import crypto from 'crypto';
 import { gzipSync, brotliCompressSync, constants as zlibConstants } from 'zlib';
 import { scoreboardRegistry } from '$lib/server/scoreboard-registry.js';
 import { competitionHub } from '$lib/server/competition-hub.js';
+import { buildOptions } from '$lib/server/build-options.js';
 
 const responseCache = new Map();
 const BROTLI_OPTS = { params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 4 } };
@@ -96,37 +97,12 @@ export async function GET({ url, request }) {
 		}
 
 		// Extract all other parameters as options
-		const options = {};
-		
-		// First, apply defaults from BASE plugin config (if this is a delegating extension)
-		const baseScoreboard = scoreboardRegistry.getBaseScoreboard(type);
-		if (baseScoreboard?.config?.options && Array.isArray(baseScoreboard.config.options)) {
-			for (const opt of baseScoreboard.config.options) {
-				if (opt.key && opt.default !== undefined) {
-					options[opt.key] = opt.default;
-				}
-			}
-		}
-		
-		// Then, apply defaults from extension/current scoreboard config (overrides base)
-		if (scoreboard?.config?.options && Array.isArray(scoreboard.config.options)) {
-			for (const opt of scoreboard.config.options) {
-				if (opt.key && opt.default !== undefined) {
-					options[opt.key] = opt.default;
-				}
-			}
-		}
-		
-		// Then, override with URL parameters
-		for (const [key, value] of url.searchParams.entries()) {
-			if (key !== 'type' && key !== 'fop') {
-				// Try to parse as boolean/number
-				if (value === 'true') options[key] = true;
-				else if (value === 'false') options[key] = false;
-				else if (!isNaN(value) && value !== '') options[key] = parseFloat(value);
-				else options[key] = value;
-			}
-		}
+		const options = buildOptions({
+			scoreboard,
+			url,
+			reservedKeys: new Set(['type', 'fop']),
+			registry: scoreboardRegistry
+		});
 		
 		// Get current FOP version for cache validation
 		const currentVersion = competitionHub.getFopStateVersion?.({ fopName }) ?? null;

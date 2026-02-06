@@ -39,6 +39,7 @@
   "dependencies": {
     "@owlcms/tracker-core": "github:owlcms/tracker-core#1.3.9",
     "adm-zip": "^0.5.10",
+    "exceljs": "^4.4.0",
     "gsap": "^3.13.0",
     "http-proxy-middleware": "^3.0.5",
     "obs-websocket-js": "^5.0.6",

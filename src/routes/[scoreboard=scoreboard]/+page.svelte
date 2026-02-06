@@ -5,9 +5,9 @@
 	import { subscribeSSE, connectSSE } from '$lib/sse-client.js';
 	import { onMount, onDestroy } from 'svelte';
 	
-	// Pre-import all page.svelte files using glob (supports nested plugins)
+	// Pre-import all page*.svelte files using glob (supports nested plugins and additional pages)
 	// Vite transforms this at build time into a map of path -> dynamic import function
-	const pageModules = import.meta.glob('../../plugins/**/page.svelte');
+	const pageModules = import.meta.glob('../../plugins/**/page*.svelte');
 	
 	export let data;
 	
@@ -132,16 +132,18 @@
 	<!-- Dynamically import the scoreboard component using pluginPath -->
 	<!-- Uses glob map to support nested plugins (e.g., books/iwf-startbook) -->
 	<!-- Runtime plugins can use delegateTo to use a built-in plugin's page component -->
+	<!-- Additional pages (from config.pages[]) use pageComponent field -->
 	{@const delegatePath = data.config?.delegateTo}
+	{@const componentFile = data.config?.pageComponent || 'page.svelte'}
 	{@const modulePath = delegatePath 
-		? `../../plugins/${delegatePath}/page.svelte`
-		: `../../plugins/${data.pluginPath}/page.svelte`}
+		? `../../plugins/${delegatePath}/${componentFile}`
+		: `../../plugins/${data.pluginPath}/${componentFile}`}
 	{@const moduleLoader = pageModules[modulePath]}
 	{#if moduleLoader}
 		{#await moduleLoader()}
 			<div class="loading">Loading scoreboard...</div>
 		{:then module}
-			<svelte:component this={module.default} data={scoreboardData} config={data.config} options={data.options} />
+			<svelte:component this={module.default} data={scoreboardData} config={data.config} options={data.options} scoreboardType={data.scoreboardType} />
 		{:catch error}
 			<div class="error">
 				<h1>Error Loading Scoreboard</h1>

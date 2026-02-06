@@ -9,6 +9,7 @@
 
 import { json } from '@sveltejs/kit';
 import { scoreboardRegistry } from '$lib/server/scoreboard-registry.js';
+import { buildOptions } from '$lib/server/build-options.js';
 
 export async function GET({ url }) {
   return handleRequest(url);
@@ -52,20 +53,34 @@ async function handleRequest(url) {
     }, { status: 400 });
   }
 
-  // Extract all other parameters as options
-  const options = {};
-  for (const [key, value] of url.searchParams.entries()) {
-    if (key !== 'plugin' && key !== 'action') {
-      // Try to parse as boolean/number
-      if (value === 'true') options[key] = true;
-      else if (value === 'false') options[key] = false;
-      else if (!isNaN(value) && value !== '') options[key] = parseFloat(value);
-      else options[key] = value;
-    }
-  }
+  // Build options: config defaults (base then extension) + URL overrides
+  const options = buildOptions({
+    scoreboard,
+    url,
+    reservedKeys: new Set(['plugin', 'action']),
+    registry: scoreboardRegistry
+  });
+
+  // DEBUG: Log what plugin-action receives and builds
+  console.warn(`[plugin-action] pluginName=${pluginName}, URL params: ${[...url.searchParams.entries()].map(([k,v]) => `${k}=${v}`).join(', ')}`);
+  console.warn(`[plugin-action] options after buildOptions:`, JSON.stringify(options));
 
   try {
     const result = await scoreboard.handleAction({ action, options });
+    
+    // Handle binary responses (e.g., Excel files)
+    if (result.binary === true && result.buffer && result.contentType && result.filename) {
+      const buffer = Buffer.from(result.buffer, 'base64');
+      return new Response(buffer, {
+        headers: {
+          'Content-Type': result.contentType,
+          'Content-Disposition': `attachment; filename="${result.filename}"`,
+          'Cache-Control': 'no-cache'
+        }
+      });
+    }
+    
+    // Default JSON response
     return json(result);
   } catch (error) {
     console.error(`[Plugin Action] Error in ${pluginName}.${action}:`, error);

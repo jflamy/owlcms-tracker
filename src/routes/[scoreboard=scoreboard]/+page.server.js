@@ -9,6 +9,7 @@
 
 import { scoreboardRegistry } from '$lib/server/scoreboard-registry.js';
 import { competitionHub } from '$lib/server/competition-hub.js';
+import { buildOptions } from '$lib/server/build-options.js';
 import { error } from '@sveltejs/kit';
 
 export async function load({ params, url }) {
@@ -53,17 +54,13 @@ export async function load({ params, url }) {
 			}
 		}
 		
-		// Extract all other parameters as options
-		const options = {};
-		for (const [key, value] of url.searchParams.entries()) {
-			if (key !== 'fop') {
-				// Parse boolean/number values
-				if (value === 'true') options[key] = true;
-				else if (value === 'false') options[key] = false;
-				else if (!isNaN(value) && value !== '') options[key] = parseFloat(value);
-				else options[key] = value;
-			}
-		}
+		// Build options: config defaults (base then extension) + URL overrides
+		const options = buildOptions({
+			scoreboard,
+			url,
+			reservedKeys: new Set(['fop']),
+			registry: scoreboardRegistry
+		});
 		
 		// Get live data from plugin helpers (includes current config with overrides)
 		let liveData = null;

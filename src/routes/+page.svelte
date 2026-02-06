@@ -163,6 +163,42 @@
   let confirmedFops = data.hasConfirmedFops ?? false;
   let protocolError = null;
 
+  /**
+   * Open an export page (e.g., team-export) in a new tab with current options
+   * @param {string} type - The scoreboard type (e.g., 'team-scoreboard')
+   * @param {string} fop - The FOP name
+   */
+  function openExportPage(type, fop) {
+    const options = scoreboardOptions[type]?.[fop] || {};
+    const params = new URLSearchParams();
+    
+    // Find the scoreboard config
+    const scoreboard = data.scoreboards.find(s => s.type === type);
+    
+    // Find the export page key from config.pages
+    const exportPageKey = scoreboard?.config?.pages?.find(p => p.component === 'page-export.svelte')?.key;
+    if (!exportPageKey) {
+      alert('Export page not configured for this scoreboard');
+      return;
+    }
+    
+    // Add FOP parameter
+    if (fop && scoreboard?.fopRequired !== false) {
+      params.append('fop', fop);
+    }
+    
+    // Add all configured options to URL
+    Object.entries(options).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        params.append(key, value);
+      }
+    });
+    
+    const url = `/${exportPageKey}?${params.toString()}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+    closeModal();
+  }
+
   onMount(() => {
     if (!browser) return;
     const eventSource = new EventSource('/api/client-stream');
@@ -1013,6 +1049,15 @@
             title="Configure OBS sources with these settings"
           >
             🔧 Configure OBS
+          </button>
+        {/if}
+        {#if modalScoreboard?.config?.pages?.length > 0}
+          <button 
+            class="action-btn" 
+            on:click={() => openExportPage(modalScoreboard.type, modalFop)}
+            title="Export team results to Excel"
+          >
+            📊 Export Results
           </button>
         {/if}
         <button class="btn-secondary" on:click={closeModal}>Cancel</button>

@@ -10,18 +10,21 @@ export async function load() {
 	
 	// Get available scoreboards
 	const allScoreboards = scoreboardRegistry.getAllScoreboards();
-	const scoreboards = allScoreboards.map(sb => ({
-		type: sb.type,
-		name: sb.config.name,
-		description: sb.config.description,
-		options: sb.config.options || [],
-		isLowerThird: sb.config.isLowerThird || false,
-		category: sb.config.category || 'standard',
-		order: sb.config.order || 999,
-		fopRequired: sb.config.fopRequired !== false, // Default to true if not specified
-		standalone: sb.config.standalone || false, // Plugin works without OWLCMS data
-		additionalDependencies: sb.config.additionalDependencies || []
-	}));
+	const scoreboards = allScoreboards
+		.filter(sb => !sb.isSubPage) // Exclude sub-pages (e.g., export pages)
+		.map(sb => ({
+			type: sb.type,
+			name: sb.config.name,
+			description: sb.config.description,
+			options: sb.config.options || [],
+			isLowerThird: sb.config.isLowerThird || false,
+			category: sb.config.category || 'standard',
+			order: sb.config.order || 999,
+			fopRequired: sb.config.fopRequired !== false, // Default to true if not specified
+			standalone: sb.config.standalone || false, // Plugin works without OWLCMS data
+			additionalDependencies: sb.config.additionalDependencies || [],
+			config: sb.config // Include full config for pages array access
+		}));
 	
 	// Get available FOPs from competition data
 	const availableFOPs = competitionHub.getAvailableFOPs();

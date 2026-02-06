@@ -24,6 +24,19 @@ export default {
 	// Whether this scoreboard requires athlete pictures
 	requiresPictures: false,
 
+	// Runtime dependencies that are not bundled (externalized)
+	additionalDependencies: ['exceljs'],
+
+	// Additional pages this plugin provides (for export, configuration, etc.)
+	pages: [
+		{
+			key: 'team-export',
+			name: 'Export Results',
+			icon: '📊',
+			component: 'page-export.svelte'
+		}
+	],
+
 	// User-configurable options
 	options: [
 		{

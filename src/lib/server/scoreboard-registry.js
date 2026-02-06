@@ -286,6 +286,18 @@ class ScoreboardRegistry {
 						// Create helpers with custom scoring (or null for default)
 						const derivedHelpers = baseHelpersModule.createHelpers(customCalculateScore);
 						dataHelper = derivedHelpers.getScoreboardData;
+						if (!actionHandler && derivedHelpers.handleAction) {
+							actionHandler = derivedHelpers.handleAction;
+						}
+
+						// Inherit pages from base config if extension doesn't define its own
+						if (!config.pages) {
+							const baseConfigModule = configModules[`../../plugins/${basePluginPath}/config.js`];
+							const baseConfig = baseConfigModule?.default || baseConfigModule;
+							if (baseConfig?.pages) {
+								config.pages = baseConfig.pages;
+							}
+						}
 					} else {
 						console.warn(`[ScoreboardRegistry] ${folderName}: base plugin ${basePluginPath} has no createHelpers export`);
 					}
@@ -308,6 +320,41 @@ class ScoreboardRegistry {
 			});
 
 			console.log(`[ScoreboardRegistry] Registered: ${type} (path: ${pluginPath}${runtimePaths ? ', runtime' : ''}${actionHandler ? ', has actions' : ''})`);
+
+			// Register additional pages if config declares them
+			if (config.pages && Array.isArray(config.pages)) {
+				for (const page of config.pages) {
+					if (!page.key || !page.component) {
+						console.warn(`[ScoreboardRegistry] ${type}: invalid page entry (missing key or component)`);
+						continue;
+					}
+
+					const pageType = page.key;
+					const pageConfig = {
+						...config,
+						name: page.name || config.name,
+						icon: page.icon,
+						pageComponent: page.component,
+						isSubPage: true,
+						parentType: type
+					};
+
+					this.scoreboards.set(pageType, {
+						type: pageType,
+						folderName,
+						pluginPath,
+						config: pageConfig,
+						dataHelper,
+						handleAction: actionHandler,
+						path: `../../plugins/${pluginPath}`,
+						runtime: !!runtimePaths,
+						isSubPage: true,
+						parentType: type
+					});
+
+					console.log(`[ScoreboardRegistry] Registered sub-page: ${pageType} (parent: ${type}, component: ${page.component})`);
+				}
+			}
 		} catch (err) {
 			console.error(`[ScoreboardRegistry] Failed to register ${pluginPath}:`, err);
 		}

@@ -1597,57 +1597,23 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// enforceBombout: fallback to false if extension doesn't define it
 	const enforceBombout = options.enforceBombout ?? false;
 	
-	// Check if any topN options are explicitly provided in the URL
-	const hasTopNOptions = options.topM !== undefined || options.topF !== undefined || 
-	                       options.topMFm !== undefined || options.topMFf !== undefined;
+	// Options are the single source of truth (config defaults + URL overrides, applied by the API layer)
+	const includeAllAthletes = options.allAthletes === true || options.allAthletes === 'true';
 	
-	// Check if database has topN settings (for TeamPoints mode only)
-	// Note: OWLCMS uses mensTeamSize/womensTeamSize for "best N results" (backward compatibility)
-	const dbTopNMale = databaseState.competition?.mensTeamSize || 0;
-	const dbTopNFemale = databaseState.competition?.womensTeamSize || 0;
-	const hasDbTopN = scoringSystem === 'TeamPoints' && (dbTopNMale > 0 || dbTopNFemale > 0);
-	
-	logger.debug(`[TeamScoreboard] TopN settings from DB: mensTeamSize=${dbTopNMale}, womensTeamSize=${dbTopNFemale}, hasDbTopN=${hasDbTopN}`);
-	
-	// Check if "include all athletes" mode is enabled
-	// Logic:
-	// 1. If database has topN settings (TeamPoints mode), use those (set includeAllAthletes=false)
-	// 2. If allAthletes is explicitly set (true/false), use that value
-	// 3. If topN options are provided in URL, default to false (use clamping)
-	// 4. Otherwise, default to true (include all athletes)
-	let includeAllAthletes;
-	if (hasDbTopN) {
-		includeAllAthletes = false;
-	} else if (options.allAthletes === true || options.allAthletes === 'true') {
-		includeAllAthletes = true;
-	} else if (options.allAthletes === false || options.allAthletes === 'false') {
-		includeAllAthletes = false;
-	} else if (hasTopNOptions) {
-		includeAllAthletes = false;
-	} else {
-		includeAllAthletes = true;
-	}
-	
-	logger.debug(`[TeamScoreboard] includeAllAthletes=${includeAllAthletes}`);
-	// Top score counts for team scoring (configurable per federation)
+	// Top score counts (from options, which already have config defaults applied)
 	// When includeAllAthletes is true, use 10 for all counts (effectively includes everyone)
-	// When database has topN settings (TeamPoints mode), use those values
 	const topCounts = includeAllAthletes ? {
 		topM: 10,
 		topF: 10,
 		topMFm: 10,
 		topMFf: 10
-	} : hasDbTopN ? {
-		topM: dbTopNMale,
-		topF: dbTopNFemale,
-		topMFm: dbTopNMale,  // Use male count for mixed mode male athletes
-		topMFf: dbTopNFemale  // Use female count for mixed mode female athletes
 	} : {
-		topM: parseInt(options.topM, 10) || 4,      // M mode: top N men
-		topF: parseInt(options.topF, 10) || 4,      // F mode: top N women
-		topMFm: parseInt(options.topMFm, 10) || 2,  // MF mode: top N men
-		topMFf: parseInt(options.topMFf, 10) || 2   // MF mode: top N women
+		topM: parseInt(options.topM, 10) || 4,
+		topF: parseInt(options.topF, 10) || 4,
+		topMFm: parseInt(options.topMFm, 10) || 2,
+		topMFf: parseInt(options.topMFf, 10) || 2
 	};
+	logger.debug(`[TeamScoreboard] includeAllAthletes=${includeAllAthletes}, topCounts: M=${topCounts.topM}, F=${topCounts.topF}, MFm=${topCounts.topMFm}, MFf=${topCounts.topMFf}`);
 	const sessionStatus = competitionHub.getSessionStatus({ fopName });
 
 	// Detect session gender from session athletes
@@ -2290,6 +2256,482 @@ export function getTeamRankings() {
 }
 
 // =============================================================================
+// PLUGIN ACTIONS
+// =============================================================================
+
+/**
+ * Handle plugin actions (e.g., Excel export)
+ * @param {Object} params - Action parameters
+ * @param {string} params.action - Action name ('exportScoreboard' or 'exportFlat')
+ * @param {Object} params.options - Options including platform, scoringSystem, gender, etc.
+ * @returns {Promise<Object>} Result object with success status or binary data
+ */
+export async function handleAction({ action, options }) {
+	if (action === 'exportScoreboard' || action === 'exportFlat') {
+		try {
+			// Dynamically import exceljs (externalized dependency)
+			let ExcelJS;
+			try {
+				const module = await import('exceljs');
+				// Handle both ESM default export and direct export
+				ExcelJS = module.default || module;
+			} catch (importErr) {
+				return {
+					success: false,
+					error: 'missing_dependency',
+					message: 'ExcelJS is not installed. Run: npm install exceljs'
+				};
+			}
+
+			// Get the scoreboard data using the same logic as the display
+			const fopName = options.platform || options.fop;
+			if (!fopName) {
+				return {
+					success: false,
+					error: 'missing_fop',
+					message: 'Platform/FOP parameter is required'
+				};
+			}
+
+			logger.warn(
+				`[Team Scoreboard][Excel] action=${action} fop=${fopName} language=${options.lang || options.language || 'no'}`
+			);
+
+			const data = await getScoreboardData(fopName, options);
+			if (!data || !data.teams) {
+				return {
+					success: false,
+					error: 'no_data',
+					message: 'No team data available for this platform'
+				};
+			}
+
+			// Create workbook
+			const workbook = new ExcelJS.Workbook();
+			workbook.creator = 'OWLCMS Tracker';
+			workbook.created = new Date();
+
+			const worksheet = workbook.addWorksheet('Team Results');
+
+			if (action === 'exportScoreboard') {
+				// Scoreboard format: team-grouped with merged headers
+				return await generateScoreboardFormat(workbook, worksheet, data, options);
+			} else {
+				// Flat format: one row per athlete
+				return await generateFlatFormat(workbook, worksheet, data, options);
+			}
+		} catch (error) {
+			logger.error('[Team Scoreboard] Excel export error:', error.message);
+			return {
+				success: false,
+				error: 'export_failed',
+				message: error.message
+			};
+		}
+	}
+
+	return {
+		success: false,
+		error: 'unknown_action',
+		message: `Unknown action: ${action}`
+	};
+}
+
+/**
+ * Generate scoreboard format Excel (team-grouped with merged headers)
+ */
+async function generateScoreboardFormat(workbook, worksheet, data, options) {
+	const { teams, headers, competition } = data;
+	const scoringSystem = options.scoringSystem || 'Sinclair';
+	const allContribute = data.allAthletes === true;
+
+	// Column widths (no header text — we build the 2-row header manually)
+	// Cols: 1=Order, 2=Name, 3=Cat, 4=Born, 5=Team, 6-8=Sn1-3, 9=BestSn, 10-12=CJ1-3, 13=BestCJ, 14=Total, 15=Score
+	const colWidths = [8, 25, 10, 8, 20, 8, 8, 8, 10, 8, 8, 8, 10, 10, 12];
+	colWidths.forEach((w, i) => { worksheet.getColumn(i + 1).width = w; });
+
+	const headerFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } };
+	const headerFont = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+	const headerBorder = {
+		top: { style: 'thin' }, bottom: { style: 'thin' },
+		left: { style: 'thin' }, right: { style: 'thin' }
+	};
+	const centerAlign = { vertical: 'middle', horizontal: 'center' };
+
+	// --- Row 1: group headers with merges ---
+	// ORDER (merge rows 1-2)
+	worksheet.mergeCells(1, 1, 2, 1);
+	// NAME (merge rows 1-2)
+	worksheet.mergeCells(1, 2, 2, 2);
+	// CATEGORY (merge rows 1-2)
+	worksheet.mergeCells(1, 3, 2, 3);
+	// BORN (merge rows 1-2)
+	worksheet.mergeCells(1, 4, 2, 4);
+	// TEAM (merge rows 1-2)
+	worksheet.mergeCells(1, 5, 2, 5);
+	// SNATCH group (cols 6-9 in row 1)
+	worksheet.mergeCells(1, 6, 1, 9);
+	// CLEAN&JERK group (cols 10-13 in row 1)
+	worksheet.mergeCells(1, 10, 1, 13);
+	// TOTAL (merge rows 1-2)
+	worksheet.mergeCells(1, 14, 2, 14);
+	// SCORE (merge rows 1-2)
+	worksheet.mergeCells(1, 15, 2, 15);
+
+	const row1 = worksheet.getRow(1);
+	row1.getCell(1).value = headers?.order || 'Order';
+	row1.getCell(2).value = headers?.name || 'Name';
+	row1.getCell(3).value = headers?.category || 'Cat.';
+	row1.getCell(4).value = headers?.birth || 'Born';
+	row1.getCell(5).value = headers?.team || 'Team';
+	row1.getCell(6).value = headers?.snatch || 'Snatch';
+	row1.getCell(10).value = headers?.cleanJerk || 'Clean & Jerk';
+	row1.getCell(14).value = headers?.total || 'Total';
+	row1.getCell(15).value = headers?.score || 'Score';
+
+	// Style row 1
+	for (let col = 1; col <= 15; col++) {
+		const cell = row1.getCell(col);
+		cell.fill = headerFill;
+		cell.font = headerFont;
+		cell.alignment = centerAlign;
+		cell.border = headerBorder;
+	}
+
+	// --- Row 2: sub-headers for attempt columns ---
+	const row2 = worksheet.getRow(2);
+	row2.getCell(6).value = '1';
+	row2.getCell(7).value = '2';
+	row2.getCell(8).value = '3';
+	row2.getCell(9).value = headers?.best || '✔';
+	row2.getCell(10).value = '1';
+	row2.getCell(11).value = '2';
+	row2.getCell(12).value = '3';
+	row2.getCell(13).value = headers?.best || '✔';
+
+	for (let col = 1; col <= 15; col++) {
+		const cell = row2.getCell(col);
+		cell.fill = headerFill;
+		cell.font = headerFont;
+		cell.alignment = centerAlign;
+		cell.border = headerBorder;
+	}
+
+	let currentRow = 3;
+
+	// Add each team
+	for (const team of teams) {
+		// Team header row (merged across name columns)
+		const teamRow = worksheet.getRow(currentRow);
+		worksheet.mergeCells(currentRow, 1, currentRow, 5); // Merge Order through Team columns
+		
+		const teamCell = teamRow.getCell(1);
+		teamCell.value = team.teamName;
+		teamCell.font = { bold: true, size: 12 };
+		teamCell.fill = {
+			type: 'pattern',
+			pattern: 'solid',
+			fgColor: { argb: 'FFE7E6E6' }
+		};
+		teamCell.alignment = { vertical: 'middle', horizontal: 'left' };
+		
+		// Team score in the Score column
+		const scoreCell = teamRow.getCell(15); // Score column
+		scoreCell.value = team.teamScore;
+		scoreCell.font = { bold: true, size: 12 };
+		scoreCell.fill = {
+			type: 'pattern',
+			pattern: 'solid',
+			fgColor: { argb: 'FFE7E6E6' }
+		};
+		scoreCell.alignment = { vertical: 'middle', horizontal: 'right' };
+		scoreCell.numFmt = scoringSystem === 'TeamPoints' ? '0' : '0.00';
+
+		// Apply borders to team header row
+		for (let col = 1; col <= 15; col++) {
+			teamRow.getCell(col).border = {
+				top: { style: 'thin' },
+				bottom: { style: 'thin' },
+				left: { style: 'thin' },
+				right: { style: 'thin' }
+			};
+		}
+
+		currentRow++;
+
+		// Add athlete rows
+		for (const athlete of team.athletes) {
+			const row = worksheet.getRow(currentRow);
+			
+			row.getCell(1).value = athlete.inCurrentSession ? (athlete.liftingOrder || '') : '';
+			row.getCell(2).value = athlete.fullName || '';
+			row.getCell(3).value = athlete.category || '';
+			row.getCell(4).value = athlete.yearOfBirth || '';
+			row.getCell(5).value = athlete.teamName || '';
+			
+			// Attempts - format with strikethrough for failed lifts
+			const sattempts = athlete.sattempts || [];
+			const cattempts = athlete.cattempts || [];
+			
+			for (let i = 0; i < 3; i++) {
+				const snCell = row.getCell(6 + i);
+				const attempt = sattempts[i];
+				snCell.alignment = { horizontal: 'right' };
+				if (attempt && attempt.stringValue && attempt.stringValue !== '\u00A0') {
+					snCell.value = attempt.stringValue;
+					if (attempt.liftStatus === 'bad') {
+						snCell.font = { strike: true, color: { argb: 'FFFF0000' } };
+					}
+				}
+			}
+			
+			const bestSnCell = row.getCell(9);
+			bestSnCell.value = athlete.bestSnatch || '';
+			bestSnCell.alignment = { horizontal: 'right' };
+			bestSnCell.font = { bold: true };
+			
+			for (let i = 0; i < 3; i++) {
+				const cjCell = row.getCell(10 + i);
+				const attempt = cattempts[i];
+				cjCell.alignment = { horizontal: 'right' };
+				if (attempt && attempt.stringValue && attempt.stringValue !== '\u00A0') {
+					cjCell.value = attempt.stringValue;
+					if (attempt.liftStatus === 'bad') {
+						cjCell.font = { strike: true, color: { argb: 'FFFF0000' } };
+					}
+				}
+			}
+			
+			const bestCjCell = row.getCell(13);
+			bestCjCell.value = athlete.bestCleanJerk || '';
+			bestCjCell.alignment = { horizontal: 'right' };
+			bestCjCell.font = { bold: true };
+			const totalCell = row.getCell(14);
+			totalCell.value = athlete.displayTotal || '';
+			totalCell.alignment = { horizontal: 'right' };
+			totalCell.font = { bold: true };
+			
+			const scoreValue = scoringSystem === 'TeamPoints' ? athlete.displayTeamPoints : athlete.displayScore;
+			const scoreCell = row.getCell(15);
+			scoreCell.value = scoreValue || '';
+			scoreCell.numFmt = scoringSystem === 'TeamPoints' ? '0' : '0.00';
+			scoreCell.alignment = { horizontal: 'right' };
+
+			// Highlight score cell if this athlete contributes to the team score
+			if (athlete.scoreHighlightClass || allContribute) {
+				scoreCell.fill = {
+					type: 'pattern',
+					pattern: 'solid',
+					fgColor: { argb: 'FFFFF2CC' }  // Light gold
+				};
+				scoreCell.font = { bold: true };
+			}
+
+			// Apply borders
+			for (let col = 1; col <= 15; col++) {
+				row.getCell(col).border = {
+					top: { style: 'thin' },
+					bottom: { style: 'thin' },
+					left: { style: 'thin' },
+					right: { style: 'thin' }
+				};
+			}
+
+			currentRow++;
+		}
+
+		// Add spacing row after team
+		currentRow++;
+	}
+
+	// Generate buffer
+	const buffer = await workbook.xlsx.writeBuffer();
+	const base64 = buffer.toString('base64');
+
+	const timestamp = new Date().toISOString().slice(0, 10);
+	const filename = `Team_Results_Scoreboard_${competition?.fop || 'Platform'}_${timestamp}.xlsx`;
+
+	return {
+		success: true,
+		binary: true,
+		contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+		filename,
+		buffer: base64
+	};
+}
+
+/**
+ * Generate flat format Excel (one row per athlete)
+ */
+async function generateFlatFormat(workbook, worksheet, data, options) {
+	const { teams, headers, competition } = data;
+	const scoringSystem = options.scoringSystem || 'Sinclair';
+	const allContribute = data.allAthletes === true;
+
+	// Flatten team-grouped athletes (same processed data as scoreboard format)
+	const flatAthletes = [];
+	if (teams) {
+		for (const team of teams) {
+			for (const athlete of team.athletes || []) {
+				flatAthletes.push(athlete);
+			}
+		}
+	}
+
+	// Sort by team name, then by score descending
+	flatAthletes.sort((a, b) => {
+		const teamCompare = (a.teamName || '').localeCompare(b.teamName || '');
+		if (teamCompare !== 0) return teamCompare;
+		const scoreA = parseFloat(a.displayScore) || 0;
+		const scoreB = parseFloat(b.displayScore) || 0;
+		return scoreB - scoreA;
+	});
+
+	// Column definitions
+	const columns = [
+		{ header: headers?.team || 'Team', key: 'team', width: 20 },
+		{ header: headers?.name || 'Name', key: 'name', width: 25 },
+		{ header: headers?.category || 'Category', key: 'category', width: 10 },
+		{ header: headers?.birth || 'Born', key: 'born', width: 8 },
+		{ header: 'Sn1', key: 'sn1', width: 8 },
+		{ header: 'Sn2', key: 'sn2', width: 8 },
+		{ header: 'Sn3', key: 'sn3', width: 8 },
+		{ header: headers?.best || 'Best Snatch', key: 'bestSnatch', width: 12 },
+		{ header: 'CJ1', key: 'cj1', width: 8 },
+		{ header: 'CJ2', key: 'cj2', width: 8 },
+		{ header: 'CJ3', key: 'cj3', width: 8 },
+		{ header: headers?.best || 'Best CJ', key: 'bestCj', width: 12 },
+		{ header: headers?.total || 'Total', key: 'total', width: 10 },
+		{ header: headers?.score || 'Score', key: 'score', width: 12 },
+		{ header: headers?.team || 'Team', key: 'teamGender', width: 8 }
+	];
+
+	worksheet.columns = columns;
+
+	// Header row styling
+	const headerRow = worksheet.getRow(1);
+	headerRow.font = { bold: true, size: 11 };
+	headerRow.fill = {
+		type: 'pattern',
+		pattern: 'solid',
+		fgColor: { argb: 'FF4472C4' }
+	};
+	headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+	headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
+	headerRow.border = {
+		top: { style: 'thin' },
+		bottom: { style: 'thin' },
+		left: { style: 'thin' },
+		right: { style: 'thin' }
+	};
+
+	// Add athlete rows
+	let currentRow = 2;
+	for (const athlete of flatAthletes) {
+		const row = worksheet.getRow(currentRow);
+		
+		row.getCell(1).value = athlete.teamName || '';
+		row.getCell(2).value = athlete.fullName || '';
+		row.getCell(3).value = athlete.category || '';
+		row.getCell(4).value = athlete.yearOfBirth || '';
+		
+		// Attempts
+		const sattempts = athlete.sattempts || [];
+		const cattempts = athlete.cattempts || [];
+		
+		for (let i = 0; i < 3; i++) {
+			const snCell = row.getCell(5 + i);
+			const attempt = sattempts[i];
+			snCell.alignment = { horizontal: 'right' };
+			if (attempt && attempt.stringValue && attempt.stringValue !== '\u00A0') {
+				snCell.value = attempt.stringValue;
+				if (attempt.liftStatus === 'bad') {
+					snCell.font = { strike: true, color: { argb: 'FFFF0000' } };
+				}
+			}
+		}
+		
+		const bestSnCell = row.getCell(8);
+		bestSnCell.value = athlete.bestSnatch || '';
+		bestSnCell.alignment = { horizontal: 'right' };
+		bestSnCell.font = { bold: true };
+		
+		for (let i = 0; i < 3; i++) {
+			const cjCell = row.getCell(9 + i);
+			const attempt = cattempts[i];
+			cjCell.alignment = { horizontal: 'right' };
+			if (attempt && attempt.stringValue && attempt.stringValue !== '\u00A0') {
+				cjCell.value = attempt.stringValue;
+				if (attempt.liftStatus === 'bad') {
+					cjCell.font = { strike: true, color: { argb: 'FFFF0000' } };
+				}
+			}
+		}
+		
+		const bestCjCell = row.getCell(12);
+		bestCjCell.value = athlete.bestCleanJerk || '';
+		bestCjCell.alignment = { horizontal: 'right' };
+		bestCjCell.font = { bold: true };
+		const totalCell = row.getCell(13);
+		totalCell.value = athlete.displayTotal || '';
+		totalCell.alignment = { horizontal: 'right' };
+		totalCell.font = { bold: true };
+		
+		const scoreValue = scoringSystem === 'TeamPoints' ? athlete.displayTeamPoints : athlete.displayScore;
+		const scoreCell = row.getCell(14);
+		scoreCell.value = scoreValue || '';
+		scoreCell.numFmt = scoringSystem === 'TeamPoints' ? '0' : '0.00';
+		scoreCell.alignment = { horizontal: 'right' };
+
+		// Highlight score cell if this athlete contributes to the team score
+		const contributes = athlete.scoreHighlightClass || allContribute;
+		if (contributes) {
+			scoreCell.fill = {
+				type: 'pattern',
+				pattern: 'solid',
+				fgColor: { argb: 'FFFFF2CC' }  // Light gold
+			};
+			scoreCell.font = { bold: true };
+		}
+
+		// Team gender column - show M/F only for scoring athletes
+		const teamGenderCell = row.getCell(15);
+		if (contributes) {
+			const normalizedGender = normalizeGender(athlete.gender);
+			teamGenderCell.value = normalizedGender || '';
+			teamGenderCell.alignment = { horizontal: 'center' };
+		}
+
+		// Apply borders
+		for (let col = 1; col <= 15; col++) {
+			row.getCell(col).border = {
+				top: { style: 'thin' },
+				bottom: { style: 'thin' },
+				left: { style: 'thin' },
+				right: { style: 'thin' }
+			};
+		}
+
+		currentRow++;
+	}
+
+	// Generate buffer
+	const buffer = await workbook.xlsx.writeBuffer();
+	const base64 = buffer.toString('base64');
+
+	const timestamp = new Date().toISOString().slice(0, 10);
+	const filename = `Team_Results_Flat_${competition?.fop || 'Platform'}_${timestamp}.xlsx`;
+
+	return {
+		success: true,
+		binary: true,
+		contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+		filename,
+		buffer: base64
+	};
+}
+
+// =============================================================================
 // FACTORY FUNCTION FOR PLUGIN INHERITANCE
 // =============================================================================
 
@@ -2330,6 +2772,7 @@ export function createHelpers(customCalculateScore = null) {
 		getFopUpdate,
 		getCompetitionStats,
 		getTopAthletes,
-		getTeamRankings
+		getTeamRankings,
+		handleAction
 	};
 }
