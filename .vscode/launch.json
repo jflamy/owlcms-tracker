@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "OWLCMS Tracker - Production Mode",
+      "name": "🔳 OWLCMS Tracker - Production Mode",
       "type": "node",
       "request": "launch",
       "runtimeExecutable": "npm",
@@ -17,7 +17,7 @@
       ]
     },
     {
-      "name": "OWLCMS Tracker - Learning Mode",
+      "name": "🔳 OWLCMS Tracker - Learning Mode",
       "type": "node",
       "request": "launch",
       "runtimeExecutable": "npm",
