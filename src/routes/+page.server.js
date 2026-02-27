@@ -1,5 +1,6 @@
 import { scoreboardRegistry } from '$lib/server/scoreboard-registry.js';
 import { competitionHub } from '$lib/server/competition-hub.js';
+import { listTemplates } from '../plugins/OBS/shared/scene-provisioner.js';
 
 /**
  * Landing page - discovers available scoreboards and FOPs
@@ -71,6 +72,15 @@ export async function load() {
 	const confirmedFopsAvailable = typeof competitionHub.hasConfirmedFops === 'function'
 		? competitionHub.hasConfirmedFops()
 		: false;
+
+	// Discover available OBS scene collection templates
+	let sceneTemplates = [''];
+	try {
+		sceneTemplates = listTemplates();
+	} catch (err) {
+		// Non-fatal — dropdown will just show "None"
+	}
+
 	return {
 		scoreboards,
 		fops: availableFOPs,
@@ -78,6 +88,7 @@ export async function load() {
 		hasData: availableFOPs.length > 0,
 		hasConfirmedFops: confirmedFopsAvailable,
 		availableLocales,
-		languageNames
+		languageNames,
+		sceneTemplates
 	};
 }

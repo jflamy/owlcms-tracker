@@ -18,6 +18,7 @@
   // Language name translations (from OWLCMS via Tracker.LocaleName)
   // These are dynamically loaded from the server and refreshed when data arrives
   $: languageNames = data.languageNames || {};
+  $: sceneTemplates = data.sceneTemplates || [''];
   $: availableLocales = data.availableLocales || [];
 
   /**
@@ -39,6 +40,9 @@
         return nameA.localeCompare(nameB);
       });
     }
+    if (option.options === 'dynamic:sceneTemplates') {
+      return sceneTemplates;
+    }
     return option.options || [];
   }
 
@@ -46,6 +50,10 @@
     // If this is a language option, use the language name translations
     if (optionKey === 'language' && languageNames[option]) {
       return languageNames[option];
+    }
+    // Scene template: show filename or "None" for empty
+    if (optionKey === 'sceneTemplate') {
+      return option === '' ? 'None (manual OBS configuration)' : option;
     }
     return option;
   }
@@ -316,7 +324,7 @@
 
   /**
    * Call a plugin action (e.g., configureOBS)
-   * @param {string} pluginType - The plugin type (e.g., 'mainScreen')
+   * @param {string} pluginType - The plugin type (e.g., 'streaming', 'ledwall')
    * @param {string} action - The action to call (e.g., 'configureOBS')
    * @param {string} fop - The FOP name
    */
@@ -874,12 +882,17 @@
         {#if modalScoreboard.options && modalScoreboard.options.length > 0}
           {@const hasGroups = modalScoreboard.options.some(opt => opt.group)}
           {#if hasGroups}
-            {@const displayOptions = modalScoreboard.options.filter(opt => opt.group === 'display' || !opt.group)}
-            {@const scoringOptions = modalScoreboard.options.filter(opt => opt.group === 'scoring')}
+            {@const groupNames = [...new Set(modalScoreboard.options.filter(o => o.group).map(o => o.group))]}
+            {@const groupLabels = Object.fromEntries(modalScoreboard.options.filter(o => o.group && o.groupLabel).map(o => [o.group, o.groupLabel]))}
+            {@const ungrouped = modalScoreboard.options.filter(opt => !opt.group)}
+            {@const firstGroup = groupNames[0]}
+            {@const col1Options = [...ungrouped, ...modalScoreboard.options.filter(opt => opt.group === firstGroup)]}
+            {@const col2Options = modalScoreboard.options.filter(opt => opt.group && opt.group !== firstGroup)}
+            {@const col2Label = groupLabels[groupNames[1]] || groupNames[1] || 'Options'}
             <div class="options-columns">
               <div class="options-column">
-                <h4 class="column-title">Display Options</h4>
-                {#each displayOptions as option}
+                <h4 class="column-title">{groupLabels[firstGroup] || firstGroup || 'Options'}</h4>
+                {#each col1Options as option}
                   {@const isDisabled = isOptionDisabled(option, modalScoreboard.type, modalFop)}
                   <div class="option-field" class:disabled-option={isDisabled}>
                     <label for="{modalScoreboard.type}-{modalFop}-{option.key}">
@@ -931,10 +944,10 @@
                   </div>
                 {/each}
               </div>
-              {#if scoringOptions.length > 0}
+              {#if col2Options.length > 0}
                 <div class="options-column">
-                  <h4 class="column-title">Team Scoring</h4>
-                  {#each scoringOptions as option}
+                  <h4 class="column-title">{col2Label}</h4>
+                  {#each col2Options as option}
                     {@const isDisabled = isOptionDisabled(option, modalScoreboard.type, modalFop)}
                     <div class="option-field" class:disabled-option={isDisabled}>
                       <label for="{modalScoreboard.type}-{modalFop}-{option.key}">
@@ -1042,7 +1055,7 @@
       </div>
       
       <div class="modal-footer">
-        {#if modalScoreboard?.type === 'mainScreen'}
+        {#if modalScoreboard?.type === 'streaming' || modalScoreboard?.type === 'ledwall'}
           <button 
             class="action-btn" 
             on:click={() => callPluginAction(modalScoreboard.type, 'configureOBS', modalFop)}
