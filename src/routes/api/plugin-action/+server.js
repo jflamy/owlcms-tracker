@@ -61,10 +61,6 @@ async function handleRequest(url) {
     registry: scoreboardRegistry
   });
 
-  // DEBUG: Log what plugin-action receives and builds
-  console.warn(`[plugin-action] pluginName=${pluginName}, URL params: ${[...url.searchParams.entries()].map(([k,v]) => `${k}=${v}`).join(', ')}`);
-  console.warn(`[plugin-action] options after buildOptions:`, JSON.stringify(options));
-
   try {
     const result = await scoreboard.handleAction({ action, options });
     
