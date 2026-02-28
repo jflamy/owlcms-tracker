@@ -15,12 +15,16 @@
  */
 export function buildOptions({ scoreboard, url, reservedKeys = new Set(), registry = null }) {
 	const options = {};
+	const optionTypes = {};
 
 	// 1. Apply defaults from BASE plugin config (if this is a delegating extension)
 	if (registry) {
 		const baseScoreboard = registry.getBaseScoreboard(scoreboard?.type);
 		if (baseScoreboard?.config?.options && Array.isArray(baseScoreboard.config.options)) {
 			for (const opt of baseScoreboard.config.options) {
+				if (opt.key && opt.type) {
+					optionTypes[opt.key] = opt.type;
+				}
 				if (opt.key && opt.default !== undefined) {
 					options[opt.key] = opt.default;
 				}
@@ -31,6 +35,9 @@ export function buildOptions({ scoreboard, url, reservedKeys = new Set(), regist
 	// 2. Apply defaults from current scoreboard config (overrides base if extension redefines)
 	if (scoreboard?.config?.options && Array.isArray(scoreboard.config.options)) {
 		for (const opt of scoreboard.config.options) {
+			if (opt.key && opt.type) {
+				optionTypes[opt.key] = opt.type;
+			}
 			if (opt.key && opt.default !== undefined) {
 				options[opt.key] = opt.default;
 			}
@@ -41,10 +48,20 @@ export function buildOptions({ scoreboard, url, reservedKeys = new Set(), regist
 	for (const [key, value] of url.searchParams.entries()) {
 		if (reservedKeys.has(key)) continue;
 
-		// Parse boolean / number values
+		const declaredType = optionTypes[key];
+
+		if (declaredType === 'boolean') {
+			options[key] = value === 'true';
+			continue;
+		}
+
+		if (declaredType === 'number') {
+			options[key] = (!isNaN(value) && value !== '') ? parseFloat(value) : value;
+			continue;
+		}
+
 		if (value === 'true') options[key] = true;
 		else if (value === 'false') options[key] = false;
-		else if (!isNaN(value) && value !== '') options[key] = parseFloat(value);
 		else options[key] = value;
 	}
 
