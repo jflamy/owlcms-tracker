@@ -885,69 +885,21 @@
             {@const groupNames = [...new Set(modalScoreboard.options.filter(o => o.group).map(o => o.group))]}
             {@const groupLabels = Object.fromEntries(modalScoreboard.options.filter(o => o.group && o.groupLabel).map(o => [o.group, o.groupLabel]))}
             {@const ungrouped = modalScoreboard.options.filter(opt => !opt.group)}
-            {@const firstGroup = groupNames[0]}
-            {@const col1Options = [...ungrouped, ...modalScoreboard.options.filter(opt => opt.group === firstGroup)]}
-            {@const col2Options = modalScoreboard.options.filter(opt => opt.group && opt.group !== firstGroup)}
-            {@const col2Label = groupLabels[groupNames[1]] || groupNames[1] || 'Options'}
+            {@const groupedColumns = groupNames
+              .map((groupName, index) => ({
+                groupName,
+                groupLabel: groupLabels[groupName] || groupName || 'Options',
+                options: [
+                  ...(index === 0 ? ungrouped : []),
+                  ...modalScoreboard.options.filter(opt => opt.group === groupName)
+                ]
+              }))
+              .filter(col => col.options.length > 0)}
             <div class="options-columns">
-              <div class="options-column">
-                <h4 class="column-title">{groupLabels[firstGroup] || firstGroup || 'Options'}</h4>
-                {#each col1Options as option}
-                  {@const isDisabled = isOptionDisabled(option, modalScoreboard.type, modalFop)}
-                  <div class="option-field" class:disabled-option={isDisabled}>
-                    <label for="{modalScoreboard.type}-{modalFop}-{option.key}">
-                      {option.label}
-                      {#if option.description}
-                        <span class="option-help" title={option.description}>ⓘ</span>
-                      {/if}
-                    </label>
-                    
-                    {#if option.type === 'select'}
-                      <select 
-                        id="{modalScoreboard.type}-{modalFop}-{option.key}"
-                        bind:value={scoreboardOptions[modalScoreboard.type][modalFop][option.key]}
-                        disabled={isDisabled}
-                      >
-                        {#each getEffectiveOptions(option) as opt}
-                          <option value={opt}>{getDisplayName(opt, option.key)}</option>
-                        {/each}
-                      </select>
-                    {:else if option.type === 'boolean'}
-                      <div class="checkbox-wrapper">
-                        <input 
-                          type="checkbox" 
-                          id="{modalScoreboard.type}-{modalFop}-{option.key}"
-                          bind:checked={scoreboardOptions[modalScoreboard.type][modalFop][option.key]}
-                          disabled={isDisabled}
-                        />
-                        <label for="{modalScoreboard.type}-{modalFop}-{option.key}" class="checkbox-label">
-                          {scoreboardOptions[modalScoreboard.type][modalFop][option.key] ? 'Yes' : 'No'}
-                        </label>
-                      </div>
-                    {:else if option.type === 'number'}
-                      <input 
-                        type="number" 
-                        id="{modalScoreboard.type}-{modalFop}-{option.key}"
-                        bind:value={scoreboardOptions[modalScoreboard.type][modalFop][option.key]}
-                        min={option.min}
-                        max={option.max}
-                        disabled={isDisabled}
-                      />
-                    {:else}
-                      <input 
-                        type="text" 
-                        id="{modalScoreboard.type}-{modalFop}-{option.key}"
-                        bind:value={scoreboardOptions[modalScoreboard.type][modalFop][option.key]}
-                        disabled={isDisabled}
-                      />
-                    {/if}
-                  </div>
-                {/each}
-              </div>
-              {#if col2Options.length > 0}
+              {#each groupedColumns as column}
                 <div class="options-column">
-                  <h4 class="column-title">{col2Label}</h4>
-                  {#each col2Options as option}
+                  <h4 class="column-title">{column.groupLabel}</h4>
+                  {#each column.options as option}
                     {@const isDisabled = isOptionDisabled(option, modalScoreboard.type, modalFop)}
                     <div class="option-field" class:disabled-option={isDisabled}>
                       <label for="{modalScoreboard.type}-{modalFop}-{option.key}">
@@ -999,7 +951,7 @@
                     </div>
                   {/each}
                 </div>
-              {/if}
+              {/each}
             </div>
           {:else}
             <div class="options-grid">
@@ -1398,8 +1350,8 @@
     background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
     border-radius: 12px;
     border: 1px solid rgba(255, 255, 255, 0.2);
-    max-width: 700px;
-    width: 90%;
+    max-width: 1200px;
+    width: min(95vw, 1200px);
     max-height: 95vh;
     display: flex;
     flex-direction: column;
@@ -1510,7 +1462,7 @@
   
   .options-columns {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
     gap: 2rem;
   }
   
@@ -1540,10 +1492,17 @@
     cursor: not-allowed;
   }
   
+  @media (max-width: 900px) {
+    .options-columns {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1.5rem;
+    }
+  }
+
   @media (max-width: 600px) {
     .options-columns {
       grid-template-columns: 1fr;
-      gap: 1.5rem;
+      gap: 1.25rem;
     }
   }
   
