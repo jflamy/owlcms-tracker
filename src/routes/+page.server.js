@@ -1,6 +1,5 @@
 import { scoreboardRegistry } from '$lib/server/scoreboard-registry.js';
 import { competitionHub } from '$lib/server/competition-hub.js';
-import { listTemplates } from '../plugins/OBS/shared/scene-provisioner.js';
 
 /**
  * Landing page - discovers available scoreboards and FOPs
@@ -76,9 +75,10 @@ export async function load() {
 	// Discover available OBS scene collection templates
 	let sceneTemplates = [''];
 	try {
+		const { listTemplates } = await import('../plugins/OBS/shared/scene-provisioner.js');
 		sceneTemplates = listTemplates();
 	} catch (err) {
-		// Non-fatal — dropdown will just show "None"
+		// Non-fatal — OBS submodule may be absent; dropdown will just show "None"
 	}
 
 	return {
