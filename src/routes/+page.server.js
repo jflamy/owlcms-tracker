@@ -73,9 +73,11 @@ export async function load() {
 		: false;
 
 	// Discover available OBS scene collection templates
+	// Use a variable path so Rollup/Vite won't try to resolve the submodule at build time
 	let sceneTemplates = [''];
 	try {
-		const { listTemplates } = await import('../plugins/OBS/shared/scene-provisioner.js');
+		const obsPath = ['../plugins/OBS', '/shared/scene-provisioner.js'].join('');
+		const { listTemplates } = await import(/* @vite-ignore */ obsPath);
 		sceneTemplates = listTemplates();
 	} catch (err) {
 		// Non-fatal — OBS submodule may be absent; dropdown will just show "None"
