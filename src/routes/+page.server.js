@@ -1,5 +1,7 @@
 import { scoreboardRegistry } from '$lib/server/scoreboard-registry.js';
 import { competitionHub } from '$lib/server/competition-hub.js';
+import { existsSync, readdirSync } from 'fs';
+import { resolve } from 'path';
 
 /**
  * Landing page - discovers available scoreboards and FOPs
@@ -72,15 +74,44 @@ export async function load() {
 		? competitionHub.hasConfirmedFops()
 		: false;
 
-	// Discover available OBS scene collection templates
-	// Use a variable path so Rollup/Vite won't try to resolve the submodule at build time
-	let sceneTemplates = [''];
-	try {
-		const obsPath = ['../plugins/OBS', '/shared/scene-provisioner.js'].join('');
-		const { listTemplates } = await import(/* @vite-ignore */ obsPath);
-		sceneTemplates = listTemplates();
-	} catch (err) {
-		// Non-fatal — OBS submodule may be absent; dropdown will just show "None"
+	// Resolve all 'dynamic:*' option values server-side so the client receives
+	// concrete arrays and doesn't need access to backend data or filesystem.
+	for (const sb of scoreboards) {
+		if (!sb.options) continue;
+		const regEntry = allScoreboards.find(r => r.type === sb.type);
+		for (const opt of sb.options) {
+			if (typeof opt.options !== 'string' || !opt.options.startsWith('dynamic:')) continue;
+
+			if (opt.options === 'dynamic:locales') {
+				const defaultLang = opt.default || 'en';
+				opt.options = [...availableLocales].sort((a, b) => {
+					if (a === defaultLang) return -1;
+					if (b === defaultLang) return 1;
+					if (a === 'ia') return 1;
+					if (b === 'ia') return -1;
+					return (languageNames[a] || a).localeCompare(languageNames[b] || b);
+				});
+			} else if (opt.options === 'dynamic:templates') {
+				// Scan the plugin's own templates/ directory
+				const templates = [''];
+				const pluginPath = regEntry?.pluginPath;
+				if (pluginPath) {
+					const templateDir = resolve('src/plugins', pluginPath, 'templates');
+					if (existsSync(templateDir)) {
+						try {
+							for (const entry of readdirSync(templateDir, { withFileTypes: true })) {
+								if (entry.isFile() && entry.name.endsWith('.json')) {
+									templates.push(entry.name);
+								}
+							}
+						} catch {
+							// Non-fatal
+						}
+					}
+				}
+				opt.options = templates;
+			}
+		}
 	}
 
 	return {
@@ -90,7 +121,6 @@ export async function load() {
 		hasData: availableFOPs.length > 0,
 		hasConfirmedFops: confirmedFopsAvailable,
 		availableLocales,
-		languageNames,
-		sceneTemplates
+		languageNames
 	};
 }

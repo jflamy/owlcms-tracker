@@ -18,33 +18,7 @@
   // Language name translations (from OWLCMS via Tracker.LocaleName)
   // These are dynamically loaded from the server and refreshed when data arrives
   $: languageNames = data.languageNames || {};
-  $: sceneTemplates = data.sceneTemplates || [''];
   $: availableLocales = data.availableLocales || [];
-
-  /**
-   * Get the effective options for a select field
-   * Handles dynamic options like 'dynamic:locales' which are resolved at runtime
-   */
-  function getEffectiveOptions(option) {
-    if (option.key === 'language' && option.options === 'dynamic:locales') {
-      // Sort with default language first, then alphabetically by display name, Interlingua (ia) last
-      const defaultLang = option.default || 'en';
-      return [...availableLocales].sort((a, b) => {
-        if (a === defaultLang) return -1;
-        if (b === defaultLang) return 1;
-        // Interlingua (ia) always last
-        if (a === 'ia') return 1;
-        if (b === 'ia') return -1;
-        const nameA = languageNames[a] || a;
-        const nameB = languageNames[b] || b;
-        return nameA.localeCompare(nameB);
-      });
-    }
-    if (option.options === 'dynamic:sceneTemplates') {
-      return sceneTemplates;
-    }
-    return option.options || [];
-  }
 
   function getDisplayName(option, optionKey) {
     // If this is a language option, use the language name translations
@@ -915,7 +889,7 @@
                           bind:value={scoreboardOptions[modalScoreboard.type][modalFop][option.key]}
                           disabled={isDisabled}
                         >
-                          {#each getEffectiveOptions(option) as opt}
+                          {#each (option.options || []) as opt}
                             <option value={opt}>{getDisplayName(opt, option.key)}</option>
                           {/each}
                         </select>
@@ -969,7 +943,7 @@
                       id="{modalScoreboard.type}-{modalFop}-{option.key}"
                       bind:value={scoreboardOptions[modalScoreboard.type][modalFop][option.key]}
                     >
-                      {#each getEffectiveOptions(option) as opt}
+                      {#each (option.options || []) as opt}
                         <option value={opt}>{getDisplayName(opt, option.key)}</option>
                       {/each}
                     </select>

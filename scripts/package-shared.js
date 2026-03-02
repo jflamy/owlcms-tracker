@@ -353,6 +353,26 @@ export function buildAndPackage({
   copyDir('build', path.join(DIST_DIR, 'build'));
   console.log('✓ Copied build/');
 
+  // Copy templates/ directories from any plugin (at any nesting depth) that has one.
+  // These are static JSON assets needed at runtime (e.g., OBS scene collection templates).
+  // JS code in plugins is NOT copied — it is either bundled by Vite or loaded at runtime.
+  const pluginsDir = 'src/plugins';
+  if (fs.existsSync(pluginsDir)) {
+    const findTemplates = (dir) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        if (!entry.isDirectory()) continue;
+        const child = path.join(dir, entry.name);
+        if (entry.name === 'templates') {
+          copyDir(child, path.join(DIST_DIR, child));
+          console.log(`✓ Copied ${child}`);
+        } else {
+          findTemplates(child);
+        }
+      }
+    };
+    findTemplates(pluginsDir);
+  }
+
   // Copy extensions directory (runtime plugins) if requested and exists
   if (includeExtensions && fs.existsSync('extensions')) {
     copyDir('extensions', path.join(DIST_DIR, 'extensions'));
