@@ -296,13 +296,17 @@
     showPdfModal = false;
   }
 
+  function getModalActions(scoreboard) {
+    return scoreboard?.config?.modalActions || [];
+  }
+
   /**
    * Call a plugin action (e.g., configureOBS)
    * @param {string} pluginType - The plugin type (e.g., 'streaming', 'ledwall')
    * @param {string} action - The action to call (e.g., 'configureOBS')
    * @param {string} fop - The FOP name
    */
-  async function callPluginAction(pluginType, action, fop) {
+  async function callPluginAction(pluginType, action, fop, { download = false } = {}) {
     const options = scoreboardOptions[pluginType]?.[fop] || {};
     const params = new URLSearchParams();
     
@@ -323,6 +327,22 @@
     
     try {
       const response = await fetch(`/api/plugin-action?${params.toString()}`);
+
+      // If this is a download action and the server returned a file, trigger browser download
+      const contentDisposition = response.headers.get('Content-Disposition');
+      if (download && contentDisposition && contentDisposition.includes('attachment')) {
+        const blob = await response.blob();
+        const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+        const filename = filenameMatch ? filenameMatch[1] : 'download.json';
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+        return { success: true, message: 'Download started' };
+      }
+
       const result = await response.json();
       
       if (result.success) {
@@ -330,8 +350,21 @@
       } else {
         alert(`❌ ${result.message || 'Action failed'}`);
       }
+      return result;
     } catch (error) {
       alert(`❌ Error: ${error.message}`);
+      return { success: false, message: error.message };
+    }
+  }
+
+  async function runModalAction(actionDef) {
+    if (!modalScoreboard || !actionDef?.action) return;
+
+    const result = await callPluginAction(modalScoreboard.type, actionDef.action, modalFop, {
+      download: actionDef.download === true
+    });
+    if (result?.success && actionDef.closeModalOnSuccess) {
+      closeModal();
     }
   }
 </script>
@@ -981,15 +1014,15 @@
       </div>
       
       <div class="modal-footer">
-        {#if modalScoreboard?.type === 'streaming' || modalScoreboard?.type === 'ledwall'}
-          <button 
-            class="action-btn" 
-            on:click={() => callPluginAction(modalScoreboard.type, 'configureOBS', modalFop)}
-            title="Configure OBS sources with these settings"
+        {#each getModalActions(modalScoreboard) as actionDef}
+          <button
+            class="action-btn"
+            on:click={() => runModalAction(actionDef)}
+            title={actionDef.title || actionDef.label}
           >
-            🔧 Configure OBS
+            {#if actionDef.icon}{actionDef.icon} {/if}{actionDef.label}
           </button>
-        {/if}
+        {/each}
         {#if modalScoreboard?.config?.pages?.length > 0}
           <button 
             class="action-btn" 
