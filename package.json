@@ -29,6 +29,7 @@
     "@testing-library/svelte": "^5.2.9",
     "cross-env": "^7.0.3",
     "exceljs": "^4.4.0",
+    "mustache": "^4.2.0",
     "puppeteer-core": "^24.0.0",
     "semver": "^7.6.0",
     "svelte": "^5.1.9",
@@ -43,7 +44,6 @@
     "adm-zip": "^0.5.10",
     "gsap": "^3.13.0",
     "http-proxy-middleware": "^3.0.5",
-    "mustache": "^4.2.0",
     "obs-websocket-js": "^5.0.6",
     "pagedjs": "0.4.3",
     "ws": "^8.18.3"
