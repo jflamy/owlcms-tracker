@@ -140,7 +140,9 @@ jobs:
           git push origin ${{ env.REVISION }}
           
           # Create release with package and release notes
+          # Use --target to avoid race condition where tag push hasn't propagated yet
           gh release create ${{ env.REVISION }} \
+            --target "${{ github.sha }}" \
             --title "${{ env.REVISION }}" \
             --notes-file ReleaseNotes.md \
             dist/owlcms-tracker_${{ env.REVISION }}.zip
