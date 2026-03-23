@@ -13,6 +13,7 @@ import { gzipSync, brotliCompressSync, constants as zlibConstants } from 'zlib';
 import { scoreboardRegistry } from '$lib/server/scoreboard-registry.js';
 import { competitionHub } from '$lib/server/competition-hub.js';
 import { buildOptions } from '$lib/server/build-options.js';
+import { refreshDatabaseForDocuments } from '$lib/server/document-refresh.js';
 
 const responseCache = new Map();
 const BROTLI_OPTS = { params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 4 } };
@@ -103,6 +104,10 @@ export async function GET({ url, request }) {
 			reservedKeys: new Set(['type', 'fop']),
 			registry: scoreboardRegistry
 		});
+
+		if (scoreboard?.config?.category === 'documents') {
+			await refreshDatabaseForDocuments();
+		}
 		
 		// Get current FOP version for cache validation
 		const currentVersion = competitionHub.getFopStateVersion?.({ fopName }) ?? null;

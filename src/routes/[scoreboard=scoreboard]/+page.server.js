@@ -10,6 +10,7 @@
 import { scoreboardRegistry } from '$lib/server/scoreboard-registry.js';
 import { competitionHub } from '$lib/server/competition-hub.js';
 import { buildOptions } from '$lib/server/build-options.js';
+import { refreshDatabaseForDocuments } from '$lib/server/document-refresh.js';
 import { error } from '@sveltejs/kit';
 
 export async function load({ params, url }) {
@@ -61,6 +62,10 @@ export async function load({ params, url }) {
 			reservedKeys: new Set(['fop']),
 			registry: scoreboardRegistry
 		});
+
+		if (scoreboard.config?.category === 'documents') {
+			await refreshDatabaseForDocuments();
+		}
 		
 		// Get live data from plugin helpers (includes current config with overrides)
 		let liveData = null;

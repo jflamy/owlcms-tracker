@@ -21,11 +21,11 @@ let activeConnection = null; // Track active WebSocket connection for sending me
 export function requestResources(resources) {
 	if (!activeConnection || activeConnection.readyState !== 1) {
 		console.log('[WebSocket] Cannot request resources - no active OWLCMS connection');
-		return;
+		return false;
 	}
 	
 	if (!resources || resources.length === 0) {
-		return;
+		return false;
 	}
 	
 	console.log(`[WebSocket] 📦 Requesting resources from OWLCMS: ${resources.join(', ')}`);
@@ -35,6 +35,7 @@ export function requestResources(resources) {
 		reason: 'plugin_preconditions',
 		missing: resources
 	}));
+	return true;
 }
 
 /**

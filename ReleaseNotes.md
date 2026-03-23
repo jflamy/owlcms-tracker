@@ -4,6 +4,9 @@
 > #### ⚠ To use Tracker, you need to use version 64 or newer of OWLCMS (see Installing Locally below)
 
 ##### Release log
+
+- 2.13.0: the referee assignment document plugin now requests a database refresh so it matches the master database changes.
+
 - 2.12.0: fixes to support packaging of combined plugins with shared content 
 
 - 2.9.0: Clean-up of large unnecessary dependencies that were specific to some plugins -- puppeteer is no longer included by default

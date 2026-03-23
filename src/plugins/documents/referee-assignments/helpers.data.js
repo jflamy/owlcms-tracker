@@ -74,11 +74,11 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		return result;
 	}
 
-	// Sort sessions by name
+	// Sort sessions by competition time first, then by name for stable ordering.
 	const sortedSessions = [...sessions].sort((a, b) => {
-		const aNum = parseInt(a.name, 10);
-		const bNum = parseInt(b.name, 10);
-		return !isNaN(aNum) && !isNaN(bNum) ? aNum - bNum : a.name.localeCompare(b.name);
+		const timeCompare = compareDateTimeArrays(a.competitionTime, b.competitionTime);
+		if (timeCompare !== 0) return timeCompare;
+		return (a.name || '').localeCompare(b.name || '', undefined, { numeric: true, sensitivity: 'base' });
 	});
 
 	// Get competition info for header
@@ -250,6 +250,27 @@ function formatTime(timeArray) {
 	if (!timeArray || timeArray.length < 5) return '';
 	const [, , , hour, minute] = timeArray;
 	return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
+
+function compareDateTimeArrays(a, b) {
+	const aHasValue = Array.isArray(a) && a.length > 0;
+	const bHasValue = Array.isArray(b) && b.length > 0;
+
+	if (aHasValue && bHasValue) {
+		const maxLength = Math.max(a.length, b.length);
+		for (let index = 0; index < maxLength; index += 1) {
+			const aPart = a[index] ?? 0;
+			const bPart = b[index] ?? 0;
+			if (aPart !== bPart) {
+				return aPart - bPart;
+			}
+		}
+		return 0;
+	}
+
+	if (aHasValue) return -1;
+	if (bHasValue) return 1;
+	return 0;
 }
 
 /**
