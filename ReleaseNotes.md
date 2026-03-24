@@ -5,7 +5,8 @@
 
 ##### Release log
 
-- 2.13.0: the referee assignment document plugin now requests a database refresh so it matches the master database changes.
+-- 2.13.1: On Linux, a race condition was preventing the entry page cards from showing the full language list
+ - 2.13.0: the referee assignment document plugin now requests a database refresh so it matches the master database changes.
 
 - 2.12.0: fixes to support packaging of combined plugins with shared content 
 
