@@ -22,6 +22,17 @@
           "url": "https://www.princexml.com/doc/properties/bookmark-label/"
         }
       ]
+    },
+    {
+      "name": "string-set",
+      "description": "Named string capture for paged media headers and footers, used by Paged.js.",
+      "syntax": "none | <custom-ident> <content-list>#",
+      "references": [
+        {
+          "name": "Paged.js",
+          "url": "https://pagedjs.org/"
+        }
+      ]
     }
   ]
 }
