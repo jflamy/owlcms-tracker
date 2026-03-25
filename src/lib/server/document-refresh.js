@@ -1,5 +1,25 @@
 import { competitionHub } from '$lib/server/competition-hub.js';
-import { logger, requestResources } from '@owlcms/tracker-core';
+import { logger } from '@owlcms/tracker-core';
+
+/**
+ * Request resources from OWLCMS via the hub's injected callback.
+ * 
+ * We must NOT import requestResources directly from tracker-core because
+ * Vite may create separate module instances (one for vite.config.js, another
+ * for SvelteKit SSR), each with its own `activeConnection` variable.
+ * Only the instance loaded by vite.config.js has the real connection.
+ * 
+ * The hub singleton (globalThis.__competitionHub) is safe from this problem.
+ * During WebSocket init, tracker-core injects requestResources into the hub
+ * via hub.setRequestResourcesCallback(). So we call through the hub.
+ */
+function requestResourcesViaHub(resources) {
+	if (typeof competitionHub._requestResourcesCallback !== 'function') {
+		logger.warn('[Documents] Cannot request resources - WebSocket not initialized yet');
+		return false;
+	}
+	return competitionHub._requestResourcesCallback(resources);
+}
 
 /**
  * Requests a fresh database from OWLCMS and waits for it to load.
@@ -47,7 +67,7 @@ export async function refreshDatabaseForDocuments(timeoutMs = 5000) {
 	logger.debug('[Documents] Requesting fresh database from OWLCMS...');
 
 	while (Date.now() - startTime < timeoutMs) {
-		const sent = requestResources(['database']);
+		const sent = requestResourcesViaHub(['database']);
 
 		if (sent) {
 			const waitTime = Math.min(2000, timeoutMs - (Date.now() - startTime));

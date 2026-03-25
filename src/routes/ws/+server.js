@@ -6,11 +6,11 @@
  * connection is handled at the HTTP server level (not SvelteKit level).
  * 
  * Instead, the WebSocket server must be attached to the Node.js HTTP server
- * in the hooks or startup script. This file serves as documentation of the
- * expected URL path only.
+ * via @owlcms/tracker-core/websocket attachWebSocketToServer().
+ * This file serves as documentation of the expected URL path only.
  * 
- * See: src/hooks.server.js for server initialization
- * See: src/lib/server/websocket-server.js for WebSocket implementation
+ * See: vite.config.js (dev) or start-with-ws.js (prod) for WebSocket initialization
+ * See: @owlcms/tracker-core/websocket for WebSocket implementation
  */
 
 // This route is not directly callable - WebSocket upgrade happens at HTTP level
