@@ -5,6 +5,8 @@
 
 ##### Release log
 
+- 2.14.0: Remove hard-coded timer values, obey directives from owlcms
+
 - 2.13.2: Fix for the on-demand database refresh issue
 - 2.13.2: Checked that usage of the Champioship entities works
 - 2.13.1: On Linux, a race condition was preventing the entry page cards from showing the full language list
