@@ -6,11 +6,12 @@
      * Props:
      * - timerData: { state: 'running'|'stopped'|'set', timeRemaining: ms, displayText?: string }
      * - color: CSS color for the timer text (default: green)
-     * - warningColor: CSS color when <= 30 seconds (default: yellow)
+    * - warningColor: CSS color when the active timer enters its warning threshold (default: yellow)
      * 
      * If timerData.displayText is set (e.g., "STOP" or "STOPP"), it overrides the countdown display
      */
     import { onMount, onDestroy } from 'svelte';
+    import { isTimerInWarning } from '$lib/timer-logic.js';
 
     export let timerData = null;
     export let color = '#4ade80';  // Green for athlete timer
@@ -28,6 +29,7 @@
     let startTime = null;
     let initialRemaining = 0;
     let lastSyncedState = null;
+    let currentTimerData = null;
 
     function formatTime(totalSeconds) {
         if (totalSeconds <= 0) return '0:00';
@@ -53,18 +55,20 @@
         const elapsed = Date.now() - startTime;
         const remaining = Math.max(0, initialRemaining - elapsed);
         seconds = Math.ceil(remaining / 1000);
-        isWarning = seconds > 0 && seconds <= 30;
+        isWarning = isTimerInWarning(currentTimerData, remaining);
         display = formatTime(seconds);
     }
 
     function syncWithServer(data) {
         if (!data) return;
 
+        currentTimerData = data;
+
         // Check for backend-provided display text (e.g., "STOP", "STOPP")
         displayText = data.displayText || null;
 
         // Create a state key to detect actual changes
-        const stateKey = `${data.state}-${data.timeRemaining}-${data.displayText || ''}`;
+        const stateKey = `${data.state}-${data.timeRemaining}-${data.duration ?? data.timeAllowed ?? ''}-${data.initialWarningMillis ?? data.athleteInitialWarningMillis ?? ''}-${data.finalWarningMillis ?? data.athleteFinalWarningMillis ?? ''}-${data.displayText || ''}`;
         if (stateKey === lastSyncedState) return;
         lastSyncedState = stateKey;
 
@@ -80,7 +84,7 @@
             seconds = Math.max(0, Math.ceil((data.timeRemaining || 0) / 1000));
         }
 
-        isWarning = seconds > 0 && seconds <= 30;
+        isWarning = isTimerInWarning(data, (data.timeRemaining || 0));
         updateDisplay();
     }
 
@@ -106,6 +110,16 @@
     // Sync when timerData prop changes
     $: if (timerData) {
         syncWithServer(timerData);
+    } else {
+        currentTimerData = null;
+        lastSyncedState = null;
+        displayText = null;
+        startTime = null;
+        initialRemaining = 0;
+        seconds = 0;
+        isRunning = false;
+        isWarning = false;
+        display = '0:00';
     }
 </script>
 

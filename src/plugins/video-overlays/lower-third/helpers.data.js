@@ -40,7 +40,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		return {
 		competition: { name: 'Waiting for data...', fop: fopName },
 		currentAthleteInfo: null,
-		timer: { state: 'stopped', timeRemaining: 0, duration: 60000 },
+		timer: { state: 'stopped', timeRemaining: 0, duration: 0, initialWarningMillis: -1, finalWarningMillis: -1 },
 		breakTimer: { state: 'stopped', timeRemaining: 0, duration: 300000 },
 		decision: { visible: false, isSingleReferee: false, ref1: null, ref2: null, ref3: null },
 		displayMode: 'none',

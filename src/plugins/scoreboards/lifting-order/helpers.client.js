@@ -3,6 +3,8 @@
  * All data access happens server-side and gets passed to these functions
  */
 
+import { getAthleteWarningThresholds } from '$lib/timer-logic.js';
+
 /**
  * Format time remaining for display
  * @param {number} milliseconds - Time remaining in milliseconds
@@ -31,8 +33,9 @@ export function getTimerStatusColor(timer) {
 	if (timer.state !== 'running') return 'text-gray-500';
 	
 	const timeRemaining = timer.timeRemaining || 0;
-	if (timeRemaining <= 30000) return 'text-red-600'; // 30 seconds warning
-	if (timeRemaining <= 60000) return 'text-yellow-600'; // 1 minute warning
+	const { initialWarningMillis, finalWarningMillis } = getAthleteWarningThresholds(timer);
+	if (finalWarningMillis >= 0 && timeRemaining <= finalWarningMillis) return 'text-red-600';
+	if (initialWarningMillis >= 0 && timeRemaining <= initialWarningMillis) return 'text-yellow-600';
 	return 'text-green-600';
 }
 

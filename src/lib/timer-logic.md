@@ -43,7 +43,7 @@ The timer manager provides this state object:
 {
 	seconds: 45,           // Time remaining in seconds
 	isRunning: true,       // Whether timer is actively counting down
-	isWarning: false,      // True when ≤ 30 seconds remaining
+	isWarning: false,      // True when the active timer enters its warning threshold
 	display: '0:45'        // Formatted display string (M:SS)
 }
 ```
@@ -61,7 +61,7 @@ Creates a new timer instance.
 Start the timer interval. Call this in `onMount()`.
 
 **Parameters:**
-- `initialTimerData` - Initial timer data from server: `{ state, timeRemaining, duration }`
+- `initialTimerData` - Initial timer data from server: `{ state, timeRemaining, duration, initialWarningMillis, finalWarningMillis }`
 - `intervalMs` - Update interval in milliseconds (default: 100)
 
 ### `timer.stop()`
@@ -73,7 +73,7 @@ Stop the timer interval. Call this in `onDestroy()`.
 Sync timer with new data from server. Call this when `data.timer` changes.
 
 **Parameters:**
-- `timerData` - Timer data from server: `{ state: 'running'|'stopped'|'set', timeRemaining: ms }`
+- `timerData` - Timer data from server: `{ state: 'running'|'stopped'|'set', timeRemaining: ms, duration?: ms, initialWarningMillis?: ms, finalWarningMillis?: ms }`
 
 **Behavior:**
 - Detects state changes
@@ -103,6 +103,8 @@ Get current timer state snapshot.
 4. **Timer logic syncs with server** on state changes
 5. **Client-side countdown** runs independently (no SSE spam)
 6. **Subscribers receive updates** every 100ms during countdown
+
+For athlete timers, warning thresholds come from the server when available. Legacy `2:00` and `1:00` timers still fall back to `1:30` and `0:30` behavior when explicit warning fields are absent.
 
 ## Benefits
 

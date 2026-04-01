@@ -58,7 +58,7 @@ Shows when athlete is called to the platform:
 ### 2. Timer Running
 Replaces decision card with countdown:
 - **Timer Card**: Large countdown display (MM:SS)
-- Turns red and pulses when ≤30 seconds remain
+- Turns red and pulses when the active timer enters its configured warning threshold
 - Automatically hides when timer stops
 
 ### 3. Decision Visible
@@ -116,7 +116,7 @@ The overlay uses semi-transparent black cards with white text:
 
 All data comes from OWLCMS via WebSocket:
 - **Athlete Info**: From `type="update"` messages (fullName, teamName, weight, attemptNumber)
-- **Timer**: From `type="timer"` messages (athleteTimerEventType, athleteMillisRemaining)
+- **Timer**: From `type="timer"` messages (athleteTimerEventType, athleteMillisRemaining, timeAllowed, athleteInitialWarningMillis, athleteFinalWarningMillis)
 - **Decisions**: From `type="decision"` messages (d1, d2, d3, decisionsVisible)
 
 ## Architecture

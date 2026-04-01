@@ -151,10 +151,15 @@ export function parseV1Database(params) {
   }
 
   // Timer state
+  const duration = params.timeAllowed ? parseInt(params.timeAllowed) : 0;
+  const initialWarningMillis = duration === 120000 ? 90000 : -1;
+  const finalWarningMillis = (duration === 120000 || duration === 60000) ? 30000 : -1;
   result.timer = {
     state: params.timerRunning === 'true' ? 'running' : 'stopped',
     timeRemaining: params.timeRemaining ? parseInt(params.timeRemaining) : 0,
-    duration: params.timeAllowed ? parseInt(params.timeAllowed) : 60000,
+    duration,
+    initialWarningMillis,
+    finalWarningMillis,
     startTime: params.timerRunning === 'true' ? Date.now() : null
   };
 

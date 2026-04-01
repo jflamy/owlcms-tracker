@@ -1,6 +1,7 @@
 <script>
   import { timer } from '$lib/stores';
   import { onDestroy } from 'svelte';
+  import { isTimerInWarning } from '$lib/timer-logic.js';
   
   let remainingMs = 0;
   let interval;
@@ -37,7 +38,7 @@
   });
   
   $: seconds = Math.ceil(remainingMs / 1000);
-  $: warning = seconds > 0 && seconds <= 30;
+  $: warning = isTimerInWarning($timer, remainingMs);
   $: urgent = seconds > 0 && seconds <= 10;
 </script>
 

@@ -1,5 +1,6 @@
 <script>
 	import { onMount, onDestroy } from 'svelte';
+	import { isTimerInWarning } from '$lib/timer-logic.js';
 	
 	// Props
 	export let timerData = null; // { state: 'running'|'stopped'|'set', timeRemaining: ms, duration: ms }
@@ -42,7 +43,7 @@
 			// If timer just started, record the start time
 			if (timerStartTime === null) {
 				timerStartTime = Date.now();
-				timerInitialRemaining = timerData.timeRemaining || 60000;
+				timerInitialRemaining = timerData.timeRemaining || timerData.duration || 0;
 			}
 			
 			// Calculate elapsed time and remaining time (client-side only, no server needed)
@@ -53,7 +54,7 @@
 		}
 		
 		// Update derived state
-		isWarning = timerSeconds > 0 && timerSeconds <= 30;
+		isWarning = isTimerInWarning(timerData, timerSeconds > 0 ? timerSeconds * 1000 : 0);
 		timerDisplay = Math.floor(timerSeconds / 60) + ':' + String(timerSeconds % 60).padStart(2, '0');
 		
 		// Call optional callback
@@ -64,7 +65,7 @@
 	
 	// Watch for timer state changes
 	$: if (timerData) {
-		const currentState = `${timerData.state}-${timerData.timeRemaining}`;
+		const currentState = `${timerData.state}-${timerData.timeRemaining}-${timerData.duration ?? timerData.timeAllowed ?? ''}-${timerData.initialWarningMillis ?? timerData.athleteInitialWarningMillis ?? ''}-${timerData.finalWarningMillis ?? timerData.athleteFinalWarningMillis ?? ''}`;
 		if (currentState !== lastTimerState) {
 			lastTimerState = currentState;
 			

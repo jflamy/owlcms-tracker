@@ -212,6 +212,8 @@ fopUpdate = {
   athleteTimerEventType: 'StartTime',
   athleteMillisRemaining: 60000,
   timeAllowed: 60000,
+  athleteInitialWarningMillis: -1,
+  athleteFinalWarningMillis: 30000,
   // ... more fields
 }
 ```
@@ -234,7 +236,9 @@ fopUpdate = {
   timer: {
     state: 'running' | 'stopped' | 'set',
     timeRemaining: number,  // milliseconds
-    duration: number        // milliseconds
+    duration: number,       // milliseconds
+    initialWarningMillis: number,
+    finalWarningMillis: number
   },
   liftingOrderAthletes: [  // All athletes in standard order (from sessionAthletes)
     {

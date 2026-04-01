@@ -1,5 +1,6 @@
 import { writable, derived } from 'svelte/store';
 import { browser } from '$app/environment';
+import { getAthleteWarningThresholds } from '$lib/timer-logic.js';
 
 /**
  * Translation Map Store - Receives translations from SSE
@@ -138,10 +139,20 @@ export const timer = derived(competition, $c => {
   
   // Convert OWLCMS timer format to our expected format
   if (timer.timeAllowed && timer.timeRemaining !== undefined) {
+    const thresholds = getAthleteWarningThresholds({
+      duration: timer.timeAllowed,
+      initialWarningMillis: timer.initialWarningMillis,
+      finalWarningMillis: timer.finalWarningMillis,
+      athleteInitialWarningMillis: timer.athleteInitialWarningMillis,
+      athleteFinalWarningMillis: timer.athleteFinalWarningMillis
+    });
     return {
       state: timer.timeRemaining > 0 ? 'running' : 'stopped',
+      timeRemaining: timer.timeRemaining,
       startTime: timer.timeRemaining > 0 ? Date.now() - (timer.timeAllowed - timer.timeRemaining) : null,
       duration: timer.timeAllowed,
+      initialWarningMillis: thresholds.initialWarningMillis,
+      finalWarningMillis: thresholds.finalWarningMillis,
       indefinite: timer.indefinite || false
     };
   }

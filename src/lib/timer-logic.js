@@ -3,6 +3,56 @@
  * Handles client-side countdown with server sync
  */
 
+function parseTimerMillis(value) {
+	if (value === undefined || value === null || value === '') {
+		return null;
+	}
+	const parsed = parseInt(value, 10);
+	return Number.isNaN(parsed) ? null : parsed;
+}
+
+export function getAthleteWarningThresholds(timerData) {
+	const duration = parseTimerMillis(timerData?.duration ?? timerData?.timeAllowed);
+	const explicitInitial = parseTimerMillis(timerData?.initialWarningMillis ?? timerData?.athleteInitialWarningMillis);
+	const explicitFinal = parseTimerMillis(timerData?.finalWarningMillis ?? timerData?.athleteFinalWarningMillis);
+
+	if (explicitInitial !== null || explicitFinal !== null) {
+		return {
+			initialWarningMillis: explicitInitial ?? -1,
+			finalWarningMillis: explicitFinal ?? -1
+		};
+	}
+
+	if (duration === 120000) {
+		return { initialWarningMillis: 90000, finalWarningMillis: 30000 };
+	}
+
+	if (duration === 60000) {
+		return { initialWarningMillis: -1, finalWarningMillis: 30000 };
+	}
+
+	return { initialWarningMillis: -1, finalWarningMillis: -1 };
+}
+
+export function getTimerWarningThresholdMillis(timerData, defaultMillis = 30000) {
+	const explicitFinal = parseTimerMillis(timerData?.finalWarningMillis ?? timerData?.athleteFinalWarningMillis);
+	if (explicitFinal !== null) {
+		return explicitFinal;
+	}
+
+	const athleteThresholds = getAthleteWarningThresholds(timerData);
+	if (athleteThresholds.finalWarningMillis >= 0) {
+		return athleteThresholds.finalWarningMillis;
+	}
+
+	return defaultMillis;
+}
+
+export function isTimerInWarning(timerData, remainingMillis, defaultMillis = 30000) {
+	const warningThresholdMillis = getTimerWarningThresholdMillis(timerData, defaultMillis);
+	return warningThresholdMillis >= 0 && remainingMillis > 0 && remainingMillis <= warningThresholdMillis;
+}
+
 /**
  * Creates a timer state manager
  * @returns {Object} Timer manager with state and methods
@@ -12,6 +62,7 @@ export function createTimer() {
 	let timerInterval = null;
 	let timerStartTime = null; // When timer was started (client time)
 	let timerInitialRemaining = 0; // Initial time remaining from server
+	let currentTimerData = null;
 	let lastTimerState = null; // Track last known timer state to detect changes
 	let subscribers = [];
 
@@ -21,10 +72,13 @@ export function createTimer() {
 	 */
 	function updateTimer(timerData) {
 		if (!timerData) {
+			currentTimerData = null;
 			timerSeconds = 0;
 			notifySubscribers();
 			return;
 		}
+
+		currentTimerData = timerData;
 
 		// If timer is stopped, show the time without counting down
 		if (timerData.state === 'stopped') {
@@ -47,7 +101,7 @@ export function createTimer() {
 			// If timer just started, record the start time
 			if (timerStartTime === null) {
 				timerStartTime = Date.now();
-				timerInitialRemaining = Math.max(0, timerData.timeRemaining || 60000);
+				timerInitialRemaining = Math.max(0, timerData.timeRemaining || timerData.duration || 0);
 			}
 
 			// Calculate elapsed time and remaining time (client-side only, no server needed)
@@ -65,7 +119,7 @@ export function createTimer() {
 	function syncWithServer(timerData) {
 		if (!timerData) return;
 
-		const currentState = `${timerData.state}-${timerData.timeRemaining}`;
+		const currentState = `${timerData.state}-${timerData.timeRemaining}-${timerData.duration ?? timerData.timeAllowed ?? ''}-${timerData.initialWarningMillis ?? timerData.athleteInitialWarningMillis ?? ''}-${timerData.finalWarningMillis ?? timerData.athleteFinalWarningMillis ?? ''}`;
 		if (currentState !== lastTimerState) {
 			lastTimerState = currentState;
 
@@ -110,6 +164,7 @@ export function createTimer() {
 			clearInterval(timerInterval);
 			timerInterval = null;
 		}
+		currentTimerData = null;
 	}
 
 	/**
@@ -142,7 +197,8 @@ export function createTimer() {
 	 */
 	function getState() {
 		const isRunning = timerStartTime !== null && timerSeconds > 0;
-		const isWarning = timerSeconds > 0 && timerSeconds <= 30;
+		const remainingMillis = timerSeconds > 0 ? timerSeconds * 1000 : 0;
+		const isWarning = isTimerInWarning(currentTimerData, remainingMillis);
 		const timerDisplay = Math.floor(timerSeconds / 60) + ':' + String(timerSeconds % 60).padStart(2, '0');
 
 		return {
