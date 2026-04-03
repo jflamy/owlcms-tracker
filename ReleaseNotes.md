@@ -5,6 +5,7 @@
 
 ##### Release log
 
+- 2.15.1: team scoreboards result exports now include membership and body weight
 - 2.14.0: Remove hard-coded timer values, obey directives from owlcms
 
 - 2.13.2: Fix for the on-demand database refresh issue
