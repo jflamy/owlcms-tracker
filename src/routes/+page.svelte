@@ -403,59 +403,61 @@
 
     <main class="main">
       <!-- Standard Scoreboards -->
-      <section class="scoreboard-category collapsible" style:order={categoryOrder('standard')}>
-        <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
-        <h2 class="category-title clickable" on:click={() => toggleCategory('standard')}>
-          <span class="toggle-icon">{expandedCategory === 'standard' ? '▼' : '▶'}</span>
-          Standard Scoreboards
-        </h2>
-        {#if expandedCategory === 'standard'}
-          <div class="scoreboards-grid">
-            {#each standardScoreboards as scoreboard}
-              <div class="scoreboard-card">
-                <h3>{scoreboard.name}</h3>
-                <p class="description">{@html scoreboard.description}</p>
-                
-                <div class="fop-links">
-                  {#if confirmedFops}
-                    <h4>Select Platform:</h4>
-                    <div class="fop-list">
-                      {#each data.fops as fop}
-                        <div class="fop-row">
-                          <a 
-                            href={getScoreboardUrl(scoreboard.type, fop)}
-                            class="fop-link"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            Platform {fop}
-                          </a>
-                          {#if scoreboard.options && scoreboard.options.length > 0}
-                            <button
-                              class="options-btn"
-                              on:click={() => openOptionsModal(scoreboard, fop)}
-                              title="Configure options for Platform {fop}"
+      {#if standardScoreboards.length > 0}
+        <section class="scoreboard-category collapsible" style:order={categoryOrder('standard')}>
+          <!-- svelte-ignore a11y-click-events-have-key-events -->
+          <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+          <h2 class="category-title clickable" on:click={() => toggleCategory('standard')}>
+            <span class="toggle-icon">{expandedCategory === 'standard' ? '▼' : '▶'}</span>
+            Standard Scoreboards
+          </h2>
+          {#if expandedCategory === 'standard'}
+            <div class="scoreboards-grid">
+              {#each standardScoreboards as scoreboard}
+                <div class="scoreboard-card">
+                  <h3>{scoreboard.name}</h3>
+                  <p class="description">{@html scoreboard.description}</p>
+                  
+                  <div class="fop-links">
+                    {#if confirmedFops}
+                      <h4>Select Platform:</h4>
+                      <div class="fop-list">
+                        {#each data.fops as fop}
+                          <div class="fop-row">
+                            <a 
+                              href={getScoreboardUrl(scoreboard.type, fop)}
+                              class="fop-link"
+                              target="_blank"
+                              rel="noopener noreferrer"
                             >
-                              ⚙️ Options
-                            </button>
-                          {/if}
-                        </div>
-                      {/each}
-                    </div>
-                  {:else}
-                    <div class="fop-list">
-                      <div class="fop-link disabled">
-                        <span class="fop-wait">Awaiting OWLCMS connection...</span>
+                              Platform {fop}
+                            </a>
+                            {#if scoreboard.options && scoreboard.options.length > 0}
+                              <button
+                                class="options-btn"
+                                on:click={() => openOptionsModal(scoreboard, fop)}
+                                title="Configure options for Platform {fop}"
+                              >
+                                ⚙️ Options
+                              </button>
+                            {/if}
+                          </div>
+                        {/each}
                       </div>
-                    </div>
-                  {/if}
+                    {:else}
+                      <div class="fop-list">
+                        <div class="fop-link disabled">
+                          <span class="fop-wait">Awaiting OWLCMS connection...</span>
+                        </div>
+                      </div>
+                    {/if}
+                  </div>
                 </div>
-              </div>
-            {/each}
-          </div>
-        {/if}
-      </section>
+              {/each}
+            </div>
+          {/if}
+        </section>
+      {/if}
 
       <!-- Team Scoreboards -->
       {#if teamScoreboards.length > 0}
