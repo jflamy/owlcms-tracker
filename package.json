@@ -1,6 +1,6 @@
 {
   "name": "owlcms-tracker",
-  "version": "2.14.0",
+  "version": "2.14.1",
   "private": true,
   "scripts": {
     "dev": "node node_modules/vite/bin/vite.js dev --port 8096",
