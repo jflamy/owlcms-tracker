@@ -890,6 +890,7 @@ function teamAthleteFromDatabase(dbAthlete, context = {}) {
 		fullName,
 		firstName: dbAthlete.firstName,
 		lastName: dbAthlete.lastName,
+		membership: dbAthlete.membership || '',
 		teamName,  // Resolved from team ID using hub's indexed teams
 		team: dbAthlete.team,  // Original team ID
 		startNumber: dbAthlete.startNumber,
@@ -1103,8 +1104,24 @@ function buildDisplayInfo(athlete, displayTotal) {
 		teamLength: (athlete.teamName || '').length,
 		custom1: '',
 		custom2: '',
-		membership: ''
+		membership: athlete.membership || ''
 	};
+}
+
+function getAthleteMembership(athlete) {
+	if (!athlete) return '';
+	if (athlete.membership !== undefined && athlete.membership !== null) {
+		return String(athlete.membership);
+	}
+	if (athlete.displayInfo?.membership !== undefined && athlete.displayInfo?.membership !== null) {
+		return String(athlete.displayInfo.membership);
+	}
+	return '';
+}
+
+function getAthleteBodyWeight(athlete) {
+	const bodyWeight = parseFormattedNumber(athlete?.bodyWeight);
+	return bodyWeight > 0 ? bodyWeight : '';
 }
 
 /**
@@ -1702,8 +1719,10 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// Build headers from translations (all from OWLCMS, using Tracker.* keys for new ones)
 	const headers = {
 		order: translations['Tracker.Order'] || translations.Start || translations.Order || 'Order',
+		membership: translations['Results.Membership'] || translations.Membership || 'Membership',
 		name: translations.Name || 'Name',
 		category: translations.Category || 'Cat.',
+		bodyWeight: translations['Results.BodyWeight'] || translations['Scoreboard.BodyWeight'] || translations.BodyWeight || 'B.W.',
 		birth: translations['Scoreboard.Birth'] || translations.Birth || 'Born',
 		team: translations.Team || 'Team',
 		snatch: translations.Snatch || 'Snatch',
@@ -2351,8 +2370,8 @@ async function generateScoreboardFormat(workbook, worksheet, data, options) {
 	const allContribute = data.allAthletes === true;
 
 	// Column widths (no header text — we build the 2-row header manually)
-	// Cols: 1=Order, 2=Name, 3=Cat, 4=Born, 5=Team, 6-8=Sn1-3, 9=BestSn, 10-12=CJ1-3, 13=BestCJ, 14=Total, 15=Score
-	const colWidths = [8, 25, 10, 8, 20, 8, 8, 8, 10, 8, 8, 8, 10, 10, 12];
+	// Cols: 1=Membership, 2=Name, 3=Cat, 4=Bodyweight, 5=Born, 6=Team, 7-9=Sn1-3, 10=BestSn, 11-13=CJ1-3, 14=BestCJ, 15=Total, 16=Score
+	const colWidths = [14, 25, 10, 10, 8, 20, 8, 8, 8, 10, 8, 8, 8, 10, 10, 12];
 	colWidths.forEach((w, i) => { worksheet.getColumn(i + 1).width = w; });
 
 	const headerFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } };
@@ -2364,38 +2383,41 @@ async function generateScoreboardFormat(workbook, worksheet, data, options) {
 	const centerAlign = { vertical: 'middle', horizontal: 'center' };
 
 	// --- Row 1: group headers with merges ---
-	// ORDER (merge rows 1-2)
+	// MEMBERSHIP (merge rows 1-2)
 	worksheet.mergeCells(1, 1, 2, 1);
 	// NAME (merge rows 1-2)
 	worksheet.mergeCells(1, 2, 2, 2);
 	// CATEGORY (merge rows 1-2)
 	worksheet.mergeCells(1, 3, 2, 3);
-	// BORN (merge rows 1-2)
+	// BODYWEIGHT (merge rows 1-2)
 	worksheet.mergeCells(1, 4, 2, 4);
-	// TEAM (merge rows 1-2)
+	// BORN (merge rows 1-2)
 	worksheet.mergeCells(1, 5, 2, 5);
-	// SNATCH group (cols 6-9 in row 1)
-	worksheet.mergeCells(1, 6, 1, 9);
-	// CLEAN&JERK group (cols 10-13 in row 1)
-	worksheet.mergeCells(1, 10, 1, 13);
+	// TEAM (merge rows 1-2)
+	worksheet.mergeCells(1, 6, 2, 6);
+	// SNATCH group (cols 7-10 in row 1)
+	worksheet.mergeCells(1, 7, 1, 10);
+	// CLEAN&JERK group (cols 11-14 in row 1)
+	worksheet.mergeCells(1, 11, 1, 14);
 	// TOTAL (merge rows 1-2)
-	worksheet.mergeCells(1, 14, 2, 14);
-	// SCORE (merge rows 1-2)
 	worksheet.mergeCells(1, 15, 2, 15);
+	// SCORE (merge rows 1-2)
+	worksheet.mergeCells(1, 16, 2, 16);
 
 	const row1 = worksheet.getRow(1);
-	row1.getCell(1).value = headers?.order || 'Order';
+	row1.getCell(1).value = headers?.membership || 'Membership';
 	row1.getCell(2).value = headers?.name || 'Name';
 	row1.getCell(3).value = headers?.category || 'Cat.';
-	row1.getCell(4).value = headers?.birth || 'Born';
-	row1.getCell(5).value = headers?.team || 'Team';
-	row1.getCell(6).value = headers?.snatch || 'Snatch';
-	row1.getCell(10).value = headers?.cleanJerk || 'Clean & Jerk';
-	row1.getCell(14).value = headers?.total || 'Total';
-	row1.getCell(15).value = headers?.score || 'Score';
+	row1.getCell(4).value = headers?.bodyWeight || 'B.W.';
+	row1.getCell(5).value = headers?.birth || 'Born';
+	row1.getCell(6).value = headers?.team || 'Team';
+	row1.getCell(7).value = headers?.snatch || 'Snatch';
+	row1.getCell(11).value = headers?.cleanJerk || 'Clean & Jerk';
+	row1.getCell(15).value = headers?.total || 'Total';
+	row1.getCell(16).value = headers?.score || 'Score';
 
 	// Style row 1
-	for (let col = 1; col <= 15; col++) {
+	for (let col = 1; col <= 16; col++) {
 		const cell = row1.getCell(col);
 		cell.fill = headerFill;
 		cell.font = headerFont;
@@ -2405,16 +2427,16 @@ async function generateScoreboardFormat(workbook, worksheet, data, options) {
 
 	// --- Row 2: sub-headers for attempt columns ---
 	const row2 = worksheet.getRow(2);
-	row2.getCell(6).value = '1';
-	row2.getCell(7).value = '2';
-	row2.getCell(8).value = '3';
-	row2.getCell(9).value = headers?.best || '✔';
-	row2.getCell(10).value = '1';
-	row2.getCell(11).value = '2';
-	row2.getCell(12).value = '3';
-	row2.getCell(13).value = headers?.best || '✔';
+	row2.getCell(7).value = '1';
+	row2.getCell(8).value = '2';
+	row2.getCell(9).value = '3';
+	row2.getCell(10).value = headers?.best || '✔';
+	row2.getCell(11).value = '1';
+	row2.getCell(12).value = '2';
+	row2.getCell(13).value = '3';
+	row2.getCell(14).value = headers?.best || '✔';
 
-	for (let col = 1; col <= 15; col++) {
+	for (let col = 1; col <= 16; col++) {
 		const cell = row2.getCell(col);
 		cell.fill = headerFill;
 		cell.font = headerFont;
@@ -2428,7 +2450,7 @@ async function generateScoreboardFormat(workbook, worksheet, data, options) {
 	for (const team of teams) {
 		// Team header row (merged across name columns)
 		const teamRow = worksheet.getRow(currentRow);
-		worksheet.mergeCells(currentRow, 1, currentRow, 5); // Merge Order through Team columns
+		worksheet.mergeCells(currentRow, 1, currentRow, 6); // Merge Membership through Team columns
 		
 		const teamCell = teamRow.getCell(1);
 		teamCell.value = team.teamName;
@@ -2441,7 +2463,7 @@ async function generateScoreboardFormat(workbook, worksheet, data, options) {
 		teamCell.alignment = { vertical: 'middle', horizontal: 'left' };
 		
 		// Team score in the Score column
-		const scoreCell = teamRow.getCell(15); // Score column
+		const scoreCell = teamRow.getCell(16); // Score column
 		scoreCell.value = team.teamScore;
 		scoreCell.font = { bold: true, size: 12 };
 		scoreCell.fill = {
@@ -2453,7 +2475,7 @@ async function generateScoreboardFormat(workbook, worksheet, data, options) {
 		scoreCell.numFmt = scoringSystem === 'TeamPoints' ? '0' : '0.00';
 
 		// Apply borders to team header row
-		for (let col = 1; col <= 15; col++) {
+		for (let col = 1; col <= 16; col++) {
 			teamRow.getCell(col).border = {
 				top: { style: 'thin' },
 				bottom: { style: 'thin' },
@@ -2468,18 +2490,22 @@ async function generateScoreboardFormat(workbook, worksheet, data, options) {
 		for (const athlete of team.athletes) {
 			const row = worksheet.getRow(currentRow);
 			
-			row.getCell(1).value = athlete.inCurrentSession ? (athlete.liftingOrder || '') : '';
+			row.getCell(1).value = getAthleteMembership(athlete);
 			row.getCell(2).value = athlete.fullName || '';
 			row.getCell(3).value = athlete.category || '';
-			row.getCell(4).value = athlete.yearOfBirth || '';
-			row.getCell(5).value = athlete.teamName || '';
+			const bodyWeightCell = row.getCell(4);
+			bodyWeightCell.value = getAthleteBodyWeight(athlete);
+			bodyWeightCell.alignment = { horizontal: 'right' };
+			bodyWeightCell.numFmt = '0.00';
+			row.getCell(5).value = athlete.yearOfBirth || '';
+			row.getCell(6).value = athlete.teamName || '';
 			
 			// Attempts - format with strikethrough for failed lifts
 			const sattempts = athlete.sattempts || [];
 			const cattempts = athlete.cattempts || [];
 			
 			for (let i = 0; i < 3; i++) {
-				const snCell = row.getCell(6 + i);
+				const snCell = row.getCell(7 + i);
 				const attempt = sattempts[i];
 				snCell.alignment = { horizontal: 'right' };
 				if (attempt && attempt.stringValue && attempt.stringValue !== '\u00A0') {
@@ -2490,13 +2516,13 @@ async function generateScoreboardFormat(workbook, worksheet, data, options) {
 				}
 			}
 			
-			const bestSnCell = row.getCell(9);
+			const bestSnCell = row.getCell(10);
 			bestSnCell.value = athlete.bestSnatch || '';
 			bestSnCell.alignment = { horizontal: 'right' };
 			bestSnCell.font = { bold: true };
 			
 			for (let i = 0; i < 3; i++) {
-				const cjCell = row.getCell(10 + i);
+				const cjCell = row.getCell(11 + i);
 				const attempt = cattempts[i];
 				cjCell.alignment = { horizontal: 'right' };
 				if (attempt && attempt.stringValue && attempt.stringValue !== '\u00A0') {
@@ -2507,17 +2533,17 @@ async function generateScoreboardFormat(workbook, worksheet, data, options) {
 				}
 			}
 			
-			const bestCjCell = row.getCell(13);
+			const bestCjCell = row.getCell(14);
 			bestCjCell.value = athlete.bestCleanJerk || '';
 			bestCjCell.alignment = { horizontal: 'right' };
 			bestCjCell.font = { bold: true };
-			const totalCell = row.getCell(14);
+			const totalCell = row.getCell(15);
 			totalCell.value = athlete.displayTotal || '';
 			totalCell.alignment = { horizontal: 'right' };
 			totalCell.font = { bold: true };
 			
 			const scoreValue = scoringSystem === 'TeamPoints' ? athlete.displayTeamPoints : athlete.displayScore;
-			const scoreCell = row.getCell(15);
+			const scoreCell = row.getCell(16);
 			scoreCell.value = scoreValue || '';
 			scoreCell.numFmt = scoringSystem === 'TeamPoints' ? '0' : '0.00';
 			scoreCell.alignment = { horizontal: 'right' };
@@ -2533,7 +2559,7 @@ async function generateScoreboardFormat(workbook, worksheet, data, options) {
 			}
 
 			// Apply borders
-			for (let col = 1; col <= 15; col++) {
+			for (let col = 1; col <= 16; col++) {
 				row.getCell(col).border = {
 					top: { style: 'thin' },
 					bottom: { style: 'thin' },
@@ -2594,9 +2620,11 @@ async function generateFlatFormat(workbook, worksheet, data, options) {
 
 	// Column definitions
 	const columns = [
+		{ header: headers?.membership || 'Membership', key: 'membership', width: 14 },
 		{ header: headers?.team || 'Team', key: 'team', width: 20 },
 		{ header: headers?.name || 'Name', key: 'name', width: 25 },
 		{ header: headers?.category || 'Category', key: 'category', width: 10 },
+		{ header: headers?.bodyWeight || 'B.W.', key: 'bodyWeight', width: 10 },
 		{ header: headers?.birth || 'Born', key: 'born', width: 8 },
 		{ header: 'Sn1', key: 'sn1', width: 8 },
 		{ header: 'Sn2', key: 'sn2', width: 8 },
@@ -2635,17 +2663,22 @@ async function generateFlatFormat(workbook, worksheet, data, options) {
 	for (const athlete of flatAthletes) {
 		const row = worksheet.getRow(currentRow);
 		
-		row.getCell(1).value = athlete.teamName || '';
-		row.getCell(2).value = athlete.fullName || '';
-		row.getCell(3).value = athlete.category || '';
-		row.getCell(4).value = athlete.yearOfBirth || '';
+		row.getCell(1).value = getAthleteMembership(athlete);
+		row.getCell(2).value = athlete.teamName || '';
+		row.getCell(3).value = athlete.fullName || '';
+		row.getCell(4).value = athlete.category || '';
+		const bodyWeightCell = row.getCell(5);
+		bodyWeightCell.value = getAthleteBodyWeight(athlete);
+		bodyWeightCell.alignment = { horizontal: 'right' };
+		bodyWeightCell.numFmt = '0.00';
+		row.getCell(6).value = athlete.yearOfBirth || '';
 		
 		// Attempts
 		const sattempts = athlete.sattempts || [];
 		const cattempts = athlete.cattempts || [];
 		
 		for (let i = 0; i < 3; i++) {
-			const snCell = row.getCell(5 + i);
+			const snCell = row.getCell(7 + i);
 			const attempt = sattempts[i];
 			snCell.alignment = { horizontal: 'right' };
 			if (attempt && attempt.stringValue && attempt.stringValue !== '\u00A0') {
@@ -2656,13 +2689,13 @@ async function generateFlatFormat(workbook, worksheet, data, options) {
 			}
 		}
 		
-		const bestSnCell = row.getCell(8);
+		const bestSnCell = row.getCell(10);
 		bestSnCell.value = athlete.bestSnatch || '';
 		bestSnCell.alignment = { horizontal: 'right' };
 		bestSnCell.font = { bold: true };
 		
 		for (let i = 0; i < 3; i++) {
-			const cjCell = row.getCell(9 + i);
+			const cjCell = row.getCell(11 + i);
 			const attempt = cattempts[i];
 			cjCell.alignment = { horizontal: 'right' };
 			if (attempt && attempt.stringValue && attempt.stringValue !== '\u00A0') {
@@ -2673,17 +2706,17 @@ async function generateFlatFormat(workbook, worksheet, data, options) {
 			}
 		}
 		
-		const bestCjCell = row.getCell(12);
+		const bestCjCell = row.getCell(14);
 		bestCjCell.value = athlete.bestCleanJerk || '';
 		bestCjCell.alignment = { horizontal: 'right' };
 		bestCjCell.font = { bold: true };
-		const totalCell = row.getCell(13);
+		const totalCell = row.getCell(15);
 		totalCell.value = athlete.displayTotal || '';
 		totalCell.alignment = { horizontal: 'right' };
 		totalCell.font = { bold: true };
 		
 		const scoreValue = scoringSystem === 'TeamPoints' ? athlete.displayTeamPoints : athlete.displayScore;
-		const scoreCell = row.getCell(14);
+		const scoreCell = row.getCell(16);
 		scoreCell.value = scoreValue || '';
 		scoreCell.numFmt = scoringSystem === 'TeamPoints' ? '0' : '0.00';
 		scoreCell.alignment = { horizontal: 'right' };
@@ -2700,7 +2733,7 @@ async function generateFlatFormat(workbook, worksheet, data, options) {
 		}
 
 		// Team gender column - show M/F only for scoring athletes
-		const teamGenderCell = row.getCell(15);
+		const teamGenderCell = row.getCell(17);
 		if (contributes) {
 			const normalizedGender = normalizeGender(athlete.gender);
 			teamGenderCell.value = normalizedGender || '';
@@ -2708,7 +2741,7 @@ async function generateFlatFormat(workbook, worksheet, data, options) {
 		}
 
 		// Apply borders
-		for (let col = 1; col <= 15; col++) {
+		for (let col = 1; col <= 17; col++) {
 			row.getCell(col).border = {
 				top: { style: 'thin' },
 				bottom: { style: 'thin' },
