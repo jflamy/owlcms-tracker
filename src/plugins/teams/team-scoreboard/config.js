@@ -75,6 +75,14 @@ export default {
 			description: 'Choose scoreboard text language'
 		},
 		{
+			key: 'fixedTeamOrder',
+			label: 'Keep Teams in Fixed Order',
+			type: 'boolean',
+			default: true,
+			group: 'display',
+			description: 'Keep teams in alphabetical order instead of re-sorting them by score'
+		},
+		{
 			key: 'showPredicted',
 			label: 'Show Predicted Totals',
 			type: 'boolean',

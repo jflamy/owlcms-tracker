@@ -42,10 +42,10 @@ function findPackageRoot(startDir) {
 	return startDir;
 }
 
-function toFileUrl(filePath) {
+function toFileUrl(filePath, cacheBust = null) {
 	if (!filePath) return null;
 	const normalized = filePath.replace(/\\/g, '/');
-	return `file:///${normalized}`;
+	return cacheBust === null ? `file:///${normalized}` : `file:///${normalized}?t=${cacheBust}`;
 }
 
 async function importFromFileUrl(fileUrl) {
@@ -157,7 +157,10 @@ class ScoreboardRegistry {
 	 */
 	async initialize() {
 		// If already initialized, return immediately
-		if (this.initialized) return;
+		if (this.initialized) {
+			await this.refreshRuntimePlugins();
+			return;
+		}
 		
 		// If initialization is in progress, wait for it
 		if (this.initializingPromise) {
@@ -205,6 +208,25 @@ class ScoreboardRegistry {
 		console.log(`[ScoreboardRegistry] Initialized with ${this.scoreboards.size} scoreboards`);
 	}
 
+	async refreshRuntimePlugins() {
+		const runtimePlugins = await discoverRuntimePlugins();
+
+		if (runtimePlugins.size === 0) {
+			return;
+		}
+
+		for (const [type, scoreboard] of Array.from(this.scoreboards.entries())) {
+			if (scoreboard.runtime) {
+				this.scoreboards.delete(type);
+			}
+		}
+
+		for (const [pluginPath, paths] of runtimePlugins) {
+			const folderName = pluginPath.split('/').pop();
+			await this.registerScoreboard(pluginPath, folderName, paths);
+		}
+	}
+
 	/**
 	 * Register a single scoreboard plugin
 	 * @param {string} pluginPath - Path relative to plugins/ (e.g., "books/iwf-startbook")
@@ -223,12 +245,14 @@ class ScoreboardRegistry {
 				// Runtime-discovered plugin - use dynamic import
 				// Use direct file URL strings (no percent-encoding) for accented paths on Windows
 				try {
-					const configUrl = toFileUrl(runtimePaths.configPath) || pathToFileURL(runtimePaths.configPath).href;
+					const configMtime = statSync(runtimePaths.configPath).mtimeMs;
+					const configUrl = toFileUrl(runtimePaths.configPath, configMtime) || `${pathToFileURL(runtimePaths.configPath).href}?t=${configMtime}`;
 					configModule = await importFromFileUrl(configUrl);
 					config = configModule.default || configModule;
 					
 					if (runtimePaths.helpersPath) {
-						const helpersUrl = toFileUrl(runtimePaths.helpersPath) || pathToFileURL(runtimePaths.helpersPath).href;
+						const helpersMtime = statSync(runtimePaths.helpersPath).mtimeMs;
+						const helpersUrl = toFileUrl(runtimePaths.helpersPath, helpersMtime) || `${pathToFileURL(runtimePaths.helpersPath).href}?t=${helpersMtime}`;
 						const helpersModule = await importFromFileUrl(helpersUrl);
 						dataHelper = helpersModule.getScoreboardData || helpersModule.processData || helpersModule.default;
 						actionHandler = helpersModule.handleAction || null;

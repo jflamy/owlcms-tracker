@@ -1364,7 +1364,7 @@ function findTopContributors(athletes, gender, scoreFn, topCounts = {}) {
  *   - nextScoreHighlightClass: CSS class for predicted score cell
  * 
  * Athletes within team are sorted by: session, start number, lot number
- * Teams are sorted by: team score (highest first)
+ * Teams are sorted by: alphabetical team name when fixedTeamOrder is enabled, otherwise by team score
  * 
  * @param {Array} teamAthletes - Array of TeamAthlete objects
  * @param {string} gender - Gender filter ('M', 'F', or 'MF')
@@ -1377,6 +1377,7 @@ function findTopContributors(athletes, gender, scoreFn, topCounts = {}) {
  */
 function groupByTeams(teamAthletes, gender, headers, topCounts = {}, includeAllAthletes = false, competition = {}, options = {}) {
 	const { topM = 4, topF = 4, topMFm = 2, topMFf = 2 } = topCounts;
+	const keepFixedTeamOrder = options.fixedTeamOrder !== false && options.fixedTeamOrder !== 'false';
 	logger.debug(`[Team groupByTeams] Input: ${teamAthletes.length} athletes, gender filter: ${gender}, topCounts: M=${topM}, F=${topF}, MFm=${topMFm}, MFf=${topMFf}, includeAll=${includeAllAthletes}`);
 	
 	// Filter athletes with no team
@@ -1542,13 +1543,17 @@ function groupByTeams(teamAthletes, gender, headers, topCounts = {}, includeAllA
 		};
 	});
 	
-	// Sort teams by actual score (highest first), then by predicted score as tiebreaker
-	teams.sort((a, b) => {
-		const scoreDiff = b.teamScore - a.teamScore;
-		if (scoreDiff !== 0) return scoreDiff;
-		// Tiebreaker: team with better predicted score first
-		return b.teamNextScore - a.teamNextScore;
-	});
+	if (keepFixedTeamOrder) {
+		teams.sort((a, b) => a.teamName.localeCompare(b.teamName, undefined, { sensitivity: 'base' }));
+	} else {
+		// Sort teams by actual score (highest first), then by predicted score as tiebreaker
+		teams.sort((a, b) => {
+			const scoreDiff = b.teamScore - a.teamScore;
+			if (scoreDiff !== 0) return scoreDiff;
+			// Tiebreaker: team with better predicted score first
+			return b.teamNextScore - a.teamNextScore;
+		});
+	}
 	
 	return teams;
 }
