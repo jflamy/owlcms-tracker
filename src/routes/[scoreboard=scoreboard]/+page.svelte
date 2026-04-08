@@ -25,9 +25,21 @@
 	// Get language preference from URL parameter or config default or fallback to 'en'
 	$: language = $page.url.searchParams.get('lang') || $page.url.searchParams.get('language') || data.config?.options?.find(o => o.key === 'language')?.default || 'en';
 	
-	// Build API URL with all parameters (including lang)
-	$: apiUrl = `/api/scoreboard?type=${data.scoreboardType}&fop=${data.fopName}&lang=${language}` +
-		Object.entries(data.options).map(([k, v]) => `&${k}=${v}`).join('');
+	function buildApiUrl() {
+		const params = new URLSearchParams({ type: data.scoreboardType, lang: language });
+
+		if (data.fopName) {
+			params.set('fop', data.fopName);
+		}
+
+		for (const [key, value] of Object.entries(data.options || {})) {
+			params.set(key, String(value));
+		}
+
+		return `/api/scoreboard?${params.toString()}`;
+	}
+
+	$: apiUrl = buildApiUrl();
 	
 	// Fetch scoreboard data from API
 	async function fetchData() {
@@ -125,7 +137,7 @@
 </script>
 
 <svelte:head>
-	<title>{data.scoreboardName} - FOP {data.fopName}</title>
+	<title>{data.scoreboardName} - {data.fopName === '*' ? 'All FOPs' : `FOP ${data.fopName}`}</title>
 </svelte:head>
 
 {#if scoreboardData}
@@ -162,7 +174,7 @@
 {:else}
 	<div class="loading">
 		<h1>Loading {data.scoreboardName}...</h1>
-		<p>FOP: {data.fopName}</p>
+		<p>{data.fopName === '*' ? 'All FOPs' : `FOP: ${data.fopName}`}</p>
 		{#if scoreboardError}
 			<p class="error-note">{scoreboardError}</p>
 		{/if}

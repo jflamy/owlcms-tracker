@@ -53,6 +53,10 @@ export async function load({ params, url }) {
 					example: `/${type}?fop=Platform_A`
 				});
 			}
+		} else if (!fopName && !fopRequired) {
+			// Scoreboards that aggregate across the competition still need a stable
+			// token so the shared route SSE/API path can subscribe to all platform updates.
+			fopName = '*';
 		}
 		
 		// Build options: config defaults (base then extension) + URL overrides

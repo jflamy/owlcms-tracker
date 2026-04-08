@@ -109,6 +109,18 @@ export async function GET({ url, request }) {
 			await refreshDatabaseForDocuments();
 		}
 		
+		if (fopName === '*') {
+			const data = await scoreboardRegistry.processData(type, fopName, options);
+			return json({
+				success: true,
+				type,
+				fop: fopName,
+				options,
+				data,
+				timestamp: Date.now()
+			});
+		}
+		
 		// Get current FOP version for cache validation
 		const currentVersion = competitionHub.getFopStateVersion?.({ fopName }) ?? null;
 		

@@ -143,9 +143,9 @@ class SSEBroker {
    * Serializes JSON once and encodes once, then sends same bytes to matching clients
    * 
    * FOP Filtering Rules:
-   * - message.fop is null (global event) → send to ALL clients
-   * - message.fop is set → send only to clients where client.fopName === message.fop
-   * - client.fopName is null → only receives global events (message.fop is null)
+  * - message.fop is null (global event) → send to ALL clients
+  * - message.fop is set → send to exact FOP subscribers and all-FOP subscribers ('*')
+  * - client.fopName is null → only receives global events (message.fop is null)
    */
   broadcast(message) {
     if (this.clients.size === 0) return;
@@ -176,12 +176,13 @@ class SSEBroker {
     for (const client of this.clients) {
       // FOP filtering:
       // - Global events (eventFop === null) go to everyone
-      // - FOP-specific events go only to clients subscribed to that FOP
+      // - FOP-specific events go to exact FOP subscribers and all-FOP subscribers
       const isGlobalEvent = eventFop === null;
       const clientMatchesFop = client.fopName === eventFop;
+      const clientWantsAllFops = client.fopName === '*';
       const clientWantsType = !client.types || client.types.has(message.type);
       
-      if (clientWantsType && (isGlobalEvent || clientMatchesFop)) {
+      if (clientWantsType && (isGlobalEvent || clientMatchesFop || clientWantsAllFops)) {
         try {
           client.send(encodedBytes);
           
