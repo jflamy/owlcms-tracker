@@ -1,6 +1,6 @@
 export default {
 	name: 'Team Rankings',
-	description: 'Paged team-only championship rankings that mirror OWLCMS team-result rules without athlete rows.',
+	description: 'Paged team championship rankings that follow OWLCMS team-result rules. REQUIRES OWLCMS 66+',
 	category: 'team',
 	order: 110,
 	fopRequired: false,
