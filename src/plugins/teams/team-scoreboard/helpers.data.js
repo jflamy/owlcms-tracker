@@ -302,6 +302,23 @@ function countCompletedCleanJerks(athlete) {
 }
 
 /**
+ * Whether an athlete is completely done lifting and should no longer show
+ * a live lifting-order position.
+ *
+ * Done means either:
+ * - all 6 attempts are completed, or
+ * - the athlete has bombed out in snatch or clean & jerk.
+ *
+ * @param {Object} athlete - Athlete with sattempts/cattempts arrays
+ * @returns {boolean}
+ */
+function isAthleteDoneLifting(athlete) {
+	if (!athlete) return false;
+	const totalAttemptsDone = countCompletedSnatches(athlete) + countCompletedCleanJerks(athlete);
+	return totalAttemptsDone >= 6 || hasBombedOut(athlete);
+}
+
+/**
  * Check if athlete has bombed out (failed all 3 attempts in snatch or C&J)
  * Bombout means the athlete completed all 3 attempts in a lift phase with zero successful lifts
  * 
@@ -522,6 +539,7 @@ function isDefinitiveTotalZero(athlete) {
  */
 function teamAthleteFromSession(sessionAthlete, context = {}) {
 	const { liftingOrder = null, bodyWeight = null, includeCjDeclaration = true } = context;
+	const displayLiftingOrder = isAthleteDoneLifting(sessionAthlete) ? null : liftingOrder;
 	
 	// Use body weight from context (merged from database) or from session athlete
 	const athleteBodyWeight = bodyWeight ?? sessionAthlete.bodyWeight ?? 0;
@@ -589,7 +607,7 @@ function teamAthleteFromSession(sessionAthlete, context = {}) {
 		totalRank,
 		
 		// Enrichment: ordering
-		liftingOrder,
+		liftingOrder: displayLiftingOrder,
 		
 		// Markers
 		inCurrentSession: true
@@ -857,6 +875,7 @@ function teamAthleteFromDatabase(dbAthlete, context = {}) {
 		bestSnatch,
 		bestCleanJerk
 	};
+	const displayLiftingOrder = isAthleteDoneLifting(normalizedAthlete) ? null : liftingOrder;
 	
 	// Check if athlete bombed out (store the raw condition, NOT applied yet)
 	// The enforceBombout option is applied later at display/scoring time
@@ -936,7 +955,7 @@ function teamAthleteFromDatabase(dbAthlete, context = {}) {
 		championshipType,
 		
 		// Enrichment: ordering
-		liftingOrder,
+		liftingOrder: displayLiftingOrder,
 		
 		// Markers
 		inCurrentSession: false

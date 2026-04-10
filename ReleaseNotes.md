@@ -5,7 +5,8 @@
 
 ##### Release log
 
-- 2.15.1: team scoreboards result exports now include membership and body weight
+- 2.14.2: team scoreboard toggle between fixed team order and ranking order now working
+- 2.14.1: team scoreboards result exports now include membership and body weight
 - 2.14.0: Remove hard-coded timer values, obey directives from owlcms
 
 - 2.13.2: Fix for the on-demand database refresh issue

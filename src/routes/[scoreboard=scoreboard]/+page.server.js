@@ -90,11 +90,15 @@ export async function load({ params, url }) {
 			scoreboardName: scoreboard.config.name,
 			scoreboardDescription: scoreboard.config.description,
 			fopName,
-			options,
 			config: scoreboard.config,  // Static config with defaults
 			liveConfig: liveData?.config,  // Current config with overrides (if available)
 			...(liveData || {})  // Include all data for skipRouteSSE plugins
 		};
+
+		// Always preserve the canonical route options (config defaults + URL overrides).
+		// Some helpers return a reduced `options` object for presentation, but the route
+		// uses `data.options` to build subsequent API URLs and must not lose query flags.
+		returnData.options = options;
 		return returnData;
 		
 	} catch (err) {
