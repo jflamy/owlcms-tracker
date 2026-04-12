@@ -52,6 +52,26 @@ export default {
 			max: 5000,
 			group: 'display',
 			description: 'Duration of the top-to-bottom row entrance animation.'
+		},
+		{
+			key: 'smhfOverrideSinclairYear',
+			label: 'Override Sinclair Year for SMHF Calculations',
+			type: 'select',
+			options: ['2020', '2024', '2028'],
+			default: '2020',
+			group: 'smhf',
+			groupLabel: 'SMHF',
+			description: 'Override the base Sinclair coefficient year used for SMHF calculations. Default 2020 matches OWLCMS.'
+		},
+		{
+			key: 'smhfAgeFactorYear',
+			label: 'Age Factor Year for SMHF Calculations',
+			type: 'select',
+			options: ['2020', '2025'],
+			default: '2020',
+			group: 'smhf',
+			groupLabel: 'SMHF',
+			description: 'Select the masters age-factor table used for SMHF calculations. 2020 is the Standard SMHF table. 2025 uses the alternate published masters age factors.'
 		}
 	]
 };

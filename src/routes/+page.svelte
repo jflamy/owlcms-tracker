@@ -11,6 +11,7 @@
   let showModal = false;
   let modalScoreboard = null;
   let modalFop = null;
+  let activeOptionTab = null;
   
   // Collapse state for categories (accordion behavior - only one open at a time)
   let expandedCategory = null; // Start folded
@@ -101,6 +102,8 @@
     
     modalScoreboard = scoreboard;
     modalFop = fop;
+    const optionTabs = getOptionTabs(scoreboard);
+    activeOptionTab = optionTabs[0]?.groupName || null;
     showModal = true;
   }
   
@@ -108,6 +111,64 @@
     showModal = false;
     modalScoreboard = null;
     modalFop = null;
+    activeOptionTab = null;
+  }
+
+  function getOptionTabs(scoreboard) {
+    const options = scoreboard?.options || [];
+    const groupNames = [...new Set(options.filter((option) => option.group).map((option) => option.group))];
+
+    if (groupNames.length === 0) {
+      return options.length > 0
+        ? [{
+            groupName: 'options',
+            groupLabel: 'options',
+            options
+          }]
+        : [];
+    }
+
+    const groupLabels = Object.fromEntries(
+      options
+        .filter((option) => option.group && option.groupLabel)
+        .map((option) => [option.group, option.groupLabel])
+    );
+    const ungrouped = options.filter((option) => !option.group);
+
+    return groupNames
+      .map((groupName, index) => ({
+        groupName,
+        groupLabel: groupLabels[groupName] || groupName || 'Options',
+        options: [
+          ...(index === 0 ? ungrouped : []),
+          ...options.filter((option) => option.group === groupName)
+        ]
+      }))
+      .filter((tab) => tab.options.length > 0);
+  }
+
+  function getTabPanelClass(groupName) {
+    return groupName === 'options'
+      ? 'options-tab-panel options-tab-panel-two-column options-tab-panel-generic'
+      : 'options-tab-panel options-tab-panel-two-column';
+  }
+
+  function getModalText(scoreboard, key, fallback) {
+    const customText = scoreboard?.config?.modalLabels?.[key];
+    return typeof customText === 'string' && customText.trim() !== '' ? customText : fallback;
+  }
+
+  function formatTabLabel(label) {
+    const text = String(label || '').trim();
+    if (!text) {
+      return '';
+    }
+
+    if (text === text.toUpperCase()) {
+      return text;
+    }
+
+    return text.replace(/(^|[\s/-])(\S)/g, (match, prefix, char) => `${prefix}${char.toUpperCase()}`);
   }
   
   async function openScoreboard(type, fop, withOptions = false) {
@@ -144,6 +205,10 @@
 
   let confirmedFops = data.hasConfirmedFops ?? false;
   let protocolError = null;
+  const defaultPageTitle = 'OWLCMS Tracker';
+  $: pageTitle = confirmedFops && data.competitionName && data.competitionName !== 'OWLCMS Competition'
+    ? data.competitionName
+    : defaultPageTitle;
 
   /**
    * Open an export page (e.g., team-export) in a new tab with current options
@@ -272,10 +337,10 @@
     return `/${type}?${params.toString()}`;
   }
 
-  function isOptionDisabled(option, type, fop) {
+  function isOptionDisabled(option, currentOptions) {
     // Only 'allAthletes' can disable other fields
     if (option.disabledBy === 'allAthletes') {
-       return !!scoreboardOptions[type]?.[fop]?.['allAthletes'];
+       return !!currentOptions?.allAthletes;
     }
     return false;
   }
@@ -370,12 +435,12 @@
 </script>
 
 <svelte:head>
-  <title>OWLCMS Tracker - {data.competitionName}</title>
+  <title>{pageTitle}</title>
 </svelte:head>
 
 <div class="container">
   <header class="header">
-    <h1><img src="/left.png" alt="OWLCMS" class="header-logo" /> OWLCMS Tracker</h1>
+    <h1><img src="/left.png" alt="OWLCMS" class="header-logo" /> {pageTitle}</h1>
   </header>
 
   {#if protocolError}
@@ -889,94 +954,38 @@
       
       <div class="modal-body">
         {#if modalScoreboard.options && modalScoreboard.options.length > 0}
-          {@const hasGroups = modalScoreboard.options.some(opt => opt.group)}
-          {#if hasGroups}
-            {@const groupNames = [...new Set(modalScoreboard.options.filter(o => o.group).map(o => o.group))]}
-            {@const groupLabels = Object.fromEntries(modalScoreboard.options.filter(o => o.group && o.groupLabel).map(o => [o.group, o.groupLabel]))}
-            {@const ungrouped = modalScoreboard.options.filter(opt => !opt.group)}
-            {@const groupedColumns = groupNames
-              .map((groupName, index) => ({
-                groupName,
-                groupLabel: groupLabels[groupName] || groupName || 'Options',
-                options: [
-                  ...(index === 0 ? ungrouped : []),
-                  ...modalScoreboard.options.filter(opt => opt.group === groupName)
-                ]
-              }))
-              .filter(col => col.options.length > 0)}
-            <div class="options-columns">
-              {#each groupedColumns as column}
-                <div class="options-column">
-                  <h4 class="column-title">{column.groupLabel}</h4>
-                  {#each column.options as option}
-                    {@const isDisabled = isOptionDisabled(option, modalScoreboard.type, modalFop)}
-                    <div class="option-field" class:disabled-option={isDisabled}>
-                      <label for="{modalScoreboard.type}-{modalFop}-{option.key}">
-                        {option.label}
-                        {#if option.description}
-                          <span class="option-help" title={option.description}>ⓘ</span>
-                        {/if}
-                      </label>
-                      
-                      {#if option.type === 'select'}
-                        <select 
-                          id="{modalScoreboard.type}-{modalFop}-{option.key}"
-                          bind:value={scoreboardOptions[modalScoreboard.type][modalFop][option.key]}
-                          disabled={isDisabled}
-                        >
-                          {#each (option.options || []) as opt}
-                            <option value={opt}>{getDisplayName(opt, option.key)}</option>
-                          {/each}
-                        </select>
-                      {:else if option.type === 'boolean'}
-                        <div class="checkbox-wrapper">
-                          <input 
-                            type="checkbox" 
-                            id="{modalScoreboard.type}-{modalFop}-{option.key}"
-                            bind:checked={scoreboardOptions[modalScoreboard.type][modalFop][option.key]}
-                            disabled={isDisabled}
-                          />
-                          <label for="{modalScoreboard.type}-{modalFop}-{option.key}" class="checkbox-label">
-                            {scoreboardOptions[modalScoreboard.type][modalFop][option.key] ? 'Yes' : 'No'}
-                          </label>
-                        </div>
-                      {:else if option.type === 'number'}
-                        <input 
-                          type="number" 
-                          id="{modalScoreboard.type}-{modalFop}-{option.key}"
-                          bind:value={scoreboardOptions[modalScoreboard.type][modalFop][option.key]}
-                          min={option.min}
-                          max={option.max}
-                          disabled={isDisabled}
-                        />
-                      {:else}
-                        <input 
-                          type="text" 
-                          id="{modalScoreboard.type}-{modalFop}-{option.key}"
-                          bind:value={scoreboardOptions[modalScoreboard.type][modalFop][option.key]}
-                          disabled={isDisabled}
-                        />
-                      {/if}
-                    </div>
-                  {/each}
-                </div>
-              {/each}
-            </div>
-          {:else}
-            <div class="options-grid">
-              {#each modalScoreboard.options as option}
-                <div class="option-field">
+          {@const optionTabs = getOptionTabs(modalScoreboard)}
+          {@const activeTab = optionTabs.find((tab) => tab.groupName === activeOptionTab) || optionTabs[0]}
+          <div class="options-tabs" role="tablist" aria-label="Configuration option groups">
+            {#each optionTabs as tab}
+              <button
+                type="button"
+                class:active-tab={activeTab?.groupName === tab.groupName}
+                class="option-tab"
+                role="tab"
+                aria-selected={activeTab?.groupName === tab.groupName}
+                on:click={() => activeOptionTab = tab.groupName}
+              >
+                {formatTabLabel(tab.groupLabel)}
+              </button>
+            {/each}
+          </div>
+          {#if activeTab}
+            <div class={getTabPanelClass(activeTab.groupName)} role="tabpanel">
+              {#each activeTab.options as option}
+                <div class="option-field" class:disabled-option={isOptionDisabled(option, scoreboardOptions[modalScoreboard.type][modalFop])}>
                   <label for="{modalScoreboard.type}-{modalFop}-{option.key}">
                     {option.label}
                     {#if option.description}
                       <span class="option-help" title={option.description}>ⓘ</span>
                     {/if}
                   </label>
-                  
+
                   {#if option.type === 'select'}
                     <select 
                       id="{modalScoreboard.type}-{modalFop}-{option.key}"
                       bind:value={scoreboardOptions[modalScoreboard.type][modalFop][option.key]}
+                      disabled={isOptionDisabled(option, scoreboardOptions[modalScoreboard.type][modalFop])}
                     >
                       {#each (option.options || []) as opt}
                         <option value={opt}>{getDisplayName(opt, option.key)}</option>
@@ -988,9 +997,12 @@
                         type="checkbox" 
                         id="{modalScoreboard.type}-{modalFop}-{option.key}"
                         bind:checked={scoreboardOptions[modalScoreboard.type][modalFop][option.key]}
+                        disabled={isOptionDisabled(option, scoreboardOptions[modalScoreboard.type][modalFop])}
                       />
                       <label for="{modalScoreboard.type}-{modalFop}-{option.key}" class="checkbox-label">
-                        {scoreboardOptions[modalScoreboard.type][modalFop][option.key] ? 'Yes' : 'No'}
+                          {scoreboardOptions[modalScoreboard.type][modalFop][option.key]
+                            ? getModalText(modalScoreboard, 'booleanTrue', 'Yes')
+                            : getModalText(modalScoreboard, 'booleanFalse', 'No')}
                       </label>
                     </div>
                   {:else if option.type === 'number'}
@@ -1000,12 +1012,14 @@
                       bind:value={scoreboardOptions[modalScoreboard.type][modalFop][option.key]}
                       min={option.min}
                       max={option.max}
+                      disabled={isOptionDisabled(option, scoreboardOptions[modalScoreboard.type][modalFop])}
                     />
                   {:else}
                     <input 
                       type="text" 
                       id="{modalScoreboard.type}-{modalFop}-{option.key}"
                       bind:value={scoreboardOptions[modalScoreboard.type][modalFop][option.key]}
+                      disabled={isOptionDisabled(option, scoreboardOptions[modalScoreboard.type][modalFop])}
                     />
                   {/if}
                 </div>
@@ -1031,12 +1045,12 @@
             on:click={() => openExportPage(modalScoreboard.type, modalFop)}
             title="Export team results to Excel"
           >
-            📊 Export Results
+            📊 {getModalText(modalScoreboard, 'exportResults', 'Export Results')}
           </button>
         {/if}
-        <button class="btn-secondary" on:click={closeModal}>Cancel</button>
+        <button class="btn-secondary" on:click={closeModal}>{getModalText(modalScoreboard, 'cancel', 'Cancel')}</button>
         <button class="btn-primary" on:click={() => openScoreboard(modalScoreboard.type, modalFop, true)}>
-          Open Scoreboard
+          {getModalText(modalScoreboard, 'openScoreboard', 'Open Scoreboard')}
         </button>
       </div>
     </div>
@@ -1359,8 +1373,9 @@
     background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
     border-radius: 12px;
     border: 1px solid rgba(255, 255, 255, 0.2);
-    max-width: 1200px;
-    width: min(95vw, 1200px);
+    width: min(96vw, 1240px);
+    height: min(88vh, 820px);
+    min-height: min(88vh, 820px);
     max-height: 95vh;
     display: flex;
     flex-direction: column;
@@ -1408,6 +1423,7 @@
     padding: 1.5rem;
     overflow-y: auto;
     flex: 1;
+    min-height: 0;
     color: #e2e8f0;
   }
 
@@ -1468,6 +1484,52 @@
     flex-direction: column;
     gap: 1rem;
   }
+
+  .options-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    margin-bottom: 1.25rem;
+    padding-bottom: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .option-tab {
+    border: none;
+    border-bottom: 3px solid transparent;
+    background: transparent;
+    color: #94a3b8;
+    padding: 0.9rem 1.15rem 0.8rem;
+    margin-bottom: -1px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 600;
+    transition: all 0.2s ease;
+  }
+
+  .option-tab:hover {
+    color: #e2e8f0;
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .option-tab.active-tab {
+    color: #ffffff;
+    border-bottom-color: #7c9cff;
+    background: linear-gradient(180deg, rgba(124, 156, 255, 0.14) 0%, rgba(124, 156, 255, 0.02) 100%);
+  }
+
+  .options-tab-panel {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem 1.25rem;
+    align-content: start;
+    justify-content: start;
+  }
+
+  .options-tab-panel-two-column {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
   
   .options-columns {
     display: grid;
@@ -1502,6 +1564,16 @@
   }
   
   @media (max-width: 900px) {
+    .modal-content {
+      width: min(96vw, 1100px);
+      height: min(90vh, 760px);
+      min-height: min(90vh, 760px);
+    }
+
+    .options-tab-panel-two-column {
+      grid-template-columns: 1fr;
+    }
+
     .options-columns {
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 1.5rem;
@@ -1509,6 +1581,29 @@
   }
 
   @media (max-width: 600px) {
+    .modal-content {
+      width: 100vw;
+      height: 100vh;
+      min-height: 100vh;
+      max-height: 100vh;
+      border-radius: 0;
+      border-left: none;
+      border-right: none;
+    }
+
+    .options-tabs {
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      scrollbar-width: thin;
+    }
+
+    .option-tab {
+      flex: 1 0 auto;
+      text-align: center;
+      padding-left: 0.9rem;
+      padding-right: 0.9rem;
+    }
+
     .options-columns {
       grid-template-columns: 1fr;
       gap: 1.25rem;
@@ -1519,6 +1614,7 @@
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+    width: min(100%, 34rem);
   }
   
   .option-field > label {

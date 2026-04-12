@@ -42,9 +42,13 @@ import {
 import { calculateTeamPoints } from '@owlcms/tracker-core/scoring';
 // Import scoring functions from tracker-core (works at runtime for derivative plugins)
 import { 
+	calculateSinclair as CalculateSinclair,
 	calculateSinclair2024 as CalculateSinclair2024, 
 	calculateSinclair2020 as CalculateSinclair2020, 
+	calculateSinclairMasters as CalculateSinclairMasters,
 	getMastersAgeFactor,
+	normalizeMastersAgeFactorYear,
+	normalizeSinclairYear,
 	calculateQPoints as CalculateQPoints,
 	calculateGamx as computeGamx,
 	Variant
@@ -52,7 +56,7 @@ import {
 
 // Re-export utilities and scoring functions for derivative plugins (from tracker-core)
 export { parseFormattedNumber };
-export { CalculateSinclair2024, CalculateSinclair2020, getMastersAgeFactor };
+export { CalculateSinclair, CalculateSinclair2024, CalculateSinclair2020, CalculateSinclairMasters, getMastersAgeFactor, normalizeMastersAgeFactorYear, normalizeSinclairYear };
 export { CalculateQPoints };
 export { computeGamx, Variant };
 
@@ -128,6 +132,24 @@ function normalizeLotNumber(value) {
 	return String(value).trim();
 }
 
+const DEFAULT_SINCLAIR_YEAR = 2024;
+const DEFAULT_SMHF_SINCLAIR_YEAR = 2020;
+const DEFAULT_SMHF_AGE_FACTOR_YEAR = 2020;
+
+function getCompetitionSinclairYear(databaseState) {
+	return normalizeSinclairYear(databaseState?.competition?.sinclairYear, DEFAULT_SINCLAIR_YEAR);
+}
+
+function resolveSinclairYearOption(optionValue, competitionYear, fallbackYear = competitionYear) {
+	const normalizedOption = String(optionValue ?? '').trim();
+	if (!normalizedOption || normalizedOption.toLowerCase() === 'competition') {
+		return competitionYear;
+	}
+
+	const parsedYear = Number.parseInt(normalizedOption, 10);
+	return normalizeSinclairYear(parsedYear, fallbackYear);
+}
+
 /**
  * Calculate score based on selected scoring system (default implementation)
  * @param {number} total - Athlete total
@@ -135,16 +157,22 @@ function normalizeLotNumber(value) {
  * @param {string} gender - 'M' or 'F'
  * @param {number} age - Athlete age
  * @param {string} system - Scoring system name
+ * @param {Object} scoringConfig - Resolved year configuration for Sinclair-based systems
  * @returns {number} Calculated score
  */
-function defaultCalculateScore(total, bw, gender, age, system = 'Sinclair') {
+function defaultCalculateScore(total, bw, gender, age, system = 'Sinclair', scoringConfig = {}) {
 	if (!total || total <= 0 || !bw || bw <= 0 || !gender) return 0;
 	
 	const normalizedGender = gender === 'M' || gender === 'F' ? gender : (gender.startsWith('M') ? 'M' : 'F');
+	const {
+		sinclairYear = DEFAULT_SINCLAIR_YEAR,
+		smhfOverrideSinclairYear = DEFAULT_SMHF_SINCLAIR_YEAR,
+		smhfAgeFactorYear = DEFAULT_SMHF_AGE_FACTOR_YEAR
+	} = scoringConfig;
 
 	switch (system) {
 		case 'SMHF':
-			return CalculateSinclair2020(total, bw, normalizedGender) * getMastersAgeFactor(age, normalizedGender);
+			return CalculateSinclairMasters(total, bw, normalizedGender, age, smhfOverrideSinclairYear, smhfAgeFactorYear);
 		case 'Q-Points':
 			return CalculateQPoints(total, bw, normalizedGender, 0); // No age factor
 		case 'Q-Masters':
@@ -159,7 +187,7 @@ function defaultCalculateScore(total, bw, gender, age, system = 'Sinclair') {
 			return computeGamx(normalizedGender, bw, total, Variant.U17, age);
 		case 'Sinclair':
 		default:
-			return CalculateSinclair2024(total, bw, normalizedGender);
+			return CalculateSinclair(total, bw, normalizedGender, sinclairYear);
 	}
 }
 
@@ -175,6 +203,7 @@ function defaultCalculateScore(total, bw, gender, age, system = 'Sinclair') {
  * @param {Object} context - Extended context for custom scoring
  * @param {Object} context.athlete - Full athlete object
  * @param {Object} context.hub - Competition hub reference
+ * @param {Object} context.scoringConfig - Resolved year configuration for Sinclair-based systems
  * @param {Function|null} customCalculateScore - Injected custom calculator (null = use default)
  * @returns {number} Calculated score
  */
@@ -188,7 +217,7 @@ function calculateScoreWithContext(total, bw, gender, age, system, context, cust
 		}
 	}
 	// Fall back to default scoring
-	return defaultCalculateScore(total, bw, gender, age, system);
+	return defaultCalculateScore(total, bw, gender, age, system, context?.scoringConfig);
 }
 
 /**
@@ -979,16 +1008,18 @@ export { calculatePredictedIfNext, calculatePredictedTotal, teamAthleteFromSessi
  * @param {string} scoringSystem - Scoring system name
  * @param {number} age - Athlete age (for masters systems)
  * @param {Object} athlete - Full athlete object for context (optional)
+ * @param {Object} scoringConfig - Resolved year configuration for Sinclair-based systems
  * @returns {number} Calculated score
  */
-function computeScore(total, bodyWeight, gender, scoringSystem, age = 0, athlete = null) {
+function computeScore(total, bodyWeight, gender, scoringSystem, age = 0, athlete = null, scoringConfig = {}) {
 	if (!total || total <= 0 || !bodyWeight || bodyWeight <= 0) return 0;
 	const normalizedGender = normalizeGender(gender) || 'M';
 	
 	// Build context for custom scoring
 	const context = {
 		athlete: athlete || {},
-		hub: competitionHub
+		hub: competitionHub,
+		scoringConfig
 	};
 	
 	// Use custom calculator if available, otherwise default
@@ -1032,7 +1063,8 @@ function computeAthleteScoring(athlete, context = {}) {
 	
 	const {
 		enforceBombout = false,
-		scoringSystem = 'Sinclair'
+		scoringSystem = 'Sinclair',
+		scoringConfig = {}
 	} = context;
 	
 	const { rawTotal = 0, rawPredictedTotal = 0, bombed = false, bodyWeight = 0, gender = 'M', age = 0 } = athlete;
@@ -1042,8 +1074,8 @@ function computeAthleteScoring(athlete, context = {}) {
 	const predictedTotal = (enforceBombout && bombed) ? 0 : rawPredictedTotal;
 	
 	// Compute scores based on scoring system (pass athlete for custom scoring context)
-	const actualScore = computeScore(actualTotal, bodyWeight, gender, scoringSystem, age, athlete);
-	const nextScore = computeScore(predictedTotal, bodyWeight, gender, scoringSystem, age, athlete);
+	const actualScore = computeScore(actualTotal, bodyWeight, gender, scoringSystem, age, athlete, scoringConfig);
+	const nextScore = computeScore(predictedTotal, bodyWeight, gender, scoringSystem, age, athlete, scoringConfig);
 	
 	// Format display values
 	const displayTotal = actualTotal > 0 ? String(actualTotal) : '-';
@@ -1634,6 +1666,12 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	const language = options.lang || options.language || 'no';
 	const translations = competitionHub.getTranslations({ locale: language });
 	const learningMode = process.env.LEARNING_MODE === 'true' ? 'enabled' : 'disabled';
+	const competitionSinclairYear = getCompetitionSinclairYear(databaseState);
+	const scoringConfig = {
+		sinclairYear: competitionSinclairYear,
+		smhfOverrideSinclairYear: resolveSinclairYearOption(options.smhfOverrideSinclairYear, competitionSinclairYear, DEFAULT_SMHF_SINCLAIR_YEAR),
+		smhfAgeFactorYear: normalizeMastersAgeFactorYear(options.smhfAgeFactorYear, DEFAULT_SMHF_AGE_FACTOR_YEAR)
+	};
 	
 	// enforceBombout: fallback to false if extension doesn't define it
 	const enforceBombout = options.enforceBombout ?? false;
@@ -1837,7 +1875,18 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	
 	// Also include whether a session is selected (sessionName present) so null-session switches invalidate cache
 	const sessionKeyState = (fopUpdate?.sessionName != null && fopUpdate?.sessionName !== '') ? 'session' : 'no-session';
-	const cacheKey = buildCacheKey({ fopName, includeFop: true, opts: { gender, sessionKeyState, ...options } });
+	const cacheKey = buildCacheKey({
+		fopName,
+		includeFop: true,
+		opts: {
+			gender,
+			sessionKeyState,
+			...options,
+			resolvedSinclairYear: scoringConfig.sinclairYear,
+			resolvedSmhfOverrideSinclairYear: scoringConfig.smhfOverrideSinclairYear,
+			resolvedSmhfAgeFactorYear: scoringConfig.smhfAgeFactorYear
+		}
+	});
 	logger.debug(`[Team helpers] Cache check: key=${String(cacheKey).substring(0, 120)}..., gender=${gender}`);
 	logger.debug(`[Team helpers] Debug state: fopState=${fopUpdate?.fopState}, currentAthleteKey=${fopUpdate?.currentAthleteKey}, sessionName=${fopUpdate?.sessionName}`);
 	
@@ -2016,7 +2065,8 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// =========================================================================
 	const scoringContext = {
 		enforceBombout,
-		scoringSystem
+		scoringSystem,
+		scoringConfig
 	};
 	const scoredAthletes = applyScoring(allTeamAthletes, scoringContext);
 	
@@ -2115,6 +2165,8 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		topN,
 		cjDecl: includeCjDeclaration,
 		scoringSystem,
+		smhfOverrideSinclairYear: scoringConfig.smhfOverrideSinclairYear,
+		smhfAgeFactorYear: scoringConfig.smhfAgeFactorYear,
 		allAthletes: includeAllAthletes
 	};
 

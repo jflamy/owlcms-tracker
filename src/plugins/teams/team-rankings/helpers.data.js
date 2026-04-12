@@ -3,9 +3,12 @@ import { registerCache } from '$lib/server/cache-utils.js';
 import { getFlagUrl } from '$lib/server/flag-resolver.js';
 import {
 	calculateTeamPoints,
-	calculateSinclair2024 as CalculateSinclair2024,
+	calculateSinclair as CalculateSinclair,
+	calculateSinclairMasters as CalculateSinclairMasters,
 	calculateQPoints as CalculateQPoints,
 	calculateGamx as computeGamx,
+	normalizeMastersAgeFactorYear,
+	normalizeSinclairYear,
 	Variant
 } from '@owlcms/tracker-core/scoring';
 
@@ -20,6 +23,9 @@ const SECTION_CONFIG = {
 
 const DEFAULT_PAGE_SIZE = 10;
 const TEMPORARY_MIN_TEAMS_PER_SECTION = 25;
+const DEFAULT_SINCLAIR_YEAR = 2024;
+const DEFAULT_SMHF_SINCLAIR_YEAR = 2020;
+const DEFAULT_SMHF_AGE_FACTOR_YEAR = 2020;
 
 function positiveCap(value) {
 	return Number.isFinite(value) && value > 0 ? value : null;
@@ -64,6 +70,20 @@ function parseChampionshipFilter(value) {
 		.filter(Boolean);
 
 	return normalized.length > 0 ? new Set(normalized) : null;
+}
+
+function getCompetitionSinclairYear(databaseState) {
+	return normalizeSinclairYear(databaseState?.competition?.sinclairYear, DEFAULT_SINCLAIR_YEAR);
+}
+
+function resolveSinclairYearOption(optionValue, competitionYear) {
+	const normalizedOption = String(optionValue ?? '').trim();
+	if (!normalizedOption || normalizedOption.toLowerCase() === 'competition') {
+		return competitionYear;
+	}
+
+	const parsedYear = Number.parseInt(normalizedOption, 10);
+	return normalizeSinclairYear(parsedYear, competitionYear);
 }
 
 function getCompetitionDate(databaseState) {
@@ -316,12 +336,17 @@ function buildPointValues(candidate, championship) {
 	};
 }
 
-function computeScoreMetric(athlete, scoreSystem, competitionDate) {
+function computeScoreMetric(athlete, scoreSystem, competitionDate, scoringConfig) {
 	const system = normalizeScoreSystem(scoreSystem);
 	const total = parseNumber(athlete?.total);
 	const bodyWeight = parseNumber(athlete?.bodyWeight || athlete?.presumedBodyWeight);
 	const gender = normalizeGender(athlete?.gender);
 	const age = calculateAge(athlete, competitionDate);
+	const {
+		sinclairYear,
+		smhfOverrideSinclairYear = DEFAULT_SMHF_SINCLAIR_YEAR,
+		smhfAgeFactorYear = DEFAULT_SMHF_AGE_FACTOR_YEAR
+	} = scoringConfig;
 
 	if (total <= 0) {
 		return 0;
@@ -330,7 +355,10 @@ function computeScoreMetric(athlete, scoreSystem, competitionDate) {
 	switch (system) {
 		case 'BW_SINCLAIR':
 		case 'SINCLAIR':
-			return CalculateSinclair2024(total, bodyWeight, gender);
+			return CalculateSinclair(total, bodyWeight, gender, sinclairYear);
+		case 'SMM':
+		case 'SMHF':
+			return CalculateSinclairMasters(total, bodyWeight, gender, age, smhfOverrideSinclairYear, smhfAgeFactorYear);
 		case 'Q_POINTS':
 		case 'QPOINTS':
 			return CalculateQPoints(total, bodyWeight, gender, 0);
@@ -368,7 +396,7 @@ function buildHeaders(locale) {
 	};
 }
 
-function createCandidate(athlete, participation, championship, competitionDate, doneSessions) {
+function createCandidate(athlete, participation, championship, competitionDate, doneSessions, scoringConfig) {
 	const teamName = resolveTeamName(athlete);
 	if (!teamName) {
 		return null;
@@ -393,13 +421,13 @@ function createCandidate(athlete, participation, championship, competitionDate, 
 		groupDone,
 		sortName: `${athlete?.lastName || ''} ${athlete?.firstName || ''}`.trim(),
 		flagUrl: getFlagUrl(teamName, true),
-		scoreMetric: computeScoreMetric(athlete, championship?.teamScoringSystem, competitionDate),
-		mixedScoreMetric: computeScoreMetric(athlete, championship?.mixedTeamScoringSystem, competitionDate),
+		scoreMetric: computeScoreMetric(athlete, championship?.teamScoringSystem, competitionDate, scoringConfig),
+		mixedScoreMetric: computeScoreMetric(athlete, championship?.mixedTeamScoringSystem, competitionDate, scoringConfig),
 		primaryRank: getPrimaryRank(participation, 'TOTAL')
 	};
 }
 
-function buildSectionCandidates(databaseState, championshipName, championship, sectionType, categoryCodeToChampionshipName, doneSessions) {
+function buildSectionCandidates(databaseState, championshipName, championship, sectionType, categoryCodeToChampionshipName, doneSessions, scoringConfig) {
 	const competitionDate = getCompetitionDate(databaseState);
 	const candidates = [];
 
@@ -425,12 +453,14 @@ function buildSectionCandidates(databaseState, championshipName, championship, s
 			continue;
 		}
 
-		const candidate = createCandidate(athlete, participation, championship, competitionDate, doneSessions);
+		const candidate = createCandidate(athlete, participation, championship, competitionDate, doneSessions, scoringConfig);
 		if (!candidate) {
 			continue;
 		}
 
-		candidate.scoreMetric = sectionType === 'MF' ? candidate.mixedScoreMetric : computeScoreMetric(athlete, championship?.teamScoringSystem, competitionDate);
+		candidate.scoreMetric = sectionType === 'MF'
+			? candidate.mixedScoreMetric
+			: computeScoreMetric(athlete, championship?.teamScoringSystem, competitionDate, scoringConfig);
 		candidates.push(candidate);
 	}
 
@@ -585,6 +615,12 @@ export function getScoreboardData(_fopName = '*', options = {}) {
 	const databaseState = competitionHub.getDatabaseState();
 	const locale = options?.lang || options?.language || 'en';
 	const headers = buildHeaders(locale);
+	const competitionSinclairYear = getCompetitionSinclairYear(databaseState);
+	const scoringConfig = {
+		sinclairYear: competitionSinclairYear,
+		smhfOverrideSinclairYear: resolveSinclairYearOption(options?.smhfOverrideSinclairYear, competitionSinclairYear, DEFAULT_SMHF_SINCLAIR_YEAR),
+		smhfAgeFactorYear: normalizeMastersAgeFactorYear(options?.smhfAgeFactorYear, DEFAULT_SMHF_AGE_FACTOR_YEAR)
+	};
 
 	if (!databaseState?.athletes || !databaseState?.championshipMap) {
 		return {
@@ -594,6 +630,8 @@ export function getScoreboardData(_fopName = '*', options = {}) {
 			message: headers.waitingForData,
 			headers,
 			options: {
+				smhfOverrideSinclairYear: scoringConfig.smhfOverrideSinclairYear,
+				smhfAgeFactorYear: scoringConfig.smhfAgeFactorYear,
 				pageSize: Math.max(1, parseNumber(options?.pageSize) || DEFAULT_PAGE_SIZE),
 				pagePauseMs: Math.max(500, parseNumber(options?.pagePauseMs) || 5000),
 				sweepDurationMs: Math.max(200, parseNumber(options?.sweepDurationMs) || 1200),
@@ -604,6 +642,8 @@ export function getScoreboardData(_fopName = '*', options = {}) {
 	}
 
 	const normalizedOptions = {
+		smhfOverrideSinclairYear: scoringConfig.smhfOverrideSinclairYear,
+		smhfAgeFactorYear: scoringConfig.smhfAgeFactorYear,
 		pageSize: Math.max(1, parseNumber(options?.pageSize) || DEFAULT_PAGE_SIZE),
 		pagePauseMs: Math.max(500, parseNumber(options?.pagePauseMs) || 5000),
 		sweepDurationMs: Math.max(200, parseNumber(options?.sweepDurationMs) || 1200),
@@ -615,6 +655,9 @@ export function getScoreboardData(_fopName = '*', options = {}) {
 		checksum: databaseState?.databaseChecksum || null,
 		locale,
 		normalizedOptions: {
+			sinclairYear: scoringConfig.sinclairYear,
+			smhfOverrideSinclairYear: normalizedOptions.smhfOverrideSinclairYear,
+			smhfAgeFactorYear: normalizedOptions.smhfAgeFactorYear,
 			pageSize: normalizedOptions.pageSize,
 			pagePauseMs: normalizedOptions.pagePauseMs,
 			sweepDurationMs: normalizedOptions.sweepDurationMs,
@@ -641,7 +684,7 @@ export function getScoreboardData(_fopName = '*', options = {}) {
 		}
 
 		for (const sectionType of ['M', 'F']) {
-			const candidates = buildSectionCandidates(databaseState, championshipName, championship, sectionType, categoryCodeToChampionshipName, doneSessions);
+			const candidates = buildSectionCandidates(databaseState, championshipName, championship, sectionType, categoryCodeToChampionshipName, doneSessions, scoringConfig);
 			if (candidates.length === 0) {
 				continue;
 			}
@@ -655,7 +698,7 @@ export function getScoreboardData(_fopName = '*', options = {}) {
 			continue;
 		}
 
-		const mixedCandidates = buildSectionCandidates(databaseState, championshipName, championship, 'MF', categoryCodeToChampionshipName, doneSessions);
+		const mixedCandidates = buildSectionCandidates(databaseState, championshipName, championship, 'MF', categoryCodeToChampionshipName, doneSessions, scoringConfig);
 		if (mixedCandidates.length === 0) {
 			continue;
 		}
@@ -674,6 +717,8 @@ export function getScoreboardData(_fopName = '*', options = {}) {
 		message: pages.length > 0 ? null : headers.waitingForData,
 		headers,
 		options: {
+			smhfOverrideSinclairYear: normalizedOptions.smhfOverrideSinclairYear,
+			smhfAgeFactorYear: normalizedOptions.smhfAgeFactorYear,
 			pageSize: normalizedOptions.pageSize,
 			pagePauseMs: normalizedOptions.pagePauseMs,
 			sweepDurationMs: normalizedOptions.sweepDurationMs,
