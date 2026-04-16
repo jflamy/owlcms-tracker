@@ -21,6 +21,12 @@ This folder contains the permanent documentation for developing and extending th
   - Setting up WebSocket connection
   - URL configuration
 
+### Collaboration
+- **[CONTRIBUTION_WORKFLOW.md](./CONTRIBUTION_WORKFLOW.md)** - Fork and local review workflow
+  - Fetch-only `official` remote setup for the fork
+  - Syncing `contributor/owlcms-tracker` from `owlcms/owlcms-tracker`
+  - Local review workflow using a second `jflamy` checkout
+
 ## 🚀 Quick Start
 
 ### For New Developers
@@ -63,6 +69,7 @@ See [SCOREBOARD_ARCHITECTURE.md](./SCOREBOARD_ARCHITECTURE.md) for implementatio
 |----------|---------|-------|
 | **Scoreboards** | Building display components | SCOREBOARD_ARCHITECTURE.md, CREATE_YOUR_OWN.md |
 | **Integration** | WebSocket & OWLCMS setup | WEBSOCKET_MESSAGE_SPEC.md, WEBSOCKET_CONFIGURATION.md |
+| **Collaboration** | Fork sync and local review workflow | CONTRIBUTION_WORKFLOW.md |
 
 ## 🔧 Change Tracking
 
@@ -81,6 +88,7 @@ Temporary change logs and compliance documents are kept in the **[/compliance](.
 | Create new scoreboard | [SCOREBOARD_ARCHITECTURE.md](./SCOREBOARD_ARCHITECTURE.md) + [CREATE_YOUR_OWN.md](../CREATE_YOUR_OWN.md) |
 | Understand data fields | WEBSOCKET_MESSAGE_SPEC.md (in `@owlcms/tracker-core`) |
 | Configure OWLCMS | [WEBSOCKET_CONFIGURATION.md](./WEBSOCKET_CONFIGURATION.md) |
+| Review fork changes locally | [CONTRIBUTION_WORKFLOW.md](./CONTRIBUTION_WORKFLOW.md) |
 
 ## 📝 Contributing
 

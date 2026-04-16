@@ -1,0 +1,185 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="1000" viewBox="0 0 1400 1000" role="img" aria-labelledby="title desc">
+  <title id="title">Contribution Workflow Diagram</title>
+  <desc id="desc">Diagram showing the official GitHub repository, the contributor fork, jflamy local checkouts, the contributor checkout, and the sequence of synchronization, review, and integration events.</desc>
+  <defs>
+    <style>
+      text {
+        font-family: "Segoe UI", Arial, sans-serif;
+        fill: #12202f;
+      }
+      .title {
+        font-size: 28px;
+        font-weight: 700;
+      }
+      .subtitle {
+        font-size: 15px;
+        fill: #4d5d6c;
+      }
+      .section {
+        font-size: 20px;
+        font-weight: 700;
+      }
+      .box-title {
+        font-size: 18px;
+        font-weight: 700;
+      }
+      .box-text {
+        font-size: 14px;
+      }
+      .legend-title {
+        font-size: 17px;
+        font-weight: 700;
+      }
+      .legend-text {
+        font-size: 15px;
+      }
+      .panel {
+        fill: #f6f8fb;
+        stroke: #c7d0db;
+        stroke-width: 2;
+      }
+      .github {
+        fill: #eef4ff;
+        stroke: #7aa2e3;
+        stroke-width: 2;
+      }
+      .maintainer {
+        fill: #eef8ef;
+        stroke: #79b27f;
+        stroke-width: 2;
+      }
+      .contributor {
+        fill: #fff5e8;
+        stroke: #d99a45;
+        stroke-width: 2;
+      }
+      .review {
+        fill: #fff9db;
+        stroke: #d3b746;
+        stroke-width: 2;
+      }
+      .arrow-sync {
+        stroke: #2e6fbb;
+        stroke-width: 4;
+        fill: none;
+      }
+      .arrow-publish {
+        stroke: #b55b1d;
+        stroke-width: 4;
+        fill: none;
+      }
+      .arrow-review {
+        stroke: #8a6d1f;
+        stroke-width: 4;
+        fill: none;
+      }
+      .arrow-maintainer {
+        stroke: #2f7b46;
+        stroke-width: 4;
+        fill: none;
+      }
+      .arrow-dashed {
+        stroke-dasharray: 10 8;
+      }
+      .number {
+        fill: #12202f;
+        font-size: 15px;
+        font-weight: 700;
+        text-anchor: middle;
+        dominant-baseline: middle;
+      }
+      .n1 { fill: #d9ebff; stroke: #2e6fbb; }
+      .n2 { fill: #ffe4cc; stroke: #b55b1d; }
+      .n3 { fill: #fff1bf; stroke: #8a6d1f; }
+      .n4 { fill: #e2f4e5; stroke: #2f7b46; }
+    </style>
+    <marker id="arrowBlue" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 z" fill="#2e6fbb" />
+    </marker>
+    <marker id="arrowOrange" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 z" fill="#b55b1d" />
+    </marker>
+    <marker id="arrowGold" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 z" fill="#8a6d1f" />
+    </marker>
+    <marker id="arrowGreen" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 z" fill="#2f7b46" />
+    </marker>
+  </defs>
+
+  <rect x="20" y="20" width="1360" height="960" rx="22" class="panel" />
+  <text x="50" y="62" class="title">Contribution Workflow Diagram</text>
+  <text x="50" y="90" class="subtitle">Official repository, contributor fork, maintainer local checkouts, contributor checkout, and the sequence of review and integration events.</text>
+
+  <text x="85" y="140" class="section">GitHub</text>
+  <rect x="50" y="160" width="1300" height="170" rx="18" class="github" />
+
+  <rect x="130" y="205" width="420" height="80" rx="14" class="maintainer" />
+  <text x="160" y="237" class="box-title">Official Repository</text>
+  <text x="160" y="261" class="box-text">owlcms/owlcms-tracker</text>
+
+  <rect x="830" y="205" width="420" height="80" rx="14" class="contributor" />
+  <text x="860" y="237" class="box-title">Contributor Fork</text>
+  <text x="860" y="261" class="box-text">contributor/owlcms-tracker</text>
+
+  <text x="85" y="390" class="section">Local Machines</text>
+
+  <rect x="50" y="410" width="620" height="340" rx="18" class="maintainer" />
+  <text x="80" y="445" class="section">Maintainer Side</text>
+  <text x="80" y="470" class="subtitle">jflamy machine</text>
+
+  <rect x="90" y="510" width="250" height="115" rx="14" class="maintainer" />
+  <text x="115" y="545" class="box-title">jflamy-checkout</text>
+  <text x="115" y="570" class="box-text">origin -&gt; owlcms/owlcms-tracker</text>
+  <text x="115" y="592" class="box-text">official maintainer working checkout</text>
+
+  <rect x="380" y="510" width="250" height="115" rx="14" class="review" />
+  <text x="405" y="545" class="box-title">contributor-review-checkout</text>
+  <text x="405" y="570" class="box-text">origin -&gt; contributor fork</text>
+  <text x="405" y="592" class="box-text">official -&gt; official repo (fetch-only)</text>
+
+  <rect x="730" y="410" width="620" height="340" rx="18" class="contributor" />
+  <text x="760" y="445" class="section">Contributor Side</text>
+  <text x="760" y="470" class="subtitle">contributor machine</text>
+
+  <rect x="915" y="510" width="250" height="115" rx="14" class="contributor" />
+  <text x="940" y="545" class="box-title">contributor-checkout</text>
+  <text x="940" y="570" class="box-text">origin -&gt; contributor fork</text>
+  <text x="940" y="592" class="box-text">official -&gt; official repo (fetch-only)</text>
+
+  <path d="M 550 285 C 690 320, 820 395, 915 510" class="arrow-publish" marker-end="url(#arrowOrange)" />
+  <circle cx="785" cy="392" r="16" class="n2" /><text x="785" y="392" class="number">1</text>
+  <text x="710" y="510" class="box-text">1. contributor catches up</text>
+  <text x="710" y="532" class="box-text">with official</text>
+
+  <path d="M 1040 510 C 1040 445, 1040 360, 1040 285" class="arrow-publish" marker-end="url(#arrowOrange)" />
+  <circle cx="1070" cy="398" r="16" class="n2" /><text x="1070" y="398" class="number">2</text>
+  <text x="1080" y="300" class="box-text">2. publish commits to fork on GitHub</text>
+
+  <path d="M 830 265 C 720 300, 610 390, 505 510" class="arrow-maintainer" marker-end="url(#arrowGreen)" />
+  <circle cx="655" cy="360" r="16" class="n4" /><text x="655" y="360" class="number">3</text>
+  <text x="700" y="310" class="box-text">3. jflamy clones or pulls contributor fork</text>
+
+  <path d="M 340 285 C 360 350, 420 420, 480 510" class="arrow-maintainer arrow-dashed" marker-end="url(#arrowGreen)" />
+  <circle cx="405" cy="355" r="16" class="n4" /><text x="405" y="355" class="number">4</text>
+  <text x="360" y="310" class="box-text">4. review checkout fetches official</text>
+  <text x="360" y="332" class="box-text">for comparison</text>
+
+  <path d="M 505 625 C 430 690, 380 700, 340 625" class="arrow-maintainer arrow-dashed" marker-end="url(#arrowGreen)" />
+  <circle cx="420" cy="700" r="16" class="n4" /><text x="420" y="700" class="number">5</text>
+  <text x="80" y="675" class="box-text">5. review discussion drives merge or cherry-pick decision</text>
+
+  <path d="M 215 510 C 215 440, 215 360, 215 285" class="arrow-maintainer" marker-end="url(#arrowGreen)" />
+  <circle cx="245" cy="398" r="16" class="n4" /><text x="245" y="398" class="number">6</text>
+  <text x="270" y="392" class="box-text">6. push integrated result</text>
+  <text x="270" y="414" class="box-text">to official repository</text>
+
+  <rect x="50" y="790" width="1300" height="190" rx="18" class="panel" />
+  <text x="80" y="830" class="legend-title">Sequence Of Events</text>
+  <text x="80" y="852" class="legend-text">1. Contributor catches up with the official repository in contributor-checkout.</text>
+  <text x="80" y="874" class="legend-text">2. Contributor pushes published commits from contributor-checkout to the GitHub fork.</text>
+  <text x="80" y="896" class="legend-text">3. Jflamy refreshes contributor-review-checkout from the contributor fork.</text>
+  <text x="80" y="918" class="legend-text">4. Jflamy fetches official into contributor-review-checkout for side-by-side comparison.</text>
+  <text x="80" y="940" class="legend-text">5. Jflamy reviews locally, discusses changes, and decides whether to merge a branch or cherry-pick selected commits.</text>
+  <text x="80" y="962" class="legend-text">6. Jflamy integrates the chosen result in jflamy-checkout and pushes it back to owlcms/owlcms-tracker.</text>
+</svg>
