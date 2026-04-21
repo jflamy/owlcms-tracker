@@ -37,49 +37,111 @@
     return (a.order || 999) - (b.order || 999);
   }
   
-  // Filter out hidden plugins (order === -1) and categorize scoreboards
-  $: visibleScoreboards = data.scoreboards.filter(s => s.order !== -1);
-  
-  $: standardScoreboards = visibleScoreboards.filter(s => s.category === 'standard').sort(sortScoreboards);
-  
-  $: videoOverlayScoreboards = visibleScoreboards.filter(s => s.category === 'video-overlay').sort(sortScoreboards);
+  // Server-side defaults can be overridden by external JSON configuration.
+  $: configuredCategoryOrder = Array.isArray(data.landingPageCategories) ? data.landingPageCategories : [];
 
-  $: remoteControlScoreboards = visibleScoreboards.filter(s => s.category === 'remote-control').sort(sortScoreboards);
+  // Filter out hidden plugins (order === -1), then group by configured landing-page categories.
+  $: visibleScoreboards = data.scoreboards.filter((scoreboard) => scoreboard.order !== -1);
 
-  $: documentsScoreboards = visibleScoreboards.filter(s => s.category === 'documents').sort(sortScoreboards);
-  
-  $: teamScoreboards = visibleScoreboards.filter(s => s.category === 'team').sort(sortScoreboards);
+  $: scoreboardsByCategory = visibleScoreboards.reduce((groups, scoreboard) => {
+    const category = scoreboard?.category || '';
+    if (!groups[category]) {
+      groups[category] = [];
+    }
+    groups[category].push(scoreboard);
+    return groups;
+  }, {});
 
-  $: attemptBoardScoreboards = visibleScoreboards.filter(s => s.category === 'attempt-board').sort(sortScoreboards);
-  
-  // Define category order
-  const defaultCategoryOrder = ['standard', 'team', 'attempt-board', 'documents', 'remote-control', 'video-overlay'];
+  $: categorySections = configuredCategoryOrder
+    .map((section) => ({
+      ...section,
+      scoreboards: [...(scoreboardsByCategory[section.category] || [])].sort(sortScoreboards)
+    }))
+    .filter((section) => section.scoreboards.length > 0);
+
+  function getCategoryIndex(category) {
+    return configuredCategoryOrder.findIndex((section) => section.category === category);
+  }
   
   // Compute CSS order for each category: expanded one gets order 0, others keep default order
   $: categoryOrder = (cat) => {
-    if (!expandedCategory) return defaultCategoryOrder.indexOf(cat);
+    const index = getCategoryIndex(cat);
+    if (!expandedCategory) return index;
     if (cat === expandedCategory) return -1;  // Expanded goes first
-    return defaultCategoryOrder.indexOf(cat);
+    return index;
   };
   
   // Toggle function for accordion behavior
   function toggleCategory(category) {
     expandedCategory = expandedCategory === category ? null : category;
   }
+
+  function getOptionDefaults(scoreboard) {
+    const optionDefaults = {};
+    scoreboard?.options?.forEach((opt) => {
+      optionDefaults[opt.key] = opt.default;
+    });
+    return optionDefaults;
+  }
+
+  function getOptionContextKey(fop = '') {
+    return fop ?? '';
+  }
+
+  function isCompetitionWideScoreboard(scoreboard) {
+    return scoreboard?.fopRequired === false;
+  }
+
+  function getSingleLauncherLabel(scoreboard) {
+    return scoreboard?.standalone ? 'Open' : 'All Platforms';
+  }
+
+  function getOptionsButtonTitle(scoreboard, fop = '') {
+    if (scoreboard?.standalone) {
+      return 'Configure options';
+    }
+
+    if (!fop || scoreboard?.fopRequired === false) {
+      return scoreboard?.category === 'documents'
+        ? 'Configure document options'
+        : 'Configure competition-wide options';
+    }
+
+    return scoreboard?.category === 'documents'
+      ? `Configure document options for Platform ${fop}`
+      : `Configure options for Platform ${fop}`;
+  }
+
+  function getModalContextLabel(scoreboard, fop = '') {
+    if (scoreboard?.type === 'iwf-results') {
+      return 'Extract';
+    }
+
+    if (scoreboard?.standalone) {
+      return 'Options';
+    }
+
+    if (!fop || scoreboard?.fopRequired === false) {
+      return 'All Platforms';
+    }
+
+    return `Platform ${fop}`;
+  }
   
   // Initialize default options for each scoreboard once the data is available
   let defaultsInitialized = false;
-  $: if (!defaultsInitialized && data.scoreboards?.length && data.fops?.length) {
+  $: if (!defaultsInitialized && data.scoreboards?.length) {
     const initialOptions = {};
 
     data.scoreboards.forEach((scoreboard) => {
       initialOptions[scoreboard.type] = {};
-      data.fops.forEach((fop) => {
-        const optionDefaults = {};
-        scoreboard.options?.forEach((opt) => {
-          optionDefaults[opt.key] = opt.default;
-        });
-        initialOptions[scoreboard.type][fop] = optionDefaults;
+
+      if (isCompetitionWideScoreboard(scoreboard) || scoreboard.standalone) {
+        initialOptions[scoreboard.type][''] = getOptionDefaults(scoreboard);
+      }
+
+      data.fops?.forEach((fop) => {
+        initialOptions[scoreboard.type][fop] = getOptionDefaults(scoreboard);
       });
     });
 
@@ -88,20 +150,18 @@
   }
   
   function openOptionsModal(scoreboard, fop) {
+    const optionKey = fop ?? '';
+
     // Ensure scoreboardOptions is initialized for this type and FOP
     if (!scoreboardOptions[scoreboard.type]) {
       scoreboardOptions[scoreboard.type] = {};
     }
-    if (!scoreboardOptions[scoreboard.type][fop]) {
-      const optionDefaults = {};
-      scoreboard.options?.forEach((opt) => {
-        optionDefaults[opt.key] = opt.default;
-      });
-      scoreboardOptions[scoreboard.type][fop] = optionDefaults;
+    if (!scoreboardOptions[scoreboard.type][optionKey]) {
+      scoreboardOptions[scoreboard.type][optionKey] = getOptionDefaults(scoreboard);
     }
     
     modalScoreboard = scoreboard;
-    modalFop = fop;
+    modalFop = optionKey;
     const optionTabs = getOptionTabs(scoreboard);
     activeOptionTab = optionTabs[0]?.groupName || null;
     showModal = true;
@@ -172,7 +232,8 @@
   }
   
   async function openScoreboard(type, fop, withOptions = false) {
-    const options = scoreboardOptions[type]?.[fop] || {};
+    const optionKey = getOptionContextKey(fop);
+    const options = scoreboardOptions[type]?.[optionKey] || {};
     const params = new URLSearchParams();
     
     // Find the scoreboard config to get default values
@@ -216,7 +277,8 @@
    * @param {string} fop - The FOP name
    */
   function openExportPage(type, fop) {
-    const options = scoreboardOptions[type]?.[fop] || {};
+    const optionKey = getOptionContextKey(fop);
+    const options = scoreboardOptions[type]?.[optionKey] || {};
     const params = new URLSearchParams();
     
     // Find the scoreboard config
@@ -311,7 +373,8 @@
   });
 
   function getScoreboardUrl(type, fop) {
-    const options = scoreboardOptions[type]?.[fop] || {};
+    const optionKey = getOptionContextKey(fop);
+    const options = scoreboardOptions[type]?.[optionKey] || {};
     const params = new URLSearchParams();
     
     // Find the scoreboard config to get default values
@@ -372,7 +435,8 @@
    * @param {string} fop - The FOP name
    */
   async function callPluginAction(pluginType, action, fop, { download = false } = {}) {
-    const options = scoreboardOptions[pluginType]?.[fop] || {};
+    const optionKey = getOptionContextKey(fop);
+    const options = scoreboardOptions[pluginType]?.[optionKey] || {};
     const params = new URLSearchParams();
     
     params.append('plugin', pluginType);
@@ -467,480 +531,212 @@
   {/if}
 
     <main class="main">
-      <!-- Standard Scoreboards -->
-      {#if standardScoreboards.length > 0}
-        <section class="scoreboard-category collapsible" style:order={categoryOrder('standard')}>
+      {#each categorySections as section}
+        <section
+          class="scoreboard-category collapsible"
+          class:documents-section={section.category === 'documents'}
+          style:order={categoryOrder(section.category)}
+        >
           <!-- svelte-ignore a11y-click-events-have-key-events -->
           <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
-          <h2 class="category-title clickable" on:click={() => toggleCategory('standard')}>
-            <span class="toggle-icon">{expandedCategory === 'standard' ? '▼' : '▶'}</span>
-            Standard Scoreboards
+          <h2 class="category-title clickable" on:click={() => toggleCategory(section.category)}>
+            <span class="toggle-icon">{expandedCategory === section.category ? '▼' : '▶'}</span>
+            {section.title}
           </h2>
-          {#if expandedCategory === 'standard'}
+          {#if expandedCategory === section.category}
             <div class="scoreboards-grid">
-              {#each standardScoreboards as scoreboard}
-                <div class="scoreboard-card">
-                  <h3>{scoreboard.name}</h3>
-                  <p class="description">{@html scoreboard.description}</p>
-                  
-                  <div class="fop-links">
-                    {#if confirmedFops}
-                      <h4>Select Platform:</h4>
-                      <div class="fop-list">
-                        {#each data.fops as fop}
-                          <div class="fop-row">
-                            <a 
-                              href={getScoreboardUrl(scoreboard.type, fop)}
-                              class="fop-link"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              Platform {fop}
-                            </a>
-                            {#if scoreboard.options && scoreboard.options.length > 0}
-                              <button
-                                class="options-btn"
-                                on:click={() => openOptionsModal(scoreboard, fop)}
-                                title="Configure options for Platform {fop}"
-                              >
-                                ⚙️ Options
-                              </button>
-                            {/if}
-                          </div>
-                        {/each}
-                      </div>
-                    {:else}
-                      <div class="fop-list">
-                        <div class="fop-link disabled">
-                          <span class="fop-wait">Awaiting OWLCMS connection...</span>
-                        </div>
-                      </div>
-                    {/if}
-                  </div>
-                </div>
-              {/each}
-            </div>
-          {/if}
-        </section>
-      {/if}
-
-      <!-- Team Scoreboards -->
-      {#if teamScoreboards.length > 0}
-        <section class="scoreboard-category collapsible" style:order={categoryOrder('team')}>
-          <!-- svelte-ignore a11y-click-events-have-key-events -->
-          <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
-          <h2 class="category-title clickable" on:click={() => toggleCategory('team')}>
-            <span class="toggle-icon">{expandedCategory === 'team' ? '▼' : '▶'}</span>
-            Team Scoreboards
-          </h2>
-          {#if expandedCategory === 'team'}
-            <div class="scoreboards-grid">
-              {#each teamScoreboards as scoreboard}
-                <div class="scoreboard-card">
-                  <h3>{scoreboard.name}</h3>
-                  <p class="description">{@html scoreboard.description}</p>
-                  
-                  <div class="fop-links">
-                    {#if confirmedFops}
-                      <h4>Select Platform:</h4>
-                      <div class="fop-list">
-                        {#each data.fops as fop}
-                          <div class="fop-row">
-                            <a 
-                              href={getScoreboardUrl(scoreboard.type, fop)}
-                              class="fop-link"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              Platform {fop}
-                            </a>
-                            {#if scoreboard.options && scoreboard.options.length > 0}
-                              <button
-                                class="options-btn"
-                                on:click={() => openOptionsModal(scoreboard, fop)}
-                                title="Configure options for Platform {fop}"
-                              >
-                                ⚙️ Options
-                              </button>
-                            {/if}
-                          </div>
-                        {/each}
-                      </div>
-                    {:else}
-                      <div class="fop-list">
-                        <div class="fop-link disabled">
-                          <span class="fop-wait">Awaiting OWLCMS connection...</span>
-                        </div>
-                      </div>
-                    {/if}
-                  </div>
-                </div>
-              {/each}
-            </div>
-          {/if}
-        </section>
-      {/if}
-
-      <!-- Attempt Boards -->
-      {#if attemptBoardScoreboards.length > 0}
-        <section class="scoreboard-category collapsible" style:order={categoryOrder('attempt-board')}>
-          <!-- svelte-ignore a11y-click-events-have-key-events -->
-          <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
-          <h2 class="category-title clickable" on:click={() => toggleCategory('attempt-board')}>
-            <span class="toggle-icon">{expandedCategory === 'attempt-board' ? '▼' : '▶'}</span>
-            Attempt Boards
-          </h2>
-          {#if expandedCategory === 'attempt-board'}
-            <div class="scoreboards-grid">
-              {#each attemptBoardScoreboards as scoreboard}
-                <div class="scoreboard-card">
-                  <h3>{scoreboard.name}</h3>
-                  <p class="description">{@html scoreboard.description}</p>
-                  
-                  <div class="fop-links">
-                    {#if confirmedFops}
-                      <h4>Select Platform:</h4>
-                      <div class="fop-list">
-                        {#each data.fops as fop}
-                          <div class="fop-row">
-                            <a 
-                              href={getScoreboardUrl(scoreboard.type, fop)}
-                              class="fop-link"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              Platform {fop}
-                            </a>
-                            {#if scoreboard.options && scoreboard.options.length > 0}
-                              <button
-                                class="options-btn"
-                                on:click={() => openOptionsModal(scoreboard, fop)}
-                                title="Configure options for Platform {fop}"
-                              >
-                                ⚙️ Options
-                              </button>
-                            {/if}
-                          </div>
-                        {/each}
-                      </div>
-                    {:else}
-                      <div class="fop-list">
-                        <div class="fop-link disabled">
-                          <span class="fop-wait">Awaiting OWLCMS connection...</span>
-                        </div>
-                      </div>
-                    {/if}
-                  </div>
-                </div>
-              {/each}
-            </div>
-          {/if}
-        </section>
-      {/if}
-
-
-
-      {#if documentsScoreboards.length > 0}
-        <section class="scoreboard-category documents-section collapsible" style:order={categoryOrder('documents')}>
-          <!-- svelte-ignore a11y-click-events-have-key-events -->
-          <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
-          <h2 class="category-title clickable" on:click={() => toggleCategory('documents')}>
-            <span class="toggle-icon">{expandedCategory === 'documents' ? '▼' : '▶'}</span>
-            Documents
-          </h2>
-          {#if expandedCategory === 'documents'}
-            <div class="scoreboards-grid">
-              {#each documentsScoreboards as scoreboard}
-                <div class="scoreboard-card document-card">
-                  <h3>{scoreboard.name}</h3>
-                  <p class="description">
-                    {@html scoreboard.description}
-                  </p>
-                  <div class="fop-links">
-                    {#if confirmedFops}
-                      {#if scoreboard.fopRequired === false}
-                        <!-- FOP not used - show single Generate button -->
-                        <div class="fop-list">
-                          <div class="fop-row">
-                            <a 
-                              href={getScoreboardUrl(scoreboard.type, null)}
-                              class="fop-link"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              Generate
-                            </a>
-                            {#if scoreboard.additionalDependencies?.includes('puppeteer-core')}
-                            <div class="pdf-btn-container">
-                              <a 
-                                href="/api/generate-pdf?type={scoreboard.type}"
-                                class="pdf-btn"
-                                class:disabled={dev}
-                                title={dev 
-                                  ? "In dev mode, you have to use the browser print. Automated generation requires a build version, click for details" 
-                                  : "Please be patient, PDF generation can take a minute"}
-                                on:click={(e) => handlePdfClick(e, scoreboard.type)}
-                              >
-                                📄 PDF
-                              </a>
-                              {#if dev}
-                                <span class="pdf-tooltip">In dev mode, you have to use the browser print<br/>Automated generation requires a build version, click for details</span>
-                              {/if}
-                            </div>
-                            {/if}
-                            {#if scoreboard.options && scoreboard.options.length > 0}
-                              <button
-                                class="options-btn"
-                                on:click={() => openOptionsModal(scoreboard, data.fops[0] || 'A')}
-                                title="Configure document options"
-                              >
-                                ⚙️ Options
-                              </button>
-                            {/if}
-                          </div>
-                        </div>
-                      {:else if scoreboard.fopRequired === 'optional'}
-                        <!-- FOP optional - show per-platform buttons + All button -->
-                        <h4>Document Views:</h4>
-                        <div class="fop-list">
-                          {#each data.fops as fop}
+              {#each section.scoreboards as scoreboard}
+                {#if section.category === 'documents'}
+                  <div class="scoreboard-card document-card">
+                    <h3>{scoreboard.name}</h3>
+                    <p class="description">
+                      {@html scoreboard.description}
+                    </p>
+                    <div class="fop-links">
+                      {#if confirmedFops}
+                        {#if scoreboard.fopRequired === false}
+                          <div class="fop-list">
                             <div class="fop-row">
                               <a 
-                                href={getScoreboardUrl(scoreboard.type, fop)}
+                                href={getScoreboardUrl(scoreboard.type, null)}
                                 class="fop-link"
                                 target="_blank"
                                 rel="noopener noreferrer"
                               >
-                                Platform {fop}
+                                Generate
                               </a>
+                              {#if scoreboard.additionalDependencies?.includes('puppeteer-core')}
+                              <div class="pdf-btn-container">
+                                <a 
+                                  href="/api/generate-pdf?type={scoreboard.type}"
+                                  class="pdf-btn"
+                                  class:disabled={dev}
+                                  title={dev 
+                                    ? "In dev mode, you have to use the browser print. Automated generation requires a build version, click for details" 
+                                    : "Please be patient, PDF generation can take a minute"}
+                                  on:click={(e) => handlePdfClick(e, scoreboard.type)}
+                                >
+                                  📄 PDF
+                                </a>
+                                {#if dev}
+                                  <span class="pdf-tooltip">In dev mode, you have to use the browser print<br/>Automated generation requires a build version, click for details</span>
+                                {/if}
+                              </div>
+                              {/if}
                               {#if scoreboard.options && scoreboard.options.length > 0}
                                 <button
                                   class="options-btn"
-                                  on:click={() => openOptionsModal(scoreboard, fop)}
-                                  title="Configure options for Platform {fop}"
+                                  on:click={() => openOptionsModal(scoreboard, '')}
+                                  title={getOptionsButtonTitle(scoreboard)}
                                 >
                                   ⚙️ Options
                                 </button>
                               {/if}
                             </div>
-                          {/each}
-                          <div class="fop-row">
-                            <a 
-                              href={getScoreboardUrl(scoreboard.type, null)}
-                              class="fop-link all-platforms"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              All Platforms
-                            </a>
                           </div>
-                        </div>
+                        {:else if scoreboard.fopRequired === 'optional'}
+                          <h4>Document Views:</h4>
+                          <div class="fop-list">
+                            {#each data.fops as fop}
+                              <div class="fop-row">
+                                <a 
+                                  href={getScoreboardUrl(scoreboard.type, fop)}
+                                  class="fop-link"
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  Platform {fop}
+                                </a>
+                                {#if scoreboard.options && scoreboard.options.length > 0}
+                                  <button
+                                    class="options-btn"
+                                    on:click={() => openOptionsModal(scoreboard, fop)}
+                                    title={getOptionsButtonTitle(scoreboard, fop)}
+                                  >
+                                    ⚙️ Options
+                                  </button>
+                                {/if}
+                              </div>
+                            {/each}
+                            <div class="fop-row">
+                              <a 
+                                href={getScoreboardUrl(scoreboard.type, null)}
+                                class="fop-link all-platforms"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                All Platforms
+                              </a>
+                            </div>
+                          </div>
+                        {:else}
+                          <h4>Document Views:</h4>
+                          <div class="fop-list">
+                            {#each data.fops as fop}
+                              <div class="fop-row">
+                                <a 
+                                  href={getScoreboardUrl(scoreboard.type, fop)}
+                                  class="fop-link"
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  Platform {fop}
+                                </a>
+                                {#if scoreboard.options && scoreboard.options.length > 0}
+                                  <button
+                                    class="options-btn"
+                                    on:click={() => openOptionsModal(scoreboard, fop)}
+                                    title={getOptionsButtonTitle(scoreboard, fop)}
+                                  >
+                                    ⚙️ Options
+                                  </button>
+                                {/if}
+                              </div>
+                            {/each}
+                          </div>
+                        {/if}
                       {:else}
-                        <!-- FOP required (default) - show per-platform buttons only -->
-                        <h4>Document Views:</h4>
                         <div class="fop-list">
-                          {#each data.fops as fop}
-                            <div class="fop-row">
-                              <a 
-                                href={getScoreboardUrl(scoreboard.type, fop)}
-                                class="fop-link"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                              >
-                                Platform {fop}
-                              </a>
-                              {#if scoreboard.options && scoreboard.options.length > 0}
-                                <button
-                                  class="options-btn"
-                                  on:click={() => openOptionsModal(scoreboard, fop)}
-                                  title="Configure document options for Platform {fop}"
-                                >
-                                  ⚙️ Options
-                                </button>
-                              {/if}
-                            </div>
-                          {/each}
+                          <div class="fop-link disabled">
+                            <span class="fop-wait">Awaiting OWLCMS connection...</span>
+                          </div>
                         </div>
                       {/if}
-                    {:else}
-                      <div class="fop-list">
-                        <div class="fop-link disabled">
-                          <span class="fop-wait">Awaiting OWLCMS connection...</span>
-                        </div>
-                      </div>
-                    {/if}
+                    </div>
                   </div>
-                </div>
-              {/each}
-            </div>
-          {/if}
-        </section>
-      {/if}
-
-      <!-- Remote Control -->
-      {#if remoteControlScoreboards.length > 0}
-        <section class="scoreboard-category collapsible" style:order={categoryOrder('remote-control')}>
-          <!-- svelte-ignore a11y-click-events-have-key-events -->
-          <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
-          <h2 class="category-title clickable" on:click={() => toggleCategory('remote-control')}>
-            <span class="toggle-icon">{expandedCategory === 'remote-control' ? '▼' : '▶'}</span>
-            Remote Control
-          </h2>
-          {#if expandedCategory === 'remote-control'}
-            <div class="scoreboards-grid">
-              {#each remoteControlScoreboards as scoreboard}
-                <div class="scoreboard-card">
-                  <h3>{scoreboard.name}</h3>
-                  <p class="description">{@html scoreboard.description}</p>
-                  
-                  <div class="fop-links">
-                    {#if scoreboard.standalone}
-                      <!-- Standalone plugin - no FOP needed -->
-                      <div class="fop-list">
-                        <div class="fop-row">
-                          <a 
-                            href={getScoreboardUrl(scoreboard.type, '')}
-                            class="fop-link"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            Open
-                          </a>
-                          {#if scoreboard.options && scoreboard.options.length > 0}
-                            <button
-                              class="options-btn"
-                              on:click={() => openOptionsModal(scoreboard, '')}
-                              title="Configure options"
-                            >
-                              ⚙️ Options
-                            </button>
-                          {/if}
-                        </div>
-                      </div>
-                    {:else if confirmedFops}
-                      <h4>Select Platform:</h4>
-                      <div class="fop-list">
-                        {#each data.fops as fop}
+                {:else}
+                  <div class="scoreboard-card">
+                    <h3>{scoreboard.name}</h3>
+                    <p class="description">{@html scoreboard.description}</p>
+                    
+                    <div class="fop-links">
+                      {#if scoreboard.standalone || isCompetitionWideScoreboard(scoreboard)}
+                        <div class="fop-list">
                           <div class="fop-row">
                             <a 
-                              href={getScoreboardUrl(scoreboard.type, fop)}
+                              href={getScoreboardUrl(scoreboard.type, '')}
                               class="fop-link"
                               target="_blank"
                               rel="noopener noreferrer"
                             >
-                              Platform {fop}
+                              {getSingleLauncherLabel(scoreboard)}
                             </a>
                             {#if scoreboard.options && scoreboard.options.length > 0}
                               <button
                                 class="options-btn"
-                                on:click={() => openOptionsModal(scoreboard, fop)}
-                                title="Configure options for Platform {fop}"
+                                on:click={() => openOptionsModal(scoreboard, '')}
+                                title={getOptionsButtonTitle(scoreboard)}
                               >
                                 ⚙️ Options
                               </button>
                             {/if}
                           </div>
-                        {/each}
-                      </div>
-                    {:else}
-                      <div class="fop-list">
-                        <div class="fop-link disabled">
-                          <span class="fop-wait">Awaiting OWLCMS connection...</span>
                         </div>
-                      </div>
-                    {/if}
-                  </div>
-                </div>
-              {/each}
-            </div>
-          {/if}
-        </section>
-      {/if}
-
-      <!-- Video Overlays -->
-      {#if videoOverlayScoreboards.length > 0}
-        <section class="scoreboard-category collapsible" style:order={categoryOrder('video-overlay')}>
-          <!-- svelte-ignore a11y-click-events-have-key-events -->
-          <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
-          <h2 class="category-title clickable" on:click={() => toggleCategory('video-overlay')}>
-            <span class="toggle-icon">{expandedCategory === 'video-overlay' ? '▼' : '▶'}</span>
-            Video Overlays
-          </h2>
-          {#if expandedCategory === 'video-overlay'}
-            <div class="scoreboards-grid">
-              {#each videoOverlayScoreboards as scoreboard}
-                <div class="scoreboard-card">
-                  <h3>{scoreboard.name}</h3>
-                  <p class="description">{@html scoreboard.description}</p>
-                  
-                  <div class="fop-links">
-                    {#if scoreboard.standalone}
-                      <!-- Standalone plugin - no FOP needed -->
-                      <div class="fop-list">
-                        <div class="fop-row">
-                          <a 
-                            href={getScoreboardUrl(scoreboard.type, '')}
-                            class="fop-link"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            Open
-                          </a>
-                          {#if scoreboard.options && scoreboard.options.length > 0}
-                            <button
-                              class="options-btn"
-                              on:click={() => openOptionsModal(scoreboard, '')}
-                              title="Configure options"
-                            >
-                              ⚙️ Options
-                            </button>
-                          {/if}
-                        </div>
-                      </div>
-                    {:else if confirmedFops}
-                      <h4>Select Platform:</h4>
-                      <div class="fop-list">
-                        {#each data.fops as fop}
-                          <div class="fop-row">
-                            <a 
-                              href={getScoreboardUrl(scoreboard.type, fop)}
-                              class="fop-link"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              Platform {fop}
-                            </a>
-                            {#if scoreboard.options && scoreboard.options.length > 0}
-                              <button
-                                class="options-btn"
-                                on:click={() => openOptionsModal(scoreboard, fop)}
-                                title="Configure options for Platform {fop}"
+                      {:else if confirmedFops}
+                        <h4>Select Platform:</h4>
+                        <div class="fop-list">
+                          {#each data.fops as fop}
+                            <div class="fop-row">
+                              <a 
+                                href={getScoreboardUrl(scoreboard.type, fop)}
+                                class="fop-link"
+                                target="_blank"
+                                rel="noopener noreferrer"
                               >
-                                ⚙️ Options
-                              </button>
-                            {/if}
-                          </div>
-                        {/each}
-                      </div>
-                    {:else}
-                      <div class="fop-list">
-                        <div class="fop-link disabled">
-                          <span class="fop-wait">Awaiting OWLCMS connection...</span>
+                                Platform {fop}
+                              </a>
+                              {#if scoreboard.options && scoreboard.options.length > 0}
+                                <button
+                                  class="options-btn"
+                                  on:click={() => openOptionsModal(scoreboard, fop)}
+                                  title={getOptionsButtonTitle(scoreboard, fop)}
+                                >
+                                  ⚙️ Options
+                                </button>
+                              {/if}
+                            </div>
+                          {/each}
                         </div>
-                      </div>
-                    {/if}
+                      {:else}
+                        <div class="fop-list">
+                          <div class="fop-link disabled">
+                            <span class="fop-wait">Awaiting OWLCMS connection...</span>
+                          </div>
+                        </div>
+                      {/if}
+                    </div>
                   </div>
-                </div>
+                {/if}
               {/each}
             </div>
           {/if}
         </section>
-      {/if}
+      {/each}
     </main>
 </div>
 
 <!-- Options Modal -->
-{#if showModal && modalScoreboard && modalFop}
+{#if showModal && modalScoreboard}
   <!-- svelte-ignore a11y-click-events-have-key-events -->
   <!-- svelte-ignore a11y-no-static-element-interactions -->
   <div class="modal-overlay" on:click={closeModal}>
@@ -948,7 +744,7 @@
     <!-- svelte-ignore a11y-no-static-element-interactions -->
     <div class="modal-content" on:click|stopPropagation>
       <div class="modal-header">
-        <h3>{modalScoreboard.name} - {modalScoreboard.type === 'iwf-results' ? 'Extract' : `Platform ${modalFop}`}</h3>
+        <h3>{modalScoreboard.name} - {getModalContextLabel(modalScoreboard, modalFop)}</h3>
         <button class="close-btn" on:click={closeModal}>×</button>
       </div>
       

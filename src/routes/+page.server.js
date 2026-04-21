@@ -1,5 +1,6 @@
 import { scoreboardRegistry } from '$lib/server/scoreboard-registry.js';
 import { competitionHub } from '$lib/server/competition-hub.js';
+import { loadLandingPageCategories } from '$lib/server/landing-page-categories.js';
 import { existsSync, readdirSync } from 'fs';
 import { resolve } from 'path';
 
@@ -85,6 +86,7 @@ export async function load() {
 	const confirmedFopsAvailable = typeof competitionHub.hasConfirmedFops === 'function'
 		? competitionHub.hasConfirmedFops()
 		: false;
+	const landingPageCategories = loadLandingPageCategories(scoreboards);
 
 	// Resolve all 'dynamic:*' option values server-side so the client receives
 	// concrete arrays and doesn't need access to backend data or filesystem.
@@ -128,6 +130,7 @@ export async function load() {
 
 	return {
 		scoreboards,
+		landingPageCategories,
 		fops: availableFOPs,
 		competitionName,
 		hasData: availableFOPs.length > 0,

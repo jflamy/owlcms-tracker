@@ -45,5 +45,37 @@ way.  A sample page follows:
 - **[CREATE_YOUR_OWN.md](./CREATE_YOUR_OWN.md)** - Create custom scoreboards (step-by-step guide)
 - **[docs/README.md](./docs/README.md)** - Documentation index and navigation
 
+## Landing Page Categories
+
+The tracker entry page ships with a built-in default category order. You can override it with external JSON without modifying source code.
+
+Override lookup order:
+- `categories.json` at the tracker root. This is the simplest option for a local customization, and it is now copied into the packaged zip when present. If you are working from a fork and don't want this file accidentally committed or pushed, mark it as local-only:
+  ```bash
+  git update-index --skip-worktree categories.json
+  ```
+- `extensions/landing-page/categories.json`. This is the zip-friendly location for a custom runtime extension when you build a custom zip with additional plugins.
+
+If neither file exists, the built-in default is used.
+
+Supported JSON shape (example):
+
+```json
+{
+	"categories": [
+		"standard",
+		"jury",
+		{ "category": "documents", "title": "Documents" },
+		{ "category": "video-overlay", "hidden": true }
+	]
+}
+```
+
+String entries use the built-in title for known categories. Object entries let you override the section title and set `hidden: true` to suppress a category.
+
+If a plugin declares a category that is not part of the built-in set and not listed in your override, tracker appends it automatically after the configured categories using a title-cased label.
+
+Restart the tracker process after changing either override file.
+
 
 

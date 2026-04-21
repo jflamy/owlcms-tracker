@@ -646,7 +646,8 @@ export function buildAndPackage({
     // Copy required files
     const filesToCopy = [
       'start-with-ws.js',
-      'package.json'
+      'package.json',
+      'categories.json'
     ];
 
     filesToCopy.forEach(file => {
