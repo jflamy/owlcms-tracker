@@ -9,6 +9,7 @@
 	let replaysViewerElement;
 	let timelinePanelElement;
 	let timelineLayoutElement;
+	let timelinePopoverElement;
 	let cameraButtonsElement;
 	let replaysStatusSocket;
 	let replaysStatusReconnectTimer;
@@ -31,11 +32,13 @@
 	let showTimelinePopover = false;
 	let timelinePopoverX = 0;
 	let timelinePopoverY = 0;
+	let timelinePopoverBaseY = 0;
 	let timelinePopoverAlign = 'center';
 	let cameraPopoverPending = false;
 	let currentTime = 0;
 	let duration = 0;
 	let activeCameraNumber = 1;
+	let selectedPlaybackMode = 'normal';
 	let mounted = false;
 	let configuredStatusSocketUrl = '';
 	let initialReplayLoadKey = '';
@@ -85,6 +88,9 @@
 								: 'neutral';
 	$: if (!canShowTimelinePopover) {
 		showTimelinePopover = false;
+	}
+	$: if (showTimelinePopover && timelineLayoutElement && timelinePopoverElement) {
+		clampTimelinePopoverWithinLayout();
 	}
 	$: if (replayPickerSessions.length === 0 && Array.isArray(data?.trackerSessions) && data.trackerSessions.length > 0) {
 		replayPickerSessions = data.trackerSessions
@@ -145,6 +151,149 @@
 
 	function cameraLabel(cameraNumber = activeCameraNumber) {
 		return `camera ${cameraNumber}`;
+	}
+
+	function normalizePlaybackMode(mode) {
+		return mode === 'slow' ? 'slow' : 'normal';
+	}
+
+	function playbackRateForMode(mode) {
+		return normalizePlaybackMode(mode) === 'slow' ? 0.5 : 1;
+	}
+
+	function normalizeLogText(value, maxLength = 240) {
+		if (value === null || value === undefined) {
+			return '';
+		}
+
+		const normalized = String(value).replace(/\s+/g, ' ').trim();
+		if (!normalized) {
+			return '';
+		}
+
+		return normalized.length > maxLength ? `${normalized.slice(0, maxLength - 1)}…` : normalized;
+	}
+
+	function roundLogNumber(value) {
+		return Number.isFinite(value) ? Math.round(value * 1000) / 1000 : null;
+	}
+
+	function describeReadyState(value) {
+		switch (value) {
+			case 0:
+				return 'HAVE_NOTHING';
+			case 1:
+				return 'HAVE_METADATA';
+			case 2:
+				return 'HAVE_CURRENT_DATA';
+			case 3:
+				return 'HAVE_FUTURE_DATA';
+			case 4:
+				return 'HAVE_ENOUGH_DATA';
+			default:
+				return '';
+		}
+	}
+
+	function describeNetworkState(value) {
+		switch (value) {
+			case 0:
+				return 'NETWORK_EMPTY';
+			case 1:
+				return 'NETWORK_IDLE';
+			case 2:
+				return 'NETWORK_LOADING';
+			case 3:
+				return 'NETWORK_NO_SOURCE';
+			default:
+				return '';
+		}
+	}
+
+	function describeMediaErrorCode(value) {
+		switch (value) {
+			case 1:
+				return 'MEDIA_ERR_ABORTED';
+			case 2:
+				return 'MEDIA_ERR_NETWORK';
+			case 3:
+				return 'MEDIA_ERR_DECODE';
+			case 4:
+				return 'MEDIA_ERR_SRC_NOT_SUPPORTED';
+			default:
+				return '';
+		}
+	}
+
+	function buildReplayPlaybackFailurePayload(error, playbackRate, blockedStatusMessage, blockedErrorMessage, context = {}) {
+		const playErrorName = normalizeLogText(error?.name || error?.constructor?.name || 'UnknownError', 80);
+		const playErrorMessage = normalizeLogText(error?.message || error?.toString?.() || '', 320);
+		const mediaErrorCode = videoElement?.error?.code ?? null;
+		const mode = normalizePlaybackMode(context?.mode || selectedPlaybackMode);
+
+		return {
+			source: 'jury-replays',
+			category: 'media.play',
+			message: `Replay play() failed during ${normalizeLogText(context?.action || 'playback', 80) || 'playback'}: ${playErrorName}${playErrorMessage ? ` - ${playErrorMessage}` : ''}`,
+			details: {
+				action: normalizeLogText(context?.action || 'playback', 80),
+				mode,
+				cameraNumber: Number.isInteger(activeCameraNumber) ? activeCameraNumber : null,
+				playbackRate: roundLogNumber(playbackRate),
+				replayUrl: normalizeLogText(replayUrl, 320),
+				currentSrc: normalizeLogText(videoElement?.currentSrc || '', 320),
+				pageUrl: normalizeLogText(window?.location?.href || '', 320),
+				documentVisibility: normalizeLogText(document?.visibilityState || '', 40),
+				playErrorName,
+				playErrorMessage,
+				mediaErrorCode,
+				mediaErrorLabel: describeMediaErrorCode(mediaErrorCode),
+				readyState: videoElement?.readyState ?? null,
+				readyStateLabel: describeReadyState(videoElement?.readyState),
+				networkState: videoElement?.networkState ?? null,
+				networkStateLabel: describeNetworkState(videoElement?.networkState),
+				paused: Boolean(videoElement?.paused),
+				ended: Boolean(videoElement?.ended),
+				currentTime: roundLogNumber(videoElement?.currentTime),
+				duration: roundLogNumber(videoElement?.duration),
+				muted: Boolean(videoElement?.muted),
+				volume: roundLogNumber(videoElement?.volume),
+				statusMessage: normalizeLogText(blockedStatusMessage, 200),
+				uiErrorMessage: normalizeLogText(blockedErrorMessage, 200),
+				athlete: normalizeLogText(reviewedAthlete || liveStatusAthlete || '', 120),
+				liftType: normalizeLogText(reviewedLiftType || liveStatusLiftType || '', 40),
+				attempt: overlayAttempt ?? null,
+				session: normalizeLogText(reviewedSession || liveStatusSession || replayStateSessionId || selectedReplaySessionId || '', 120),
+				userAgent: normalizeLogText(navigator?.userAgent || '', 320)
+			}
+		};
+	}
+
+	async function reportReplayPlaybackFailure(error, playbackRate, blockedStatusMessage, blockedErrorMessage, context = {}) {
+		if (typeof window === 'undefined' || typeof fetch !== 'function') {
+			return;
+		}
+
+		const payload = buildReplayPlaybackFailurePayload(
+			error,
+			playbackRate,
+			blockedStatusMessage,
+			blockedErrorMessage,
+			context
+		);
+
+		try {
+			await fetch('/api/client-log', {
+				method: 'POST',
+				headers: {
+					'content-type': 'application/json'
+				},
+				body: JSON.stringify(payload),
+				keepalive: true
+			});
+		} catch (loggingError) {
+			console.warn('[Replays] Failed to report play() rejection to tracker logs:', loggingError, payload);
+		}
 	}
 
 	function normalizeReplaySessionId(value) {
@@ -657,6 +806,7 @@
 		statusMessage = `Loading replay from ${cameraLabel(cameraNumber)}...`;
 		currentTime = 0;
 		duration = 0;
+		selectedPlaybackMode = 'normal';
 		replayUrl = replayTarget.url;
 		applyReplaySelectionMetadata(selection);
 
@@ -671,18 +821,20 @@
 
 		videoElement.pause();
 		videoElement.load();
+		videoElement.playbackRate = 1;
 
 		if (!autoPlay) {
 			statusMessage = `Replay from ${cameraLabel(cameraNumber)} loaded and ready to play.`;
 			return true;
 		}
 
-		try {
-			await videoElement.play();
-			statusMessage = `Playing replay from ${cameraLabel(cameraNumber)}.`;
-		} catch {
-			statusMessage = 'Replay loaded. Press play if your browser blocked autoplay.';
-		}
+		await playReplayAtMode(
+			'normal',
+			`Playing replay from ${cameraLabel(cameraNumber)}.`,
+			'Replay loaded. Press play if your browser blocked autoplay.',
+			'The browser blocked playback. Click the video or retry after loading again.',
+			{ action: 'selection-autoplay' }
+		);
 
 		return true;
 	}
@@ -729,6 +881,7 @@
 		statusMessage = `Loading latest replay from ${cameraLabel(cameraNumber)}...`;
 		currentTime = 0;
 		duration = 0;
+		selectedPlaybackMode = 'normal';
 		replayUrl = replayTarget.url;
 
 		await tick();
@@ -742,18 +895,20 @@
 
 		videoElement.pause();
 		videoElement.load();
+		videoElement.playbackRate = 1;
 
 		if (!autoPlay) {
 			statusMessage = `Latest replay from ${cameraLabel(cameraNumber)} loaded and ready to play.`;
 			return;
 		}
 
-		try {
-			await videoElement.play();
-			statusMessage = `Playing latest replay from ${cameraLabel(cameraNumber)}.`;
-		} catch {
-			statusMessage = 'Replay loaded. Press play if your browser blocked autoplay.';
-		}
+		await playReplayAtMode(
+			'normal',
+			`Playing latest replay from ${cameraLabel(cameraNumber)}.`,
+			'Replay loaded. Press play if your browser blocked autoplay.',
+			'The browser blocked playback. Click the video or retry after loading again.',
+			{ action: 'latest-autoplay' }
+		);
 	}
 
 	async function syncReplayState({ preferredCamera = 1, showPopover = false, autoPlay = false, preservePopover = false } = {}) {
@@ -868,19 +1023,66 @@
 		}
 	}
 
+	async function playReplayAtSpeed(
+		playbackRate = 1,
+		successMessage = `Playing latest replay from ${cameraLabel()}.`,
+		blockedStatusMessage = 'Replay loaded. Press play if your browser blocked autoplay.',
+		blockedErrorMessage = 'The browser blocked playback. Click the video or retry after loading again.',
+		playContext = {}
+	) {
+		if (!videoElement || !replayUrl) {
+			return false;
+		}
+
+		videoElement.playbackRate = playbackRate;
+
+		try {
+			await videoElement.play();
+			errorMessage = '';
+			statusMessage = successMessage;
+			return true;
+		} catch (error) {
+			void reportReplayPlaybackFailure(error, playbackRate, blockedStatusMessage, blockedErrorMessage, playContext);
+			statusMessage = blockedStatusMessage;
+			errorMessage = blockedErrorMessage;
+			return false;
+		}
+	}
+
+	async function playReplayAtMode(
+		mode = 'normal',
+		successMessage = `Playing latest replay from ${cameraLabel()}.`,
+		blockedStatusMessage = 'Replay loaded. Press play if your browser blocked autoplay.',
+		blockedErrorMessage = 'The browser blocked playback. Click the video or retry after loading again.',
+		playContext = {}
+	) {
+		selectedPlaybackMode = normalizePlaybackMode(mode);
+		return playReplayAtSpeed(
+			playbackRateForMode(selectedPlaybackMode),
+			successMessage,
+			blockedStatusMessage,
+			blockedErrorMessage,
+			{
+				action: `play-${selectedPlaybackMode}`,
+				...playContext,
+				mode: selectedPlaybackMode
+			}
+		);
+	}
+
 	async function togglePlayback() {
 		if (!videoElement || !replayUrl) {
 			return;
 		}
 
 		if (videoElement.paused || videoElement.ended) {
-			try {
-				await videoElement.play();
-				errorMessage = '';
-				statusMessage = `Playing latest replay from ${cameraLabel()}.`;
-			} catch {
-				errorMessage = 'The browser blocked playback. Click the video or retry after loading again.';
-			}
+			await playReplayAtMode(
+				'normal',
+				`Playing latest replay from ${cameraLabel()}.`,
+				'Replay loaded. Press play if your browser blocked autoplay.',
+				'The browser blocked playback. Click the video or retry after loading again.',
+				{ action: 'toggle-play' }
+			);
 			return;
 		}
 
@@ -928,11 +1130,63 @@
 		}
 
 		isSeeking = true;
+		showTimelinePopover = false;
 		pauseFromTimelineArea('Replay paused for scrubbing.');
 	}
 
 	function clamp(value, min, max) {
 		return Math.min(Math.max(value, min), max);
+	}
+
+	function timelinePopoverVerticalGapPx() {
+		if (typeof window === 'undefined' || typeof getComputedStyle !== 'function') {
+			return timelinePopoverAlign === 'left' ? 9 : 14;
+		}
+
+		const rootFontSize = Number.parseFloat(getComputedStyle(document.documentElement).fontSize || '16');
+		const remSize = Number.isFinite(rootFontSize) && rootFontSize > 0 ? rootFontSize : 16;
+		return (timelinePopoverAlign === 'left' ? 0.55 : 0.9) * remSize;
+	}
+
+	function clampTimelinePopoverWithinLayout() {
+		if (!timelineLayoutElement || !timelinePopoverElement) {
+			return;
+		}
+
+		const edgePadding = 8;
+		const layoutBounds = timelineLayoutElement.getBoundingClientRect();
+		const popoverBounds = timelinePopoverElement.getBoundingClientRect();
+		timelinePopoverY = timelinePopoverBaseY;
+
+		if (timelinePopoverAlign === 'left') {
+			const maxLeft = Math.max(edgePadding, layoutBounds.width - popoverBounds.width - edgePadding);
+			timelinePopoverX = clamp(timelinePopoverX, edgePadding, maxLeft);
+			return;
+		}
+
+		const halfWidth = popoverBounds.width / 2;
+		const minCenter = halfWidth + edgePadding;
+		const maxCenter = Math.max(minCenter, layoutBounds.width - halfWidth - edgePadding);
+		timelinePopoverX = clamp(timelinePopoverX, minCenter, maxCenter);
+
+		if (!cameraButtonsElement) {
+			return;
+		}
+
+		const lastButton = cameraButtonsElement.lastElementChild;
+		if (!(lastButton instanceof HTMLElement)) {
+			return;
+		}
+
+		const lastButtonBounds = lastButton.getBoundingClientRect();
+		const lastButtonRight = lastButtonBounds.right - layoutBounds.left;
+		const lastButtonTop = lastButtonBounds.top - layoutBounds.top;
+		const popoverLeft = timelinePopoverX - halfWidth;
+
+		if (popoverLeft <= lastButtonRight) {
+			const liftedY = Math.max(12, lastButtonTop + timelinePopoverVerticalGapPx());
+			timelinePopoverY = Math.min(timelinePopoverBaseY, liftedY);
+		}
 	}
 
 	function showTimelinePopoverAtClientPoint(clientX, clientY, align = 'center') {
@@ -944,17 +1198,13 @@
 		timelinePopoverAlign = align;
 
 		if (align === 'left') {
-			timelinePopoverX = Math.max(4, clientX - bounds.left);
+			timelinePopoverX = clamp(clientX - bounds.left, 4, Math.max(4, bounds.width - 4));
 		} else {
-			const horizontalPadding = 96;
-			timelinePopoverX = clamp(
-				clientX - bounds.left,
-				horizontalPadding,
-				Math.max(horizontalPadding, bounds.width - horizontalPadding)
-			);
+			timelinePopoverX = clamp(clientX - bounds.left, 4, Math.max(4, bounds.width - 4));
 		}
 
-		timelinePopoverY = Math.max(12, clientY - bounds.top);
+		timelinePopoverBaseY = Math.max(12, clientY - bounds.top);
+		timelinePopoverY = timelinePopoverBaseY;
 		showTimelinePopover = true;
 	}
 
@@ -972,14 +1222,15 @@
 		const cameraBounds = cameraButtonsElement.getBoundingClientRect();
 		timelinePopoverAlign = 'left';
 		timelinePopoverX = panelBounds.left - layoutBounds.left;
-		timelinePopoverY = Math.max(12, cameraBounds.top - layoutBounds.top + 4);
+		timelinePopoverBaseY = Math.max(12, cameraBounds.top - layoutBounds.top + 4);
+		timelinePopoverY = timelinePopoverBaseY;
 		showTimelinePopover = true;
 	}
 
 	async function handleCameraButtonClick(cameraNumber) {
 		if (cameraNumber === activeCameraNumber && replayUrl && !isLoading) {
 			showTimelinePopoverAboveCameras();
-			await handleTimelinePopoverPlay();
+			await handleTimelinePopoverRestart();
 			return;
 		}
 
@@ -1005,7 +1256,7 @@
 	}
 
 	function handleTimelineAreaPointerDown(event) {
-		if (event.target instanceof Element && event.target.closest('.timeline-popover')) {
+		if (event.target instanceof Element && (event.target.closest('.timeline-popover') || event.target.closest('.timeline'))) {
 			return;
 		}
 
@@ -1018,6 +1269,22 @@
 		currentTime = Number(event.currentTarget.value);
 	}
 
+	function showTimelinePopoverAboveSliderPosition(sliderElement, value) {
+		if (!sliderElement) {
+			return;
+		}
+
+		const bounds = sliderElement.getBoundingClientRect();
+		const min = Number(sliderElement.min || 0);
+		const max = Number(sliderElement.max || 0);
+		const range = max - min;
+		const ratio = range > 0 ? clamp((value - min) / range, 0, 1) : 0;
+		const clientX = bounds.left + bounds.width * ratio;
+		const clientY = bounds.top + bounds.height / 2;
+
+		showTimelinePopoverAtClientPoint(clientX, clientY, 'center');
+	}
+
 	function handleSeekChange(event) {
 		if (!videoElement) {
 			isSeeking = false;
@@ -1028,6 +1295,7 @@
 		videoElement.currentTime = nextTime;
 		currentTime = nextTime;
 		isSeeking = false;
+		showTimelinePopoverAboveSliderPosition(event.currentTarget, nextTime);
 		statusMessage = 'Replay paused at selected position.';
 	}
 
@@ -1036,13 +1304,41 @@
 			return;
 		}
 
-		try {
-			await videoElement.play();
-			errorMessage = '';
-			statusMessage = `Playing latest replay from ${cameraLabel()}.`;
-		} catch {
-			errorMessage = 'The browser blocked playback. Click the video or retry after loading again.';
+		if (isPlaying && selectedPlaybackMode === 'normal') {
+			videoElement.pause();
+			selectedPlaybackMode = 'normal';
+			statusMessage = 'Replay paused.';
+			return;
 		}
+
+		await playReplayAtMode(
+			'normal',
+			`Playing latest replay from ${cameraLabel()}.`,
+			'Replay loaded. Press play if your browser blocked autoplay.',
+			'The browser blocked playback. Click the video or retry after loading again.',
+			{ action: 'timeline-play' }
+		);
+	}
+
+	async function handleTimelinePopoverPlayHalfSpeed() {
+		if (!videoElement || !replayUrl) {
+			return;
+		}
+
+		if (isPlaying && selectedPlaybackMode === 'slow') {
+			videoElement.pause();
+			selectedPlaybackMode = 'slow';
+			statusMessage = 'Replay paused.';
+			return;
+		}
+
+		await playReplayAtMode(
+			'slow',
+			`Playing latest replay from ${cameraLabel()} at 50% speed.`,
+			'Replay loaded. Press 50% if your browser blocked half-speed playback.',
+			'The browser blocked playback. Click the video or retry with 50%.',
+			{ action: 'timeline-play-half-speed' }
+		);
 	}
 
 	async function handleTimelinePopoverTogglePlayback() {
@@ -1055,9 +1351,11 @@
 		}
 
 		const nextTime = Math.max(0, (videoElement.currentTime || currentTime || 0) - 2);
+		videoElement.pause();
+		isPlaying = false;
 		videoElement.currentTime = nextTime;
 		currentTime = nextTime;
-		statusMessage = 'Replay moved back 2 seconds.';
+		statusMessage = 'Replay moved back 2 seconds and paused.';
 	}
 
 	async function handleTimelinePopoverRestart() {
@@ -1068,14 +1366,20 @@
 		videoElement.currentTime = 0;
 		currentTime = 0;
 
-		try {
-			await videoElement.play();
-			errorMessage = '';
-			statusMessage = 'Replay restarted from the beginning.';
-		} catch {
-			statusMessage = 'Replay reset to the beginning. Press play to continue.';
-			errorMessage = 'The browser blocked playback. Click the video or press Play to continue.';
-		}
+		const restartMode = normalizePlaybackMode(selectedPlaybackMode);
+		await playReplayAtMode(
+			restartMode,
+			restartMode === 'slow'
+				? `Replay restarted from the beginning at 50% speed.`
+				: 'Replay restarted from the beginning.',
+			restartMode === 'slow'
+				? 'Replay reset to the beginning. Press 50% to continue.'
+				: 'Replay reset to the beginning. Press play to continue.',
+			restartMode === 'slow'
+				? 'The browser blocked playback. Click the video or press 50% to continue.'
+				: 'The browser blocked playback. Click the video or press Play to continue.',
+			{ action: 'timeline-restart' }
+		);
 	}
 
 	function handleTimelinePopoverStop() {
@@ -1213,6 +1517,7 @@
 
 			{#if showTimelinePopover && canShowTimelinePopover}
 				<div
+					bind:this={timelinePopoverElement}
 					class="timeline-popover"
 					class:is-left-aligned={timelinePopoverAlign === 'left'}
 					style:left="{timelinePopoverX}px"
@@ -1228,17 +1533,32 @@
 					</button>
 					<button
 						class="timeline-popover-btn timeline-popover-toggle"
-						class:is-primary={true}
+						class:is-primary={selectedPlaybackMode === 'normal'}
 						type="button"
-						on:click={handleTimelinePopoverTogglePlayback}
-						aria-label={isPlaying ? 'Stop replay' : 'Play replay'}
+						on:click={handleTimelinePopoverPlay}
+						aria-label={isPlaying && selectedPlaybackMode === 'normal' ? 'Stop replay' : 'Play replay'}
 					>
-						{#if isPlaying}
+						{#if isPlaying && selectedPlaybackMode === 'normal'}
 							<span class="timeline-popover-stop-icon">&#9632;</span>
 							<span>Stop</span>
 						{:else}
 							<span class="timeline-popover-play-icon">&#9654;</span>
 							<span>Play</span>
+						{/if}
+					</button>
+					<button
+						class="timeline-popover-btn timeline-popover-slow"
+						class:is-primary={selectedPlaybackMode === 'slow'}
+						type="button"
+						on:click={handleTimelinePopoverPlayHalfSpeed}
+						aria-label={isPlaying && selectedPlaybackMode === 'slow' ? 'Stop replay' : 'Play replay at 50 percent speed'}
+					>
+						{#if isPlaying && selectedPlaybackMode === 'slow'}
+							<span class="timeline-popover-stop-icon">&#9632;</span>
+							<span>Stop</span>
+						{:else}
+							<span class="timeline-popover-slow-icon">&#9655;</span>
+							<span>50%</span>
 						{/if}
 					</button>
 				</div>
@@ -1722,7 +2042,8 @@
 	}
 
 	.timeline-popover-restart,
-	.timeline-popover-back {
+	.timeline-popover-back,
+	.timeline-popover-slow {
 		background: rgba(8, 17, 26, 0.95);
 	}
 
@@ -1741,6 +2062,12 @@
 		text-shadow: 0 0 18px rgba(55, 201, 255, 0.35);
 	}
 
+	.timeline-popover-slow-icon {
+		font-size: 0.98rem;
+		line-height: 1;
+		color: rgba(244, 247, 250, 0.92);
+	}
+
 	.timeline-popover-restart-icon,
 	.timeline-popover-back-icon {
 		font-size: 1rem;
@@ -1753,8 +2080,9 @@
 		color: rgba(255, 160, 160, 0.94);
 	}
 
-	.timeline-popover-toggle.is-primary .timeline-popover-stop-icon,
-	.timeline-popover-toggle.is-primary .timeline-popover-play-icon {
+	.timeline-popover-btn.is-primary .timeline-popover-stop-icon,
+	.timeline-popover-btn.is-primary .timeline-popover-play-icon,
+	.timeline-popover-btn.is-primary .timeline-popover-slow-icon {
 		color: #081018;
 		text-shadow: none;
 	}
@@ -1857,7 +2185,59 @@
 	.timeline {
 		width: 100%;
 		margin: 0;
-		accent-color: var(--accent);
+		height: 1.4rem;
+		background: transparent;
+		appearance: none;
+		-webkit-appearance: none;
+		cursor: pointer;
+	}
+
+	.timeline:focus {
+		outline: none;
+	}
+
+	.timeline:disabled {
+		cursor: not-allowed;
+		opacity: 0.65;
+	}
+
+	.timeline::-webkit-slider-runnable-track {
+		height: 0.3rem;
+		border-radius: 999px;
+		background: linear-gradient(90deg, rgba(255, 107, 53, 0.95), rgba(255, 138, 91, 0.9));
+	}
+
+	.timeline::-webkit-slider-thumb {
+		-webkit-appearance: none;
+		width: 0.78rem;
+		height: 1.15rem;
+		margin-top: -0.425rem;
+		border: 1px solid rgba(255, 255, 255, 0.34);
+		border-radius: 0.18rem;
+		background: linear-gradient(180deg, rgba(255, 244, 238, 0.98), rgba(255, 214, 196, 0.94));
+		box-shadow: 0 0.18rem 0.45rem rgba(0, 0, 0, 0.28);
+	}
+
+	.timeline::-moz-range-track {
+		height: 0.3rem;
+		border: none;
+		border-radius: 999px;
+		background: rgba(255, 255, 255, 0.16);
+	}
+
+	.timeline::-moz-range-progress {
+		height: 0.3rem;
+		border-radius: 999px;
+		background: linear-gradient(90deg, rgba(255, 107, 53, 0.95), rgba(255, 138, 91, 0.9));
+	}
+
+	.timeline::-moz-range-thumb {
+		width: 0.78rem;
+		height: 1.15rem;
+		border: 1px solid rgba(255, 255, 255, 0.34);
+		border-radius: 0.18rem;
+		background: linear-gradient(180deg, rgba(255, 244, 238, 0.98), rgba(255, 214, 196, 0.94));
+		box-shadow: 0 0.18rem 0.45rem rgba(0, 0, 0, 0.28);
 	}
 
 	@media (max-width: 900px) {
