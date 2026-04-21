@@ -5,8 +5,10 @@
 
 ##### Release log
 
+- 2.16.0: Jury Replays user interface plugin added.  Requires replays module version 2.2.2
+- 2.16.0: Category ordering can now be overridden and extended.  See the top-level README.md
+
 - 2.15.0: Changed the user interface for the entry page cards to have a tabbed look and responsive 1 or 2 columns
-- 2.15.0: Category ordering can now be overridden and extended.  See the top-level README.md
 - 2.15.0: Team scoreboards now allow overriding the SMHF Sinclair and Age Factor options
 - 2.15.0: Tracker will now use Sinclair 2028 if that is selected in OWLMCMS (but SMHF has its own specific options)
 - 2.15.0: The tracker title on the entry page switches to the competition name as soon as it is available
