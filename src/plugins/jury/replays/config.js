@@ -13,6 +13,13 @@ export default {
 			type: 'text',
 			default: 'http://localhost:8091',
 			description: 'Base URL of the replays web app. Camera buttons 1 to 4 load the corresponding /replay/{camera} endpoint.'
+		},
+		{
+			key: 'enableSlowMotion',
+			label: 'Enable Slow Motion',
+			type: 'boolean',
+			default: false,
+			description: 'Show the 50% replay control in the timeline popover.'
 		}
 	]
 };

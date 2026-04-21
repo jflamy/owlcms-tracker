@@ -12,6 +12,7 @@ This plugin opens the latest replay from a replays server in a dedicated browser
 ## Configuration
 
 - `replaysBaseUrl`: base URL of the replays web application, for example `http://localhost:8091`
+- `enableSlowMotion`: when `true`, shows a `50%` playback button in the timeline popover. Default: `false`
 
 The plugin appends `/replay/{camera}` automatically when you provide the base server URL.
 

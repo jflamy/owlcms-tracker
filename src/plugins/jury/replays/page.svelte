@@ -56,6 +56,7 @@
 	const cameraNumbers = [1, 2, 3, 4];
 
 	$: replayServerBaseUrl = options?.replaysBaseUrl || data?.options?.replaysBaseUrl || '';
+	$: slowMotionEnabled = normalizeBooleanOption(options?.enableSlowMotion ?? data?.options?.enableSlowMotion ?? false);
 	$: hasConfiguredServer = replayServerBaseUrl.trim().length > 0;
 	$: visibleCameraNumbers = replayStateCameras.some((selection) => selection?.available)
 		? replayStateCameras
@@ -88,6 +89,12 @@
 								: 'neutral';
 	$: if (!canShowTimelinePopover) {
 		showTimelinePopover = false;
+	}
+	$: if (!slowMotionEnabled && selectedPlaybackMode === 'slow') {
+		selectedPlaybackMode = 'normal';
+		if (videoElement) {
+			videoElement.playbackRate = 1;
+		}
 	}
 	$: if (showTimelinePopover && timelineLayoutElement && timelinePopoverElement) {
 		clampTimelinePopoverWithinLayout();
@@ -153,8 +160,12 @@
 		return `camera ${cameraNumber}`;
 	}
 
+	function normalizeBooleanOption(value) {
+		return value === true || value === 'true';
+	}
+
 	function normalizePlaybackMode(mode) {
-		return mode === 'slow' ? 'slow' : 'normal';
+		return mode === 'slow' && slowMotionEnabled ? 'slow' : 'normal';
 	}
 
 	function playbackRateForMode(mode) {
@@ -1321,6 +1332,11 @@
 	}
 
 	async function handleTimelinePopoverPlayHalfSpeed() {
+		if (!slowMotionEnabled) {
+			await handleTimelinePopoverPlay();
+			return;
+		}
+
 		if (!videoElement || !replayUrl) {
 			return;
 		}
@@ -1546,21 +1562,23 @@
 							<span>Play</span>
 						{/if}
 					</button>
-					<button
-						class="timeline-popover-btn timeline-popover-slow"
-						class:is-primary={selectedPlaybackMode === 'slow'}
-						type="button"
-						on:click={handleTimelinePopoverPlayHalfSpeed}
-						aria-label={isPlaying && selectedPlaybackMode === 'slow' ? 'Stop replay' : 'Play replay at 50 percent speed'}
-					>
-						{#if isPlaying && selectedPlaybackMode === 'slow'}
-							<span class="timeline-popover-stop-icon">&#9632;</span>
-							<span>Stop</span>
-						{:else}
-							<span class="timeline-popover-slow-icon">&#9655;</span>
-							<span>50%</span>
-						{/if}
-					</button>
+					{#if slowMotionEnabled}
+						<button
+							class="timeline-popover-btn timeline-popover-slow"
+							class:is-primary={selectedPlaybackMode === 'slow'}
+							type="button"
+							on:click={handleTimelinePopoverPlayHalfSpeed}
+							aria-label={isPlaying && selectedPlaybackMode === 'slow' ? 'Stop replay' : 'Play replay at 50 percent speed'}
+						>
+							{#if isPlaying && selectedPlaybackMode === 'slow'}
+								<span class="timeline-popover-stop-icon">&#9632;</span>
+								<span>Stop</span>
+							{:else}
+								<span class="timeline-popover-slow-icon">&#9655;</span>
+								<span>50%</span>
+							{/if}
+						</button>
+					{/if}
 				</div>
 			{/if}
 		</div>
