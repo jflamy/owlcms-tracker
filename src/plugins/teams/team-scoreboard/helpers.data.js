@@ -2081,7 +2081,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// Extract competition settings (needed for team points calculation)
 	const competitionSettings = {
 		teamPoints1st: databaseState?.competition?.teamPoints1st || 28,
-		teamPoints2nd: databaseState?.competition?.teamPoints2nd || 26,
+		teamPoints2nd: databaseState?.competition?.teamPoints2nd || 25,
 		teamPoints3rd: databaseState?.competition?.teamPoints3rd || 23,
 		snatchCJTotalMedals: databaseState?.competition?.snatchCJTotalMedals || false,
 		enforceBombout // Passed for reference (already applied in scoring)
