@@ -21,16 +21,16 @@
     content: element(headerRightLogo);
   }
 
-  /* Footer: OWLCMS version and export date (left) and page number (right) */
+  /* Footer: optional logo (left), OWLCMS export date and page number (right) */
   @bottom-left {
-    content: string(footer-info);
+    content: "";
     font-size: 9pt;
-    color: #666;
   }
   
   @bottom-right {
-    content: "Page " counter(page);
+    content: "";
     font-size: 9pt;
+    color: #666;
   }
 }
 
@@ -75,6 +75,38 @@
 .header-right-logo img {
   max-height: 18mm;
   object-fit: contain;
+}
+
+.pagedjs_margin-bottom-left,
+.pagedjs_margin-bottom-left .pagedjs_margin-content {
+  overflow: visible;
+}
+
+body.has-footer-left-logo .pagedjs_page:not(.pagedjs_first_page) .pagedjs_margin-bottom-left {
+  min-width: 76mm;
+}
+
+body.has-footer-left-logo .pagedjs_page:not(.pagedjs_first_page) .pagedjs_margin-bottom-left .pagedjs_margin-content {
+  background-image: var(--footer-left-logo-url);
+  background-position: 2mm center;
+  background-repeat: no-repeat;
+  background-size: auto 16mm;
+  min-width: 76mm;
+  min-height: 16mm;
+}
+
+.pagedjs_margin-bottom-right {
+  min-width: 80mm;
+  justify-content: flex-end;
+  overflow: visible;
+}
+
+.pagedjs_margin-bottom-right .pagedjs_margin-content {
+  color: #666;
+  font-size: 9pt;
+  overflow: visible;
+  text-align: right;
+  white-space: nowrap;
 }
 
 /* Page breaks - title page handles its own break-after */
