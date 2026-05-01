@@ -276,6 +276,10 @@ function inferBreakMessage(breakType, ceremonyType, translations, mode) {
 	return translations?.['PublicMsg.CompetitionPaused'] || '!PublicMsg.CompetitionPaused';
 }
 
+function isEnabledOption(value) {
+	return value !== false && value !== 'false';
+}
+
 /**
  * Get formatted scoreboard data for SSR/API (SERVER-SIDE ONLY)
  */
@@ -283,9 +287,9 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	const fopUpdate = getFopUpdate(fopName);
 	const databaseState = getDatabaseState();
 	
-	const showPlates = options.showPlates !== 'false';
-	const showTimer = options.showTimer !== 'false';
-	const showDecisions = options.showDecisions !== 'false';
+	const showPlates = isEnabledOption(options.showPlates);
+	const showTimer = isEnabledOption(options.showTimer);
+	const showDecisions = isEnabledOption(options.showDecisions);
 	const lang = options.lang || 'en';
 	
 	// Get learning mode from environment
