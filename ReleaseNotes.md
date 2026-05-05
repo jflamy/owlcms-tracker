@@ -5,6 +5,9 @@
 
 ##### Release log
 
+- 2.17.0: Tracker now receives the mapping between country names and IOC country codes
+- 2.17.0: If a team name is a country name, and the flag is not there under that name, the flag will be looked up using the IOC code
+
 - 2.16.0: Jury Replays user interface plugin added.  Requires replays module version 2.2.2
 - 2.16.0: Category ordering can now be overridden and extended.  See the top-level README.md
 
