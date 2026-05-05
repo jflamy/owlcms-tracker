@@ -90,9 +90,9 @@ body.has-footer-left-logo .pagedjs_page:not(.pagedjs_first_page) .pagedjs_margin
   background-image: var(--footer-left-logo-url);
   background-position: 2mm center;
   background-repeat: no-repeat;
-  background-size: auto 16mm;
+  background-size: var(--footer-left-logo-background-size, auto auto);
   min-width: 76mm;
-  min-height: 16mm;
+  min-height: var(--footer-left-logo-height, 0px);
 }
 
 .pagedjs_margin-bottom-right {

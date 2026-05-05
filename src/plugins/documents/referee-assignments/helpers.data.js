@@ -214,12 +214,16 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	sessionColumns.forEach(s => allPlatforms.add(s.platformName || 'Platform'));
 	const hasMultiplePlatforms = allPlatforms.size > 1;
 	
+	const now = new Date();
+	const fileDateTime = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}h${String(now.getMinutes()).padStart(2,'0')}`;
+
 	const result = {
 		status: 'ready',
 		header: {
 			competitionName: competition.competitionName || 'Competition',
 			locationLine: buildLocationLine(),
-			title: translations['OfficialAssignments'] || `!${language}:OfficialAssignments`
+			title: translations['OfficialAssignments'] || `!${language}:OfficialAssignments`,
+			fileTitle: `Referee Assignments - ${fileDateTime}`
 		},
 		days: days,
 		hasMultiplePlatforms,
@@ -316,21 +320,24 @@ function buildLabels(translations, language) {
 	
 	return {
 		group: translations['Group'] || `!${language}:Group`,
+		weigh_in: translations['WeighIn'] || 'Weigh-In',
 		official_at_weighin: translations['WeighInOfficials'] || `!${language}:WeighInOfficials`,
+		officials: translations['Officials'] || 'Officials',
 		weighin_time: translations['WeighInTime_StartList'] || `!${language}:WeighInTime_StartList`,
 		competition_time: translations['StartTime'] || `!${language}:StartTime`,
-		announcer: translations['Announcer'] || `!${language}:Announcer`,
+		announcer: 'Speaker',
 		referees: translations['Referees'] || `!${language}:Referees`,
 		center_referee: translations['CenterReferee'] || `!${language}:CenterReferee`,
 		side_referee_1: (sideRefereeBase + ' 1'),
 		side_referee_2: (sideRefereeBase + ' 3'),
 		reserve_referee: translations['ReserveReferee'] || `!${language}:ReserveReferee`,
 		marshals: translations['Marshals'] || `!${language}:Marshals`,
-		marshall: translations['Marshall'] || `!${language}:Marshall`,
+		marshall: translations['Marshals'] || translations['Marshall'] || `!${language}:Marshall`,
 		timekeeper: translations['Timekeeper'] || `!${language}:Timekeeper`,
-		technical_controller: translations['TechnicalController'] || `!${language}:TechnicalController`,
+		technical_controller: 'Technical Controllers',
 		secretaries: translations['Secretaries'] || `!${language}:Secretaries`,
 		secretary: translations['Secretary'] || `!${language}:Secretary`,
+		competition_secretaries: translations['CompetitionSecretaries'] || 'Competition Secretaries',
 		doctor: translations['Doctor'] || `!${language}:Doctor`,
 		jury: translations['Jury'] || `!${language}:Jury`,
 		jury_president: translations['JuryPresident'] || `!${language}:JuryPresident`,

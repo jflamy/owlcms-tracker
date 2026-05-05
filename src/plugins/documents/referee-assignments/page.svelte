@@ -64,6 +64,10 @@
 	$: hasJuryMembers = hasAnyData(data.days, 'jury2', 'jury3', 'jury4', 'jury5', 'reserveJury');
 </script>
 
+<svelte:head>
+	<title>{data.header?.fileTitle || 'Referee Assignments'}</title>
+</svelte:head>
+
 <div class="protocol-sheet" class:no-jury={!hasJury}>
 	{#if data.status === 'ready'}
 		<!-- Header -->
@@ -106,6 +110,47 @@
 							</tr>
 						</thead>
 						<tbody>
+							<!-- Weigh-In Time -->
+							<tr>
+								<td class="row-label">{data.labels?.weighin_time}</td>
+								{#each platform.sessions as session (session.id)}
+									<td class="cell">{session.weighInTime || '—'}</td>
+								{/each}
+							</tr>
+
+							<!-- Competition Time -->
+							<tr>
+								<td class="row-label">{data.labels?.competition_time}</td>
+								{#each platform.sessions as session (session.id)}
+									<td class="cell">{session.competitionTime || '—'}</td>
+								{/each}
+							</tr>
+
+							<!-- Weigh-In Section -->
+							<tr class="section-divider">
+								<td class="row-label">{data.labels?.weigh_in}</td>
+								<td colspan={platform.sessions.length} class="section-title"></td>
+							</tr>
+
+							<!-- Secretariat -->
+							{#if hasSecretary}
+							<tr>
+								<td class="row-label">{data.labels?.competition_secretaries}</td>
+								{#each platform.sessions as session (session.id)}
+									<td class="cell">
+										{#if session.officials.competitionSecretary?.raw}
+											<div>{@html renderNameArray(session.officials.competitionSecretary)}</div>
+										{/if}
+										{#if session.officials.competitionSecretary2?.raw}
+											<div>{@html renderNameArray(session.officials.competitionSecretary2)}</div>
+										{/if}
+										{#if !session.officials.competitionSecretary?.raw && !session.officials.competitionSecretary2?.raw}
+									{/if}
+								</td>
+							{/each}
+						</tr>
+						{/if}
+
 							<!-- Weigh-In Officials -->
 							{#if hasWeighInOfficials}
 							<tr>
@@ -125,38 +170,6 @@
 					{/each}
 				</tr>
 				{/if}
-
-						<!-- Weigh-In Time -->
-						<tr>
-							<td class="row-label">{data.labels?.weighin_time}</td>
-							{#each platform.sessions as session (session.id)}
-								<td class="cell">{session.weighInTime || '—'}</td>
-							{/each}
-						</tr>
-
-						<!-- Competition Time -->
-						<tr>
-							<td class="row-label">{data.labels?.competition_time}</td>
-							{#each platform.sessions as session (session.id)}
-								<td class="cell">{session.competitionTime || '—'}</td>
-							{/each}
-						</tr>
-
-						<!-- Announcer -->
-						{#if hasAnnouncer}
-						<tr>
-							<td class="row-label">{data.labels?.announcer}</td>
-							{#each platform.sessions as session (session.id)}
-								<td class="cell">
-								{#if session.officials.announcer?.raw}
-									{@html renderNameArray(session.officials.announcer)}
-									{:else}
-										<span class="empty">—</span>
-									{/if}
-								</td>
-							{/each}
-						</tr>
-						{/if}
 
 						<!-- Referees Section -->
 						<tr class="section-divider">
@@ -232,9 +245,25 @@
 
 						<!-- Officials Section -->
 						<tr class="section-divider">
-							<td class="row-label">{data.labels?.officials || 'Officiels'}</td>
-							<td colspan={platform.sessions.length} class="section-title"></td>
-						</tr>
+								<td class="row-label">{data.labels?.officials}</td>
+								<td colspan={platform.sessions.length} class="section-title"></td>
+							</tr>
+
+							<!-- Announcer -->
+							{#if hasAnnouncer}
+							<tr>
+								<td class="row-label">{data.labels?.announcer}</td>
+								{#each platform.sessions as session (session.id)}
+									<td class="cell">
+									{#if session.officials.announcer?.raw}
+										{@html renderNameArray(session.officials.announcer)}
+										{:else}
+											<span class="empty">—</span>
+										{/if}
+									</td>
+								{/each}
+							</tr>
+							{/if}
 
 						<!-- Marshal -->
 						{#if hasMarshal}
@@ -288,26 +317,6 @@
 										<div>{@html renderNameArray(session.officials.technicalController3)}</div>
 									{/if}
 									{#if !session.officials.technicalController?.raw && !session.officials.technicalController2?.raw && !session.officials.technicalController3?.raw}
-										<span class="empty">—</span>
-									{/if}
-								</td>
-							{/each}
-						</tr>
-						{/if}
-
-						<!-- Secretariat -->
-						{#if hasSecretary}
-						<tr>
-							<td class="row-label">{data.labels?.secretary}</td>
-							{#each platform.sessions as session (session.id)}
-								<td class="cell">
-									{#if session.officials.competitionSecretary?.raw}
-										<div>{@html renderNameArray(session.officials.competitionSecretary)}</div>
-									{/if}
-									{#if session.officials.competitionSecretary2?.raw}
-										<div>{@html renderNameArray(session.officials.competitionSecretary2)}</div>
-									{/if}
-									{#if !session.officials.competitionSecretary?.raw && !session.officials.competitionSecretary2?.raw}
 										<span class="empty">—</span>
 									{/if}
 								</td>
