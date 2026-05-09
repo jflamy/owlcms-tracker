@@ -1,5 +1,22 @@
 <script>
 	import { onMount, tick } from 'svelte';
+	import {
+		buildExactReplayUrl,
+		buildReplayUrl,
+		buildStatusAttemptKey,
+		buildStatusSocketUrl,
+		ensureAbsoluteUrl,
+		fetchReplaySessionLifts,
+		fetchReplaySessions,
+		fetchReplayState,
+		getReplaySelectionForCamera,
+		normalizeReplaySessionId,
+		normalizeTrackerSessions,
+		openReplaysStatusSocket,
+		reportReplayPlaybackFailure,
+		replayStateView,
+		resolveLiveStatusDetails
+	} from './helpers.client.js';
 	import weightlifterIconWhite from './icons/wl_white.png';
 
 	export let data = {};
@@ -10,6 +27,7 @@
 	let timelinePanelElement;
 	let timelineLayoutElement;
 	let timelinePopoverElement;
+	let timelineSliderElement;
 	let cameraButtonsElement;
 	let replaysStatusSocket;
 	let replaysStatusReconnectTimer;
@@ -52,8 +70,13 @@
 	let replayPickerSessions = [];
 	let selectedReplaySessionId = '';
 	let replayPickerLifts = [];
+	let loadedCameraOneAttemptKey = '';
+	let pendingCameraOneAttemptKey = '';
+	let loadingCameraOneAttemptKey = '';
+	let replayStatusGeneration = 0;
 
 	const cameraNumbers = [1, 2, 3, 4];
+	const timelineKeyboardStepSeconds = 0.01;
 
 	$: replayServerBaseUrl = options?.replaysBaseUrl || data?.options?.replaysBaseUrl || '';
 	$: slowMotionEnabled = normalizeBooleanOption(options?.enableSlowMotion ?? data?.options?.enableSlowMotion ?? false);
@@ -66,12 +89,14 @@
 			.sort((left, right) => left - right)
 		: cameraNumbers;
 	$: canShowTimelinePopover = Boolean(replayUrl) && (!isLoading || cameraPopoverPending);
-	$: displayedStatusHeadline = reviewedAthlete || liveStatusAthlete || liveStatusMessage || statusMessage;
-	$: displayedStatusIsAthlete = Boolean(reviewedAthlete || liveStatusAthlete);
+	$: displayedStatusHeadline = replayUrl && reviewedAthlete ? reviewedAthlete : formatLiveStatusHeadline(liveStatusCode, statusMessage);
+	$: displayedStatusIsAthlete = Boolean(replayUrl && reviewedAthlete);
 	$: displayedStatusMessage = buildDisplayedStatusMessage();
-	$: overlayAthleteName = reviewedAthlete || liveStatusAthlete || '';
-	$: overlayLiftType = reviewedLiftType || (!reviewedAthlete ? liveStatusLiftType : '');
-	$: overlayAttempt = reviewedAttempt ?? (!reviewedAthlete ? liveStatusAttempt : null);
+	$: liveAttemptSummary = formatLiftSummary(liveStatusLiftType, liveStatusAttempt);
+	$: liveDisplaySession = liveStatusSession ? liveStatusSession.replaceAll('_', ' ') : '';
+	$: overlayAthleteName = replayUrl ? reviewedAthlete : '';
+	$: overlayLiftType = replayUrl ? reviewedLiftType : '';
+	$: overlayAttempt = replayUrl ? reviewedAttempt : null;
 	$: overlayAttemptSummary = formatLiftSummary(overlayLiftType, overlayAttempt);
 	$: displayedStatusTone =
 		errorMessage && !reviewedAthlete
@@ -100,12 +125,7 @@
 		clampTimelinePopoverWithinLayout();
 	}
 	$: if (replayPickerSessions.length === 0 && Array.isArray(data?.trackerSessions) && data.trackerSessions.length > 0) {
-		replayPickerSessions = data.trackerSessions
-			.filter((session) => session?.id)
-			.map((session) => ({
-				...session,
-				id: normalizeReplaySessionId(session.id || session.name || session.displayName || '')
-			}));
+		replayPickerSessions = normalizeTrackerSessions(data.trackerSessions);
 	}
 	$: if (mounted) {
 		const nextStatusSocketUrl = buildStatusSocketUrl(replayServerBaseUrl);
@@ -145,17 +165,6 @@
 		};
 	});
 
-	function ensureAbsoluteUrl(rawUrl) {
-		const trimmed = String(rawUrl || '').trim();
-		if (!trimmed) {
-			return '';
-		}
-
-		return /^[a-zA-Z][a-zA-Z\d+.-]*:\/\//.test(trimmed)
-			? trimmed
-			: `http://${trimmed}`;
-	}
-
 	function cameraLabel(cameraNumber = activeCameraNumber) {
 		return `camera ${cameraNumber}`;
 	}
@@ -172,231 +181,123 @@
 		return normalizePlaybackMode(mode) === 'slow' ? 0.5 : 1;
 	}
 
-	function normalizeLogText(value, maxLength = 240) {
-		if (value === null || value === undefined) {
-			return '';
+	function applyLiveStatusDetails({ athleteName, liftType, attemptNumber, session } = {}) {
+		if (typeof athleteName === 'string' && athleteName.trim()) {
+			liveStatusAthlete = athleteName.trim();
 		}
 
-		const normalized = String(value).replace(/\s+/g, ' ').trim();
-		if (!normalized) {
-			return '';
+		if (typeof liftType === 'string' && liftType.trim()) {
+			liveStatusLiftType = liftType.trim();
 		}
 
-		return normalized.length > maxLength ? `${normalized.slice(0, maxLength - 1)}…` : normalized;
-	}
+		const parsedAttempt = Number(attemptNumber);
+		if (Number.isInteger(parsedAttempt) && parsedAttempt > 0) {
+			liveStatusAttempt = parsedAttempt;
+		}
 
-	function roundLogNumber(value) {
-		return Number.isFinite(value) ? Math.round(value * 1000) / 1000 : null;
-	}
-
-	function describeReadyState(value) {
-		switch (value) {
-			case 0:
-				return 'HAVE_NOTHING';
-			case 1:
-				return 'HAVE_METADATA';
-			case 2:
-				return 'HAVE_CURRENT_DATA';
-			case 3:
-				return 'HAVE_FUTURE_DATA';
-			case 4:
-				return 'HAVE_ENOUGH_DATA';
-			default:
-				return '';
+		if (typeof session === 'string' && session.trim()) {
+			liveStatusSession = session.trim();
 		}
 	}
 
-	function describeNetworkState(value) {
-		switch (value) {
-			case 0:
-				return 'NETWORK_EMPTY';
-			case 1:
-				return 'NETWORK_IDLE';
-			case 2:
-				return 'NETWORK_LOADING';
-			case 3:
-				return 'NETWORK_NO_SOURCE';
-			default:
-				return '';
+	function clearMainReplayForLiveAttempt(attemptKey) {
+		activeCameraNumber = 1;
+		replayStatusGeneration += 1;
+		loadedCameraOneAttemptKey = '';
+		pendingCameraOneAttemptKey = attemptKey;
+		loadingCameraOneAttemptKey = '';
+		isLoading = false;
+		isPlaying = false;
+		isSeeking = false;
+		cameraPopoverPending = false;
+		showTimelinePopover = false;
+		errorMessage = '';
+		statusMessage = formatLiveStatusHeadline(liveStatusCode, 'Recording');
+		currentTime = 0;
+		duration = 0;
+		selectedPlaybackMode = 'normal';
+		replayUrl = '';
+		reviewedAthlete = '';
+		reviewedLiftType = '';
+		reviewedAttempt = null;
+		reviewedSession = '';
+
+		if (videoElement) {
+			videoElement.pause();
+			setReplayLoop(false);
+			videoElement.removeAttribute('src');
+			videoElement.load();
 		}
 	}
 
-	function describeMediaErrorCode(value) {
-		switch (value) {
-			case 1:
-				return 'MEDIA_ERR_ABORTED';
-			case 2:
-				return 'MEDIA_ERR_NETWORK';
-			case 3:
-				return 'MEDIA_ERR_DECODE';
-			case 4:
-				return 'MEDIA_ERR_SRC_NOT_SUPPORTED';
-			default:
-				return '';
+	async function loadCameraOneForLiveAttempt(attemptKey, statusGeneration = replayStatusGeneration) {
+		if (!attemptKey || loadedCameraOneAttemptKey === attemptKey || loadingCameraOneAttemptKey === attemptKey) {
+			return false;
 		}
-	}
 
-	function buildReplayPlaybackFailurePayload(error, playbackRate, blockedStatusMessage, blockedErrorMessage, context = {}) {
-		const playErrorName = normalizeLogText(error?.name || error?.constructor?.name || 'UnknownError', 80);
-		const playErrorMessage = normalizeLogText(error?.message || error?.toString?.() || '', 320);
-		const mediaErrorCode = videoElement?.error?.code ?? null;
-		const mode = normalizePlaybackMode(context?.mode || selectedPlaybackMode);
-
-		return {
-			source: 'jury-replays',
-			category: 'media.play',
-			message: `Replay play() failed during ${normalizeLogText(context?.action || 'playback', 80) || 'playback'}: ${playErrorName}${playErrorMessage ? ` - ${playErrorMessage}` : ''}`,
-			details: {
-				action: normalizeLogText(context?.action || 'playback', 80),
-				mode,
-				cameraNumber: Number.isInteger(activeCameraNumber) ? activeCameraNumber : null,
-				playbackRate: roundLogNumber(playbackRate),
-				replayUrl: normalizeLogText(replayUrl, 320),
-				currentSrc: normalizeLogText(videoElement?.currentSrc || '', 320),
-				pageUrl: normalizeLogText(window?.location?.href || '', 320),
-				documentVisibility: normalizeLogText(document?.visibilityState || '', 40),
-				playErrorName,
-				playErrorMessage,
-				mediaErrorCode,
-				mediaErrorLabel: describeMediaErrorCode(mediaErrorCode),
-				readyState: videoElement?.readyState ?? null,
-				readyStateLabel: describeReadyState(videoElement?.readyState),
-				networkState: videoElement?.networkState ?? null,
-				networkStateLabel: describeNetworkState(videoElement?.networkState),
-				paused: Boolean(videoElement?.paused),
-				ended: Boolean(videoElement?.ended),
-				currentTime: roundLogNumber(videoElement?.currentTime),
-				duration: roundLogNumber(videoElement?.duration),
-				muted: Boolean(videoElement?.muted),
-				volume: roundLogNumber(videoElement?.volume),
-				statusMessage: normalizeLogText(blockedStatusMessage, 200),
-				uiErrorMessage: normalizeLogText(blockedErrorMessage, 200),
-				athlete: normalizeLogText(reviewedAthlete || liveStatusAthlete || '', 120),
-				liftType: normalizeLogText(reviewedLiftType || liveStatusLiftType || '', 40),
-				attempt: overlayAttempt ?? null,
-				session: normalizeLogText(reviewedSession || liveStatusSession || replayStateSessionId || selectedReplaySessionId || '', 120),
-				userAgent: normalizeLogText(navigator?.userAgent || '', 320)
+		loadingCameraOneAttemptKey = attemptKey;
+		try {
+			const replayState = await loadReplayState();
+			const replaySelection = getReplaySelectionForCamera(replayState, 1, attemptKey);
+			if (!replaySelection || pendingCameraOneAttemptKey !== attemptKey || replayStatusGeneration !== statusGeneration) {
+				return false;
 			}
-		};
+
+			const didLoadReplay = await loadReplaySelection(replaySelection, false, false);
+			if (!didLoadReplay || pendingCameraOneAttemptKey !== attemptKey || replayStatusGeneration !== statusGeneration) {
+				return false;
+			}
+
+			loadedCameraOneAttemptKey = attemptKey;
+			pendingCameraOneAttemptKey = '';
+
+			return true;
+		} finally {
+			if (loadingCameraOneAttemptKey === attemptKey) {
+				loadingCameraOneAttemptKey = '';
+			}
+		}
 	}
 
-	async function reportReplayPlaybackFailure(error, playbackRate, blockedStatusMessage, blockedErrorMessage, context = {}) {
-		if (typeof window === 'undefined' || typeof fetch !== 'function') {
+	function handleLiveAttemptStatus(message, statusCode) {
+		const nextAttemptKey = buildStatusAttemptKey(message);
+
+		if (statusCode === 1 || statusCode === 2) {
+			clearMainReplayForLiveAttempt(nextAttemptKey);
 			return;
 		}
 
-		const payload = buildReplayPlaybackFailurePayload(
-			error,
-			playbackRate,
-			blockedStatusMessage,
-			blockedErrorMessage,
-			context
-		);
+		if (!nextAttemptKey) {
+			return;
+		}
 
-		try {
-			await fetch('/api/client-log', {
-				method: 'POST',
-				headers: {
-					'content-type': 'application/json'
-				},
-				body: JSON.stringify(payload),
-				keepalive: true
-			});
-		} catch (loggingError) {
-			console.warn('[Replays] Failed to report play() rejection to tracker logs:', loggingError, payload);
+		if (statusCode === 0 && nextAttemptKey !== loadedCameraOneAttemptKey) {
+			pendingCameraOneAttemptKey = nextAttemptKey;
+			void loadCameraOneForLiveAttempt(nextAttemptKey, replayStatusGeneration);
 		}
 	}
 
-	function normalizeReplaySessionId(value) {
-		return String(value || '')
-			.trim()
-			.replaceAll(' ', '_');
+	function currentLiveStatusAttemptMessage() {
+		return {
+			athleteName: liveStatusAthlete,
+			liftType: liveStatusLiftType,
+			attemptNumber: liveStatusAttempt,
+			session: liveStatusSession
+		};
 	}
 
-	function buildStatusSocketUrl(baseUrl) {
-		const normalized = ensureAbsoluteUrl(baseUrl);
-		if (!normalized) {
-			return '';
-		}
-
-		try {
-			const url = new URL(normalized);
-			url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
-			if (/\/replay\/\d+(\.mp4)?$/.test(url.pathname)) {
-				url.pathname = url.pathname.replace(/\/replay\/\d+(\.mp4)?$/, '/ws');
-			} else {
-				const basePath = url.pathname === '/' ? '' : url.pathname.replace(/\/$/, '');
-				url.pathname = `${basePath}/ws`;
-			}
-			url.search = '';
-			url.hash = '';
-			return url.toString();
-		} catch {
-			return '';
-		}
+	async function loadReplayState() {
+		const replayState = await fetchReplayState(replayServerBaseUrl);
+		const view = replayStateView(replayState);
+		replayStateSessionId = view.sessionId;
+		replayStateCameras = view.cameras;
+		return replayState;
 	}
 
-	function buildReplayStateUrl(baseUrl) {
-		const normalized = ensureAbsoluteUrl(baseUrl);
-		if (!normalized) {
-			return { error: 'Provide the replays server URL in the tracker home page before opening this plugin.' };
-		}
-
-		try {
-			const url = new URL(normalized);
-			if (/\/replay\/\d+(\.mp4)?$/.test(url.pathname)) {
-				url.pathname = url.pathname.replace(/\/replay\/\d+(\.mp4)?$/, '/api/replay-state');
-			} else {
-				const basePath = url.pathname === '/' ? '' : url.pathname.replace(/\/$/, '');
-				url.pathname = `${basePath}/api/replay-state`;
-			}
-			url.search = '';
-			url.hash = '';
-			return { url: url.toString() };
-		} catch {
-			return { error: 'The replays server URL is not valid. Use a full URL such as http://192.168.1.50:8091.' };
-		}
-	}
-
-	function buildReplaySessionsUrl(baseUrl) {
-		const normalized = ensureAbsoluteUrl(baseUrl);
-		if (!normalized) {
-			return { error: 'Provide the replays server URL in the tracker home page before opening this plugin.' };
-		}
-
-		try {
-			const url = new URL(normalized);
-			const basePath = url.pathname === '/' ? '' : url.pathname.replace(/\/$/, '');
-			url.pathname = `${basePath}/api/sessions`;
-			url.search = '';
-			url.hash = '';
-			return { url: url.toString() };
-		} catch {
-			return { error: 'The replays server URL is not valid. Use a full URL such as http://192.168.1.50:8091.' };
-		}
-	}
-
-	function buildReplaySessionLiftsUrl(baseUrl, sessionId, sortMode = 'time') {
-		const normalized = ensureAbsoluteUrl(baseUrl);
-		const normalizedSessionId = normalizeReplaySessionId(sessionId);
-		if (!normalized) {
-			return { error: 'Provide the replays server URL in the tracker home page before opening this plugin.' };
-		}
-		if (!normalizedSessionId) {
-			return { error: 'Choose a session before loading replay history.' };
-		}
-
-		try {
-			const url = new URL(normalized);
-			const basePath = url.pathname === '/' ? '' : url.pathname.replace(/\/$/, '');
-			url.pathname = `${basePath}/api/sessions/${encodeURIComponent(normalizedSessionId)}/lifts`;
-			url.search = '';
-			url.hash = '';
-			url.searchParams.set('sort', sortMode === 'athlete' ? 'athlete' : 'time');
-			return { url: url.toString() };
-		} catch {
-			return { error: 'The replays server URL is not valid. Use a full URL such as http://192.168.1.50:8091.' };
-		}
+	async function fillLiveStatusDetailsAndHandle(statusCode) {
+		const resolvedDetails = await resolveLiveStatusDetails(replayServerBaseUrl, statusCode, currentLiveStatusAttemptMessage());
+		applyLiveStatusDetails(resolvedDetails);
+		handleLiveAttemptStatus(currentLiveStatusAttemptMessage(), statusCode);
 	}
 
 	function resetLiveStatus() {
@@ -441,16 +342,35 @@
 		return parts.join(' ');
 	}
 
+	function formatLiveStatusHeadline(statusCode, fallback = '') {
+		switch (statusCode) {
+			case 0:
+				return 'Ready';
+			case 1:
+				return 'Recording';
+			case 2:
+				return 'Trimming';
+			case 3:
+				return 'Error';
+			default:
+				return fallback || '';
+		}
+	}
+
 	function buildDisplayedStatusMessage() {
 		const detailParts = [];
-		const statusAthlete = reviewedAthlete || liveStatusAthlete;
-		const statusLiftType = reviewedLiftType || (!reviewedAthlete ? liveStatusLiftType : '');
-		const statusAttempt = reviewedAttempt ?? (!reviewedAthlete ? liveStatusAttempt : null);
-		const statusSession = reviewedSession || (!reviewedAthlete ? liveStatusSession : '');
+		const statusAthlete = replayUrl ? reviewedAthlete : liveStatusAthlete;
+		const statusLiftType = replayUrl ? reviewedLiftType : liveStatusLiftType;
+		const statusAttempt = replayUrl ? reviewedAttempt : liveStatusAttempt;
+		const statusSession = replayUrl ? reviewedSession : liveStatusSession;
 		const liftSummary = formatLiftSummary(statusLiftType, statusAttempt);
 		const displaySession = statusSession ? statusSession.replaceAll('_', ' ') : '';
 
 		if (statusAthlete) {
+			if (!replayUrl) {
+				detailParts.push(statusAthlete);
+			}
+
 			if (liftSummary) {
 				detailParts.push(liftSummary);
 			}
@@ -458,8 +378,8 @@
 			if (displaySession) {
 				detailParts.push(`Session ${displaySession}`);
 			}
-		} else if (liveStatusMessage || statusMessage) {
-			detailParts.push(liveStatusMessage || statusMessage);
+		} else if (!replayUrl && liveStatusMessage) {
+			detailParts.push(liveStatusMessage);
 		}
 
 		return detailParts.join('  ·  ');
@@ -541,154 +461,37 @@
 	}
 
 	function connectReplaysStatusSocket(socketUrl) {
-		if (!mounted || !socketUrl || typeof WebSocket === 'undefined') {
+		if (!mounted || !socketUrl) {
 			return;
 		}
 
-		const socket = new WebSocket(socketUrl);
-		replaysStatusSocket = socket;
-
-		socket.onmessage = (event) => {
-			if (replaysStatusSocket !== socket) {
-				return;
-			}
-
-			try {
-				const message = JSON.parse(event.data);
-				if (!message || typeof message.text !== 'string') {
+		const socket = openReplaysStatusSocket(socketUrl, {
+			onStatus: ({ message, statusCode, details }) => {
+				if (replaysStatusSocket !== socket) {
 					return;
 				}
 
+				resetLiveStatus();
 				liveStatusMessage = message.text;
-				const nextStatusCode = Number.isFinite(message.code) ? Number(message.code) : null;
-				liveStatusCode = nextStatusCode;
-				liveStatusAthlete = typeof message.athleteName === 'string' ? message.athleteName : '';
-				liveStatusLiftType = typeof message.liftType === 'string' ? message.liftType : '';
-				const nextAttempt = Number(message.attemptNumber);
-				liveStatusAttempt = Number.isInteger(nextAttempt) && nextAttempt > 0 ? nextAttempt : null;
-				liveStatusSession = typeof message.session === 'string' ? message.session : '';
-				updateReviewedReplayInfo(
-					nextStatusCode,
-					message.athleteName,
-					message.liftType,
-					message.attemptNumber,
-					message.session
-				);
-			} catch {
-				// Ignore malformed status packets from the replays server.
+				liveStatusCode = statusCode;
+				applyLiveStatusDetails(details);
+				handleLiveAttemptStatus(currentLiveStatusAttemptMessage(), statusCode);
+				if ([0, 1, 2].includes(statusCode) && (!liveStatusAthlete || !liveStatusLiftType || !liveStatusAttempt)) {
+					void fillLiveStatusDetailsAndHandle(statusCode);
+				}
+			},
+			onClose: () => {
+				if (replaysStatusSocket !== socket) {
+					return;
+				}
+
+				replaysStatusSocket = null;
+				scheduleReplaysStatusReconnect(socketUrl);
 			}
-		};
+		});
 
-		socket.onerror = () => {
-			if (replaysStatusSocket !== socket) {
-				return;
-			}
-
-			socket.close();
-		};
-
-		socket.onclose = () => {
-			if (replaysStatusSocket !== socket) {
-				return;
-			}
-
-			replaysStatusSocket = null;
-			scheduleReplaysStatusReconnect(socketUrl);
-		};
-	}
-
-	function buildReplayUrl(baseUrl, cameraNumber = activeCameraNumber, cacheBust = Date.now()) {
-		const normalized = ensureAbsoluteUrl(baseUrl);
-		if (!normalized) {
-			return { error: 'Provide the replays server URL in the tracker home page before opening this plugin.' };
-		}
-
-		try {
-			const url = new URL(normalized);
-			if (/\/replay\/\d+(\.mp4)?$/.test(url.pathname)) {
-				url.pathname = url.pathname.replace(/\/replay\/\d+(\.mp4)?$/, `/replay/${cameraNumber}`);
-			} else {
-				const basePath = url.pathname === '/' ? '' : url.pathname.replace(/\/$/, '');
-				url.pathname = `${basePath}/replay/${cameraNumber}`;
-			}
-
-			url.searchParams.set('_t', String(cacheBust));
-			return { url: url.toString() };
-		} catch {
-			return { error: 'The replays server URL is not valid. Use a full URL such as http://192.168.1.50:8091.' };
-		}
-	}
-
-	function buildExactReplayUrl(baseUrl, videoPath, cacheBust = Date.now()) {
-		const normalized = ensureAbsoluteUrl(baseUrl);
-		if (!normalized || !videoPath) {
-			return { error: 'Replay metadata is missing a playable video path.' };
-		}
-
-		try {
-			const url = new URL(videoPath, normalized.endsWith('/') ? normalized : `${normalized}/`);
-			url.searchParams.set('_t', String(cacheBust));
-			return { url: url.toString() };
-		} catch {
-			return { error: 'Unable to build the exact replay URL from the replays server state.' };
-		}
-	}
-
-	async function fetchReplayState(baseUrl) {
-		const replayStateTarget = buildReplayStateUrl(baseUrl);
-		if (replayStateTarget.error) {
-			return null;
-		}
-
-		try {
-			const response = await fetch(replayStateTarget.url, { cache: 'no-store' });
-			if (!response.ok) {
-				return null;
-			}
-
-			const replayState = await response.json();
-			replayStateSessionId = normalizeReplaySessionId(replayState?.resolvedSession || replayState?.activeSession || '');
-			replayStateCameras = Array.isArray(replayState?.cameras) ? replayState.cameras : [];
-			return replayState;
-		} catch {
-			return null;
-		}
-	}
-
-	async function fetchReplaySessions(baseUrl) {
-		const replaySessionsTarget = buildReplaySessionsUrl(baseUrl);
-		if (replaySessionsTarget.error) {
-			return [];
-		}
-
-		try {
-			const response = await fetch(replaySessionsTarget.url, { cache: 'no-store' });
-			if (!response.ok) {
-				return [];
-			}
-
-			const payload = await response.json();
-			const sessions = Array.isArray(payload?.sessions) ? payload.sessions : [];
-			const activeSessionId = normalizeReplaySessionId(payload?.activeSession || '');
-			if (!replayStateSessionId && activeSessionId) {
-				replayStateSessionId = activeSessionId;
-			}
-			return sessions
-				.map((session) => {
-					const id = normalizeReplaySessionId(session?.id || session?.name || '');
-					return id
-						? {
-							id,
-							name: session?.name || session?.id || id,
-							displayName: session?.name || session?.id || id,
-							platformName: '',
-							active: Boolean(session?.active) || id === activeSessionId
-						}
-						: null;
-				})
-				.filter(Boolean);
-		} catch {
-			return [];
+		if (socket) {
+			replaysStatusSocket = socket;
 		}
 	}
 
@@ -719,7 +522,10 @@
 			return replayPickerSessions;
 		}
 
-		const sessions = await fetchReplaySessions(replayServerBaseUrl);
+		const { sessions, activeSessionId } = await fetchReplaySessions(replayServerBaseUrl);
+		if (!replayStateSessionId && activeSessionId) {
+			replayStateSessionId = activeSessionId;
+		}
 		replayPickerSessions = sessions;
 		return sessions;
 	}
@@ -730,38 +536,10 @@
 		replayPickerError = '';
 		replayPickerLoading = true;
 
-		const replayLiftsTarget = buildReplaySessionLiftsUrl(replayServerBaseUrl, normalizedSessionId, replayPickerSort);
-		if (replayLiftsTarget.error) {
-			replayPickerLoading = false;
-			replayPickerLifts = [];
-			replayPickerError = replayLiftsTarget.error;
-			return;
-		}
-
-		try {
-			const response = await fetch(replayLiftsTarget.url, { cache: 'no-store' });
-			if (!response.ok) {
-				throw new Error(response.status === 404 ? 'No replay history is available for that session yet.' : 'Unable to load replay history from the replays server.');
-			}
-
-			const payload = await response.json();
-			replayPickerLifts = Array.isArray(payload?.lifts) ? payload.lifts : [];
-		} catch (error) {
-			replayPickerLifts = [];
-			replayPickerError = error?.message || 'Unable to load replay history from the replays server.';
-		} finally {
-			replayPickerLoading = false;
-		}
-	}
-
-	function getReplaySelectionForCamera(replayState, cameraNumber) {
-		const replaySelections = Array.isArray(replayState?.cameras) ? replayState.cameras : [];
-		return replaySelections.find((selection) =>
-			Number(selection?.camera) === cameraNumber &&
-			selection?.available &&
-			typeof selection?.videoPath === 'string' &&
-			selection.videoPath.length > 0
-		);
+		const { lifts, error } = await fetchReplaySessionLifts(replayServerBaseUrl, normalizedSessionId, replayPickerSort);
+		replayPickerLifts = lifts;
+		replayPickerError = error;
+		replayPickerLoading = false;
 	}
 
 	function formatTime(seconds) {
@@ -795,6 +573,12 @@
 		}
 
 		isPlaying = !videoElement.paused && !videoElement.ended;
+	}
+
+	function setReplayLoop(enabled) {
+		if (videoElement) {
+			videoElement.loop = enabled;
+		}
 	}
 
 	async function loadReplaySelection(selection, preservePopover = false, autoPlay = true) {
@@ -831,6 +615,7 @@
 		}
 
 		videoElement.pause();
+		setReplayLoop(false);
 		videoElement.load();
 		videoElement.playbackRate = 1;
 
@@ -905,6 +690,7 @@
 		}
 
 		videoElement.pause();
+		setReplayLoop(false);
 		videoElement.load();
 		videoElement.playbackRate = 1;
 
@@ -922,9 +708,9 @@
 		);
 	}
 
-	async function syncReplayState({ preferredCamera = 1, showPopover = false, autoPlay = false, preservePopover = false } = {}) {
+	async function syncReplayState({ preferredCamera = 1, showPopover = false, autoPlay = false, preservePopover = false, attemptKey = '' } = {}) {
 		const replayState = await fetchReplayState(replayServerBaseUrl);
-		const replaySelection = getReplaySelectionForCamera(replayState, preferredCamera);
+		const replaySelection = getReplaySelectionForCamera(replayState, preferredCamera, attemptKey);
 		if (!replaySelection) {
 			return null;
 		}
@@ -1028,9 +814,56 @@
 		showTimelinePopoverAboveCameras();
 	}
 
+	function shouldIgnoreTimelineKeyboardStep(event) {
+		if (showReplayPicker || event.altKey || event.ctrlKey || event.metaKey) {
+			return true;
+		}
+
+		const target = event.target;
+		if (!(target instanceof Element)) {
+			return false;
+		}
+
+		if (target.closest('input:not(.timeline), textarea, select, [contenteditable="true"]')) {
+			return true;
+		}
+
+		return false;
+	}
+
+	function stepTimelineFromKeyboard(direction) {
+		if (!videoElement || !replayUrl || duration <= 0) {
+			return false;
+		}
+
+		const baseTime = Number.isFinite(videoElement.currentTime) ? videoElement.currentTime : currentTime;
+		const nextTime = clamp(baseTime + direction * timelineKeyboardStepSeconds, 0, duration);
+		pauseFromTimelineArea('Replay paused for keyboard stepping.');
+		videoElement.currentTime = nextTime;
+		currentTime = nextTime;
+		isSeeking = false;
+		showTimelinePopoverAboveSliderPosition(timelineSliderElement, nextTime);
+		statusMessage = 'Replay paused at selected position.';
+		return true;
+	}
+
 	function handleWindowKeydown(event) {
 		if (event.key === 'Escape' && showReplayPicker) {
 			closeReplayPicker();
+			return;
+		}
+
+		if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') {
+			return;
+		}
+
+		if (shouldIgnoreTimelineKeyboardStep(event)) {
+			return;
+		}
+
+		const direction = event.key === 'ArrowRight' ? 1 : -1;
+		if (stepTimelineFromKeyboard(direction)) {
+			event.preventDefault();
 		}
 	}
 
@@ -1053,7 +886,22 @@
 			statusMessage = successMessage;
 			return true;
 		} catch (error) {
-			void reportReplayPlaybackFailure(error, playbackRate, blockedStatusMessage, blockedErrorMessage, playContext);
+			void reportReplayPlaybackFailure({
+				error,
+				playbackRate,
+				blockedStatusMessage,
+				blockedErrorMessage,
+				context: playContext,
+				videoElement,
+				activeCameraNumber,
+				replayUrl,
+				selectedPlaybackMode,
+				slowMotionEnabled,
+				athlete: reviewedAthlete || liveStatusAthlete || '',
+				liftType: reviewedLiftType || liveStatusLiftType || '',
+				attempt: overlayAttempt ?? null,
+				session: reviewedSession || liveStatusSession || replayStateSessionId || selectedReplaySessionId || ''
+			});
 			statusMessage = blockedStatusMessage;
 			errorMessage = blockedErrorMessage;
 			return false;
@@ -1097,6 +945,7 @@
 			return;
 		}
 
+		setReplayLoop(false);
 		videoElement.pause();
 		statusMessage = 'Replay paused.';
 	}
@@ -1109,6 +958,16 @@
 	}
 
 	function handleVideoError() {
+		setReplayLoop(false);
+
+		if (!replayUrl) {
+			isLoading = false;
+			cameraPopoverPending = false;
+			isPlaying = false;
+			errorMessage = '';
+			return;
+		}
+
 		const keepCameraPopoverVisible = cameraPopoverPending;
 		isLoading = false;
 		cameraPopoverPending = false;
@@ -1130,6 +989,7 @@
 		}
 
 		if (!videoElement.paused && !videoElement.ended) {
+			setReplayLoop(false);
 			videoElement.pause();
 			statusMessage = message;
 		}
@@ -1316,6 +1176,7 @@
 		}
 
 		if (isPlaying && selectedPlaybackMode === 'normal') {
+			setReplayLoop(false);
 			videoElement.pause();
 			selectedPlaybackMode = 'normal';
 			statusMessage = 'Replay paused.';
@@ -1342,6 +1203,7 @@
 		}
 
 		if (isPlaying && selectedPlaybackMode === 'slow') {
+			setReplayLoop(false);
 			videoElement.pause();
 			selectedPlaybackMode = 'slow';
 			statusMessage = 'Replay paused.';
@@ -1367,6 +1229,7 @@
 		}
 
 		const nextTime = Math.max(0, (videoElement.currentTime || currentTime || 0) - 2);
+		setReplayLoop(false);
 		videoElement.pause();
 		isPlaying = false;
 		videoElement.currentTime = nextTime;
@@ -1379,6 +1242,7 @@
 			return;
 		}
 
+		setReplayLoop(true);
 		videoElement.currentTime = 0;
 		currentTime = 0;
 
@@ -1408,10 +1272,12 @@
 	}
 
 	function handlePause() {
+		setReplayLoop(false);
 		isPlaying = false;
 	}
 
 	function handleEnded() {
+		setReplayLoop(false);
 		isPlaying = false;
 		currentTime = duration;
 		statusMessage = 'Replay ended.';
@@ -1460,6 +1326,19 @@
 					{#if !hasConfiguredServer}
 						<p>Replays server not configured.</p>
 						<span>Open this plugin with <code>?replaysBaseUrl=http://host:8091</code> or set the Replays Server URL on the tracker landing page.</span>
+					{:else if displayedStatusHeadline}
+						<div class="empty-state-status">{displayedStatusHeadline}</div>
+						{#if liveStatusAthlete}
+							<p class="empty-state-athlete">{liveStatusAthlete}</p>
+							{#if liveAttemptSummary}
+								<span>{liveAttemptSummary}</span>
+							{/if}
+							{#if liveDisplaySession}
+								<span>Session {liveDisplaySession}</span>
+							{/if}
+						{:else if displayedStatusMessage}
+							<span>{displayedStatusMessage}</span>
+						{/if}
 					{:else}
 						<p>No replay loaded.</p>
 						<span>Use buttons 1 to 4 below to load the latest replay for a camera.</span>
@@ -1514,6 +1393,7 @@
 				</div>
 				<div class="slider-zone">
 					<input
+						bind:this={timelineSliderElement}
 						type="range"
 						class="timeline"
 						min="0"
@@ -2126,6 +2006,13 @@
 		color: var(--muted);
 	}
 
+	.empty-state-status {
+		margin: 0 0 0.55rem;
+		font-size: 1.25rem;
+		font-weight: 700;
+		color: var(--text);
+	}
+
 	.empty-state p {
 		margin: 0;
 		font-size: 1.25rem;
@@ -2133,9 +2020,14 @@
 		color: var(--text);
 	}
 
+	.empty-state p.empty-state-athlete {
+		font-size: clamp(1.7rem, 4vw, 2.8rem);
+		line-height: 1.08;
+	}
+
 	.empty-state span {
 		display: block;
-		margin-top: 0.5rem;
+		margin-top: 0.35rem;
 		max-width: 40rem;
 		line-height: 1.45;
 	}
