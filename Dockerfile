@@ -58,6 +58,9 @@ ENV PORT=8096
 # Disable browser auto-open in container
 ENV DOCKER=1
 
+# Increase Node.js heap size for runtime (flag/logo ZIP extraction can be large)
+ENV NODE_OPTIONS="--max-old-space-size=4096"
+
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
   CMD wget --quiet --tries=1 --spider http://localhost:8096/ || exit 1
