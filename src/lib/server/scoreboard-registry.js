@@ -59,7 +59,7 @@ async function importFromFileUrl(fileUrl) {
  * 
  * @returns {Promise<Map<string, {configPath: string, helpersPath: string}>>}
  */
-async function discoverRuntimePlugins() {
+async function discoverRuntimePlugins({ verbose = true } = {}) {
 	const runtimePlugins = new Map();
 	
 	// Only run in Node.js environment (not browser)
@@ -97,7 +97,7 @@ async function discoverRuntimePlugins() {
 								configPath: configPath,
 								helpersPath: existsSync(helpersPath) ? helpersPath : null
 							});
-							console.log(`[ScoreboardRegistry] Runtime discovery: found ${pluginPath}`);
+							if (verbose) console.log(`[ScoreboardRegistry] Runtime discovery: found ${pluginPath}`);
 						}
 					}
 					
@@ -125,12 +125,12 @@ async function discoverRuntimePlugins() {
 				continue;
 			}
 			foundAnyDir = true;
-			console.log(`[ScoreboardRegistry] Runtime discovery: scanning ${pluginsDir}`);
+			if (verbose) console.log(`[ScoreboardRegistry] Runtime discovery: scanning ${pluginsDir}`);
 			findPlugins(pluginsDir);
 		}
 		
 		if (!foundAnyDir) {
-			console.log('[ScoreboardRegistry] Runtime discovery: no plugin directories found, skipping');
+			if (verbose) console.log('[ScoreboardRegistry] Runtime discovery: no plugin directories found, skipping');
 		}
 		
 	} catch (err) {
@@ -146,6 +146,7 @@ class ScoreboardRegistry {
 		this.scoreboards = new Map();
 		this.initialized = false;
 		this.initializingPromise = null;  // Track ongoing initialization to prevent race conditions
+		this.lastRuntimeSignature = null;  // Cache to skip no-op refreshes
 	}
 
 	/**
@@ -156,9 +157,10 @@ class ScoreboardRegistry {
 	 * all see initialized=false and try to initialize simultaneously
 	 */
 	async initialize() {
-		// If already initialized, return immediately
+		// If already initialized, return immediately. Runtime plugins are
+		// discovered once on first init; if you add a new runtime plugin
+		// (e.g. a new folder under extensions/), restart the server.
 		if (this.initialized) {
-			await this.refreshRuntimePlugins();
 			return;
 		}
 		
@@ -209,11 +211,30 @@ class ScoreboardRegistry {
 	}
 
 	async refreshRuntimePlugins() {
-		const runtimePlugins = await discoverRuntimePlugins();
+		const runtimePlugins = await discoverRuntimePlugins({ verbose: false });
 
 		if (runtimePlugins.size === 0) {
+			this.lastRuntimeSignature = '';
 			return;
 		}
+
+		// Build a signature from plugin paths and source-file mtimes; skip
+		// re-registration when nothing on disk has changed since last call.
+		const signatureParts = [];
+		for (const [pluginPath, paths] of Array.from(runtimePlugins).sort(([a], [b]) => a.localeCompare(b))) {
+			let configMtime = 0;
+			let helpersMtime = 0;
+			try { configMtime = statSync(paths.configPath).mtimeMs; } catch {}
+			if (paths.helpersPath) {
+				try { helpersMtime = statSync(paths.helpersPath).mtimeMs; } catch {}
+			}
+			signatureParts.push(`${pluginPath}|${configMtime}|${helpersMtime}`);
+		}
+		const signature = signatureParts.join('\n');
+		if (signature === this.lastRuntimeSignature) {
+			return;
+		}
+		this.lastRuntimeSignature = signature;
 
 		for (const [type, scoreboard] of Array.from(this.scoreboards.entries())) {
 			if (scoreboard.runtime) {
