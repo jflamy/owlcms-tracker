@@ -33,7 +33,7 @@
 	let replaysStatusReconnectTimer;
 	let replayUrl = '';
 	let errorMessage = '';
-	let statusMessage = 'Ready to load the latest replay from cameras 1 to 4.';
+	let statusMessage = 'No replay available.';
 	let liveStatusMessage = '';
 	let liveStatusCode = null;
 	let liveStatusAthlete = '';
@@ -646,16 +646,11 @@
 			return;
 		}
 
-		cameraPopoverPending = true;
-		const loadPromise = loadLatestReplay(1, true, false);
-		await tick();
-		showTimelinePopoverAboveCameras();
-		await loadPromise;
-
-		if (!replayUrl) {
-			cameraPopoverPending = false;
-			showTimelinePopover = false;
-		}
+		statusMessage = 'No replay available.';
+		errorMessage = '';
+		isLoading = false;
+		cameraPopoverPending = false;
+		showTimelinePopover = false;
 	}
 
 	async function loadLatestReplay(cameraNumber = activeCameraNumber, preservePopover = false, autoPlay = true) {
@@ -1340,8 +1335,7 @@
 							<span>{displayedStatusMessage}</span>
 						{/if}
 					{:else}
-						<p>No replay loaded.</p>
-						<span>Use buttons 1 to 4 below to load the latest replay for a camera.</span>
+						<p>No replay available.</p>
 					{/if}
 				</div>
 			{/if}
