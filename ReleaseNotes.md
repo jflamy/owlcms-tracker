@@ -5,6 +5,7 @@
 
 ##### Release log
 
+- 2.17.2: improvements to the jury plugin to better display the recording/trimming status. Requires replays 2.3.4
 - 2.17.1: Adding plugins requires restarting the server to avoid running initialize() too often
 - 2.17.0: Tracker now receives the mapping between country names and IOC country codes
 - 2.17.0: If a team name is a country name, and the flag is not there under that name, the flag will be looked up using the IOC code
