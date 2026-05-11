@@ -5,6 +5,8 @@ import { buildAndPackage, runVersionChecks } from './package-shared.js';
 const packageJson = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 const DEFAULT_TRACKER_VERSION = packageJson.version;
 
+class UsageError extends Error {}
+
 function parseArgs(argv) {
   const flags = new Set();
   const options = new Map();
@@ -50,26 +52,90 @@ function parseCsvOption(values) {
     .filter(Boolean);
 }
 
-// Parse arguments
-const args = process.argv.slice(2);
-const parsed = parseArgs(args);
-const noExtensions = parsed.flags.has('--no-extensions');
-const noStandard = parsed.flags.has('--no-standard') || parsed.flags.has('--exclude-standard-extensions');
-const selectedSubmodules = parseCsvOption([
-  ...(parsed.options.get('--submodule') || []),
-  ...(parsed.options.get('--submodules') || [])
-]);
-const positional = parsed.positional;
-const VERSION = positional[0] || DEFAULT_TRACKER_VERSION;
-let trackerCoreRequested = positional[1]; // Optional
+function printUsage() {
+  console.log(`Usage: npm run zip -- [version] [tracker-core-version] [selectors]
 
-if (!positional[0]) {
-  console.log(`✓ Using package version ${DEFAULT_TRACKER_VERSION}`);
+Selectors:
+  --standard
+      Include the built-in plugins from the default checkout.
+
+  --include <name>[,<name>...]
+      Add plugins or extensions by display name.
+
+    --include-category <category>[,<category>...]
+    --include-categories <category>[,<category>...]
+      Add plugins or extensions by config.js category.
+
+  --submodule <name>[,<name>...]
+  --submodules <name>[,<name>...]
+      Add whole submodules such as books, OBS, or France.
+
+  --help
+      Show this message.
+
+Examples:
+  npm run zip -- --standard
+  npm run zip -- 2.17.2 --standard --include-category remote-control
+  npm run zip -- 2.17.2 --include "France - Équipes"
+  npm run zip -- 2.17.2 --submodule books --submodule OBS`);
 }
 
-console.log('📦 Building universal tracker package...\n');
+function validateSelectorArgs(parsed) {
+  const allowedFlags = new Set(['--standard', '--help']);
+  const allowedOptions = new Set([
+    '--include',
+    '--include-category',
+    '--include-categories',
+    '--submodule',
+    '--submodules'
+  ]);
 
-try {
+  const unsupportedFlags = Array.from(parsed.flags).filter((flag) => !allowedFlags.has(flag));
+  const unsupportedOptions = Array.from(parsed.options.keys()).filter((option) => !allowedOptions.has(option));
+
+  if (unsupportedFlags.length === 0 && unsupportedOptions.length === 0) {
+    return;
+  }
+
+  const unsupported = [...unsupportedFlags, ...unsupportedOptions].join(', ');
+  throw new UsageError(`Unsupported zip option(s): ${unsupported}.`);
+}
+
+async function main() {
+  // Parse arguments
+  const args = process.argv.slice(2);
+  const parsed = parseArgs(args);
+  validateSelectorArgs(parsed);
+
+  if (parsed.flags.has('--help')) {
+    printUsage();
+    return;
+  }
+
+  const includeStandard = parsed.flags.has('--standard');
+  const selectedSubmodules = parseCsvOption([
+    ...(parsed.options.get('--submodule') || []),
+    ...(parsed.options.get('--submodules') || [])
+  ]);
+  const selectedPlugins = parseCsvOption([
+    ...(parsed.options.get('--include') || [])
+  ]);
+  const selectedPluginCategories = parseCsvOption([
+    ...(parsed.options.get('--include-category') || []),
+    ...(parsed.options.get('--include-categories') || [])
+  ]);
+  const hasExplicitSelections = selectedSubmodules.length > 0 || selectedPlugins.length > 0 || selectedPluginCategories.length > 0;
+  const includeStandardPlugins = includeStandard || !hasExplicitSelections;
+  const positional = parsed.positional;
+  const VERSION = positional[0] || DEFAULT_TRACKER_VERSION;
+  const trackerCoreRequested = positional[1]; // Optional
+
+  if (!positional[0]) {
+    console.log(`✓ Using package version ${DEFAULT_TRACKER_VERSION}`);
+  }
+
+  console.log('📦 Building universal tracker package...\n');
+
   const trackerCoreVersion = await runVersionChecks({
     requestedVersion: trackerCoreRequested,
     promptOnAuto: false,
@@ -84,11 +150,23 @@ try {
     distDir: 'dist/package',
     version: VERSION,
     trackerCoreVersion,
-    includeExtensions: !noExtensions,
     selectedSubmodules,
-    noStandard
+    selectedPlugins,
+    selectedPluginCategories,
+    includeStandard: includeStandardPlugins
   });
+}
+
+try {
+  await main();
 } catch (error) {
+  if (error instanceof UsageError) {
+    console.error(`❌ ${error.message}`);
+    console.error('');
+    printUsage();
+    process.exit(1);
+  }
+
   console.error('❌ Build failed:', error.message);
   process.exit(1);
 }

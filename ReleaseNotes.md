@@ -5,43 +5,78 @@
 
 ##### Release log
 
+- 2.18.0: reviewed the "npm run zip" command options for packaging a custom tracker
+
+  - Cleaner options
+
+    `--standard` includes only the built-in plugins from the default checkout.
+    `--include` adds plugins or extensions by display name.
+    `--include-category` and `--include-categories` add plugins or extensions by the declared category in config.js
+    `--submodule` and -`-submodules` add whole submodules.
+
+  - Use commas to separate listed items.
+  - Selection is additive.
+  - Extensions must be selected explicitly with --include or --include-type
+  - Selecting an extension automatically pulls in its base plugin.
+
 - 2.17.2: improvements to the jury plugin to better display the recording/trimming status. Requires replays 2.3.4
+
 - 2.17.1: Adding plugins requires restarting the server to avoid running initialize() too often
+
 - 2.17.0: Tracker now receives the mapping between country names and IOC country codes
+
 - 2.17.0: If a team name is a country name, and the flag is not there under that name, the flag will be looked up using the IOC code
 
 - 2.16.0: Jury Replays user interface plugin added.  Requires replays module version 2.2.2
+
 - 2.16.0: Category ordering can now be overridden and extended.  See the top-level README.md
 
 - 2.15.0: Changed the user interface for the entry page cards to have a tabbed look and responsive 1 or 2 columns
+
 - 2.15.0: Team scoreboards now allow overriding the SMHF Sinclair and Age Factor options
+
 - 2.15.0: Tracker will now use Sinclair 2028 if that is selected in OWLMCMS (but SMHF has its own specific options)
+
 - 2.15.0: The tracker title on the entry page switches to the competition name as soon as it is available
 
 - 2.14.2: team scoreboard toggle between fixed team order and ranking order now working
+
 - 2.14.1: team scoreboards result exports now include membership and body weight
+
 - 2.14.0: Remove hard-coded timer values, obey directives from owlcms
 
 - 2.13.2: Fix for the on-demand database refresh issue
+
 - 2.13.2: Checked that usage of the Champioship entities works
+
 - 2.13.1: On Linux, a race condition was preventing the entry page cards from showing the full language list
+
 - 2.13.0: the referee assignment document plugin now requests a database refresh so it matches the master database changes.
 
 - 2.12.0: fixes to support packaging of combined plugins with shared content 
 
 - 2.9.0: Clean-up of large unnecessary dependencies that were specific to some plugins -- puppeteer is no longer included by default
+
 - 2.9.0: Plugins and extensions can specify additional dependencies that are not part of the base build
+
 - 2.9.0: Additional dependencies listed in the plugins and extensions are included in zip distributions
 
 - 2.8.3: extensions now inherit the default values of the base scoreboard
+
 - 2.8.3: refactored the team-scoreboard extension mechanism
+
 - 2.8.2: Share attempt bar presentation and backend for unified translations on all scoreboards
+
 - 2.8.2: Thin border on scoreboard flags for when there is black on the flags
+
 - 2.8.1: Fixed flags for teams scoreboard and standard scoreboards
+
 - 2.8.0: Support for extensions to the team scoreboard for additional scoring formulas
 
 - 2.7: Improved contrast and additional visual cues for bad lifts on scoreboards
+
 - 2.7: Scoreboard translations come from owlcms (no fallbacks)
+
 - 2.7: Plugins reorganized in subfolders to facilitate connecting submodules with additional plugins (e.g. IWF Books)
   - Plugins are still shown on entry page based on the category in config.js
 
@@ -61,6 +96,7 @@
 
 - If you installed from the control panel, there is an option on the OWLCMS page to send the data to tracker, in the Options dropdown.  Use the "Enable" option -- after enabling, the dropdown will show "Disable", which means it's enabled...
   
+
 <img width="688" height="269" alt="image" src="https://github.com/user-attachments/assets/df02b305-2bdc-49b0-b542-4779f773df2c" />
 
 - Alternatively, you can configure in your database

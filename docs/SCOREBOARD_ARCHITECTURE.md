@@ -549,7 +549,7 @@ npm run release -- 2.9.0
 
 **GitHub Actions workflow:**
 - Checks out code **without submodules** (`submodules: false`)
-- Runs `build-zip.js` with `--no-extensions` flag
+- Runs `build-zip.js` with `--standard`
 - Creates Docker image
 - Publishes GitHub release with ZIP file
 
@@ -570,13 +570,13 @@ npm run zip -- 2.9.0
 
 # With IWF books plugin
 npm run init books
-npm run zip -- 2.9.0
+npm run zip -- 2.9.0 --standard --submodule books
 npm run deinit books
 
 # With France extension + books
 npm run init France
 npm run init books
-npm run zip -- 2.9.0 --no-extensions  # Extensions excluded despite being initialized
+npm run zip -- 2.9.0 --standard --submodule books --submodule France
 npm run deinit France
 npm run deinit books
 ```
@@ -591,28 +591,37 @@ npm run deinit books
 - `npm run deinit <name>` - Remove working files but preserve README/LICENSE
 
 **Flags:**
-- `--no-extensions` - Exclude runtime `extensions/` directory from package
-- (Default) - Include `extensions/` if it exists and contains plugins
+- `--standard` - Include only the built-in plugins present in the default checkout
+- `--include <list>` - Include only plugin or extension display names
+- `--include-categories <list>` - Include plugin or extension categories from each `config.js`
+- `--submodule <list>` - Include whole submodules such as `books`, `OBS`, or `France`
 
 **Examples:**
 ```bash
-# Public release equivalent (no submodules)
-npm run zip -- 2.9.0 --no-extensions
+# Public release equivalent (no submodules, no extensions)
+npm run zip -- 2.9.0 --standard
+
+# Standard plugins plus all configured documents and remote-control plugins
+npm run zip -- 2.9.0 --standard --include-categories documents,remote-control
 
 # Books-enabled build
 npm run init books
-npm run zip -- 2.9.0
+npm run zip -- 2.9.0 --submodule books
 npm run deinit books
 
 # Internal testing with France extension
 npm run init France
-npm run zip -- 2.9.0  # includes extensions/France
+npm run zip -- 2.9.0 --include "France - Équipes"
 npm run deinit France
 ```
 
 **Key Difference:**
 - **Release**: Never includes submodules (controlled by GitHub Actions)
 - **Zip**: Developer manually controls what's included via init/deinit
+
+Selectors are additive. `--standard` adds the default-checkout built-ins, `--submodule` adds whole submodules, and `--include` / `--include-categories` add specific plugins or category matches. Category selectors expand to every plugin or extension whose `config.js` declares that category. If a match lives inside a plugin submodule or delegated extension, the required backing content is pulled in automatically. Extensions are never included implicitly just because they exist in the working tree.
+
+Any build that adds selectors beyond plain `--standard` writes a package-root `.custom-build` marker so the OWLCMS control panel can warn before replacing a customized tracker install.
 
 ---
 
@@ -864,7 +873,7 @@ curl -X POST http://localhost:8096/api/refresh?fullRefresh=true
 This appendix contains the full, actionable packaging instructions that were previously embedded earlier in the document. Keep these steps when you need to produce a ZIP with federation-specific plugins or to understand what the public release contains.
 
 ## Quick summary
-- Release (`npm run release`) — public distribution. **Never** includes submodules or runtime `extensions/`; built with `--no-extensions` in CI.
+- Release (`npm run release`) — public distribution. **Never** includes submodules or runtime `extensions/`; built with `--standard` in CI.
 - Zip (`npm run zip`) — custom package for testing or internal builds. Developer controls inclusion of submodules/extensions via `npm run init` / `npm run deinit`.
 
 ## Release (public) — mechanics
@@ -872,21 +881,22 @@ This appendix contains the full, actionable packaging instructions that were pre
 - Scripts involved: `scripts/release.js` → triggers GitHub Actions `release.yaml`.
 - CI behavior:
   - Checkout does **not** fetch submodules by default (workflow input `includeSubmodules=false`).
-  - Build uses `build-zip.js` with `--no-extensions` to exclude runtime extensions.
+  - Build uses `build-zip.js` with `--standard` to include only default-checkout built-ins.
   - Result: a minimal, redistributable ZIP and Docker images.
 
 **Why:** submodules may contain federation-specific or licensed content that cannot be bundled into the public release.
 
 ## Zip (developer/custom) — mechanics
-- Command: `npm run zip -- <version> [--no-extensions]`
-- By default `zip` will include **only** what exists in the working tree. To include submodule content you must initialize it explicitly:
+- Command: `npm run zip -- <version> [--standard] [--include ...] [--include-category(ies) ...] [--submodule(s) ...]`
+- The selectors are additive. Use `--standard` when you want the built-in plugins from the default checkout, then add extras explicitly.
+- To include submodule content you must initialize it explicitly:
   - `npm run init books` — pulls `src/plugins/books` submodule
   - `npm run init France` — pulls `extensions/France` submodule
   - After the build, restore repo state with `npm run deinit <name>`
 
 **Notes:**
-- `--no-extensions` causes the packaged ZIP to contain an empty `extensions/` folder (README only).
-- `buildAndPackage({ includeExtensions })` controls whether `extensions/` is copied into the packaged `dist` directory.
+- `--standard` does not include extensions or initialized submodules by itself.
+- Extensions are copied only when explicitly selected by `--include`, `--include-categories`, or `--submodule`.
 
 ## Submodules & files of interest
 - `.gitmodules` contains: `src/plugins/books`, `extensions/France`, `src/plugins/OBS`.

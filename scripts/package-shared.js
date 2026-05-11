@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 /**
  * Shared packaging helpers for build-zip.js and release.js
  */
@@ -249,6 +247,231 @@ function normalizeRequestedSubmodules(selectedSubmodules = []) {
     .filter(Boolean);
 }
 
+function normalizeRequestedPlugins(selectedPlugins = []) {
+  return selectedPlugins
+    .map((item) => item.replace(/^[.][\\/]/, '').replace(/^src\/plugins[\\/]/, '').replace(/^extensions[\\/]/, '').trim())
+    .filter(Boolean);
+}
+
+function stripDiacritics(value) {
+  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+function getAliasKeys(value) {
+  const normalized = value.replace(/\\/g, '/').trim().toLowerCase();
+  const asciiNormalized = stripDiacritics(normalized);
+  const compact = asciiNormalized.replace(/[^a-z0-9/]+/g, '');
+  return Array.from(new Set([normalized, asciiNormalized, compact].filter(Boolean)));
+}
+
+function addAlias(aliasMap, alias, target) {
+  if (!alias) return;
+
+  for (const key of getAliasKeys(alias)) {
+    const existing = aliasMap.get(key) || [];
+    if (!existing.some((entry) => entry.id === target.id)) {
+      existing.push(target);
+      aliasMap.set(key, existing);
+    }
+  }
+}
+
+function getAliasMatches(aliasMap, value) {
+  const matches = [];
+
+  for (const key of getAliasKeys(value)) {
+    for (const entry of aliasMap.get(key) || []) {
+      if (!matches.some((match) => match.id === entry.id)) {
+        matches.push(entry);
+      }
+    }
+  }
+
+  return matches;
+}
+
+function extractConfigValue(configContent, key) {
+  const match = configContent.match(new RegExp(`${key}\\s*:\\s*['\"]([^'\"]+)['\"]`));
+  return match ? match[1].trim() : null;
+}
+
+function extractPluginMetadata(configPath) {
+  if (!fs.existsSync(configPath)) return null;
+
+  const configContent = fs.readFileSync(configPath, 'utf8');
+  return {
+    configName: extractConfigValue(configContent, 'name'),
+    configCategory: extractConfigValue(configContent, 'category')
+  };
+}
+
+function discoverSourcePlugins(rootDir = 'src/plugins') {
+  const plugins = [];
+
+  const visit = (currentDir, prefix = '') => {
+    if (!fs.existsSync(currentDir)) return;
+
+    for (const entry of fs.readdirSync(currentDir, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
+
+      const fullPath = path.join(currentDir, entry.name);
+      const pluginPath = prefix ? `${prefix}/${entry.name}` : entry.name;
+      const configPath = path.join(fullPath, 'config.js');
+
+      if (fs.existsSync(configPath)) {
+        const metadata = extractPluginMetadata(configPath) || {};
+        plugins.push({
+          id: `plugin:${pluginPath}`,
+          kind: 'plugin',
+          pluginPath,
+          folderName: path.basename(pluginPath),
+          topLevel: pluginPath.split('/')[0],
+          configName: metadata.configName || null,
+          configCategory: metadata.configCategory || null
+        });
+      }
+
+      visit(fullPath, pluginPath);
+    }
+  };
+
+  visit(rootDir);
+
+  return plugins.sort((a, b) => a.pluginPath.localeCompare(b.pluginPath));
+}
+
+function discoverExtensionPlugins(rootDir = 'extensions') {
+  const plugins = [];
+
+  if (!fs.existsSync(rootDir)) return plugins;
+
+  for (const repoName of listDirectoryNames(rootDir)) {
+    const repoPath = path.join(rootDir, repoName);
+
+    const visit = (currentDir, prefix = '') => {
+      if (!fs.existsSync(currentDir)) return;
+
+      for (const entry of fs.readdirSync(currentDir, { withFileTypes: true })) {
+        if (!entry.isDirectory()) continue;
+        if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
+
+        const fullPath = path.join(currentDir, entry.name);
+        const extensionPath = prefix ? `${prefix}/${entry.name}` : entry.name;
+        const configPath = path.join(fullPath, 'config.js');
+
+        if (fs.existsSync(configPath)) {
+          const configContent = fs.readFileSync(configPath, 'utf8');
+          const metadata = extractPluginMetadata(configPath) || {};
+          plugins.push({
+            id: `extension:${repoName}/${extensionPath}`,
+            kind: 'extension-plugin',
+            repoName,
+            extensionPath,
+            folderName: path.basename(extensionPath),
+            configName: metadata.configName || null,
+            configCategory: metadata.configCategory || null,
+            delegateTarget: extractDelegateTarget(configContent)
+          });
+        }
+
+        visit(fullPath, extensionPath);
+      }
+    };
+
+    visit(repoPath);
+  }
+
+  return plugins.sort((a, b) => `${a.repoName}/${a.extensionPath}`.localeCompare(`${b.repoName}/${b.extensionPath}`));
+}
+
+function formatAvailablePluginNames(sourcePlugins, extensionPlugins) {
+  const labels = new Set();
+
+  for (const plugin of sourcePlugins) {
+    labels.add(plugin.configName || plugin.folderName);
+  }
+
+  for (const plugin of extensionPlugins) {
+    labels.add(plugin.configName || plugin.folderName);
+  }
+
+  return Array.from(labels).sort((a, b) => a.localeCompare(b)).join(', ');
+}
+
+export function isCustomBuild({
+  includeStandard = false,
+  selectedSubmodules = [],
+  selectedPlugins = [],
+  selectedPluginCategories = []
+} = {}) {
+  return !includeStandard
+    || selectedSubmodules.length > 0
+    || selectedPlugins.length > 0
+    || selectedPluginCategories.length > 0;
+}
+
+function formatAvailablePluginCategories(sourcePlugins, extensionPlugins) {
+  const labels = new Set();
+
+  for (const plugin of sourcePlugins) {
+    if (plugin.configCategory) {
+      labels.add(plugin.configCategory);
+    }
+  }
+
+  for (const plugin of extensionPlugins) {
+    if (plugin.configCategory) {
+      labels.add(plugin.configCategory);
+    }
+  }
+
+  return Array.from(labels).sort((a, b) => a.localeCompare(b)).join(', ');
+}
+
+function describeResolvedPluginTarget(match) {
+  if (match.kind === 'plugin') {
+    return match.configName ? `${match.configName} (${match.pluginPath})` : match.pluginPath;
+  }
+
+  if (match.kind === 'extension-plugin') {
+    const pluginLabel = match.plugin.configName || match.plugin.folderName;
+    return `${pluginLabel} (extensions/${match.plugin.repoName}/${match.plugin.extensionPath})`;
+  }
+
+  return match.id;
+}
+
+function addPluginPathSelection(pluginPath, {
+  sourcePluginPaths,
+  submoduleByTopLevel,
+  selectedStandardPluginPaths,
+  selectedPluginSubmoduleTopLevels,
+  missingPaths
+}) {
+  if (!pluginPath) return;
+
+  const topLevel = pluginPath.split('/')[0];
+  const owningSubmodule = submoduleByTopLevel.get(topLevel);
+
+  if (owningSubmodule?.type === 'plugin') {
+    if (!fs.existsSync(owningSubmodule.path)) {
+      missingPaths.push(owningSubmodule.path);
+      return;
+    }
+
+    selectedPluginSubmoduleTopLevels.add(owningSubmodule.topLevel);
+    return;
+  }
+
+  if (sourcePluginPaths.has(pluginPath)) {
+    selectedStandardPluginPaths.add(pluginPath);
+    return;
+  }
+
+  missingPaths.push(path.join('src', 'plugins', pluginPath));
+}
+
 function resolveSelectedSubmodules(selectedSubmodules = []) {
   const allSubmodules = readGitSubmodules();
   const requested = normalizeRequestedSubmodules(selectedSubmodules);
@@ -288,7 +511,7 @@ function resolveSelectedSubmodules(selectedSubmodules = []) {
   }
 
   const uniqueResolved = requested.length === 0
-    ? allSubmodules
+    ? allSubmodules.filter((submodule) => fs.existsSync(submodule.path))
     : Array.from(new Map(resolved.map((submodule) => [submodule.path, submodule])).values());
 
   const missingPaths = uniqueResolved
@@ -306,31 +529,149 @@ function resolveSelectedSubmodules(selectedSubmodules = []) {
   };
 }
 
-function computeAllowedTopLevelDirs({ rootDir, type, selectedSubmodules = [], noStandard = false }) {
-  const currentDirs = listDirectoryNames(rootDir);
-  const submodules = resolveSelectedSubmodules(selectedSubmodules);
-  const allTopLevels = new Set(submodules.all.filter((submodule) => submodule.type === type && submodule.topLevel).map((submodule) => submodule.topLevel));
-  const selectedTopLevels = new Set(submodules.selected.filter((submodule) => submodule.type === type && submodule.topLevel).map((submodule) => submodule.topLevel));
+export function resolveSelectedPlugins({
+  selectedPlugins = [],
+  selectedPluginCategories = []
+} = {}) {
+  const allSubmodules = readGitSubmodules();
+  const requestedNames = normalizeRequestedPlugins(selectedPlugins);
+  const requestedCategories = normalizeRequestedPlugins(selectedPluginCategories);
+  const sourcePlugins = discoverSourcePlugins();
+  const extensionPlugins = discoverExtensionPlugins();
+  const submoduleByTopLevel = new Map(
+    allSubmodules
+      .filter((submodule) => submodule.topLevel)
+      .map((submodule) => [submodule.topLevel, submodule])
+  );
+  const sourcePluginPaths = new Set(sourcePlugins.map((plugin) => plugin.pluginPath));
+  const nameAliasMap = new Map();
+  const categoryAliasMap = new Map();
 
-  if (!noStandard && !submodules.hasSelection) {
-    return currentDirs;
+  for (const plugin of sourcePlugins) {
+    addAlias(nameAliasMap, plugin.configName || plugin.folderName, plugin);
+    addAlias(categoryAliasMap, plugin.configCategory, plugin);
   }
 
-  const allowed = new Set();
+  for (const plugin of extensionPlugins) {
+    const target = {
+      id: plugin.id,
+      kind: 'extension-plugin',
+      plugin
+    };
 
-  if (!noStandard) {
-    for (const dir of currentDirs) {
-      if (!allTopLevels.has(dir)) {
-        allowed.add(dir);
+    addAlias(nameAliasMap, plugin.configName || plugin.folderName, target);
+    addAlias(categoryAliasMap, plugin.configCategory, target);
+  }
+
+  const selectedStandardPluginPaths = new Set();
+  const selectedPluginSubmoduleTopLevels = new Set();
+  const selectedExtensionSubmoduleTopLevels = new Set();
+  const missingNames = [];
+  const missingCategories = [];
+  const ambiguous = [];
+  const missingPaths = [];
+  const selectionContext = {
+    sourcePluginPaths,
+    submoduleByTopLevel,
+    selectedStandardPluginPaths,
+    selectedPluginSubmoduleTopLevels,
+    missingPaths
+  };
+
+  const applyResolvedMatch = (match) => {
+    if (match.kind === 'plugin') {
+      addPluginPathSelection(match.pluginPath, selectionContext);
+      return;
+    }
+
+    if (match.kind !== 'extension-plugin') {
+      return;
+    }
+
+    const repoPath = path.join('extensions', match.plugin.repoName);
+    if (!fs.existsSync(repoPath)) {
+      missingPaths.push(repoPath);
+      return;
+    }
+
+    selectedExtensionSubmoduleTopLevels.add(match.plugin.repoName);
+    addPluginPathSelection(match.plugin.delegateTarget, selectionContext);
+  };
+
+  const resolveRequestedValues = (requested, aliasMap, missingList, label, allowMultipleMatches = false) => {
+    for (const item of requested) {
+      const matches = getAliasMatches(aliasMap, item);
+
+      if (matches.length === 0) {
+        missingList.push(item);
+        continue;
+      }
+
+      if (!allowMultipleMatches && matches.length > 1) {
+        ambiguous.push(`${label} ${item} -> ${matches.map(describeResolvedPluginTarget).join(', ')}`);
+        continue;
+      }
+
+      for (const match of matches) {
+        applyResolvedMatch(match);
       }
     }
+  };
+
+  resolveRequestedValues(requestedNames, nameAliasMap, missingNames, 'name');
+  resolveRequestedValues(requestedCategories, categoryAliasMap, missingCategories, 'category', true);
+
+  if (ambiguous.length > 0) {
+    throw new Error(`Include selector(s) are ambiguous: ${ambiguous.join('; ')}`);
   }
 
-  for (const dir of selectedTopLevels) {
-    allowed.add(dir);
+  if (missingNames.length > 0 || missingCategories.length > 0) {
+    const errors = [];
+
+    if (missingNames.length > 0) {
+      const availableNames = formatAvailablePluginNames(sourcePlugins, extensionPlugins) || '(none)';
+      errors.push(`Requested plugin name(s) not found: ${missingNames.join(', ')}. Available plugin names: ${availableNames}`);
+    }
+
+    if (missingCategories.length > 0) {
+      const availableCategories = formatAvailablePluginCategories(sourcePlugins, extensionPlugins) || '(none)';
+      errors.push(`Requested plugin category(s) not found: ${missingCategories.join(', ')}. Available plugin categories: ${availableCategories}`);
+    }
+
+    throw new Error(errors.join(' '));
   }
 
-  return currentDirs.filter((dir) => allowed.has(dir));
+  if (missingPaths.length > 0) {
+    throw new Error(`Selected include target(s) are not available in this workspace: ${Array.from(new Set(missingPaths)).join(', ')}`);
+  }
+
+  return {
+    hasSelection: requestedNames.length > 0 || requestedCategories.length > 0,
+    selectedStandardPluginPaths,
+    selectedPluginSubmoduleTopLevels,
+    selectedExtensionSubmoduleTopLevels
+  };
+}
+
+function computeAllowedTopLevelDirs({
+  rootDir,
+  type,
+  selectedSubmodules = [],
+  explicitSelectedTopLevels = []
+}) {
+  const currentDirs = listDirectoryNames(rootDir);
+  const submodules = resolveSelectedSubmodules(selectedSubmodules);
+  const selectedTopLevels = new Set(
+    (submodules.hasSelection ? submodules.selected : [])
+      .filter((submodule) => submodule.type === type && submodule.topLevel)
+      .map((submodule) => submodule.topLevel)
+  );
+
+  for (const dir of explicitSelectedTopLevels) {
+    selectedTopLevels.add(dir);
+  }
+
+  return currentDirs.filter((dir) => selectedTopLevels.has(dir));
 }
 
 function extractDelegateTarget(configContent) {
@@ -361,37 +702,63 @@ function findDelegatedPluginIds(extensionRepoNames = []) {
   return delegated;
 }
 
-function computeBuildSelection({ selectedSubmodules = [], noStandard = false, includeExtensions = false, allowedExtensionDirs = [] }) {
+function pathMatchesAllowedRoots(relativePath, allowedRoots = new Set()) {
+  const normalized = relativePath.split(path.sep).join('/');
+
+  for (const root of allowedRoots) {
+    if (normalized === root) {
+      return true;
+    }
+
+    if (normalized.startsWith(`${root}/`)) {
+      return true;
+    }
+
+    if (root.startsWith(`${normalized}/`)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+export function computeBuildSelection({
+  selectedSubmodules = [],
+  explicitPluginSelection = null,
+  includeStandard = false,
+  allowedExtensionDirs = []
+}) {
   const submodules = resolveSelectedSubmodules(selectedSubmodules);
+  const pluginSelection = explicitPluginSelection || resolveSelectedPlugins();
+  const explicitlySelectedSubmodules = submodules.hasSelection ? submodules.selected : [];
   const pluginSubmoduleTopLevels = new Set(
     submodules.all
       .filter((submodule) => submodule.type === 'plugin' && submodule.topLevel)
       .map((submodule) => submodule.topLevel)
   );
-  const selectedPluginSubmoduleTopLevels = new Set(
-    submodules.selected
+  const selectedPluginSubmoduleTopLevels = new Set([
+    ...explicitlySelectedSubmodules
       .filter((submodule) => submodule.type === 'plugin' && submodule.topLevel)
-      .map((submodule) => submodule.topLevel)
-  );
-  const delegatedPluginIds = includeExtensions && noStandard
-    ? findDelegatedPluginIds(allowedExtensionDirs)
-    : new Set();
+      .map((submodule) => submodule.topLevel),
+    ...pluginSelection.selectedPluginSubmoduleTopLevels
+  ]);
+  const delegatedPluginIds = findDelegatedPluginIds(allowedExtensionDirs);
+  const allowedStandardPluginRoots = new Set([
+    ...pluginSelection.selectedStandardPluginPaths,
+    ...delegatedPluginIds
+  ]);
 
   return {
-    noStandard,
+    includeStandard,
     pluginSubmoduleTopLevels,
     selectedPluginSubmoduleTopLevels,
-    delegatedPluginIds,
+    allowedStandardPluginRoots,
     allowedExtensionDirs: new Set(allowedExtensionDirs),
-    includeStandardExtensionFiles: !noStandard
+    includeStandardExtensionFiles: true
   };
 }
 
-function hasAllowedStandardPluginInCategory(category, delegatedPluginIds) {
-  return Array.from(delegatedPluginIds).some((pluginId) => pluginId.startsWith(`${category}/`));
-}
-
-function shouldCopyWorkspaceEntry(relativePath, isDirectory, selection) {
+export function shouldCopyWorkspaceEntry(relativePath, isDirectory, selection) {
   const normalized = relativePath.split(path.sep).join('/');
   const parts = normalized.split('/').filter(Boolean);
 
@@ -416,20 +783,16 @@ function shouldCopyWorkspaceEntry(relativePath, isDirectory, selection) {
     if (parts.length <= 2) return true;
 
     const category = parts[2];
+    const pluginRelativePath = parts.slice(2).join('/');
     if (selection.pluginSubmoduleTopLevels.has(category)) {
       return selection.selectedPluginSubmoduleTopLevels.has(category);
     }
 
-    if (!selection.noStandard) {
+    if (selection.includeStandard) {
       return true;
     }
 
-    if (parts.length === 3) {
-      return hasAllowedStandardPluginInCategory(category, selection.delegatedPluginIds);
-    }
-
-    const pluginId = `${category}/${parts[3]}`;
-    return selection.delegatedPluginIds.has(pluginId);
+    return pathMatchesAllowedRoots(pluginRelativePath, selection.allowedStandardPluginRoots);
   }
 
   return true;
@@ -480,7 +843,7 @@ function linkBuildWorkspaceNodeModules(repoRoot, workspaceRoot) {
  * Looks in src/plugins/ (source) and selected extensions/ (runtime)
  * @returns {string[]} Array of npm package specifiers to install
  */
-function scanPluginDependencies({ srcPluginsDir = 'src/plugins', includeExtensions = true, extensionsDir = 'extensions', allowedExtensionDirs = null } = {}) {
+function scanPluginDependencies({ srcPluginsDir = 'src/plugins', extensionsDir = 'extensions', allowedExtensionDirs = [] } = {}) {
   const deps = new Set();
   
   // Scan source plugins (nested: src/plugins/category/plugin-name/)
@@ -495,8 +858,8 @@ function scanPluginDependencies({ srcPluginsDir = 'src/plugins', includeExtensio
   }
   
   // Scan extensions (nested structure: extensions/RepoName/plugin-name/)
-  if (includeExtensions && fs.existsSync(extensionsDir)) {
-    const repos = allowedExtensionDirs ?? listDirectoryNames(extensionsDir);
+  if (fs.existsSync(extensionsDir)) {
+    const repos = allowedExtensionDirs ?? [];
     for (const repo of repos) {
       const repoPath = path.join(extensionsDir, repo);
       scanPluginDir(repoPath, deps);
@@ -583,23 +946,34 @@ export function buildAndPackage({
   version,
   trackerCoreVersion,
   updateDistDependency = true,
-  includeExtensions = false,
   selectedSubmodules = [],
-  noStandard = false
+  selectedPlugins = [],
+  selectedPluginCategories = [],
+  includeStandard = false
 }) {
   const DIST_DIR = distDir || 'dist/package';
   const BUILD_WORKSPACE_DIR = path.join('dist', 'build-workspace');
   const repoRoot = process.cwd();
+  const customBuild = isCustomBuild({
+    includeStandard,
+    selectedSubmodules,
+    selectedPlugins,
+    selectedPluginCategories
+  });
+  const explicitPluginSelection = resolveSelectedPlugins({
+    selectedPlugins,
+    selectedPluginCategories
+  });
   const allowedExtensionDirs = computeAllowedTopLevelDirs({
     rootDir: 'extensions',
     type: 'extension',
     selectedSubmodules,
-    noStandard
+    explicitSelectedTopLevels: Array.from(explicitPluginSelection.selectedExtensionSubmoduleTopLevels)
   });
   const buildSelection = computeBuildSelection({
     selectedSubmodules,
-    noStandard,
-    includeExtensions,
+    explicitPluginSelection,
+    includeStandard,
     allowedExtensionDirs
   });
 
@@ -689,29 +1063,16 @@ export function buildAndPackage({
       findTemplates(pluginsDir);
     }
 
-    // Copy extensions directory (runtime plugins) if requested and exists
+    // Copy explicitly selected extensions (runtime plugins), or create an empty folder with README.
     const workspaceExtensionsDir = path.join(BUILD_WORKSPACE_DIR, 'extensions');
-    if (includeExtensions && fs.existsSync(workspaceExtensionsDir)) {
-      const copied = copySelectedExtensions({
-        distDir: DIST_DIR,
-        sourceDir: workspaceExtensionsDir,
-        includeStandardFiles: !noStandard,
-        allowedExtensionDirs
-      });
-      if (copied === 0) {
-        console.log('⚠ No runtime extensions selected to include');
-      }
-    } else if (includeExtensions) {
-      console.log('⚠ No runtime extensions to include');
-    } else {
-      // Create empty extensions folder with just the README
-      fs.mkdirSync(path.join(DIST_DIR, 'extensions'), { recursive: true });
-      if (!noStandard && fs.existsSync('extensions/README.md')) {
-        fs.copyFileSync('extensions/README.md', path.join(DIST_DIR, 'extensions/README.md'));
-        console.log('✓ Created extensions/ with README.md (plugins excluded for release)');
-      } else {
-        console.log('✓ Created empty extensions/ folder (plugins excluded for release)');
-      }
+    const copied = copySelectedExtensions({
+      distDir: DIST_DIR,
+      sourceDir: workspaceExtensionsDir,
+      includeStandardFiles: true,
+      allowedExtensionDirs
+    });
+    if (copied === 0) {
+      console.log('✓ No runtime extensions selected; created extensions/ with README only');
     }
 
     // Install production dependencies only
@@ -721,7 +1082,6 @@ export function buildAndPackage({
     // Scan source plugins for additional dependencies and install them
     const workspaceAdditionalDeps = scanPluginDependencies({
       srcPluginsDir: path.join(BUILD_WORKSPACE_DIR, 'src/plugins'),
-      includeExtensions,
       extensionsDir: workspaceExtensionsDir,
       allowedExtensionDirs
     });
@@ -771,6 +1131,15 @@ The tracker will receive competition data automatically.
     fs.writeFileSync(path.join(DIST_DIR, 'README.txt'), readme);
     console.log('✓ Created README.txt');
 
+    if (customBuild) {
+      fs.writeFileSync(path.join(DIST_DIR, '.custom-build'), [
+        'This tracker package was built with custom selection options.',
+        'Updating it from the OWLCMS control panel may replace custom plugins or extensions.',
+        ''
+      ].join('\n'));
+      console.log('✓ Created .custom-build marker');
+    }
+
     // Create zip
     console.log('\n📦 Creating ZIP archive...');
     const zipName = version ? `owlcms-tracker_${version}.zip` : 'owlcms-tracker.zip';
@@ -787,7 +1156,7 @@ The tracker will receive competition data automatically.
       try {
         execSync(`${sevenZipPath} a -tzip ../${zipName} .`, { cwd: DIST_DIR, stdio: 'inherit' });
       } catch {
-        execSync(`powershell -Command "Compress-Archive -Path '${DIST_DIR}/*' -DestinationPath 'dist/${zipName}' -Force"`, { stdio: 'inherit' });
+        execSync(`powershell -Command "Add-Type -AssemblyName System.IO.Compression.FileSystem; [System.IO.Compression.ZipFile]::CreateFromDirectory('${DIST_DIR}', 'dist/${zipName}')"`, { stdio: 'inherit' });
       }
     } else {
       execSync(`cd ${DIST_DIR} && zip -r ../${zipName} .`, { stdio: 'inherit' });

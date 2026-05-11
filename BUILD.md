@@ -119,6 +119,37 @@ The release workflow (`.github/workflows/release.yaml`) performs:
 - `X.Y.Z` - Standard release (e.g., `2.4.0`)
 - `X.Y.Z-suffix` - Pre-release (e.g., `2.4.0-beta01`, `2.4.0-rc1`)
 
+## Custom Zip Plugin Selection
+
+The zip packager uses additive selectors. `--standard` adds the built-in plugins from the default checkout, and the other selectors add extra plugins, extensions, or full submodules on top.
+
+```bash
+# Public-style package: only default-checkout built-ins
+npm run zip -- 2.17.2 --standard
+```
+
+```bash
+# Standard plugins plus all configured documents and remote-control plugins
+npm run zip -- 2.17.2 --standard --include-categories documents,remote-control
+```
+
+`--include` can be repeated, and `--include-category`/`--include-categories` plus `--submodule`/`--submodules` both accept singular or plural forms.
+
+```bash
+npm run zip -- 2.17.2 --standard --include-category remote-control --include-categories team --submodule France
+```
+
+Selector notes:
+- `--include` matches plugin display names only, for example `Referee Assignments` or `France - Équipes`.
+- `--include-categories` matches the `category` declared in each plugin or extension `config.js`, for example `documents`, `remote-control`, or `team`.
+- `--submodule` selects whole submodules such as `books`, `OBS`, or `France`.
+- `--standard` includes only the built-in plugins present in the default checkout. It does not include runtime extensions or initialized submodules by itself.
+- Any build that adds selectors beyond plain `--standard` writes a package-root `.custom-build` marker so the OWLCMS control panel can warn before replacing a customized tracker install.
+- Selecting a category pulls in every plugin or extension whose `config.js` uses that category. If those matches live in plugin submodules or delegated extensions, the required backing content is included automatically.
+- Selecting an extension automatically includes the plugin it delegates to via `delegateTo`, even if that base plugin was not named explicitly.
+- Extensions are never included implicitly; they must be named by `--include`, `--include-categories`, or `--submodule`.
+- `npm run zip -- <version>` currently behaves like `npm run zip -- <version> --standard`.
+
 ## Coordinated Releases (tracker-core + owlcms-tracker)
 
 When releasing both packages together:
