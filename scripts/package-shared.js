@@ -987,6 +987,15 @@ export function buildAndPackage({
   copyWorkspaceForBuild(repoRoot, BUILD_WORKSPACE_DIR, buildSelection);
   linkBuildWorkspaceNodeModules(repoRoot, BUILD_WORKSPACE_DIR);
 
+  // Discover which plugins/extensions are present in the build workspace so the
+  // .custom-build marker can record the exact list for the control panel to compare.
+  const workspaceSourcePlugins = discoverSourcePlugins(path.join(BUILD_WORKSPACE_DIR, 'src/plugins'));
+  const workspaceExtensionPlugins = discoverExtensionPlugins(path.join(BUILD_WORKSPACE_DIR, 'extensions'));
+  const includedPluginNames = [
+    ...workspaceSourcePlugins.map(p => p.configName || p.folderName),
+    ...workspaceExtensionPlugins.map(p => p.configName || p.folderName)
+  ].sort((a, b) => a.localeCompare(b));
+
   try {
     // Clean dist directory
     if (fs.existsSync(DIST_DIR)) {
@@ -1132,12 +1141,16 @@ The tracker will receive competition data automatically.
     console.log('✓ Created README.txt');
 
     if (customBuild) {
+      const pluginLine = includedPluginNames.length > 0
+        ? `plugins: ${includedPluginNames.join(', ')}`
+        : 'plugins: (none)';
       fs.writeFileSync(path.join(DIST_DIR, '.custom-build'), [
         'This tracker package was built with custom selection options.',
         'Updating it from the OWLCMS control panel may replace custom plugins or extensions.',
+        pluginLine,
         ''
       ].join('\n'));
-      console.log('✓ Created .custom-build marker');
+      console.log(`✓ Created .custom-build marker (${includedPluginNames.length} plugins)`);
     }
 
     // Create zip
