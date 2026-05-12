@@ -115,6 +115,15 @@ export default {
 			description: 'Count all athletes toward team score (overrides individual top counts)'
 		},
 		{
+			key: 'exportOnlyScoringAthletes',
+			label: 'Export only the athletes included in the team score',
+			type: 'boolean',
+			default: true,
+			group: 'export',
+			groupLabel: 'Export',
+			description: 'When enabled, Excel exports include only athletes who count toward each team total.'
+		},
+		{
 			key: 'topM',
 			label: 'M Team Top Scores',
 			type: 'number',

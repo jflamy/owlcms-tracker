@@ -1538,6 +1538,8 @@ function groupByTeams(teamAthletes, gender, headers, topCounts = {}, includeAllA
 			const athleteKey = normalizeKey(a.athleteKey ?? a.key);
 			const isActualContributor = actualTopContributors.has(athleteKey);
 			const isPredictedContributor = predictedTopContributors.has(athleteKey);
+			const includedInTeamScore = includeAllAthletes || isActualContributor;
+			const includedInProjectedTeamScore = includeAllAthletes || isPredictedContributor;
 			const athleteGender = normalizeGender(a.gender);
 			
 			// Recalculate team points with actual competition settings (if using TeamPoints)
@@ -1569,6 +1571,8 @@ function groupByTeams(teamAthletes, gender, headers, topCounts = {}, includeAllA
 				...a,
 				teamPoints: athleteTeamPoints,
 				displayTeamPoints,
+				includedInTeamScore,
+				includedInProjectedTeamScore,
 				scoreHighlightClass,
 				nextScoreHighlightClass
 			};
@@ -1678,6 +1682,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	
 	// Options are the single source of truth (config defaults + URL overrides, applied by the API layer)
 	const includeAllAthletes = options.allAthletes === true || options.allAthletes === 'true';
+	const exportOnlyScoringAthletes = options.exportOnlyScoringAthletes !== false && options.exportOnlyScoringAthletes !== 'false';
 	
 	// Top score counts (from options, which already have config defaults applied)
 	// When includeAllAthletes is true, use 10 for all counts (effectively includes everyone)
@@ -2167,7 +2172,8 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		scoringSystem,
 		smhfOverrideSinclairYear: scoringConfig.smhfOverrideSinclairYear,
 		smhfAgeFactorYear: scoringConfig.smhfAgeFactorYear,
-		allAthletes: includeAllAthletes
+		allAthletes: includeAllAthletes,
+		exportOnlyScoringAthletes
 	};
 
 	// Show attempt bar unless inactive with no currentAthleteKey (covers breaks)
@@ -2432,13 +2438,25 @@ export async function handleAction({ action, options }) {
 	};
 }
 
+function shouldExportOnlyScoringAthletes(options = {}) {
+	return options.exportOnlyScoringAthletes !== false && options.exportOnlyScoringAthletes !== 'false';
+}
+
+function getExportTeamAthletes(team, options = {}) {
+	const athletes = team?.athletes || [];
+	if (!shouldExportOnlyScoringAthletes(options)) {
+		return athletes;
+	}
+
+	return athletes.filter((athlete) => athlete.includedInTeamScore);
+}
+
 /**
  * Generate scoreboard format Excel (team-grouped with merged headers)
  */
 async function generateScoreboardFormat(workbook, worksheet, data, options) {
 	const { teams, headers, competition } = data;
 	const scoringSystem = options.scoringSystem || 'Sinclair';
-	const allContribute = data.allAthletes === true;
 
 	// Column widths (no header text — we build the 2-row header manually)
 	// Cols: 1=Membership, 2=Name, 3=Cat, 4=Bodyweight, 5=Born, 6=Team, 7-9=Sn1-3, 10=BestSn, 11-13=CJ1-3, 14=BestCJ, 15=Total, 16=Score
@@ -2519,6 +2537,11 @@ async function generateScoreboardFormat(workbook, worksheet, data, options) {
 
 	// Add each team
 	for (const team of teams) {
+		const teamAthletes = getExportTeamAthletes(team, options);
+		if (teamAthletes.length === 0) {
+			continue;
+		}
+
 		// Team header row (merged across name columns)
 		const teamRow = worksheet.getRow(currentRow);
 		worksheet.mergeCells(currentRow, 1, currentRow, 6); // Merge Membership through Team columns
@@ -2558,7 +2581,7 @@ async function generateScoreboardFormat(workbook, worksheet, data, options) {
 		currentRow++;
 
 		// Add athlete rows
-		for (const athlete of team.athletes) {
+		for (const athlete of teamAthletes) {
 			const row = worksheet.getRow(currentRow);
 			
 			row.getCell(1).value = getAthleteMembership(athlete);
@@ -2620,7 +2643,7 @@ async function generateScoreboardFormat(workbook, worksheet, data, options) {
 			scoreCell.alignment = { horizontal: 'right' };
 
 			// Highlight score cell if this athlete contributes to the team score
-			if (athlete.scoreHighlightClass || allContribute) {
+			if (athlete.includedInTeamScore) {
 				scoreCell.fill = {
 					type: 'pattern',
 					pattern: 'solid',
@@ -2668,13 +2691,12 @@ async function generateScoreboardFormat(workbook, worksheet, data, options) {
 async function generateFlatFormat(workbook, worksheet, data, options) {
 	const { teams, headers, competition } = data;
 	const scoringSystem = options.scoringSystem || 'Sinclair';
-	const allContribute = data.allAthletes === true;
 
 	// Flatten team-grouped athletes (same processed data as scoreboard format)
 	const flatAthletes = [];
 	if (teams) {
 		for (const team of teams) {
-			for (const athlete of team.athletes || []) {
+			for (const athlete of getExportTeamAthletes(team, options)) {
 				flatAthletes.push(athlete);
 			}
 		}
@@ -2793,7 +2815,7 @@ async function generateFlatFormat(workbook, worksheet, data, options) {
 		scoreCell.alignment = { horizontal: 'right' };
 
 		// Highlight score cell if this athlete contributes to the team score
-		const contributes = athlete.scoreHighlightClass || allContribute;
+		const contributes = athlete.includedInTeamScore;
 		if (contributes) {
 			scoreCell.fill = {
 				type: 'pattern',

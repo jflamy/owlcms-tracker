@@ -13,6 +13,9 @@
 	$: gender = data.options?.gender || 'Current';
 	$: fopName = data.fopName || 'Platform';
 	$: competitionName = data.competition?.name || 'Competition';
+	$: includeAllAthletes = data.options?.allAthletes === true;
+	$: exportOnlyScoringAthletes = data.options?.exportOnlyScoringAthletes !== false;
+	$: exportsAllAthletes = includeAllAthletes || !exportOnlyScoringAthletes;
 	
 	/**
 	 * Trigger Excel export via plugin-action API
@@ -128,6 +131,10 @@
 					<span class="label">Gender:</span>
 					<span class="value">{gender}</span>
 				</div>
+				<div class="info-item">
+					<span class="label">Exported Athletes:</span>
+					<span class="value">{exportsAllAthletes ? 'All athletes' : 'Only team scorers'}</span>
+				</div>
 				{#if data.options?.allAthletes === false}
 					<div class="info-item">
 						<span class="label">Top Athletes:</span>
@@ -193,6 +200,7 @@
 			<ul>
 				<li><strong>Scoreboard Format:</strong> Preserves the visual layout with team headers, merged cells, and team totals.</li>
 				<li><strong>Flat File:</strong> Simple table format with one row per athlete, suitable for data analysis.</li>
+				<li><strong>Export Scope:</strong> {exportsAllAthletes ? 'All athletes are exported.' : 'Only athletes included in each team score are exported.'}</li>
 				<li>Both formats exclude predicted total and predicted score columns.</li>
 				<li>Failed attempts are shown with strikethrough formatting, successful attempts in bold.</li>
 			</ul>
