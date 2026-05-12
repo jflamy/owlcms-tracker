@@ -5,6 +5,8 @@
 
 ##### Release log
 
+- 2.18.1: Add timestamps to packaged zips since the version number shown is that of tracker and not of the included plugins
+
 - 2.18.0: Include a marker file that indicates that a non-standard build was created using npm run zip.
   - the file includes the plugins included, to provide correct warnings or errors when updating/importing
 - 2.18.0: reviewed the "npm run zip" command options for packaging a custom tracker
