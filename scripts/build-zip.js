@@ -57,7 +57,7 @@ function printUsage() {
   console.log(`Usage: npm run zip -- [version] [tracker-core-version] [selectors]
 
 The first -- is required by npm. It passes the version and selector options to this script.
-The version becomes the ZIP filename with timestamp metadata, for example dist/owlcms-tracker_2.18.0+2026-05-12.14h37.zip.
+The version becomes the ZIP filename with timestamp metadata by default, for example dist/owlcms-tracker_2.18.0+2026-05-12.14h37.zip.
 Use --name to add package metadata before the timestamp, for example dist/owlcms-tracker_2.18.0+documents.2026-05-12.14h37.zip.
 
 Package name metadata:
@@ -65,6 +65,10 @@ Package name metadata:
       Add metadata to the ZIP version name before the automatic timestamp. Metadata is
       sanitized for Windows filenames and control panel install parsing. Underscores become
       hyphens because the control panel extracts the version after the last underscore.
+
+    --no-timestamp
+      Do not add automatic timestamp metadata. This is used by release builds so the
+      package filename is exactly owlcms-tracker_<version>.zip.
 
 Selectors:
   --standard
@@ -124,7 +128,7 @@ function sanitizeMetadataPart(value) {
   return sanitized;
 }
 
-function addPackageMetadata(version, metadataValues) {
+function addPackageMetadata(version, metadataValues, { includeTimestamp = true } = {}) {
   const plusIndex = version.indexOf('+');
   const baseVersion = plusIndex === -1 ? version : version.slice(0, plusIndex);
   const existingMetadata = plusIndex === -1 ? '' : version.slice(plusIndex + 1);
@@ -138,13 +142,19 @@ function addPackageMetadata(version, metadataValues) {
     metadataParts.push(sanitizeMetadataPart(existingMetadata));
   }
   metadataParts.push(...metadataValues.map(sanitizeMetadataPart));
-  metadataParts.push(formatPackageTimestamp());
+  if (includeTimestamp) {
+    metadataParts.push(formatPackageTimestamp());
+  }
+
+  if (metadataParts.length === 0) {
+    return baseVersion;
+  }
 
   return `${baseVersion}+${metadataParts.join('.')}`;
 }
 
 function validateSelectorArgs(parsed) {
-  const allowedFlags = new Set(['--standard', '--help']);
+  const allowedFlags = new Set(['--standard', '--no-timestamp', '--help']);
   const allowedOptions = new Set([
     '--include',
     '--include-category',
@@ -193,7 +203,8 @@ async function main() {
   const positional = parsed.positional;
   const baseVersion = positional[0] || DEFAULT_TRACKER_VERSION;
   const packageNameMetadata = parseCsvOption(parsed.options.get('--name') || []);
-  const VERSION = addPackageMetadata(baseVersion, packageNameMetadata);
+  const includeTimestamp = !parsed.flags.has('--no-timestamp');
+  const VERSION = addPackageMetadata(baseVersion, packageNameMetadata, { includeTimestamp });
   const trackerCoreRequested = positional[1]; // Optional
 
   if (!positional[0]) {
