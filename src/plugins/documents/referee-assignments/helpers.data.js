@@ -63,6 +63,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			status: 'ready',
 			header: {
 				competitionName: competition.competitionName || 'Competition',
+				fileTitle: `Referee Assignments - ${competition.competitionName || 'Competition'}`,
 				locationLine: '',
 				title: translations['OfficialAssignments'] || `!${language}:OfficialAssignments`
 			},
@@ -214,16 +215,15 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	sessionColumns.forEach(s => allPlatforms.add(s.platformName || 'Platform'));
 	const hasMultiplePlatforms = allPlatforms.size > 1;
 	
-	const now = new Date();
-	const fileDateTime = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}h${String(now.getMinutes()).padStart(2,'0')}`;
+	const competitionName = competition.competitionName || 'Competition';
 
 	const result = {
 		status: 'ready',
 		header: {
-			competitionName: competition.competitionName || 'Competition',
+			competitionName,
 			locationLine: buildLocationLine(),
 			title: translations['OfficialAssignments'] || `!${language}:OfficialAssignments`,
-			fileTitle: `Referee Assignments - ${fileDateTime}`
+			fileTitle: `Referee Assignments - ${competitionName}`
 		},
 		days: days,
 		hasMultiplePlatforms,

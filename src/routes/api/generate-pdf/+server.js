@@ -19,6 +19,7 @@ try {
 }
 
 import { findChrome } from '$lib/server/chrome-finder.js';
+import { appendPdfTimestamp, sanitizePdfFilename } from '$lib/pdf-filenames.js';
 
 export async function GET({ url }) {
 	// Check if puppeteer is available
@@ -218,14 +219,10 @@ export async function GET({ url }) {
 		
 		console.log('[PDF Generator] PDF generated successfully');
 		
-		// Generate filename from page title, fallback to type
-		// Title is "Result Book - Competition Name", so use that with .pdf extension
-		const filename = pageTitle ? `${pageTitle}.pdf` : `${type}.pdf`;
-		// Sanitize filename for Windows/Mac/Linux compatibility
-		const sanitizedFilename = filename
-			.replace(/[<>:"|?*]/g, '-')  // Replace invalid characters
-			.replace(/\s+/g, ' ')         // Normalize whitespace
-			.trim();
+		// Generate filename from page title, fallback to type.
+		// Some pages already timestamp their title for browser Print -> Save as PDF.
+		const filenameBase = appendPdfTimestamp(pageTitle || type);
+		const sanitizedFilename = sanitizePdfFilename(`${filenameBase}.pdf`);
 		
 		return new Response(pdf, {
 			headers: {

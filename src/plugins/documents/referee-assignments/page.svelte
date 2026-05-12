@@ -1,5 +1,9 @@
 <script>
+	import { appendPdfTimestamp } from '$lib/pdf-filenames.js';
+
 	export let data = {};
+
+	$: pageTitle = appendPdfTimestamp(data.header?.fileTitle || 'Referee Assignments');
 
 	function splitNames(namesObj) {
 		if (!namesObj) return ['—'];
@@ -65,7 +69,7 @@
 </script>
 
 <svelte:head>
-	<title>{data.header?.fileTitle || 'Referee Assignments'}</title>
+	<title>{pageTitle}</title>
 </svelte:head>
 
 <div class="protocol-sheet" class:no-jury={!hasJury}>
