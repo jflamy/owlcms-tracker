@@ -562,6 +562,28 @@ npm run release -- 2.9.0
 
 **Purpose:** Custom builds for specific use cases (testing, specialized deployments).
 
+**Command form:**
+
+```bash
+npm run zip -- <tracker-version> [tracker-core-version] [selectors]
+```
+
+The first `--` is the npm argument separator. It is required when passing the version or selector options through to the zip script.
+
+The tracker version becomes the output ZIP filename, with timestamp metadata added automatically, for example:
+
+```bash
+npm run zip -- 2.18.0 --include-category documents
+# creates dist/owlcms-tracker_2.18.0+2026-05-12.14h37.zip
+```
+
+Selectors do not add package-name metadata automatically. Use `--name` when the control panel install should keep a custom package name before the timestamp:
+
+```bash
+npm run zip -- 2.18.0 --name documents --include-category documents
+# creates dist/owlcms-tracker_2.18.0+documents.2026-05-12.14h37.zip
+```
+
 **Flexible inclusion via explicit initialization:**
 
 ```bash
@@ -592,6 +614,7 @@ npm run deinit books
 
 **Flags:**
 - `--standard` - Include only the built-in plugins present in the default checkout
+- `--name <metadata>` - Add package metadata before the automatic timestamp in the ZIP filename version for control-panel installs
 - `--include <list>` - Include only plugin or extension display names
 - `--include-categories <list>` - Include plugin or extension categories from each `config.js`
 - `--submodule <list>` - Include whole submodules such as `books`, `OBS`, or `France`
@@ -606,7 +629,7 @@ npm run zip -- 2.9.0 --standard --include-categories documents,remote-control
 
 # Books-enabled build
 npm run init books
-npm run zip -- 2.9.0 --submodule books
+npm run zip -- 2.9.0 --name books --submodule books
 npm run deinit books
 
 # Internal testing with France extension
@@ -887,7 +910,11 @@ This appendix contains the full, actionable packaging instructions that were pre
 **Why:** submodules may contain federation-specific or licensed content that cannot be bundled into the public release.
 
 ## Zip (developer/custom) — mechanics
-- Command: `npm run zip -- <version> [--standard] [--include ...] [--include-category(ies) ...] [--submodule(s) ...]`
+- Command: `npm run zip -- <version> [--name <metadata>] [--standard] [--include ...] [--include-category(ies) ...] [--submodule(s) ...]`
+- The first `--` is required by npm. It separates `npm run zip` from the arguments passed to `scripts/build-zip.js`.
+- The first positional argument is the tracker version and is used in the ZIP filename with automatic timestamp metadata: `npm run zip -- 2.18.0 --include-category documents` creates `dist/owlcms-tracker_2.18.0+2026-05-12.14h37.zip`.
+- `--name <metadata>` adds install-preserved package metadata before the timestamp: `npm run zip -- 2.18.0 --name documents --include-category documents` creates `dist/owlcms-tracker_2.18.0+documents.2026-05-12.14h37.zip`, which the control panel installs as `2.18.0+documents.2026-05-12.14h37`.
+- The optional second positional argument pins the tracker-core version: `npm run zip -- 2.18.0 1.5.5 --include-category documents`.
 - The selectors are additive. Use `--standard` when you want the built-in plugins from the default checkout, then add extras explicitly.
 - To include submodule content you must initialize it explicitly:
   - `npm run init books` — pulls `src/plugins/books` submodule

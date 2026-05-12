@@ -123,6 +123,30 @@ The release workflow (`.github/workflows/release.yaml`) performs:
 
 The zip packager uses additive selectors. `--standard` adds the built-in plugins from the default checkout, and the other selectors add extra plugins, extensions, or full submodules on top.
 
+Use the npm argument separator `--` before the tracker version and selector options. Without this separator, npm consumes the arguments and the zip script will not receive the version or selectors.
+
+The first positional argument is the tracker version that appears in the output ZIP name. Every generated zip includes timestamp metadata that is preserved when installed by the OWLCMS control panel:
+
+```bash
+npm run zip -- 2.18.0 --include-category documents
+# creates dist/owlcms-tracker_2.18.0+2026-05-12.14h37.zip
+```
+
+Selectors do not change the ZIP filename by themselves. Use `--name` to append install-preserved package metadata before the automatic timestamp:
+
+```bash
+npm run zip -- 2.18.0 --name documents --include-category documents
+# creates dist/owlcms-tracker_2.18.0+documents.2026-05-12.14h37.zip
+```
+
+The control panel installs that package as `2.18.0+documents.2026-05-12.14h37`. Metadata is sanitized for Windows filenames and control panel parsing; underscores become hyphens because the control panel extracts the version after the last underscore.
+
+The optional second positional argument pins the tracker-core version:
+
+```bash
+npm run zip -- 2.18.0 1.5.5 --include-category documents
+```
+
 ```bash
 # Public-style package: only default-checkout built-ins
 npm run zip -- 2.17.2 --standard
