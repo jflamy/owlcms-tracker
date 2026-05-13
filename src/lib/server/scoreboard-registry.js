@@ -18,7 +18,7 @@
 import { bumpCacheEpoch } from './cache-epoch.js';
 import { competitionHub } from './competition-hub.js';
 import { existsSync, readdirSync, statSync } from 'fs';
-import { resolve, join } from 'path';
+import { dirname, resolve, join } from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 
 // Eager imports so Vite includes all plugins at build time
@@ -51,6 +51,89 @@ function toFileUrl(filePath, cacheBust = null) {
 async function importFromFileUrl(fileUrl) {
 	const dynamicImport = new Function('u', 'return import(u)');
 	return dynamicImport(fileUrl);
+}
+
+function clonePluginConfig(config) {
+	if (!config || typeof config !== 'object') return config;
+	return {
+		...config,
+		options: Array.isArray(config.options)
+			? config.options.map((option) => ({
+				...option,
+				options: Array.isArray(option.options) ? [...option.options] : option.options
+			}))
+			: config.options,
+		modalActions: Array.isArray(config.modalActions)
+			? config.modalActions.map((action) => ({ ...action }))
+			: config.modalActions,
+		pages: Array.isArray(config.pages)
+			? config.pages.map((page) => ({ ...page }))
+			: config.pages
+	};
+}
+
+function applyConfigOverrideDefaults(config, overrideConfig) {
+	const merged = clonePluginConfig(config);
+	if (!Array.isArray(merged?.options) || !Array.isArray(overrideConfig?.options)) {
+		return { config: merged, overriddenKeys: [] };
+	}
+
+	const defaultsByKey = new Map();
+	for (const option of overrideConfig.options) {
+		if (!option?.key || !Object.prototype.hasOwnProperty.call(option, 'default')) continue;
+		defaultsByKey.set(option.key, option.default);
+	}
+
+	if (defaultsByKey.size === 0) {
+		return { config: merged, overriddenKeys: [] };
+	}
+
+	const overriddenKeys = [];
+	merged.options = merged.options.map((option) => {
+		if (!option?.key || !defaultsByKey.has(option.key)) return option;
+		overriddenKeys.push(option.key);
+		return {
+			...option,
+			default: defaultsByKey.get(option.key)
+		};
+	});
+
+	return { config: merged, overriddenKeys };
+}
+
+function getRuntimeConfigOverrideCandidates(pluginPath, runtimePaths = null) {
+	const candidates = [];
+	if (runtimePaths?.configPath) {
+		candidates.push(join(dirname(runtimePaths.configPath), 'config-override.js'));
+	}
+
+	try {
+		const moduleDir = fileURLToPath(new URL('.', import.meta.url));
+		const moduleRoot = findPackageRoot(moduleDir);
+		candidates.push(
+			resolve(process.cwd(), 'src/plugins', pluginPath, 'config-override.js'),
+			resolve(moduleRoot, 'src/plugins', pluginPath, 'config-override.js')
+		);
+	} catch {
+		candidates.push(resolve(process.cwd(), 'src/plugins', pluginPath, 'config-override.js'));
+	}
+
+	return Array.from(new Set(candidates));
+}
+
+async function loadRuntimeConfigOverride(pluginPath, runtimePaths = null) {
+	for (const overridePath of getRuntimeConfigOverrideCandidates(pluginPath, runtimePaths)) {
+		if (!existsSync(overridePath)) continue;
+		const overrideMtime = statSync(overridePath).mtimeMs;
+		const overrideUrl = toFileUrl(overridePath, overrideMtime) || `${pathToFileURL(overridePath).href}?t=${overrideMtime}`;
+		const overrideModule = await importFromFileUrl(overrideUrl);
+		return {
+			path: overridePath,
+			config: overrideModule.default || overrideModule
+		};
+	}
+
+	return null;
 }
 
 /**
@@ -330,6 +413,16 @@ class ScoreboardRegistry {
 					? helpersModule.getScoreboardData || helpersModule.processData || helpersModule.default
 					: null;
 				actionHandler = helpersModule?.handleAction || null;
+			}
+
+			config = clonePluginConfig(config);
+			const runtimeConfigOverride = await loadRuntimeConfigOverride(pluginPath, runtimePaths);
+			if (runtimeConfigOverride) {
+				const overrideResult = applyConfigOverrideDefaults(config, runtimeConfigOverride.config);
+				config = overrideResult.config;
+				if (overrideResult.overriddenKeys.length > 0) {
+					console.log(`[ScoreboardRegistry] Applied config-override.js for ${pluginPath}: ${overrideResult.overriddenKeys.join(', ')}`);
+				}
 			}
 
 			// Handle delegateTo pattern: config-only plugins that extend a base plugin

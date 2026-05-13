@@ -905,6 +905,83 @@ function copyDir(src, dest) {
 	});
 }
 
+function parseDefaultLiteral(rawValue) {
+  const trimmed = String(rawValue || '').trim();
+  if ((trimmed.startsWith("'") && trimmed.endsWith("'")) || (trimmed.startsWith('"') && trimmed.endsWith('"'))) {
+    return trimmed.slice(1, -1);
+  }
+  if (trimmed === 'true') return true;
+  if (trimmed === 'false') return false;
+  if (trimmed === 'null') return null;
+  if (trimmed !== '' && !Number.isNaN(Number(trimmed))) return Number(trimmed);
+  return trimmed;
+}
+
+function extractDefaultOptionsFromConfig(configPath) {
+  if (!fs.existsSync(configPath)) return [];
+
+  const configContent = fs.readFileSync(configPath, 'utf8');
+  const defaults = [];
+  const optionRegex = /key\s*:\s*['"]([^'"]+)['"][\s\S]*?default\s*:\s*([^,\n}]+)/g;
+  let match;
+
+  while ((match = optionRegex.exec(configContent)) !== null) {
+    defaults.push({
+      key: match[1],
+      default: parseDefaultLiteral(match[2])
+    });
+  }
+
+  return defaults;
+}
+
+function writeGeneratedConfigOverride({ configPath, destPath }) {
+  const defaults = extractDefaultOptionsFromConfig(configPath);
+  if (defaults.length === 0) return false;
+
+  const optionBlocks = defaults.map(({ key, default: defaultValue }) => [
+    '    {',
+    `      key: ${JSON.stringify(key)},`,
+    `      default: ${JSON.stringify(defaultValue)}`,
+    '    }'
+  ].join('\n'));
+
+  const content = [
+    '// Runtime default overrides for this plugin.',
+    '// The tracker reads only options[].default from this file.',
+    'export default {',
+    '  options: [',
+    optionBlocks.join(',\n'),
+    '  ]',
+    '};',
+    ''
+  ].join('\n');
+
+  fs.mkdirSync(path.dirname(destPath), { recursive: true });
+  fs.writeFileSync(destPath, content);
+  return true;
+}
+
+function copyOrGenerateConfigOverride({ pluginDir, buildWorkspaceDir, distDir }) {
+  const configPath = path.join(pluginDir, 'config.js');
+  if (!fs.existsSync(configPath)) return;
+
+  const overridePath = path.join(pluginDir, 'config-override.js');
+  const relativeOverride = path.relative(buildWorkspaceDir, overridePath);
+  const dest = path.join(distDir, relativeOverride);
+
+  if (fs.existsSync(overridePath)) {
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.copyFileSync(overridePath, dest);
+    console.log(`✓ Copied ${relativeOverride}`);
+    return;
+  }
+
+  if (writeGeneratedConfigOverride({ configPath, destPath: dest })) {
+    console.log(`✓ Generated ${relativeOverride}`);
+  }
+}
+
 /**
  * Scan a directory for plugins with config.js containing additionalDependencies
  */
@@ -1051,25 +1128,31 @@ export function buildAndPackage({
     copyDir(path.join(BUILD_WORKSPACE_DIR, 'build'), path.join(DIST_DIR, 'build'));
     console.log('✓ Copied build/');
 
-    // Copy templates/ directories from any plugin (at any nesting depth) that has one.
-    // These are static JSON assets needed at runtime (e.g., OBS scene collection templates).
-    // JS code in plugins is NOT copied — it is either bundled by Vite or loaded at runtime.
+    // Copy runtime assets from any plugin (at any nesting depth) that has them.
+    // These are loose files needed at runtime (e.g., OBS scene collection templates
+    // and editable config-override.js default overrides). Normal plugin JS is not
+    // copied; it is either bundled by Vite or loaded as a runtime extension.
     const pluginsDir = path.join(BUILD_WORKSPACE_DIR, 'src/plugins');
     if (fs.existsSync(pluginsDir)) {
-      const findTemplates = (dir) => {
+      const findPluginRuntimeAssets = (dir) => {
+        copyOrGenerateConfigOverride({
+          pluginDir: dir,
+          buildWorkspaceDir: BUILD_WORKSPACE_DIR,
+          distDir: DIST_DIR
+        });
+
         for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-          if (!entry.isDirectory()) continue;
           const child = path.join(dir, entry.name);
-          if (entry.name === 'templates') {
+          if (entry.isDirectory() && entry.name === 'templates') {
             const relativeChild = path.relative(BUILD_WORKSPACE_DIR, child);
             copyDir(child, path.join(DIST_DIR, relativeChild));
             console.log(`✓ Copied ${relativeChild}`);
-          } else {
-            findTemplates(child);
+          } else if (entry.isDirectory()) {
+            findPluginRuntimeAssets(child);
           }
         }
       };
-      findTemplates(pluginsDir);
+      findPluginRuntimeAssets(pluginsDir);
     }
 
     // Copy explicitly selected extensions (runtime plugins), or create an empty folder with README.
