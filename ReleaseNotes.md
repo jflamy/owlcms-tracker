@@ -5,6 +5,10 @@
 
 ##### Release log
 
+- 2.18.2: Packaged plugins can now provide editable `config-override.js` files for runtime option defaults.
+  - Custom zip packaging copies hand-authored override files and generates missing ones for selected plugins with options.
+  - OBS packages include override files for install-specific host, path, platform, and scene defaults.
+
 - 2.18.1: Add timestamps to packaged zips since the version number shown is that of tracker and not of the included plugins
 
 - 2.18.0: Include a marker file that indicates that a non-standard build was created using npm run zip.
