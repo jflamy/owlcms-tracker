@@ -401,7 +401,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		
 		// Get picture and flag URLs using unified resolver
 		const pictureUrl = getPictureUrl(currentAthlete.membership, true);
-		const flagUrl = getFlagUrl(currentAthlete.teamName, true);
+		const flagUrl = currentAthlete.flagUrl || currentAthlete.flagURL || getFlagUrl(currentAthlete.teamName, true);
 		
 		// Format attempt string using translations (e.g., "Snatch #2" or "C&J #1")
 		const liftTypeKey = fopUpdate?.liftTypeKey || '';

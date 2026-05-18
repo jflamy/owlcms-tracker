@@ -33,6 +33,11 @@ export { buildSessionInfo, buildAttemptLabel, inferGroupName, inferBreakMessage,
 const scoreboardCache = new Map();
 registerCache(scoreboardCache);
 
+function resolveFlagUrl(source, teamName = source?.teamName) {
+	const propagated = source?.flagUrl || source?.flagURL;
+	return propagated || (teamName ? getFlagUrl(teamName, true) : null);
+}
+
 /**
  * Configuration for standard scoreboard types
  */
@@ -411,7 +416,7 @@ function processAthletes(entries) {
 			classname,
 			sattempts,
 			cattempts,
-			flagUrl: getFlagUrl(entry.teamName, true)
+			flagUrl: resolveFlagUrl(entry)
 		};
 		
 		// Strip to display fields only for cloud efficiency
@@ -494,7 +499,7 @@ function extractLeaders(fopUpdate) {
 				flat.athlete = leader.athlete;
 				flat.displayInfo = leader.displayInfo;
 				flat.athleteKey = leader.athlete?.key ?? leader.athlete?.id ?? flat.athleteKey ?? null;
-				flat.flagUrl = flat.teamName ? getFlagUrl(flat.teamName, true) : null;
+				flat.flagUrl = resolveFlagUrl(flat);
 				
 				let sattempts = Array.isArray(flat.sattempts) ? [...flat.sattempts] : [];
 				let cattempts = Array.isArray(flat.cattempts) ? [...flat.cattempts] : [];
@@ -508,7 +513,7 @@ function extractLeaders(fopUpdate) {
 
 			return {
 				...leader,
-				flagUrl: leader.teamName ? getFlagUrl(leader.teamName, true) : null
+				flagUrl: resolveFlagUrl(leader)
 			};
 		})
 		.filter(Boolean);

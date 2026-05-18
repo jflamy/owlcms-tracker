@@ -84,7 +84,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		currentAthleteInfo = {
 			fullName: fopUpdate.fullName || '',
 			teamName: fopUpdate.teamName || '',
-			flagUrl: getFlagUrl(fopUpdate.teamName),
+			flagUrl: fopUpdate.flagUrl || fopUpdate.flagURL || getFlagUrl(fopUpdate.teamName),
 			weight: fopUpdate.weight || '',
 			attemptNumber: fopUpdate.attemptNumber || '',
 			liftType: fopUpdate.attemptNumber ? 

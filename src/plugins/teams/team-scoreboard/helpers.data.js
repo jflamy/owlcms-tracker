@@ -2080,7 +2080,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	// Add flag URLs
 	const athletesWithFlags = scoredAthletes.map(athlete => ({
 		...athlete,
-		flagUrl: getFlagUrl(athlete.teamName || athlete.team, true)
+		flagUrl: athlete.flagUrl || athlete.flagURL || getFlagUrl({ teamName: athlete.teamName || athlete.team })
 	}));
 	
 	// Extract competition settings (needed for team points calculation)

@@ -5,6 +5,8 @@
 
 ##### Release log
 
+- 2.18.3: Flag files for countries and North America provinces/states/territories now are mapped from full name to 2-letter juridiction or 3-letter IOC Code (Ontario can be found under ON.svg and Australia under AUS.svg). 
+
 - 2.18.2: Packaged plugins can now provide editable `config-override.js` files for runtime option defaults.
   - Custom zip packaging copies hand-authored override files and generates missing ones for selected plugins with options.
   - OBS packages include override files for install-specific host, path, platform, and scene defaults.

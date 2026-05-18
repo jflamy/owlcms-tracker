@@ -420,7 +420,7 @@ function createCandidate(athlete, participation, championship, competitionDate, 
 		bestCleanJerk,
 		groupDone,
 		sortName: `${athlete?.lastName || ''} ${athlete?.firstName || ''}`.trim(),
-		flagUrl: getFlagUrl(teamName, true),
+		flagUrl: athlete?.flagUrl || athlete?.flagURL || getFlagUrl(teamName, true),
 		scoreMetric: computeScoreMetric(athlete, championship?.teamScoringSystem, competitionDate, scoringConfig),
 		mixedScoreMetric: computeScoreMetric(athlete, championship?.mixedTeamScoringSystem, competitionDate, scoringConfig),
 		primaryRank: getPrimaryRank(participation, 'TOTAL')
