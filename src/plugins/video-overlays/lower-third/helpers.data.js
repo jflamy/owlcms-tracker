@@ -7,6 +7,17 @@ import { buildCacheKey, registerCache } from '$lib/server/cache-utils.js';
 const lowerThirdCache = new Map();
 registerCache(lowerThirdCache);
 
+function decodeEntities(str) {
+	if (!str) return '';
+	return str
+		.replace(/&ndash;/g, '–')
+		.replace(/&mdash;/g, '—')
+		.replace(/&nbsp;/g, ' ')
+		.replace(/&amp;/g, '&')
+		.replace(/&lt;/g, '<')
+		.replace(/&gt;/g, '>');
+}
+
 export function getScoreboardData(fopName = 'A', options = {}) {
 	const fopUpdate = competitionHub.getFopUpdate({ fopName });
 	const databaseState = competitionHub.getDatabaseState();
@@ -61,10 +72,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	
 	// During interruption: use the break message from fullName
 	if (fopUpdate?.mode === 'INTERRUPTION' && fopUpdate?.fullName) {
-		let displayName = fopUpdate.fullName || '';
-		// Extract just the message after the ndash (handles both &ndash; and – unicode)
-		// First decode HTML entities
-		displayName = displayName.replace(/&ndash;/g, '–').replace(/&mdash;/g, '—');
+		let displayName = decodeEntities(fopUpdate.fullName);
 		// Then split on ndash or mdash and take the last part
 		const parts = displayName.split(/\s*[–—]\s*/);
 		if (parts.length > 1) {
@@ -82,8 +90,8 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		// Normal mode: use fullName from fopUpdate (athlete info)
 		// Only use fullName if mode is NOT interruption (avoid stale jury deliberation text)
 		currentAthleteInfo = {
-			fullName: fopUpdate.fullName || '',
-			teamName: fopUpdate.teamName || '',
+			fullName: decodeEntities(fopUpdate.fullName),
+			teamName: decodeEntities(fopUpdate.teamName),
 			flagUrl: fopUpdate.flagUrl || fopUpdate.flagURL || getFlagUrl(fopUpdate.teamName),
 			weight: fopUpdate.weight || '',
 			attemptNumber: fopUpdate.attemptNumber || '',
