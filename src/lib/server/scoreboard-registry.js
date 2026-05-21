@@ -365,6 +365,20 @@ class ScoreboardRegistry {
 		}
 	}
 
+	async reloadScoreboard(type) {
+		const existing = this.scoreboards.get(type);
+		if (!existing) {
+			return false;
+		}
+
+		await this.registerScoreboard(
+			existing.pluginPath,
+			existing.folderName,
+			existing.runtime ? existing.runtimePaths : null
+		);
+		return this.scoreboards.has(type);
+	}
+
 	/**
 	 * Register a single scoreboard plugin
 	 * @param {string} pluginPath - Path relative to plugins/ (e.g., "books/iwf-startbook")
@@ -488,7 +502,8 @@ class ScoreboardRegistry {
 				dataHelper,
 				handleAction: actionHandler,
 				path: `../../plugins/${pluginPath}`,
-				runtime: !!runtimePaths
+				runtime: !!runtimePaths,
+				runtimePaths
 			});
 
 			console.log(`[ScoreboardRegistry] Registered: ${type} (path: ${pluginPath}${runtimePaths ? ', runtime' : ''}${actionHandler ? ', has actions' : ''})`);
@@ -520,6 +535,7 @@ class ScoreboardRegistry {
 						handleAction: actionHandler,
 						path: `../../plugins/${pluginPath}`,
 						runtime: !!runtimePaths,
+						runtimePaths,
 						isSubPage: true,
 						parentType: type
 					});

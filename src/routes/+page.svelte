@@ -492,6 +492,10 @@
     const result = await callPluginAction(modalScoreboard.type, actionDef.action, modalFop, {
       download: actionDef.download === true
     });
+    if (result?.success && (actionDef.refreshDataOnSuccess || result.refreshData)) {
+      await invalidateAll();
+      defaultsInitialized = false;
+    }
     if (result?.success && actionDef.closeModalOnSuccess) {
       closeModal();
     }

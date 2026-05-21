@@ -62,7 +62,15 @@ async function handleRequest(url) {
   });
 
   try {
-    const result = await scoreboard.handleAction({ action, options });
+    let result = await scoreboard.handleAction({ action, options });
+
+    if (result?.refreshRegistry === true) {
+      const registryRefreshed = await scoreboardRegistry.reloadScoreboard(pluginName);
+      result = {
+        ...result,
+        registryRefreshed
+      };
+    }
     
     // Handle binary responses (e.g., Excel files)
     if (result.binary === true && result.buffer && result.contentType && result.filename) {
