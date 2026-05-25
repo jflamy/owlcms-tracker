@@ -5,6 +5,8 @@
 
 ##### Release log
 
+- 2.18.4: Stale provisional records that do not match the current event are no longer included in the results book
+
 - 2.18.3: Flag files for countries and North America provinces/states/territories now are mapped from full name to 2-letter juridiction or 3-letter IOC Code (Ontario can be found under ON.svg and Australia under AUS.svg). 
 
 - 2.18.2: Packaged plugins can now provide editable `config-override.js` files for runtime option defaults.
