@@ -148,7 +148,11 @@ export default defineConfig({
 	},
 	test: {
 		environment: 'node',
-		include: ['tests/**/*.{test,spec}.{js,ts}']
+		include: [
+			'tests/**/*.{test,spec}.{js,ts}',
+			'src/plugins/**/*.{test,spec}.{js,ts}',
+			'extensions/**/*.{test,spec}.{js,ts}'
+		]
 	}
 });
 

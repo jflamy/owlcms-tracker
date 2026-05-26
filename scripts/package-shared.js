@@ -722,6 +722,14 @@ function pathMatchesAllowedRoots(relativePath, allowedRoots = new Set()) {
   return false;
 }
 
+function isPluginTestPath(parts) {
+  const testDirNames = new Set(['test', 'tests', '__tests__']);
+  const basename = parts[parts.length - 1] || '';
+
+  return parts.some((part) => testDirNames.has(part))
+    || /\.(test|spec)\.[cm]?[jt]sx?$/i.test(basename);
+}
+
 export function computeBuildSelection({
   selectedSubmodules = [],
   explicitPluginSelection = null,
@@ -781,6 +789,9 @@ export function shouldCopyWorkspaceEntry(relativePath, isDirectory, selection) {
 
   if (topLevel === 'src' && parts[1] === 'plugins') {
     if (parts.length <= 2) return true;
+    if (isPluginTestPath(parts.slice(2))) {
+      return false;
+    }
 
     const category = parts[2];
     const pluginRelativePath = parts.slice(2).join('/');

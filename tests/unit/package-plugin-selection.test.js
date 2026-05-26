@@ -42,6 +42,9 @@ describe('Zip packaging plugin selection', () => {
 
     expect(shouldCopyWorkspaceEntry('src/plugins/documents/referee-assignments/config.js', false, selection)).toBe(true);
     expect(shouldCopyWorkspaceEntry('src/plugins/scoreboards/lifting-order/config.js', false, selection)).toBe(true);
+    expect(shouldCopyWorkspaceEntry('src/plugins/books/iwf-startbook/tests', true, selection)).toBe(false);
+    expect(shouldCopyWorkspaceEntry('src/plugins/books/iwf-startbook/tests/iwf-startbook-options.test.js', false, selection)).toBe(false);
+    expect(shouldCopyWorkspaceEntry('src/plugins/books/iwf-startbook/helpers.data.test.js', false, selection)).toBe(false);
   });
 
   it('does not treat submodule names as plugin selectors', () => {

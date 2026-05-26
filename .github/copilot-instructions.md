@@ -197,6 +197,15 @@ tests/                      # Test scripts and utilities
 └── README.md               # Test documentation
 ```
 
+## Test Placement Rules
+
+- Default to colocated tests. If a test belongs to one plugin, put it under that plugin at `src/plugins/<category>/<plugin>/tests/`.
+- Put plugin-only fixtures, rendered outputs, and diagnostic scripts in the same plugin `tests/` directory, not in top-level `tests/`.
+- If a test is shared by several plugins inside one plugin family, put it at the nearest shared owner, for example `src/plugins/books/tests/` or `src/plugins/books/iwf-helpers/tests/`.
+- Keep top-level `tests/` only for genuinely shared system, protocol, packaging, or integration checks that are not owned by one plugin family.
+- Do not create new plugin-owned tests in `tests/unit/`.
+- When adding plugin-local tests, keep the usual `*.test.js` or `*.spec.js` names. Vitest is configured to discover tests under `tests/`, `src/plugins/`, and `extensions/`, and packaging excludes plugin-local `tests/` directories and plugin-local `*.test`/`*.spec` files from build artifacts.
+
 ------
 
 ## ��� Creating Scoreboards with AI Assistance

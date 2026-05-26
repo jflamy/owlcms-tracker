@@ -34,7 +34,7 @@ vi.mock('@owlcms/tracker-core', () => ({
 	logger: mocks.logger
 }));
 
-import { getScoreboardData } from '../../src/plugins/attemptboards/attempt-board/helpers.data.js';
+import { getScoreboardData } from '../helpers.data.js';
 
 describe('Attempt board option parsing', () => {
 	beforeEach(() => {
