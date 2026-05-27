@@ -149,7 +149,8 @@
 											<div>{@html renderNameArray(session.officials.competitionSecretary2)}</div>
 										{/if}
 										{#if !session.officials.competitionSecretary?.raw && !session.officials.competitionSecretary2?.raw}
-									{/if}
+											<span class="empty">—</span>
+										{/if}
 								</td>
 							{/each}
 						</tr>
@@ -415,6 +416,8 @@
 	{:else}
 		<p class="message">Loading...</p>
 	{/if}
+
+	<div class="sheet-footer">{data.productionTimestamp}</div>
 </div>
 
 <style>
@@ -574,6 +577,15 @@
 		text-align: center;
 	}
 
+	.sheet-footer {
+		margin-top: 1rem;
+		padding-top: 0.3rem;
+		border-top: 1px solid #ccc;
+		font-size: 0.7rem;
+		color: #555;
+		text-align: right;
+	}
+
 	/* Day grouping */
 	.day-group {
 		margin-bottom: 2rem;
@@ -595,7 +607,7 @@
 
 	@media print {
 		.protocol-sheet {
-			padding: 0;
+			padding: 0 0 0.5in 0;
 			font-size: 0.7rem;
 		}
 
@@ -620,6 +632,16 @@
 		.day-header {
 			margin-top: 0;
 			padding-top: 0;
+		}
+
+		.sheet-footer {
+			position: fixed;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			margin-top: 0;
+			padding-top: 0.15rem;
+			background: #fff;
 		}
 	}
 </style>

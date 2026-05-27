@@ -13,6 +13,20 @@ const refereeAssignmentsCache = new Map();
 registerCache(refereeAssignmentsCache);
 
 /**
+ * Returns the current date/time formatted as yyyy-mm-dd HHhMM (no timezone).
+ */
+function formatProductionTimestamp() {
+	const now = new Date();
+	const date = [
+		now.getFullYear(),
+		String(now.getMonth() + 1).padStart(2, '0'),
+		String(now.getDate()).padStart(2, '0')
+	].join('-');
+	const time = String(now.getHours()).padStart(2, '0') + 'h' + String(now.getMinutes()).padStart(2, '0');
+	return `${date} ${time}`;
+}
+
+/**
  * Main function to get referee assignment data
  * @param {string} fopName - Field of play name (not used for this scoreboard, but required by system)
  * @param {object} options - User options (including lang/language for translation locale)
@@ -30,7 +44,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 	const cacheKey = buildCacheKey({ includeFop: false, opts: options }) + `-txcs:${translationsChecksum.substring(0, 8)}`;
 	
 	if (refereeAssignmentsCache.has(cacheKey)) {
-		return refereeAssignmentsCache.get(cacheKey);
+		return { ...refereeAssignmentsCache.get(cacheKey), productionTimestamp: formatProductionTimestamp() };
 	}
 	
 	if (!databaseState || !databaseState.competition) {
@@ -38,7 +52,8 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			status: 'no_data',
 			message: 'No competition data available',
 			days: [],
-			header: {}
+			header: {},
+			productionTimestamp: formatProductionTimestamp()
 		};
 	}
 
@@ -72,7 +87,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 			labels: buildLabels(translations, language)
 		};
 		refereeAssignmentsCache.set(cacheKey, result);
-		return result;
+		return { ...result, productionTimestamp: formatProductionTimestamp() };
 	}
 
 	// Sort sessions by competition time first, then by name for stable ordering.
@@ -232,7 +247,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		labels: buildLabels(translations, language)
 	};
 
-	// Cache the result
+	// Cache the result (without timestamp — timestamp is added fresh on every call)
 	refereeAssignmentsCache.set(cacheKey, result);
 	if (refereeAssignmentsCache.size > 3) {
 		const firstKey = refereeAssignmentsCache.keys().next().value;
@@ -244,7 +259,7 @@ export function getScoreboardData(fopName = 'A', options = {}) {
 		refereeAssignmentsCache.delete(firstKey);
 	}
 
-	return result;
+	return { ...result, productionTimestamp: formatProductionTimestamp() };
 }
 
 /**
