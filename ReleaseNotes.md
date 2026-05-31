@@ -5,6 +5,10 @@
 
 ##### Release log
 
+- 2.18.6: Plugin option defaults can now be saved from the options modal via a built-in "Save as Defaults" button. Overrides are persisted as `config-override.json5` (JSON5 with comments and trailing commas). The legacy `config-override.js` format is no longer loaded; re-save defaults from the modal to migrate. 
+
+- 2.18.6: Fixes a bug where comma-separated string defaults (e.g. `'S,J,U,V'`) were truncated when handling defaults
+
 - 2.18.5: moved plugin-specific unit tests down to their plugin or submodule.
 
 - 2.18.4: Stale provisional records that do not match the current event are no longer included in the results book

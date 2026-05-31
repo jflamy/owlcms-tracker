@@ -44,6 +44,7 @@
     "adm-zip": "^0.5.10",
     "gsap": "^3.13.0",
     "http-proxy-middleware": "^3.0.5",
+    "json5": "^2.2.3",
     "obs-websocket-js": "^5.0.6",
     "pagedjs": "0.4.3",
     "ws": "^8.18.3"

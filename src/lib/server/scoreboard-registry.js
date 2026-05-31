@@ -17,9 +17,10 @@
 
 import { bumpCacheEpoch } from './cache-epoch.js';
 import { competitionHub } from './competition-hub.js';
-import { existsSync, readdirSync, statSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'fs';
 import { dirname, resolve, join } from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
+import JSON5 from 'json5';
 
 // Eager imports so Vite includes all plugins at build time
 // Note: import.meta.glob is a Vite COMPILE-TIME feature - it gets transformed
@@ -103,19 +104,18 @@ function applyConfigOverrideDefaults(config, overrideConfig) {
 
 function getRuntimeConfigOverrideCandidates(pluginPath, runtimePaths = null) {
 	const candidates = [];
+
 	if (runtimePaths?.configPath) {
-		candidates.push(join(dirname(runtimePaths.configPath), 'config-override.js'));
+		candidates.push(join(dirname(runtimePaths.configPath), 'config-override.json5'));
 	}
 
 	try {
 		const moduleDir = fileURLToPath(new URL('.', import.meta.url));
 		const moduleRoot = findPackageRoot(moduleDir);
-		candidates.push(
-			resolve(process.cwd(), 'src/plugins', pluginPath, 'config-override.js'),
-			resolve(moduleRoot, 'src/plugins', pluginPath, 'config-override.js')
-		);
+		candidates.push(resolve(process.cwd(), 'src/plugins', pluginPath, 'config-override.json5'));
+		candidates.push(resolve(moduleRoot, 'src/plugins', pluginPath, 'config-override.json5'));
 	} catch {
-		candidates.push(resolve(process.cwd(), 'src/plugins', pluginPath, 'config-override.js'));
+		candidates.push(resolve(process.cwd(), 'src/plugins', pluginPath, 'config-override.json5'));
 	}
 
 	return Array.from(new Set(candidates));
@@ -124,16 +124,27 @@ function getRuntimeConfigOverrideCandidates(pluginPath, runtimePaths = null) {
 async function loadRuntimeConfigOverride(pluginPath, runtimePaths = null) {
 	for (const overridePath of getRuntimeConfigOverrideCandidates(pluginPath, runtimePaths)) {
 		if (!existsSync(overridePath)) continue;
-		const overrideMtime = statSync(overridePath).mtimeMs;
-		const overrideUrl = toFileUrl(overridePath, overrideMtime) || `${pathToFileURL(overridePath).href}?t=${overrideMtime}`;
-		const overrideModule = await importFromFileUrl(overrideUrl);
-		return {
-			path: overridePath,
-			config: overrideModule.default || overrideModule
-		};
+		try {
+			const raw = readFileSync(overridePath, 'utf8');
+			return { path: overridePath, config: JSON5.parse(raw) };
+		} catch (err) {
+			console.error(`[ScoreboardRegistry] Failed to parse ${overridePath}:`, err.message);
+			continue;
+		}
 	}
 
 	return null;
+}
+
+/**
+ * Resolve the preferred path to write a generated/updated override file.
+ * Reuses an existing config-override.json5 if present; otherwise picks
+ * the first candidate location.
+ */
+function getRuntimeConfigOverrideWritePath(pluginPath, runtimePaths = null) {
+	const candidates = getRuntimeConfigOverrideCandidates(pluginPath, runtimePaths);
+	const existing = candidates.find((p) => existsSync(p));
+	return existing || candidates[0] || null;
 }
 
 /**
@@ -435,7 +446,7 @@ class ScoreboardRegistry {
 				const overrideResult = applyConfigOverrideDefaults(config, runtimeConfigOverride.config);
 				config = overrideResult.config;
 				if (overrideResult.overriddenKeys.length > 0) {
-					console.log(`[ScoreboardRegistry] Applied config-override.js for ${pluginPath}: ${overrideResult.overriddenKeys.join(', ')}`);
+					console.log(`[ScoreboardRegistry] Applied config-override.json5 for ${pluginPath}: ${overrideResult.overriddenKeys.join(', ')}`);
 				}
 			}
 
@@ -553,6 +564,60 @@ class ScoreboardRegistry {
 	 */
 	getScoreboard(type) {
 		return this.scoreboards.get(type);
+	}
+
+	/**
+	 * Persist the supplied option values as defaults for `type` by writing
+	 * (or updating) a sibling config-override.json5 file. Only keys that the
+	 * plugin actually declares as options are saved.
+	 *
+	 * Returns { success, path, savedKeys } on success or { success: false, error }.
+	 */
+	saveOptionDefaults(type, suppliedOptions = {}) {
+		const scoreboard = this.scoreboards.get(type);
+		if (!scoreboard) {
+			return { success: false, error: 'plugin_not_found' };
+		}
+
+		const declaredOptions = Array.isArray(scoreboard.config?.options) ? scoreboard.config.options : [];
+		if (declaredOptions.length === 0) {
+			return { success: false, error: 'no_options_declared' };
+		}
+
+		const writePath = getRuntimeConfigOverrideWritePath(scoreboard.pluginPath, scoreboard.runtimePaths);
+		if (!writePath) {
+			return { success: false, error: 'no_writable_location' };
+		}
+
+		const savedKeys = [];
+		const payload = {
+			options: declaredOptions
+				.filter((opt) => opt?.key && Object.prototype.hasOwnProperty.call(suppliedOptions, opt.key))
+				.map((opt) => {
+					savedKeys.push(opt.key);
+					return { key: opt.key, default: suppliedOptions[opt.key] };
+				})
+		};
+
+		if (payload.options.length === 0) {
+			return { success: false, error: 'no_matching_options' };
+		}
+
+		const header = [
+			'// Runtime default overrides for this plugin.',
+			'// The tracker reads only options[].default from this file.',
+			'// JSON5 syntax: comments and trailing commas are allowed.',
+			''
+		].join('\n');
+
+		try {
+			mkdirSync(dirname(writePath), { recursive: true });
+			writeFileSync(writePath, `${header}${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+		} catch (err) {
+			return { success: false, error: 'write_failed', message: err.message };
+		}
+
+		return { success: true, path: writePath, savedKeys };
 	}
 
 	/**

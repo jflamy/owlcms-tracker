@@ -226,7 +226,7 @@ async function main() {
 
   console.log(`✓ Using tracker-core@${trackerCoreVersion}`);
 
-  buildAndPackage({
+  await buildAndPackage({
     distDir: 'dist/package',
     version: VERSION,
     trackerCoreVersion,

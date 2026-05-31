@@ -428,6 +428,21 @@
     return scoreboard?.config?.modalActions || [];
   }
 
+  function canPersistOptions(scoreboard) {
+    if (!scoreboard) return false;
+    if (scoreboard.config?.persistOptions === false) return false;
+    return Array.isArray(scoreboard.options) && scoreboard.options.length > 0;
+  }
+
+  async function saveOptionDefaults() {
+    if (!modalScoreboard) return;
+    const result = await callPluginAction(modalScoreboard.type, 'saveOptions', modalFop);
+    if (result?.success) {
+      await invalidateAll();
+      defaultsInitialized = false;
+    }
+  }
+
   /**
    * Call a plugin action (e.g., configureOBS)
    * @param {string} pluginType - The plugin type (e.g., 'streaming', 'ledwall')
@@ -830,6 +845,15 @@
       </div>
       
       <div class="modal-footer">
+        {#if canPersistOptions(modalScoreboard)}
+          <button
+            class="action-btn"
+            on:click={saveOptionDefaults}
+            title={getModalText(modalScoreboard, 'saveDefaultsTitle', 'Save the current values as defaults for this plugin (applies to all FOPs).')}
+          >
+            💾 {getModalText(modalScoreboard, 'saveDefaults', 'Save as Defaults')}
+          </button>
+        {/if}
         {#each getModalActions(modalScoreboard) as actionDef}
           <button
             class="action-btn"

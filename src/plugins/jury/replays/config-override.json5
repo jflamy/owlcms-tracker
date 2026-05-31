@@ -1,0 +1,15 @@
+// Runtime default overrides for this plugin.
+// The tracker reads only options[].default from this file.
+// JSON5 syntax: comments and trailing commas are allowed.
+{
+  "options": [
+    {
+      "key": "replaysBaseUrl",
+      "default": "http://192.168.1.58:8091"
+    },
+    {
+      "key": "enableSlowMotion",
+      "default": false
+    }
+  ]
+}

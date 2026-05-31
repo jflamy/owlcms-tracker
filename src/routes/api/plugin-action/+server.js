@@ -45,7 +45,7 @@ async function handleRequest(url) {
   }
 
   // Check if plugin has an action handler
-  if (typeof scoreboard.handleAction !== 'function') {
+  if (typeof scoreboard.handleAction !== 'function' && action !== 'saveOptions') {
     return json({
       success: false,
       error: 'no_action_handler',
@@ -62,7 +62,35 @@ async function handleRequest(url) {
   });
 
   try {
-    let result = await scoreboard.handleAction({ action, options });
+    let result;
+
+    if (action === 'saveOptions') {
+      // Generic handler: persist supplied option values as defaults.
+      // Available for every plugin that declares options (unless persistOptions: false).
+      if (scoreboard.config?.persistOptions === false) {
+        return json({
+          success: false,
+          error: 'save_disabled',
+          message: `Plugin "${pluginName}" has persistOptions disabled`
+        }, { status: 400 });
+      }
+      result = scoreboardRegistry.saveOptionDefaults(pluginName, options);
+      if (result.success) {
+        result = {
+          ...result,
+          message: `Saved defaults for ${result.savedKeys.length} option(s).`,
+          refreshRegistry: true,
+          refreshData: true
+        };
+      } else {
+        result = {
+          ...result,
+          message: result.message || `Could not save defaults: ${result.error}`
+        };
+      }
+    } else {
+      result = await scoreboard.handleAction({ action, options });
+    }
 
     if (result?.refreshRegistry === true) {
       const registryRefreshed = await scoreboardRegistry.reloadScoreboard(pluginName);

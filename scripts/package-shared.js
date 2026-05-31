@@ -7,6 +7,7 @@ import path from 'path';
 import https from 'https';
 import readline from 'readline';
 import { execSync } from 'child_process';
+import { pathToFileURL } from 'url';
 import { gt, valid } from 'semver';
 
 export function promptConfirmation(message) {
@@ -916,55 +917,37 @@ function copyDir(src, dest) {
 	});
 }
 
-function parseDefaultLiteral(rawValue) {
-  const trimmed = String(rawValue || '').trim();
-  if ((trimmed.startsWith("'") && trimmed.endsWith("'")) || (trimmed.startsWith('"') && trimmed.endsWith('"'))) {
-    return trimmed.slice(1, -1);
-  }
-  if (trimmed === 'true') return true;
-  if (trimmed === 'false') return false;
-  if (trimmed === 'null') return null;
-  if (trimmed !== '' && !Number.isNaN(Number(trimmed))) return Number(trimmed);
-  return trimmed;
-}
-
-function extractDefaultOptionsFromConfig(configPath) {
+async function extractDefaultOptionsFromConfig(configPath) {
   if (!fs.existsSync(configPath)) return [];
 
-  const configContent = fs.readFileSync(configPath, 'utf8');
-  const defaults = [];
-  const optionRegex = /key\s*:\s*['"]([^'"]+)['"][\s\S]*?default\s*:\s*([^,\n}]+)/g;
-  let match;
+  const configMtime = fs.statSync(configPath).mtimeMs;
+  const configUrl = `${pathToFileURL(configPath).href}?t=${configMtime}`;
+  const configModule = await import(configUrl);
+  const config = configModule.default || configModule;
 
-  while ((match = optionRegex.exec(configContent)) !== null) {
-    defaults.push({
-      key: match[1],
-      default: parseDefaultLiteral(match[2])
-    });
-  }
+  if (!Array.isArray(config?.options)) return [];
 
-  return defaults;
+  return config.options
+    .filter((option) => option?.key && Object.prototype.hasOwnProperty.call(option, 'default'))
+    .map((option) => ({
+      key: option.key,
+      default: option.default
+    }));
 }
 
-function writeGeneratedConfigOverride({ configPath, destPath }) {
-  const defaults = extractDefaultOptionsFromConfig(configPath);
+async function writeGeneratedConfigOverride({ configPath, destPath }) {
+  const defaults = await extractDefaultOptionsFromConfig(configPath);
   if (defaults.length === 0) return false;
 
-  const optionBlocks = defaults.map(({ key, default: defaultValue }) => [
-    '    {',
-    `      key: ${JSON.stringify(key)},`,
-    `      default: ${JSON.stringify(defaultValue)}`,
-    '    }'
-  ].join('\n'));
+  const payload = {
+    options: defaults.map(({ key, default: defaultValue }) => ({ key, default: defaultValue }))
+  };
 
   const content = [
     '// Runtime default overrides for this plugin.',
     '// The tracker reads only options[].default from this file.',
-    'export default {',
-    '  options: [',
-    optionBlocks.join(',\n'),
-    '  ]',
-    '};',
+    '// JSON5 syntax: comments and trailing commas are allowed.',
+    JSON.stringify(payload, null, 2),
     ''
   ].join('\n');
 
@@ -973,23 +956,25 @@ function writeGeneratedConfigOverride({ configPath, destPath }) {
   return true;
 }
 
-function copyOrGenerateConfigOverride({ pluginDir, buildWorkspaceDir, distDir }) {
+async function copyOrGenerateConfigOverride({ pluginDir, buildWorkspaceDir, distDir }) {
   const configPath = path.join(pluginDir, 'config.js');
   if (!fs.existsSync(configPath)) return;
 
-  const overridePath = path.join(pluginDir, 'config-override.js');
-  const relativeOverride = path.relative(buildWorkspaceDir, overridePath);
-  const dest = path.join(distDir, relativeOverride);
-
+  const overridePath = path.join(pluginDir, 'config-override.json5');
   if (fs.existsSync(overridePath)) {
+    const relativeOverride = path.relative(buildWorkspaceDir, overridePath);
+    const dest = path.join(distDir, relativeOverride);
     fs.mkdirSync(path.dirname(dest), { recursive: true });
     fs.copyFileSync(overridePath, dest);
     console.log(`✓ Copied ${relativeOverride}`);
     return;
   }
 
-  if (writeGeneratedConfigOverride({ configPath, destPath: dest })) {
-    console.log(`✓ Generated ${relativeOverride}`);
+  const generatedPath = path.join(pluginDir, 'config-override.json5');
+  const relativeGenerated = path.relative(buildWorkspaceDir, generatedPath);
+  const generatedDest = path.join(distDir, relativeGenerated);
+  if (await writeGeneratedConfigOverride({ configPath, destPath: generatedDest })) {
+    console.log(`✓ Generated ${relativeGenerated}`);
   }
 }
 
@@ -1029,7 +1014,7 @@ function scanPluginDir(dir, deps) {
   }
 }
 
-export function buildAndPackage({
+export async function buildAndPackage({
   distDir,
   version,
   trackerCoreVersion,
@@ -1141,12 +1126,12 @@ export function buildAndPackage({
 
     // Copy runtime assets from any plugin (at any nesting depth) that has them.
     // These are loose files needed at runtime (e.g., OBS scene collection templates
-    // and editable config-override.js default overrides). Normal plugin JS is not
+    // and editable config-override.json5 default overrides). Normal plugin JS is not
     // copied; it is either bundled by Vite or loaded as a runtime extension.
     const pluginsDir = path.join(BUILD_WORKSPACE_DIR, 'src/plugins');
     if (fs.existsSync(pluginsDir)) {
-      const findPluginRuntimeAssets = (dir) => {
-        copyOrGenerateConfigOverride({
+      const findPluginRuntimeAssets = async (dir) => {
+        await copyOrGenerateConfigOverride({
           pluginDir: dir,
           buildWorkspaceDir: BUILD_WORKSPACE_DIR,
           distDir: DIST_DIR
@@ -1159,11 +1144,11 @@ export function buildAndPackage({
             copyDir(child, path.join(DIST_DIR, relativeChild));
             console.log(`✓ Copied ${relativeChild}`);
           } else if (entry.isDirectory()) {
-            findPluginRuntimeAssets(child);
+            await findPluginRuntimeAssets(child);
           }
         }
       };
-      findPluginRuntimeAssets(pluginsDir);
+      await findPluginRuntimeAssets(pluginsDir);
     }
 
     // Copy explicitly selected extensions (runtime plugins), or create an empty folder with README.

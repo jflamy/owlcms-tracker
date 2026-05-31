@@ -1,44 +1,4 @@
 import { competitionHub } from '$lib/server/competition-hub.js';
-import { mkdirSync, writeFileSync } from 'fs';
-import { dirname, resolve } from 'path';
-
-const configOverridePath = resolve(process.cwd(), 'src/plugins/jury/replays/config-override.js');
-const savedOptionKeys = ['replaysBaseUrl', 'enableSlowMotion'];
-
-function normalizeBooleanOption(value) {
-	return value === true || value === 'true';
-}
-
-function buildConfigOverrideContent(options) {
-	const defaults = {
-		replaysBaseUrl: String(options?.replaysBaseUrl || '').trim(),
-		enableSlowMotion: normalizeBooleanOption(options?.enableSlowMotion)
-	};
-
-	const optionBlocks = savedOptionKeys.map((key) => [
-		'    {',
-		`      key: ${JSON.stringify(key)},`,
-		`      default: ${JSON.stringify(defaults[key])}`,
-		'    }'
-	].join('\n'));
-
-	return [
-		'// Runtime default overrides for this plugin.',
-		'// The tracker reads only options[].default from this file.',
-		'export default {',
-		'  options: [',
-		optionBlocks.join(',\n'),
-		'  ]',
-		'};',
-		''
-	].join('\n');
-}
-
-function saveDefaultOptions(options) {
-	const content = buildConfigOverrideContent(options);
-	mkdirSync(dirname(configOverridePath), { recursive: true });
-	writeFileSync(configOverridePath, content, 'utf8');
-}
 
 function normalizeReplaySessionId(value) {
 	return String(value || '')
@@ -107,24 +67,6 @@ export function getScoreboardData(_fopName = '*', options = {}) {
 	return {
 		trackerSessions,
 		options
-	};
-}
-
-export async function handleAction({ action, options = {} }) {
-	if (action !== 'saveDefaultOptions') {
-		return {
-			success: false,
-			error: 'unknown_action',
-			message: `Unsupported replays action: ${action}`
-		};
-	}
-
-	saveDefaultOptions(options);
-	return {
-		success: true,
-		message: 'Replays defaults saved.',
-		refreshRegistry: true,
-		refreshData: true
 	};
 }
 

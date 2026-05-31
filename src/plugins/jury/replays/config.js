@@ -6,14 +6,6 @@ export default {
 	customSSE: true,
 	fopRequired: false,
 	standalone: true,
-	modalActions: [
-		{
-			action: 'saveDefaultOptions',
-			label: 'Save Defaults',
-			title: 'Save the current replays server settings as the defaults for this tracker.',
-			refreshDataOnSuccess: true
-		}
-	],
 	options: [
 		{
 			key: 'replaysBaseUrl',
