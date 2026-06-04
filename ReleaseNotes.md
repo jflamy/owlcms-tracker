@@ -5,6 +5,8 @@
 
 ##### Release log
 
+- 2.18.7: Removed an unfinished partial implementation of plugins that would run on server startup. To be redone with better use cases.
+
 - 2.18.6: Plugin option defaults can now be saved from the options modal via a built-in "Save as Defaults" button. Overrides are persisted as `config-override.json5` (JSON5 with comments and trailing commas). The legacy `config-override.js` format is no longer loaded; re-save defaults from the modal to migrate. 
 
 - 2.18.6: Fixes a bug where comma-separated string defaults (e.g. `'S,J,U,V'`) were truncated when handling defaults
