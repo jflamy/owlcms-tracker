@@ -301,41 +301,7 @@ class ScoreboardRegistry {
 		}
 
 		this.initialized = true;
-		await this.activateStartupPlugins();
 		console.log(`[ScoreboardRegistry] Initialized with ${this.scoreboards.size} scoreboards`);
-	}
-
-	buildDefaultOptions(scoreboard) {
-		const options = {};
-		const applyDefaults = (config) => {
-			if (!config?.options || !Array.isArray(config.options)) return;
-			for (const opt of config.options) {
-				if (opt.key && opt.default !== undefined) {
-					options[opt.key] = opt.default;
-				}
-			}
-		};
-
-		applyDefaults(this.getBaseScoreboard(scoreboard?.type)?.config);
-		applyDefaults(scoreboard?.config);
-		return options;
-	}
-
-	async activateStartupPlugins() {
-		for (const scoreboard of this.scoreboards.values()) {
-			if (scoreboard.isSubPage) continue;
-			if (scoreboard.config?.serverStartup !== true) continue;
-			if (typeof scoreboard.dataHelper !== 'function') continue;
-
-			const options = this.buildDefaultOptions(scoreboard);
-			const fopName = options.fop || options.platform || 'A';
-			try {
-				await scoreboard.dataHelper(fopName, options);
-				console.log(`[ScoreboardRegistry] Startup activated: ${scoreboard.type} (fop: ${fopName})`);
-			} catch (err) {
-				console.warn(`[ScoreboardRegistry] Startup activation failed for ${scoreboard.type}:`, err.message);
-			}
-		}
 	}
 
 	async refreshRuntimePlugins() {
