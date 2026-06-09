@@ -874,7 +874,7 @@
         {/if}
         <button class="btn-secondary" on:click={closeModal}>{getModalText(modalScoreboard, 'cancel', 'Cancel')}</button>
         <button class="btn-primary" on:click={() => openScoreboard(modalScoreboard.type, modalFop, true)}>
-          {getModalText(modalScoreboard, 'openScoreboard', 'Open Scoreboard')}
+          {getModalText(modalScoreboard, 'openScoreboard', 'Open')}
         </button>
       </div>
     </div>
