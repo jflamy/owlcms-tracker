@@ -143,6 +143,7 @@
 	.scoreboard {
 		width: 100vw;
 		height: 100vh;
+		height: 100dvh;
 		background: #000;
 		color: #fff;
 		display: flex;
@@ -154,6 +155,7 @@
 	.main {
 		flex: 1;
 		overflow-y: auto;
+		-webkit-overflow-scrolling: touch;
 		padding: 8px;
 		background: #000;
 		display: flex;
@@ -171,12 +173,24 @@
 		color: #888;
 	}
 
-	/* Grid container - must expand to fill .main for 1fr elastic spacer to work */
+	/* The athlete grid includes the previous-session leaders section. Fill
+	   available space when rows are short, but do not shrink below the grid's
+	   actual row content when rows exceed the viewport. */
 	.grid-container {
-		flex: 1;
+		flex: 1 0 auto;
 		display: flex;
 		flex-direction: column;
 		min-height: 0;
+	}
+
+	.grid-container :global(.scoreboard-grid) {
+		flex: 1 0 auto;
+	}
+
+	/* Records are a separate block after the grid; keep them in the scroll flow
+	   instead of letting flexbox compress them. */
+	.main :global(.records-section) {
+		flex: 0 0 auto;
 	}
 
 	/* When vFill=false, don't expand - let grid use natural height */

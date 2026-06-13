@@ -297,9 +297,6 @@
 
 	.header-primary > .cell {
 		grid-row: 1;
-		position: sticky;
-		top: 0;
-		z-index: 20;
 		align-self: stretch;
 		padding: var(--header-primary-vpad) 0.15rem;
 		min-height: 0;
@@ -307,14 +304,10 @@
 
 	.header-primary > .cell.span-two {
 		grid-row: 1 / span 2;
-		z-index: 21;
 	}
 
 	.header-secondary > .cell {
 		grid-row: 2;
-		position: sticky;
-		top: var(--header-primary-height);
-		z-index: 19;
 		font-size: 1rem;
 		padding: var(--header-secondary-vpad) 0.15rem;
 		min-height: 0;

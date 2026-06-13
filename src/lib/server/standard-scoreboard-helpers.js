@@ -227,7 +227,8 @@ export function getScoreboardData(scoreboardType, fopName = 'A', options = {}) {
 		rank: competitionHub.translate('Rank', lang),
 		best: competitionHub.translate('Scoreboard.Best', lang),
 		leaders: competitionHub.translate('Leaders', lang),
-		records: competitionHub.translate('Scoreboard.records', lang)
+		records: competitionHub.translate('Scoreboard.records', lang),
+		waitingNextSession: competitionHub.translate('Scoreboard.WaitingNextGroup', lang)
 	};
 
 	const result = {
