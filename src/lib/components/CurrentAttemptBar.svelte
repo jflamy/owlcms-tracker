@@ -57,6 +57,9 @@
 						{#if currentAttempt?.teamName}
 							<span class="team">{currentAttempt.teamName}</span>
 						{/if}
+						{#if !sessionStatus?.isDone}
+							<span class="portrait-session-info">{@html displaySessionInfo}</span>
+						{/if}
 					</div>
 					<span class="attempt-label">{@html currentAttempt?.attempt || ''}</span>
 					{#if competition?.showWeight && currentAttempt?.weight}
@@ -126,6 +129,9 @@
 						<span class="lifter-name">{currentAttempt?.fullName || translations?.noAthleteLifting || 'No athlete currently lifting'}</span>
 						{#if currentAttempt?.teamName}
 							<span class="team">{currentAttempt.teamName}</span>
+						{/if}
+						{#if !sessionStatus?.isDone}
+							<span class="portrait-session-info">{@html displaySessionInfo}</span>
 						{/if}
 					</div>
 					<span class="attempt-label">{@html currentAttempt?.attempt || ''}</span>
@@ -353,6 +359,14 @@
 		padding: 0;
 	}
 
+	.portrait-session-info {
+		display: none;
+		color: #ccc;
+		font-weight: bold;
+		font-size: 1rem;
+		line-height: 1.1;
+	}
+
 	/* Responsive adjustments for landscape mode */
 	/* iPad landscape and 1366x768: Slight reduction */
 	@media (max-width: 1366px) and (orientation: landscape) {
@@ -517,16 +531,40 @@
 		.lifter-info {
 			gap: 0.8rem;
 			flex: 1 1 100%;
-			justify-content: center;
+			flex-wrap: wrap;
+			align-items: flex-start;
+			justify-content: flex-start;
 			margin-bottom: 0.3rem;
+		}
+
+		.name-and-team {
+			flex: 0 0 100%;
+			width: 100%;
+			flex-direction: column;
+			align-items: stretch;
+			gap: 0.15rem;
 		}
 
 		.lifter-name {
 			font-size: 1.2rem;
+			display: block;
+			width: 100%;
 		}
 
 		.team {
 			font-size: 1rem;
+			display: block;
+			width: 100%;
+		}
+
+		.portrait-session-info {
+			display: block;
+			font-size: 1rem;
+			width: 100%;
+		}
+
+		.timer-decision-container {
+			margin-left: auto;
 		}
 
 		.attempt-label,
@@ -564,12 +602,14 @@
 		.lifter-info {
 			gap: 0.5rem;
 			flex: 1 1 100%;
-			justify-content: center;
+			justify-content: flex-start;
 			margin-bottom: 0.25rem;
 		}
 
 		.name-and-team {
-			gap: 0.4rem;
+			flex-direction: column;
+			align-items: flex-start;
+			gap: 0.1rem;
 		}
 
 		.lifter-name {
@@ -577,6 +617,10 @@
 		}
 
 		.team {
+			font-size: 0.85rem;
+		}
+
+		.portrait-session-info {
 			font-size: 0.85rem;
 		}
 
@@ -633,6 +677,10 @@
 		}
 
 		.team {
+			font-size: 0.75rem;
+		}
+
+		.portrait-session-info {
 			font-size: 0.75rem;
 		}
 

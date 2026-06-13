@@ -324,7 +324,7 @@
 
 		.records-title-cell {
 			font-size: 0.65rem;
-			line-height: 0.85;
+			line-height: 1;
 		}
 
 		.records-category-header {
