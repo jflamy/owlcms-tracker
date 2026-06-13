@@ -18,6 +18,28 @@ RUN npm ci
 # Note: books/ included only if --submodules flag used in release workflow
 COPY . .
 
+# Optional plugin pruning for slim deployments (e.g. Fly single-tenant deploy).
+# KEEP_PLUGINS is a comma- or space-separated list of plugin folder paths,
+# relative to src/plugins, to KEEP (e.g. "scoreboards/start-order,scoreboards/lifting-order").
+# Every other plugin (any folder containing a config.js) plus extensions/ and
+# experiments/ is removed BEFORE the build, so Vite's import.meta.glob bundles
+# only the kept plugins. Empty (the default) keeps everything, so official
+# releases are unaffected because the release workflow never passes this arg.
+ARG KEEP_PLUGINS=""
+RUN if [ -n "$KEEP_PLUGINS" ]; then \
+      keep=" $(echo "$KEEP_PLUGINS" | tr ',' ' ') " && \
+      echo "Pruning plugins, keeping:$keep" && \
+      find src/plugins -name config.js | while read -r cfg; do \
+        dir=$(dirname "$cfg"); \
+        rel=${dir#src/plugins/}; \
+        case "$keep" in \
+          *" $rel "*) echo "  keep   $rel" ;; \
+          *) echo "  remove $rel" && rm -rf "$dir" ;; \
+        esac; \
+      done && \
+      rm -rf src/plugins/experiments extensions ; \
+    fi
+
 # Build the application (will include all plugins in source)
 # Increase Node.js heap size to prevent OOM during build
 ENV NODE_OPTIONS="--max-old-space-size=4096"

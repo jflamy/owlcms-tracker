@@ -1,7 +1,7 @@
 # Fly.io configuration for owlcms-tracker
 # Documentation: https://fly.io/docs/reference/configuration/
 
-app = "owlcms-tracker"
+app = "fhq-tracker"
 
 # Primary region (change to your preferred region code)
 # Region codes: https://fly.io/docs/reference/regions/
@@ -15,6 +15,12 @@ primary_region = "yyz"
   # Use the Dockerfile in the project root
   dockerfile = "Dockerfile"
 
+  # Bundle ONLY the listed plugin folders for this deployment. The Dockerfile
+  # removes every other plugin before `npm run build`. Paths are relative to
+  # src/plugins. Official releases never pass this arg, so they keep all plugins.
+  [build.args]
+    KEEP_PLUGINS = "scoreboards/start-order,scoreboards/lifting-order"
+
 # Environment variables
 [env]
   # Enable learning mode to capture OWLCMS messages for debugging
@@ -26,35 +32,36 @@ primary_region = "yyz"
   # Logging level: debug, info, warn, error
   LOG_LEVEL = "info"
 
-# HTTP Service configuration
+# Single HTTP service on standard ports (Fly edge: 80 -> https redirect, 443 TLS).
+# Everything is forwarded to the app on internal port 8096:
+#   Browsers: https://fhq-tracker.fly.dev          -> 8096
+#   OWLCMS:   wss://fhq-tracker.fly.dev/ws          -> 8096 (HTTP upgrade)
+#
+# IMPORTANT: This app MUST run as a SINGLE machine. The competition hub keeps
+# all state in memory: OWLCMS holds one long-lived WebSocket on one machine,
+# and browser SSE/API requests must hit that same machine. A second machine
+# would serve an empty hub. Keep machine count at 1:
+#   - `fly scale count 1` to enforce it
+#   - deploy fresh apps with `fly deploy --ha=false` (Fly only auto-adds an HA
+#     machine when launching into an empty machine group)
 [http_service]
-  # Port inside the container
   internal_port = 8096
-  
-  # Auto-stop/start machines to save costs
-  auto_stop_machines = true
-  auto_start_machines = true
-  
-  # Force HTTPS (set to true in production)
-  force_https = false
+  force_https = true
+  processes = ["app"]
 
-# Service port configuration
-[[services]]
-  protocol = "tcp"
-  internal_port = 8096
-  
-  auto_stop_machines = true
+  # Keep the single machine running: OWLCMS holds a long-lived WebSocket and
+  # auto-stop causes "instance refused connection" (PC01) errors.
+  auto_stop_machines = false
   auto_start_machines = true
-  
-  [[services.ports]]
-    port = 8096
-    handlers = ["http"]
-    # Uncomment for HTTPS (after setting up a domain and certificate)
-    # handlers = ["http", "https"]
+  min_machines_running = 1
+
+  [http_service.concurrency]
+    type = "connections"
+    soft_limit = 200
+    hard_limit = 250
 
 # Machine resource configuration
-# Minimum 1GB memory required for Vite dev server + Node.js runtime
-# Increase cpus for high concurrency scenarios
+# Minimum 1GB memory required for Node.js runtime
 [vm]
   memory = "1gb"    # Minimum required (can increase to 2gb for high traffic)
   cpus = 1          # Standard (increase to 2+ for many concurrent scoreboards)
@@ -64,14 +71,10 @@ primary_region = "yyz"
 #   source = "tracker_data"
 #   destination = "/app/local"
 
-# Service configuration
-[concurrency]
-  type = "notional"
-  value = 10  # Allow up to 10 concurrent connections
-
-# Graceful shutdown timeout (seconds)
+# Same entrypoint as local production: attaches the /ws WebSocket handler.
+# (node build/index.js alone would serve HTTP but never accept OWLCMS WebSockets.)
 [processes]
-  app = "node build/index.js"
+  app = "node start-with-ws.js"
 
 # Health check configuration
 # The Dockerfile includes a HEALTHCHECK instruction
