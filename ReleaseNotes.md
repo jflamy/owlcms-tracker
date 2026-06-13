@@ -5,6 +5,10 @@
 
 ##### Release log
 
+- 2.18.9: Standard scoreboards were not behaving correctly on large sessions (or on smaller devices like phones); also portrait mode fixes
+
+- 2.18.9: Scoreboards in the default bundle were hiding the down signal too early
+
 - 2.18.8: Cosmetic: Use the more general label "Open" for opening a plugin from the Options page.
 
 - 2.18.7: Removed an unfinished partial implementation of plugins that would run on server startup. To be redone with better use cases.
