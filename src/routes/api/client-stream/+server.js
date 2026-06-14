@@ -1,5 +1,6 @@
 import { competitionHub } from '$lib/server/competition-hub.js';
 import { sseBroker } from '$lib/server/sse-broker.js';
+import { logger } from '@owlcms/tracker-core';
 
 /**
  * Server-Sent Events endpoint for browser clients
@@ -18,7 +19,7 @@ export async function GET({ request, url }) {
   const mode = url.searchParams.get('mode') || null;
 
   const modeLabel = mode ? `, mode: ${mode}` : '';
-  console.log(`[SSE] New client connection: ${connectionId} (language: ${language}, FOP: ${fopName || 'global'}${modeLabel})`);
+  logger.debug(`[SSE] New client connection: ${connectionId} (language: ${language}, FOP: ${fopName || 'global'}${modeLabel})`);
   
   const stream = new ReadableStream({
     start(controller) {
@@ -41,7 +42,12 @@ export async function GET({ request, url }) {
             controller.enqueue(encoder.encode(message));
           }
         } catch (error) {
-          console.error(`[SSE] ${connectionId}: Error sending message:`, error.message);
+          const errorMessage = error?.message || String(error);
+          if (errorMessage.includes('already closed')) {
+            logger.debug(`[SSE] ${connectionId}: Error sending message: ${errorMessage}`);
+          } else {
+            logger.warn(`[SSE] ${connectionId}: Error sending message: ${errorMessage}`);
+          }
           cleanup();
         }
       };
@@ -49,7 +55,7 @@ export async function GET({ request, url }) {
       const cleanup = () => {
         if (isClosed) return;
         
-        console.log(`[SSE] ${connectionId}: Cleaning up connection`);
+        logger.debug(`[SSE] ${connectionId}: Cleaning up connection`);
         isClosed = true;
         
         // Unregister client from broker

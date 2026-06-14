@@ -41,7 +41,7 @@
   },
   "type": "module",
   "dependencies": {
-    "@owlcms/tracker-core": "github:owlcms/tracker-core#1.5.7",
+    "@owlcms/tracker-core": "github:owlcms/tracker-core#1.5.8",
     "adm-zip": "^0.5.10",
     "gsap": "^3.13.0",
     "http-proxy-middleware": "^3.0.5",

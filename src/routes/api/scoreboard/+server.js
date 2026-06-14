@@ -14,6 +14,7 @@ import { scoreboardRegistry } from '$lib/server/scoreboard-registry.js';
 import { competitionHub } from '$lib/server/competition-hub.js';
 import { buildOptions } from '$lib/server/build-options.js';
 import { refreshDatabaseForDocuments } from '$lib/server/document-refresh.js';
+import { logger } from '@owlcms/tracker-core';
 
 const responseCache = new Map();
 const BROTLI_OPTS = { params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 4 } };
@@ -168,13 +169,13 @@ export async function GET({ url, request }) {
 			if (!existing || (existing.version ?? -1) <= currentVersion) {
 				responseCache.set(cacheKey, newEntry);
 				cached = newEntry;
-				console.log(`[API /api/scoreboard] Cache MISS/UPDATE: ${cacheKey} (v${currentVersion})`);
+				logger.debug(`[API /api/scoreboard] Cache MISS/UPDATE: ${cacheKey} (v${currentVersion})`);
 			} else {
 				cached = existing;
-				console.log(`[API /api/scoreboard] Cache collision avoided: ${cacheKey} (kept v${existing.version})`);
+				logger.debug(`[API /api/scoreboard] Cache collision avoided: ${cacheKey} (kept v${existing.version})`);
 			}
 		} else {
-			console.log(`[API /api/scoreboard] Cache HIT: ${cacheKey}`);
+			logger.debug(`[API /api/scoreboard] Cache HIT: ${cacheKey}`);
 		}
 		
 		// Determine best compression based on Accept-Encoding

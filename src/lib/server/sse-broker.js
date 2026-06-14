@@ -8,6 +8,7 @@
  */
 
 import { competitionHub } from './competition-hub.js';
+import { logger } from '@owlcms/tracker-core';
 
 class SSEBroker {
   constructor() {
@@ -21,7 +22,7 @@ class SSEBroker {
   attachHubListeners() {
     if (this.hubListenersAttached) return;
     
-    console.log('[SSE Broker] Attaching hub event listeners');
+    logger.debug('[SSE Broker] Attaching hub event listeners');
 
     competitionHub.on('protocol_error', (eventData) => {
       this.broadcast({
@@ -79,7 +80,7 @@ class SSEBroker {
     });
 
     competitionHub.on('hub_ready_broadcast', (eventData) => {
-      console.log('[SSE Broker] hub_ready_broadcast received, broadcasting to', this.clients.size, 'clients');
+      logger.debug('[SSE Broker] hub_ready_broadcast received, broadcasting to', this.clients.size, 'clients');
       this.broadcast({
         type: 'hub_ready',
         message: eventData.message,
@@ -128,12 +129,12 @@ class SSEBroker {
     this.clients.add(client);
     
     const fopLabel = fopName ? `FOP ${fopName}` : 'GLOBAL';
-    console.log(`[SSE Broker] ✓ Client ${connectionId} CONNECTED to ${fopLabel}`);
+    logger.debug(`[SSE Broker] ✓ Client ${connectionId} CONNECTED to ${fopLabel}`);
     this.logClientDistribution('After connect');
     
     return () => {
       this.clients.delete(client);
-      console.log(`[SSE Broker] ✗ Client ${connectionId} DISCONNECTED`);
+      logger.debug(`[SSE Broker] ✗ Client ${connectionId} DISCONNECTED`);
       this.logClientDistribution('After disconnect');
     };
   }
@@ -193,7 +194,7 @@ class SSEBroker {
             recipientsByFop[client.fopName] = (recipientsByFop[client.fopName] || 0) + 1;
           }
         } catch (error) {
-          console.error(`[SSE Broker] Error sending to client ${client.connectionId}:`, error.message);
+          logger.debug(`[SSE Broker] Error sending to client ${client.connectionId}:`, error.message);
           this.clients.delete(client);
         }
       }
@@ -214,7 +215,7 @@ class SSEBroker {
         recipientParts.push(`${fop}=${count}`);
       }
       
-      console.log(`[SSE Broker] ➜ ${eventLabel}: ${totalRecipients}/${this.clients.size} clients (${recipientParts.join(', ')})`);
+      logger.debug(`[SSE Broker] ➜ ${eventLabel}: ${totalRecipients}/${this.clients.size} clients (${recipientParts.join(', ')})`);
     }
   }
 
@@ -252,7 +253,7 @@ class SSEBroker {
     if (stats.fopClientSummary) {
       parts.push(`FOPs=[${stats.fopClientSummary}]`);
     }
-    console.log(parts.join(' | '));
+    logger.debug(parts.join(' | '));
   }
   getActiveClientCount() {
     return this.clients.size;
