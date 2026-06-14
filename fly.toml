@@ -32,6 +32,9 @@ primary_region = "yyz"
   # Logging level: debug, info, warn, error
   LOG_LEVEL = "info"
 
+  # V8 heap limit — set to ~75% of machine RAM to prevent OOM kills
+  NODE_OPTIONS = "--max-old-space-size=1536"
+
 # Single HTTP service on standard ports (Fly edge: 80 -> https redirect, 443 TLS).
 # Everything is forwarded to the app on internal port 8096:
 #   Browsers: https://fhq-tracker.fly.dev          -> 8096
@@ -63,8 +66,8 @@ primary_region = "yyz"
 # Machine resource configuration
 # Minimum 1GB memory required for Node.js runtime
 [vm]
-  memory = "1gb"    # Minimum required (can increase to 2gb for high traffic)
-  cpus = 1          # Standard (increase to 2+ for many concurrent scoreboards)
+  memory = "2gb"
+  cpus = 1
 
 # Mounts for persistent data (if needed)
 # [[mounts]]
