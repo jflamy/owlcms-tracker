@@ -2,7 +2,7 @@
 	import { page } from '$app/stores';
 	import { browser } from '$app/environment';
 	import { translations } from '$lib/stores.js';
-	import { subscribeSSE, connectSSE } from '$lib/sse-client.js';
+	import { subscribeSSE, connectSSE, getClientId, pauseSSEUntilVisible } from '$lib/sse-client.js';
 	import { onMount, onDestroy } from 'svelte';
 	
 	// Pre-import all page*.svelte files using glob (supports nested plugins and additional pages)
@@ -32,6 +32,12 @@
 			params.set('fop', data.fopName);
 		}
 
+		// Correlate this stateless API call with our SSE stream so the server can
+		// track liveness and reap streams whose client has stopped querying.
+		if (browser) {
+			params.set('clientId', getClientId());
+		}
+
 		for (const [key, value] of Object.entries(data.options || {})) {
 			params.set(key, String(value));
 		}
@@ -40,9 +46,47 @@
 	}
 
 	$: apiUrl = buildApiUrl();
+
+	// Hidden-tab grace period: when the tab is hidden we keep querying the API for
+	// a short while so a quick tab switch does not make the scoreboard fall behind.
+	// After the grace period a hidden tab stops querying; the server then reaps its
+	// SSE stream once it has been silent long enough. Coming back to the foreground
+	// resets this and triggers an immediate catch-up fetch.
+	const HIDDEN_GRACE_MS = 5 * 60 * 1000; // 5 minutes
+	let hiddenSince = null;
+	let hiddenGraceTimer = null;
+
+	function shouldQuery() {
+		if (typeof document === 'undefined') return true;
+		if (document.visibilityState === 'visible') return true;
+		// Hidden: keep querying only during the grace window.
+		return hiddenSince !== null && (Date.now() - hiddenSince) < HIDDEN_GRACE_MS;
+	}
+
+	function clearHiddenGraceTimer() {
+		if (hiddenGraceTimer) {
+			clearTimeout(hiddenGraceTimer);
+			hiddenGraceTimer = null;
+		}
+	}
+
+	function scheduleHiddenGracePause() {
+		clearHiddenGraceTimer();
+		hiddenGraceTimer = setTimeout(() => {
+			hiddenGraceTimer = null;
+			if (document.visibilityState === 'hidden' && !skipRouteSSE) {
+				console.log(`[Scoreboard] Hidden grace exceeded; pausing SSE (clientId=${getClientId()})`);
+				pauseSSEUntilVisible();
+			}
+		}, HIDDEN_GRACE_MS);
+	}
 	
 	// Fetch scoreboard data from API
 	async function fetchData() {
+		// Skip API queries once a hidden tab is past its grace period.
+		if (!shouldQuery()) {
+			return;
+		}
 		try {
 			const response = await fetch(apiUrl);
 			const result = await response.json();
@@ -60,6 +104,23 @@
 			scoreboardError = err?.message || 'Network error fetching scoreboard data';
 		}
 	}
+
+	function onVisibilityChange() {
+		if (document.visibilityState === 'hidden') {
+			if (hiddenSince === null) hiddenSince = Date.now();
+			console.log(`[Scoreboard] Tab hidden; starting grace timer (clientId=${getClientId()}, graceMs=${HIDDEN_GRACE_MS})`);
+			scheduleHiddenGracePause();
+		} else {
+			const hiddenDurationMs = hiddenSince === null ? 0 : Date.now() - hiddenSince;
+			clearHiddenGraceTimer();
+			hiddenSince = null;
+			if (hiddenDurationMs >= HIDDEN_GRACE_MS) {
+				console.log(`[Scoreboard] Tab visible after grace; reconnect/fetch path confirmed (clientId=${getClientId()}, hiddenMs=${hiddenDurationMs})`);
+			}
+			// Catch up immediately on return to the foreground.
+			fetchData();
+		}
+	}
 	
 	onMount(() => {
 		console.log('[Scoreboard] Mount - skipRouteSSE:', skipRouteSSE, 'category:', data.config?.category);
@@ -74,6 +135,14 @@
 		
 		// Initial fetch for regular scoreboards
 		fetchData();
+
+		// Track tab visibility to drive the hidden-tab grace period.
+		if (browser) {
+			document.addEventListener('visibilitychange', onVisibilityChange);
+			if (document.visibilityState === 'hidden') {
+				onVisibilityChange();
+			}
+		}
 		
 		// Connect to shared SSE (browser only) - skip for plugins that manage their own SSE
 		if (browser && !skipRouteSSE) {
@@ -124,6 +193,10 @@
 	});
 	
 	onDestroy(() => {
+		if (browser) {
+			clearHiddenGraceTimer();
+			document.removeEventListener('visibilitychange', onVisibilityChange);
+		}
 		if (unsubscribeSSE) {
 			console.log('[Scoreboard Destroy] Unsubscribing from SSE');
 			unsubscribeSSE();

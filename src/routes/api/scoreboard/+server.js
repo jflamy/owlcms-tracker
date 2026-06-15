@@ -12,6 +12,7 @@ import crypto from 'crypto';
 import { gzipSync, brotliCompressSync, constants as zlibConstants } from 'zlib';
 import { scoreboardRegistry } from '$lib/server/scoreboard-registry.js';
 import { competitionHub } from '$lib/server/competition-hub.js';
+import { sseBroker } from '$lib/server/sse-broker.js';
 import { buildOptions } from '$lib/server/build-options.js';
 import { refreshDatabaseForDocuments } from '$lib/server/document-refresh.js';
 import { logger } from '@owlcms/tracker-core';
@@ -64,6 +65,11 @@ function variantHash({ type, fop, options }) {
 
 export async function GET({ url, request }) {
 	try {
+		const clientId = url.searchParams.get('clientId');
+		if (clientId) {
+			sseBroker.markSeen(clientId);
+		}
+
 		// Check for protocol mismatch first - nothing works if versions don't match
 		const protocolError = typeof competitionHub.getProtocolError === 'function'
 			? competitionHub.getProtocolError()
@@ -102,7 +108,7 @@ export async function GET({ url, request }) {
 		const options = buildOptions({
 			scoreboard,
 			url,
-			reservedKeys: new Set(['type', 'fop']),
+			reservedKeys: new Set(['type', 'fop', 'clientId']),
 			registry: scoreboardRegistry
 		});
 

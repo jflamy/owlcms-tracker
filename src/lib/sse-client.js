@@ -11,6 +11,39 @@ let currentFop = null;
 let clientCount = 0;
 let reconnectTimer = null;
 let reconnectDelayMs = 2000;
+// Set true when a reconnect was suppressed because the tab was hidden, so we can
+// reconnect as soon as the tab becomes visible again (see ensureVisibilityHook).
+let reconnectWhenVisible = false;
+let visibilityHookInstalled = false;
+
+/**
+ * Stable per-tab client id. The same id is sent on the SSE connection and on
+ * every /api/scoreboard request, letting the server correlate the stateless API
+ * calls with this SSE stream and reap streams whose client has stopped querying.
+ */
+export function getClientId() {
+	return connectionId;
+}
+
+function isHidden() {
+	return typeof document !== 'undefined' && document.visibilityState === 'hidden';
+}
+
+/**
+ * Install a one-time visibilitychange hook that reconnects the SSE stream when
+ * the tab becomes visible again, if a reconnect was deferred while hidden.
+ */
+function ensureVisibilityHook() {
+	if (visibilityHookInstalled || typeof document === 'undefined') return;
+	visibilityHookInstalled = true;
+	document.addEventListener('visibilitychange', () => {
+		if (document.visibilityState === 'visible' && reconnectWhenVisible && subscribers.size > 0) {
+			console.log(`[SSE] Reconnecting hidden-paused stream (clientId=${connectionId}, lang=${language}, fop=${currentFop || 'global'})`);
+			reconnectWhenVisible = false;
+			connectSSE(language, currentFop);
+		}
+	});
+}
 
 /**
  * Connect to SSE stream (called once, reused by all pages)
@@ -18,12 +51,14 @@ let reconnectDelayMs = 2000;
  * @param {string|null} fop - FOP name to filter events (null = global events only)
  */
 export function connectSSE(lang = 'en', fop = null) {
-	language = lang;
-	
-	// If already connected and language+FOP match, reuse
-	if (eventSource && eventSource.readyState === EventSource.OPEN && currentFop === fop) {
+	// If a matching stream is already open or still connecting, reuse it. EventSource
+	// starts in CONNECTING, so treating only OPEN as reusable causes rapid close/reopen
+	// churn when subscribeSSE or Svelte reactive statements call connectSSE again.
+	if (eventSource && eventSource.readyState !== EventSource.CLOSED && language === lang && currentFop === fop) {
 		return eventSource;
 	}
+
+	language = lang;
 	
 	// Close old connection if language or FOP changed
 	if (eventSource) {
@@ -36,8 +71,12 @@ export function connectSSE(lang = 'en', fop = null) {
 	}
 	
 	currentFop = fop;
+	reconnectWhenVisible = false;
+	ensureVisibilityHook();
 	const fopParam = fop ? `&fop=${encodeURIComponent(fop)}` : '';
-	eventSource = new EventSource(`/api/client-stream?lang=${lang}${fopParam}`);
+	const clientParam = `&clientId=${encodeURIComponent(connectionId)}`;
+	console.log(`[SSE] Opening stream (clientId=${connectionId}, lang=${lang}, fop=${fop || 'global'})`);
+	eventSource = new EventSource(`/api/client-stream?lang=${lang}${fopParam}${clientParam}`);
 	
 	eventSource.onmessage = (event) => {
 		try {
@@ -59,7 +98,15 @@ export function connectSSE(lang = 'en', fop = null) {
 		console.error('[SSE] Connection error:', error);
 		if (eventSource.readyState === EventSource.CLOSED) {
 			eventSource = null;
-			if (!reconnectTimer && subscribers.size > 0) {
+			if (subscribers.size === 0) return;
+			// Do not reconnect while hidden: a tab nobody is watching should stay
+			// disconnected (e.g. after the server reaped its idle stream) until the
+			// user brings it back to the foreground.
+			if (isHidden()) {
+				reconnectWhenVisible = true;
+				return;
+			}
+			if (!reconnectTimer) {
 				reconnectTimer = setTimeout(() => {
 					reconnectTimer = null;
 					connectSSE(language, currentFop);
@@ -112,4 +159,43 @@ export function getLanguage() {
  */
 export function getSubscriberCount() {
 	return subscribers.size;
+}
+
+/**
+ * Close the current EventSource while keeping subscribers registered.
+ * Used when a tab has stayed hidden past its grace period; the visibility hook
+ * reconnects the stream when the user returns to the tab.
+ */
+export function pauseSSEUntilVisible() {
+	if (reconnectTimer) {
+		clearTimeout(reconnectTimer);
+		reconnectTimer = null;
+	}
+	ensureVisibilityHook();
+	reconnectWhenVisible = subscribers.size > 0;
+	console.log(`[SSE] Pausing stream until visible (clientId=${connectionId}, subscribers=${subscribers.size}, lang=${language}, fop=${currentFop || 'global'})`);
+	if (eventSource) {
+		eventSource.close();
+		eventSource = null;
+	}
+}
+
+/**
+ * Forcibly close the shared SSE connection and drop all subscribers.
+ * Used by the inactivity timeout: once a tab is declared idle we release the
+ * server-side stream (triggers the server abort/cleanup path) and prevent any
+ * automatic reconnect until the user explicitly reloads the page.
+ */
+export function disconnectSSE() {
+	if (reconnectTimer) {
+		clearTimeout(reconnectTimer);
+		reconnectTimer = null;
+	}
+	reconnectWhenVisible = false;
+	subscribers.clear();
+	clientCount = 0;
+	if (eventSource) {
+		eventSource.close();
+		eventSource = null;
+	}
 }

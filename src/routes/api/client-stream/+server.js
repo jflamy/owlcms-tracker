@@ -17,14 +17,16 @@ export async function GET({ request, url }) {
   // Get FOP filter (null = global events only, specific FOP = that FOP + global)
   const fopName = url.searchParams.get('fop') || null;
   const mode = url.searchParams.get('mode') || null;
+  const clientId = url.searchParams.get('clientId') || null;
 
   const modeLabel = mode ? `, mode: ${mode}` : '';
-  logger.debug(`[SSE] New client connection: ${connectionId} (language: ${language}, FOP: ${fopName || 'global'}${modeLabel})`);
+  logger.info(`[SSE] New client connection: ${connectionId} (clientId: ${clientId || 'none'}, language: ${language}, FOP: ${fopName || 'global'}${modeLabel})`);
   
   const stream = new ReadableStream({
     start(controller) {
       const encoder = new TextEncoder();
       let isClosed = false;
+      let unregisterClient = () => {};
       
       const send = (dataOrBytes) => {
         if (isClosed) {
@@ -55,7 +57,7 @@ export async function GET({ request, url }) {
       const cleanup = () => {
         if (isClosed) return;
         
-        logger.debug(`[SSE] ${connectionId}: Cleaning up connection`);
+        logger.info(`[SSE] ${connectionId}: Cleaning up connection (clientId: ${clientId || 'none'})`);
         isClosed = true;
         
         // Unregister client from broker
@@ -78,7 +80,10 @@ export async function GET({ request, url }) {
         typeFilter = ['display_state'];
       }
 
-      const unregisterClient = sseBroker.registerClient(send, connectionId, fopName, typeFilter);
+      unregisterClient = sseBroker.registerClient(send, connectionId, fopName, typeFilter, {
+        clientId,
+        close: cleanup
+      });
       
       // Handle client disconnect
       request.signal.addEventListener('abort', cleanup);

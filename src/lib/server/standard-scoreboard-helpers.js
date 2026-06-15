@@ -231,6 +231,13 @@ export function getScoreboardData(scoreboardType, fopName = 'A', options = {}) {
 		waitingNextSession: competitionHub.translate('Scoreboard.WaitingNextGroup', lang)
 	};
 
+	// Pre-translated strings for the client-side inactivity timeout overlay
+	const inactivity = {
+		title: competitionHub.translate('PublicResults.sessionExpiredTitle', lang),
+		text: competitionHub.translate('PublicResults.sessionExpiredText', lang),
+		reload: competitionHub.translate('PublicResults.sessionExpiredLabel', lang).replace('{0}', '').trim()
+	};
+
 	const result = {
 		scoreboardName: config.scoreboardName,
 		competition,
@@ -262,7 +269,8 @@ export function getScoreboardData(scoreboardType, fopName = 'A', options = {}) {
 		lastUpdate: fopUpdate?.lastUpdate || Date.now(),
 		options: { showRecords },
 		// translations,  // Remove full translation dict - use headers instead
-		headers // Include pre-translated headers (only ~150 bytes)
+		headers, // Include pre-translated headers (only ~150 bytes)
+		inactivity // Pre-translated inactivity-timeout overlay strings
 	};
 	
 	// Cache result (excluding volatile fields)
@@ -289,7 +297,8 @@ export function getScoreboardData(scoreboardType, fopName = 'A', options = {}) {
 		lastUpdate: result.lastUpdate,
 		options: result.options,
 		// translations: result.translations,  // Remove full translation dict
-		headers: result.headers // Cache only pre-translated headers
+		headers: result.headers, // Cache only pre-translated headers
+		inactivity: result.inactivity // Cache inactivity overlay strings
 	});
 	
 	// Cleanup old cache entries

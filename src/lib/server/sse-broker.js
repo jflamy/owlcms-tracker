@@ -10,10 +10,23 @@
 import { competitionHub } from './competition-hub.js';
 import { logger } from '@owlcms/tracker-core';
 
+const SCOREBOARD_CLIENT_IDLE_MS = 30 * 60 * 1000;
+const IDLE_REAPER_INTERVAL_MS = 60 * 1000;
+
 class SSEBroker {
   constructor() {
-    this.clients = new Set(); // Set of { send, connectionId, fopName } objects
+    this.clients = new Set(); // Set of { send, connectionId, clientId, fopName } objects
     this.hubListenersAttached = false;
+    this.reaperInterval = null;
+  }
+
+  startIdleReaper() {
+    if (this.reaperInterval) return;
+
+    this.reaperInterval = setInterval(() => this.reapIdleClients(), IDLE_REAPER_INTERVAL_MS);
+    if (typeof this.reaperInterval.unref === 'function') {
+      this.reaperInterval.unref();
+    }
   }
 
   /**
@@ -116,27 +129,76 @@ class SSEBroker {
    * @param {string} connectionId - Unique connection identifier
    * @param {string|null} fopName - FOP name to filter events (null = global events only)
    * @param {string[]|null} types - Optional list of event types to receive (null = all)
+   * @param {Object} options - Optional client metadata
+   * @param {string|null} options.clientId - Stable browser-tab id shared with /api/scoreboard
+   * @param {Function|null} options.close - Function that closes this SSE stream
    * @returns {Function} Unregister function
    */
-  registerClient(sendFn, connectionId, fopName = null, types = null) {
+  registerClient(sendFn, connectionId, fopName = null, types = null, options = {}) {
     // Attach hub listeners on first client
     if (!this.hubListenersAttached) {
       this.attachHubListeners();
     }
+    this.startIdleReaper();
     
     const typeSet = Array.isArray(types) && types.length > 0 ? new Set(types) : null;
-    const client = { send: sendFn, connectionId, fopName, types: typeSet };
+    const clientId = options?.clientId || null;
+    const close = typeof options?.close === 'function' ? options.close : null;
+    const client = {
+      send: sendFn,
+      connectionId,
+      clientId,
+      fopName,
+      types: typeSet,
+      lastSeen: clientId ? Date.now() : null,
+      close
+    };
     this.clients.add(client);
     
     const fopLabel = fopName ? `FOP ${fopName}` : 'GLOBAL';
-    logger.debug(`[SSE Broker] ✓ Client ${connectionId} CONNECTED to ${fopLabel}`);
+    const clientLabel = clientId ? `clientId=${clientId}` : 'clientId=none';
+    logger.info(`[SSE Broker] Client ${connectionId} CONNECTED to ${fopLabel} (${clientLabel})`);
     this.logClientDistribution('After connect');
     
     return () => {
       this.clients.delete(client);
-      logger.debug(`[SSE Broker] ✗ Client ${connectionId} DISCONNECTED`);
+      logger.info(`[SSE Broker] Client ${connectionId} DISCONNECTED (${clientLabel})`);
       this.logClientDistribution('After disconnect');
     };
+  }
+
+  markSeen(clientId) {
+    if (!clientId) return 0;
+
+    const now = Date.now();
+    let seen = 0;
+    for (const client of this.clients) {
+      if (client.clientId === clientId) {
+        client.lastSeen = now;
+        seen++;
+      }
+    }
+    logger.debug(`[SSE Broker] markSeen clientId=${clientId} matched=${seen}`);
+    return seen;
+  }
+
+  reapIdleClients() {
+    if (this.clients.size === 0) return;
+
+    const now = Date.now();
+    for (const client of Array.from(this.clients)) {
+      if (!client.clientId || !client.lastSeen) continue;
+
+      const idleMs = now - client.lastSeen;
+      if (idleMs < SCOREBOARD_CLIENT_IDLE_MS) continue;
+
+      logger.info(`[SSE Broker] Reaping idle scoreboard client ${client.connectionId} (clientId=${client.clientId}, idleMs=${idleMs})`);
+      if (client.close) {
+        client.close();
+      } else {
+        this.clients.delete(client);
+      }
+    }
   }
 
   /**
@@ -272,6 +334,9 @@ class SSEBroker {
 // Singleton instance
 if (!globalThis.__sseBroker) {
   globalThis.__sseBroker = new SSEBroker();
+} else {
+  Object.setPrototypeOf(globalThis.__sseBroker, SSEBroker.prototype);
+  globalThis.__sseBroker.reaperInterval ??= null;
 }
 
 export const sseBroker = globalThis.__sseBroker;

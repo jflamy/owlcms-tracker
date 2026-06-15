@@ -2,6 +2,7 @@
 	import { createTimer } from '$lib/timer-logic.js';
 	import { page } from '$app/stores';
 	import { onMount, onDestroy } from 'svelte';
+	import { disconnectSSE } from '$lib/sse-client.js';
 	import RecordsSection from '$lib/components/RecordsSection.svelte';
 	import CurrentAttemptBar from '$lib/components/CurrentAttemptBar.svelte';
 	import AthletesGrid from '$lib/components/AthletesGrid.svelte';
@@ -20,14 +21,89 @@
 	
 	// Use pre-translated headers from server (optimized for cloud)
 	$: headers = data.headers || {};
+
+	// --- Inactivity timeout -------------------------------------------------
+	// Hidden scoreboards expire quickly because nobody is watching them. Visible
+	// scoreboards expire only when the competition data has been quiet long enough
+	// to indicate an end-of-day or dead-connection state. After either limit we
+	// show the overlay and release the SSE stream so the page must be reloaded to
+	// come back.
+	//
+	// This is the client-visible half of inactivity handling. Reclaiming the
+	// server-side SSE stream for tabs that nobody is watching (switched away,
+	// phone asleep) is handled separately and authoritatively on the server: the
+	// page only queries /api/scoreboard while it is visible, and the SSE broker
+	// reaps streams whose client has stopped querying.
+	const HIDDEN_INACTIVITY_LIMIT_MS = 30 * 60 * 1000;      // 30 minutes hidden
+	const COMPETITION_DEAD_LIMIT_MS = 30 * 60 * 1000;       // 30 minutes without data
+	const INACTIVITY_CHECK_MS = 30 * 1000;                  // evaluate every 30 s
+	let lastCompetitionActivity = Date.now();
+	let hiddenStartedAt = null;
+	let inactivityExpired = false;
+	let inactivityCheckId = null;
+
+	$: inactivityStrings = data.inactivity || {};
+
+	function markCompetitionActivity() {
+		// Once expired we stay expired until the user reloads explicitly.
+		if (inactivityExpired) return;
+		lastCompetitionActivity = Date.now();
+	}
+
+	function checkInactivity() {
+		if (inactivityExpired) return;
+		if (hiddenStartedAt !== null && Date.now() - hiddenStartedAt >= HIDDEN_INACTIVITY_LIMIT_MS) {
+			console.warn(`[Inactivity] Expired: hidden too long (hiddenMs=${Date.now() - hiddenStartedAt})`);
+			inactivityExpired = true;
+			disconnectSSE();
+			return;
+		}
+		if (document.visibilityState === 'hidden') return;
+		if (Date.now() - lastCompetitionActivity < COMPETITION_DEAD_LIMIT_MS) return;
+		console.warn(`[Inactivity] Expired: competition dead (quietMs=${Date.now() - lastCompetitionActivity})`);
+		inactivityExpired = true;
+		// Release the server-side SSE stream; do not auto-reconnect.
+		disconnectSSE();
+	}
+
+	function checkVisibilityInactivity() {
+		if (document.visibilityState === 'hidden') {
+			if (hiddenStartedAt === null) hiddenStartedAt = Date.now();
+			console.log(`[Inactivity] visibilitychange -> hidden (hiddenLimit=${HIDDEN_INACTIVITY_LIMIT_MS}ms)`);
+		} else {
+			const hiddenMs = hiddenStartedAt === null ? 0 : Date.now() - hiddenStartedAt;
+			console.log(`[Inactivity] visibilitychange -> visible (hiddenMs=${hiddenMs})`);
+			checkInactivity();
+			hiddenStartedAt = null;
+		}
+	}
+
+	function reloadPage() {
+		window.location.reload();
+	}
+
+	// Fresh data from the server (lastUpdate changes on every SSE-driven refresh,
+	// timer tick, or decision) counts as competition activity and resets the clock.
+	$: if (data && data.lastUpdate !== undefined) {
+		void data.lastUpdate;
+		markCompetitionActivity();
+	}
 	
 	onMount(() => {
 		timer.start(data.timer);
+
+		lastCompetitionActivity = Date.now();
+		// On wake / tab focus, evaluate immediately instead of waiting for the tick.
+		document.addEventListener('visibilitychange', checkVisibilityInactivity);
+		inactivityCheckId = setInterval(checkInactivity, INACTIVITY_CHECK_MS);
 	});
 	
 	onDestroy(() => {
 		timer.stop();
 		unsubscribe();
+
+		if (inactivityCheckId) clearInterval(inactivityCheckId);
+		document.removeEventListener('visibilitychange', checkVisibilityInactivity);
 	});
 	
 	$: currentAttempt = data.currentAttempt;
@@ -129,6 +205,20 @@
 		{/if}
 	</main>
 </div>
+
+{#if inactivityExpired}
+	<div class="inactivity-overlay">
+		<div class="inactivity-panel">
+			<h1 class="inactivity-title">{inactivityStrings.title || 'Inactivity Delay Exceeded'}</h1>
+			<p class="inactivity-text">
+				{inactivityStrings.text || 'This page has been inactive for too long. You can reload the page by using the button below.'}
+			</p>
+			<button class="inactivity-reload" type="button" on:click={reloadPage}>
+				{inactivityStrings.reload || 'Reload'}
+			</button>
+		</div>
+	</div>
+{/if}
 
 <style>
 	:global(body) {
@@ -237,5 +327,57 @@
 		.waiting {
 			font-size: 1.2rem;
 		}
+	}
+
+	/* Inactivity timeout overlay */
+	.inactivity-overlay {
+		position: fixed;
+		inset: 0;
+		z-index: 1000;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background: rgba(0, 0, 0, 0.85);
+		padding: 1rem;
+	}
+
+	.inactivity-panel {
+		max-width: 32rem;
+		width: 100%;
+		background: #1b2a4a;
+		border-radius: 0.75rem;
+		padding: 2rem;
+		text-align: center;
+		box-shadow: 0 0.5rem 2rem rgba(0, 0, 0, 0.5);
+	}
+
+	.inactivity-title {
+		margin: 0 0 1rem;
+		color: #f5a623;
+		font-size: 1.75rem;
+		font-weight: 700;
+	}
+
+	.inactivity-text {
+		margin: 0 0 1.75rem;
+		color: #fff;
+		font-size: 1.1rem;
+		line-height: 1.5;
+	}
+
+	.inactivity-reload {
+		display: inline-block;
+		padding: 0.75rem 2rem;
+		background: #2e7d32;
+		color: #fff;
+		border: none;
+		border-radius: 0.375rem;
+		font-size: 1.1rem;
+		font-weight: 600;
+		cursor: pointer;
+	}
+
+	.inactivity-reload:hover {
+		background: #388e3c;
 	}
 </style>
