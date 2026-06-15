@@ -5,6 +5,8 @@
 
 ##### Release log
 
+- 2.18.11: Authentication fixes; keys are systematically compared.  Empty key on tracker disables authentication
+
 - 2.18.10: logging cleanup to allow at-a-glance status of a simulation feeding tracker
 
 - 2.18.9: Standard scoreboards were not behaving correctly on large sessions (or on smaller devices like phones); also portrait mode fixes
