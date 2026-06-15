@@ -2,13 +2,14 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "🔳 OWLCMS Tracker - Normal Mode",
+      "name": "🔳 tracker normal",
       "type": "node",
       "request": "launch",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "env": {
-        "NODE_ENV": "development"
+        "NODE_ENV": "development",
+        //"OWLCMS_UPDATEKEY": "amalauxpattes"
       },
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
@@ -17,14 +18,15 @@
       ]
     },
     {
-      "name": "🔳 OWLCMS Tracker - Learning Mode",
+      "name": "🔳 tracker learning",
       "type": "node",
       "request": "launch",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev:learning"],
       "env": {
         "NODE_ENV": "development",
-        "LEARNING_MODE": "true"
+        "LEARNING_MODE": "true",
+        //"OWLCMS_UPDATEKEY": "amalauxpattes"
       },
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
