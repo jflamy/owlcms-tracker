@@ -144,26 +144,49 @@ class SSEBroker {
     const typeSet = Array.isArray(types) && types.length > 0 ? new Set(types) : null;
     const clientId = options?.clientId || null;
     const close = typeof options?.close === 'function' ? options.close : null;
+    // Scoreboard type drives the per-scoreboard watcher counts. Different
+    // languages/settings of the same scoreboard are intentionally counted
+    // together so the totals reflect load per scoreboard.
+    const scoreboardType = options?.scoreboardType || null;
+
+    // A tab keeps a stable clientId across reconnects. When it reconnects (e.g. a
+    // hidden tab being reactivated re-opens its SSE stream before the old stream's
+    // abort has fired), evict the stale registration so the same tab is counted
+    // once instead of inflating the watcher totals.
+    if (clientId) {
+      for (const existing of this.clients) {
+        if (existing.clientId === clientId) {
+          this.clients.delete(existing);
+          if (typeof existing.close === 'function') {
+            try {
+              existing.close();
+            } catch {
+              // stale stream may already be closed; ignore
+            }
+          }
+        }
+      }
+    }
+
     const client = {
       send: sendFn,
       connectionId,
       clientId,
       fopName,
+      scoreboardType,
       types: typeSet,
       lastSeen: clientId ? Date.now() : null,
       close
     };
     this.clients.add(client);
     
-    const fopLabel = fopName ? `FOP ${fopName}` : 'GLOBAL';
-    const clientLabel = clientId ? `clientId=${clientId}` : 'clientId=none';
-    logger.info(`[SSE Broker] Client ${connectionId} CONNECTED to ${fopLabel} (${clientLabel})`);
-    this.logClientDistribution('After connect');
+    // Per-connection +1/-1 lines are intentionally omitted; only the aggregate
+    // per-scoreboard/per-FOP distribution is logged on arrival/departure.
+    this.logScoreboardDistribution({ byFop: true });
     
     return () => {
       this.clients.delete(client);
-      logger.info(`[SSE Broker] Client ${connectionId} DISCONNECTED (${clientLabel})`);
-      this.logClientDistribution('After disconnect');
+      this.logScoreboardDistribution({ byFop: true });
     };
   }
 
@@ -231,10 +254,6 @@ class SSEBroker {
     const encoder = new TextEncoder();
     const encodedBytes = encoder.encode(sseMessage);
 
-    // Track recipients per FOP for logging
-    const recipientsByFop = {};
-    let globalRecipients = 0;
-
     // Send to matching clients only
     for (const client of this.clients) {
       // FOP filtering:
@@ -248,13 +267,6 @@ class SSEBroker {
       if (clientWantsType && (isGlobalEvent || clientMatchesFop || clientWantsAllFops)) {
         try {
           client.send(encodedBytes);
-          
-          // Track for logging
-          if (client.fopName === null) {
-            globalRecipients++;
-          } else {
-            recipientsByFop[client.fopName] = (recipientsByFop[client.fopName] || 0) + 1;
-          }
         } catch (error) {
           logger.debug(`[SSE Broker] Error sending to client ${client.connectionId}:`, error.message);
           this.clients.delete(client);
@@ -262,61 +274,68 @@ class SSEBroker {
       }
     }
 
-    // Log detailed delivery stats
-    const totalRecipients = Object.values(recipientsByFop).reduce((a, b) => a + b, 0) + globalRecipients;
-    if (totalRecipients > 0) {
-      const eventLabel = `${message.type}${eventFop ? ` [FOP ${eventFop}]` : ' [GLOBAL]'}`;
-      const recipientParts = [];
-      
-      if (globalRecipients > 0) {
-        recipientParts.push(`GLOBAL=${globalRecipients}`);
-      }
-      
-      const fopParts = Object.entries(recipientsByFop).sort(([a], [b]) => a.localeCompare(b));
-      for (const [fop, count] of fopParts) {
-        recipientParts.push(`${fop}=${count}`);
-      }
-      
-      logger.debug(`[SSE Broker] ➜ ${eventLabel}: ${totalRecipients}/${this.clients.size} clients (${recipientParts.join(', ')})`);
-    }
+    // Per-event delivery stats are intentionally silenced to keep the logs
+    // focused on scoreboard watcher counts (see logScoreboardDistribution).
   }
 
   /**
-   * Get detailed FOP distribution stats
-   * @returns {Object} Stats with fopCounts, globalCount, totalClients
+   * Get watcher counts per scoreboard type (aggregated across languages/settings).
+   * @param {Object} [options]
+   * @param {boolean} [options.byFop=false] - When true, slice each scoreboard by FOP:
+   *   returns { [scoreboardType]: { total, fops: { [fopName]: count } } }.
+   *   When false (default), returns the flat { [scoreboardType]: count } map.
+   * @returns {Object}
    */
-  getClientStats() {
-    const fopCounts = {};
-    let globalCount = 0;
+  getScoreboardStats({ byFop = false } = {}) {
+    if (!byFop) {
+      const counts = {};
+      for (const client of this.clients) {
+        const sb = client.scoreboardType || 'other';
+        counts[sb] = (counts[sb] || 0) + 1;
+      }
+      return counts;
+    }
 
+    const sliced = {};
     for (const client of this.clients) {
-      if (client.fopName === null) {
-        globalCount++;
-      } else {
-        fopCounts[client.fopName] = (fopCounts[client.fopName] || 0) + 1;
+      const sb = client.scoreboardType || 'other';
+      const fop = client.fopName || 'global';
+      if (!sliced[sb]) {
+        sliced[sb] = { total: 0, fops: {} };
       }
+      sliced[sb].total += 1;
+      sliced[sb].fops[fop] = (sliced[sb].fops[fop] || 0) + 1;
     }
-
-    return {
-      totalClients: this.clients.size,
-      globalClients: globalCount,
-      fopClients: fopCounts,
-      fops: Object.keys(fopCounts).sort(),
-      fopClientSummary: Object.entries(fopCounts).map(([fop, count]) => `${fop}:${count}`).join(', ')
-    };
+    return sliced;
   }
 
   /**
-   * Log current client distribution
+   * Log the number of active connections to each scoreboard.
+   * @param {Object} [options]
+   * @param {boolean} [options.byFop=false] - When true, also break each scoreboard down by FOP.
    */
-  logClientDistribution(context = 'Current') {
-    const stats = this.getClientStats();
-    const parts = [`[SSE Broker] ${context} client distribution:`, `Total=${stats.totalClients}`, `Global=${stats.globalClients}`];
-    if (stats.fopClientSummary) {
-      parts.push(`FOPs=[${stats.fopClientSummary}]`);
+  logScoreboardDistribution({ byFop = false } = {}) {
+    const total = this.clients.size;
+
+    if (byFop) {
+      const sliced = this.getScoreboardStats({ byFop: true });
+      const parts = [];
+      for (const [sb, { fops }] of Object.entries(sliced).sort(([a], [b]) => a.localeCompare(b))) {
+        for (const [fop, count] of Object.entries(fops).sort(([a], [b]) => a.localeCompare(b))) {
+          parts.push(`${sb}/${fop}=${count}`);
+        }
+      }
+      logger.info(`[Scoreboards] watchers: ${parts.join(', ') || 'none'} (total=${total})`);
+      return;
     }
-    logger.debug(parts.join(' | '));
+
+    const counts = this.getScoreboardStats();
+    const parts = Object.entries(counts)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([sb, count]) => `${sb}=${count}`);
+    logger.info(`[Scoreboards] watchers: ${parts.join(', ') || 'none'} (total=${total})`);
   }
+
   getActiveClientCount() {
     return this.clients.size;
   }

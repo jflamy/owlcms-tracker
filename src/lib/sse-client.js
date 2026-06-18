@@ -8,6 +8,7 @@ let subscribers = new Set();
 let connectionId = Math.random().toString(36).substr(2, 9);
 let language = 'en';
 let currentFop = null;
+let currentScoreboard = null;
 let clientCount = 0;
 let reconnectTimer = null;
 let reconnectDelayMs = 2000;
@@ -49,12 +50,13 @@ function ensureVisibilityHook() {
  * Connect to SSE stream (called once, reused by all pages)
  * @param {string} lang - Language code (default: 'en')
  * @param {string|null} fop - FOP name to filter events (null = global events only)
+ * @param {string|null} scoreboard - Scoreboard type (used for per-scoreboard watcher counts)
  */
-export function connectSSE(lang = 'en', fop = null) {
+export function connectSSE(lang = 'en', fop = null, scoreboard = currentScoreboard) {
 	// If a matching stream is already open or still connecting, reuse it. EventSource
 	// starts in CONNECTING, so treating only OPEN as reusable causes rapid close/reopen
 	// churn when subscribeSSE or Svelte reactive statements call connectSSE again.
-	if (eventSource && eventSource.readyState !== EventSource.CLOSED && language === lang && currentFop === fop) {
+	if (eventSource && eventSource.readyState !== EventSource.CLOSED && language === lang && currentFop === fop && currentScoreboard === scoreboard) {
 		return eventSource;
 	}
 
@@ -71,12 +73,14 @@ export function connectSSE(lang = 'en', fop = null) {
 	}
 	
 	currentFop = fop;
+	currentScoreboard = scoreboard;
 	reconnectWhenVisible = false;
 	ensureVisibilityHook();
 	const fopParam = fop ? `&fop=${encodeURIComponent(fop)}` : '';
+	const sbParam = scoreboard ? `&sb=${encodeURIComponent(scoreboard)}` : '';
 	const clientParam = `&clientId=${encodeURIComponent(connectionId)}`;
-	console.log(`[SSE] Opening stream (clientId=${connectionId}, lang=${lang}, fop=${fop || 'global'})`);
-	eventSource = new EventSource(`/api/client-stream?lang=${lang}${fopParam}${clientParam}`);
+	console.log(`[SSE] Opening stream (clientId=${connectionId}, lang=${lang}, fop=${fop || 'global'}, sb=${scoreboard || 'none'})`);
+	eventSource = new EventSource(`/api/client-stream?lang=${lang}${fopParam}${sbParam}${clientParam}`);
 	
 	eventSource.onmessage = (event) => {
 		try {

@@ -92,7 +92,7 @@
 			const result = await response.json();
 			
 			if (result.success) {
-				console.log('[Scoreboard] API returned:', result.data?.currentAttempt?.weight || result.data?.weight || 'no weight');
+				// console.log('[Scoreboard] API returned:', result.data?.currentAttempt?.weight || result.data?.weight || 'no weight');
 				scoreboardData = result.data;
 				scoreboardError = null;
 			} else {
@@ -147,9 +147,11 @@
 		// Connect to shared SSE (browser only) - skip for plugins that manage their own SSE
 		if (browser && !skipRouteSSE) {
 			// Pass fopName so SSE broker only sends events for this FOP (+ global events)
-			connectSSE(language, data.fopName);
+			// Pass scoreboardType so the server can count watchers per scoreboard.
+			connectSSE(language, data.fopName, data.scoreboardType);
 			unsubscribeSSE = subscribeSSE((message) => {
-				console.log('[Scoreboard] SSE received:', message.type, message.fop || '', JSON.stringify(message.timer || message.decision || {}).substring(0, 100));
+				// Per-message tracking silenced to reduce log noise during load tests.
+				// console.log('[Scoreboard] SSE received:', message.type, message.fop || '', JSON.stringify(message.timer || message.decision || {}).substring(0, 100));
 				
 				// Handle translation updates
 				if (message.type === 'translations') {
@@ -185,7 +187,7 @@
 				
 				// Refresh data on any competition update or hub ready
 				if (message.type === 'fop_update' || message.type === 'state_update' || message.type === 'competition_update' || message.type === 'hub_ready') {
-					console.log('[Scoreboard] Triggering fetchData() for', message.type);
+					// console.log('[Scoreboard] Triggering fetchData() for', message.type);
 					fetchData();
 				}
 			});
@@ -205,7 +207,7 @@
 	
 	// Reconnect SSE if language changes (browser only)
 	$: if (browser && language && !skipRouteSSE) {
-		connectSSE(language, data.fopName);
+		connectSSE(language, data.fopName, data.scoreboardType);
 	}
 </script>
 

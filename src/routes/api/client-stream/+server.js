@@ -18,9 +18,12 @@ export async function GET({ request, url }) {
   const fopName = url.searchParams.get('fop') || null;
   const mode = url.searchParams.get('mode') || null;
   const clientId = url.searchParams.get('clientId') || null;
+  // Scoreboard type (e.g. lifting-order, rankings, start-order) used to count
+  // how many people are watching each scoreboard.
+  const scoreboardType = url.searchParams.get('sb') || null;
 
   const modeLabel = mode ? `, mode: ${mode}` : '';
-  logger.info(`[SSE] New client connection: ${connectionId} (clientId: ${clientId || 'none'}, language: ${language}, FOP: ${fopName || 'global'}${modeLabel})`);
+  logger.debug(`[SSE] New client connection: ${connectionId} (clientId: ${clientId || 'none'}, language: ${language}, FOP: ${fopName || 'global'}, scoreboard: ${scoreboardType || 'none'}${modeLabel})`);
   
   const stream = new ReadableStream({
     start(controller) {
@@ -57,7 +60,7 @@ export async function GET({ request, url }) {
       const cleanup = () => {
         if (isClosed) return;
         
-        logger.info(`[SSE] ${connectionId}: Cleaning up connection (clientId: ${clientId || 'none'})`);
+        logger.debug(`[SSE] ${connectionId}: Cleaning up connection (clientId: ${clientId || 'none'})`);
         isClosed = true;
         
         // Unregister client from broker
@@ -82,6 +85,7 @@ export async function GET({ request, url }) {
 
       unregisterClient = sseBroker.registerClient(send, connectionId, fopName, typeFilter, {
         clientId,
+        scoreboardType,
         close: cleanup
       });
       
