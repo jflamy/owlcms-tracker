@@ -19,7 +19,8 @@ export default {
 
 	// Required resources that must be loaded before this plugin can render
 	// When accessed, missing resources will be requested from OWLCMS via 428
-	requires: ['flags_zip'],
+	// Computes GAMX team scoring locally, so it pulls the GAMX param tables.
+	requires: ['flags_zip', 'gamx_zip'],
 
 	// Whether this scoreboard requires athlete pictures
 	requiresPictures: false,

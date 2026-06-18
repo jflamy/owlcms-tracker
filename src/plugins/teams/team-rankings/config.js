@@ -5,6 +5,8 @@ export default {
 	order: 110,
 	fopRequired: false,
 	requiresPictures: false,
+	// Only plugin that computes GAMX locally (team aggregation), so it pulls the GAMX param tables.
+	requires: ['gamx_zip'],
 	options: [
 		{
 			key: 'language',

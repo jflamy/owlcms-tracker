@@ -20,6 +20,7 @@ compliance/*
 !compliance/README.md
 local/pictures
 local/logos/
+local/gamx/
 
 # Note: extensions/ now contains git submodules (e.g., tracker-France)
 # Submodules are tracked by git even though their contents are from other repos
