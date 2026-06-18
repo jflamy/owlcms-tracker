@@ -5,6 +5,8 @@
 
 ##### Release log
 
+- 2.19.0: scoreboards correctly track closed tabs and log number of connected users.
+
 - 2.18.12: Idle scoreboard tabs now release their server SSE stream after a 5 min hidden grace period, and a hidden or quiet (30 min) flushes everything else about the session and prompts the user to reload.
 
 - 2.18.11: Authentication fixes; keys are systematically compared.  Empty key on tracker disables authentication
