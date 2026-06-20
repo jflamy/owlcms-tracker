@@ -5,6 +5,8 @@
 
 ##### Release log
 
+- 2.19.2: Handle before intro - intro - before snatch transition correctly in the scoreboards
+
 - 2.19.1: fix scoreboard timer wonky behavior between stop and decision
 
 - 2.19.0: scoreboards correctly track closed tabs and log number of connected users.

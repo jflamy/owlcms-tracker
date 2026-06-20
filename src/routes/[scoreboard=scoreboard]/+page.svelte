@@ -20,6 +20,7 @@
 	let lastTimerSseTime = 0;
 	let latestTimerSse = null;
 	let latestTimerDisplayMode = null;
+	let latestBreakTimerFromSse = null; // Rebuilt from flat breakState/breakRemaining/breakVisible fields
 	let lastDecisionSseTime = 0;
 	let latestDecisionSse = null;
 	let latestDecisionDisplayMode = null;
@@ -111,6 +112,9 @@
 
 				if (timerSseIsNewer) {
 					nextData = { ...nextData, timer: latestTimerSse };
+					if (latestBreakTimerFromSse != null) {
+						nextData = { ...nextData, breakTimer: latestBreakTimerFromSse };
+					}
 				}
 				if (decisionSseIsNewer) {
 					nextData = { ...nextData, decision: latestDecisionSse };
@@ -196,10 +200,19 @@
 					lastTimerSseTime = Date.now();
 					latestTimerSse = message.timer;
 					latestTimerDisplayMode = message.displayMode;
+					// The timer SSE embeds break timer state as flat fields (breakState,
+					// breakRemaining, breakVisible) inside message.timer. Rebuild the
+					// breakTimer object so CountdownTimer gets the live remaining value
+					// rather than the stale API-fetched snapshot (e.g. 0:00 before_introduction).
+					const tmsg = message.timer;
+					latestBreakTimerFromSse = scoreboardData?.breakTimer != null
+						? { ...scoreboardData.breakTimer, state: tmsg.breakState, timeRemaining: tmsg.breakRemaining, visible: tmsg.breakVisible }
+						: { state: tmsg.breakState, timeRemaining: tmsg.breakRemaining, visible: tmsg.breakVisible };
 					if (scoreboardData) {
 						scoreboardData = {
 							...scoreboardData,
 							timer: message.timer,
+							breakTimer: latestBreakTimerFromSse,
 							displayMode: message.displayMode
 						};
 					}
