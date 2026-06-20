@@ -14,6 +14,15 @@
 	let scoreboardData = null;
 	let scoreboardError = null;
 	let unsubscribeSSE = null;
+
+	// Track direct SSE payloads so in-flight API fetches cannot overwrite newer
+	// timer/decision event state with an older snapshot.
+	let lastTimerSseTime = 0;
+	let latestTimerSse = null;
+	let latestTimerDisplayMode = null;
+	let lastDecisionSseTime = 0;
+	let latestDecisionSse = null;
+	let latestDecisionDisplayMode = null;
 	
 	// Check if this plugin manages its own SSE or doesn't need live updates
 	// - documents: static content, no live updates needed
@@ -87,13 +96,35 @@
 		if (!shouldQuery()) {
 			return;
 		}
+		// Capture timestamp before the async fetch so we can detect if a timer SSE
+		// arrived while we were waiting for the response.
+		const fetchStart = Date.now();
 		try {
 			const response = await fetch(apiUrl);
 			const result = await response.json();
 			
 			if (result.success) {
 				// console.log('[Scoreboard] API returned:', result.data?.currentAttempt?.weight || result.data?.weight || 'no weight');
-				scoreboardData = result.data;
+				let nextData = result.data;
+				const timerSseIsNewer = lastTimerSseTime > fetchStart && latestTimerSse != null;
+				const decisionSseIsNewer = lastDecisionSseTime > fetchStart && latestDecisionSse != null;
+
+				if (timerSseIsNewer) {
+					nextData = { ...nextData, timer: latestTimerSse };
+				}
+				if (decisionSseIsNewer) {
+					nextData = { ...nextData, decision: latestDecisionSse };
+				}
+				if (timerSseIsNewer || decisionSseIsNewer) {
+					const latestDisplayMode = timerSseIsNewer && (!decisionSseIsNewer || lastTimerSseTime >= lastDecisionSseTime)
+						? latestTimerDisplayMode
+						: latestDecisionDisplayMode;
+					if (latestDisplayMode != null) {
+						nextData = { ...nextData, displayMode: latestDisplayMode };
+					}
+				}
+
+				scoreboardData = nextData;
 				scoreboardError = null;
 			} else {
 				console.error('[Scoreboard] API error:', result.error);
@@ -162,6 +193,9 @@
 				// Handle timer events directly (no API fetch)
 				// Server provides displayMode computed with full FOP context
 				if (message.type === 'timer' && message.fop === data.fopName) {
+					lastTimerSseTime = Date.now();
+					latestTimerSse = message.timer;
+					latestTimerDisplayMode = message.displayMode;
 					if (scoreboardData) {
 						scoreboardData = {
 							...scoreboardData,
@@ -175,6 +209,9 @@
 				// Handle decision events directly (no API fetch)
 				// Server provides displayMode computed with full FOP context
 				if (message.type === 'decision' && message.fop === data.fopName) {
+					lastDecisionSseTime = Date.now();
+					latestDecisionSse = message.decision;
+					latestDecisionDisplayMode = message.displayMode;
 					if (scoreboardData) {
 						scoreboardData = {
 							...scoreboardData,
