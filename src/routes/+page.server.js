@@ -3,6 +3,7 @@ import { competitionHub } from '$lib/server/competition-hub.js';
 import { loadLandingPageCategories } from '$lib/server/landing-page-categories.js';
 import { existsSync, readdirSync } from 'fs';
 import { resolve } from 'path';
+import versionInfo from '$lib/server/version.json';
 
 /**
  * Landing page - discovers available scoreboards and FOPs
@@ -136,6 +137,7 @@ export async function load() {
 		hasData: availableFOPs.length > 0,
 		hasConfirmedFops: confirmedFopsAvailable,
 		availableLocales,
-		languageNames
+		languageNames,
+		versionInfo
 	};
 }

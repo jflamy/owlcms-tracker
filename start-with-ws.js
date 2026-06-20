@@ -10,7 +10,30 @@
 globalThis.__startWithWsActive = true;
 
 import { createServer } from 'http';
+import { existsSync } from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { handler } from './build/handler.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const buildClientDir = path.join(__dirname, 'build', 'client');
+
+function shouldReturnMissingImmutableAsset(req) {
+  if (!req.url) return false;
+
+  const pathname = req.url.split('?')[0];
+  if (!pathname?.startsWith('/_app/immutable/')) return false;
+
+  const normalizedPath = path.normalize(pathname).replace(/^([/\\])+/, '');
+  const resolvedPath = path.resolve(buildClientDir, normalizedPath);
+
+  if (!resolvedPath.startsWith(buildClientDir + path.sep)) {
+    return false;
+  }
+
+  return !existsSync(resolvedPath);
+}
 
 // Add global uncaught exception handler to prevent crashes from abrupt connection resets
 process.on('uncaughtException', (err) => {
@@ -49,6 +72,16 @@ process.on('unhandledRejection', (reason, promise) => {
 
     // Create HTTP server with proxy middleware before SvelteKit handler
     const httpServer = createServer((req, res) => {
+      // Browsers can keep old immutable chunk URLs cached across rebuilds.
+      // Return 404 for stale assets instead of letting adapter-node try a missing
+      // .br/.gz variant and crash the local preview server.
+      if (shouldReturnMissingImmutableAsset(req)) {
+        res.statusCode = 404;
+        res.setHeader('Cache-Control', 'no-store');
+        res.end('Not found');
+        return;
+      }
+
       // Route /proxy requests through OWLCMS proxy
       if (proxyMiddleware && req.url.startsWith('/proxy')) {
         return proxyMiddleware(req, res, () => handler(req, res));

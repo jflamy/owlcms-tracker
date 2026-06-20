@@ -21,7 +21,10 @@ export function extractRecordsFromUpdate(fopUpdate) {
 
 		const isBlockFormat = Array.isArray(recordsData.recordTable) && recordsData.recordTable.length > 0 && !!recordsData.recordTable[0]?.records;
 
-		const isEmpty = (val) => !val || val === '' || (typeof val === 'string' && val.trim() === '');
+		// A numeric record value of 0 is a real standard (challengeable and highlightable),
+		// not an absent record. OWLCMS sends a blank string (" ") for a missing record.
+		// Only null/undefined and blank strings count as empty.
+		const isEmpty = (val) => val === null || val === undefined || (typeof val === 'string' && val.trim() === '');
 
 		if (isBlockFormat) {
 			// Normalize block format -> federation -> categories map
@@ -79,7 +82,7 @@ export function extractRecordsFromUpdate(fopUpdate) {
 			categorySet.add(category);
 
 			const liftType = entry.index % 3 === 0 ? 'S' : entry.index % 3 === 1 ? 'CJ' : 'T';
-			let value = entry.value || '';
+			let value = entry.value ?? '';
 			const highlight = entry.highlight === 1 || entry.highlight === true;
 
 			records.push({

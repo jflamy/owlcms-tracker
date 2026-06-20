@@ -131,6 +131,17 @@ function readResolvedTrackerCore() {
   };
 }
 
+function generateVersionFile() {
+  // Bake the version file on the host so the tracker git commit is captured.
+  // The Docker build excludes .git (see .dockerignore), so the commit cannot be
+  // resolved inside the container; the file is copied into the image instead.
+  console.log('\n🔖 Generating build-time version info ...');
+  const result = spawnSync('node', ['scripts/generate-version.js'], { stdio: 'inherit' });
+  if (result.error || result.status !== 0) {
+    throw new Error('Failed to generate version file (scripts/generate-version.js)');
+  }
+}
+
 function runFlyDeploy(flyArgs) {
   // This app MUST run as a single machine (in-memory competition hub). Default to
   // --ha=false so a fresh launch never gets a standby HA machine. If the caller
@@ -254,6 +265,7 @@ async function main() {
     console.log(`   resolved dependency:  ${resolved.resolved}`);
     console.log(`   resolved commit:      ${resolved.commit}`);
 
+    generateVersionFile();
     runFlyDeploy(flyArgs);
     enforceSingleMachine(extractAppArgs(flyArgs));
   } finally {

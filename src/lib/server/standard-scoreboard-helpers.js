@@ -125,12 +125,26 @@ export function getScoreboardData(scoreboardType, fopName = 'A', options = {}) {
 	let athleteEntries = getAthleteEntries(config.dataSource, fopName, fopUpdate);
 	
 	const records = extractRecordsFromUpdate(fopUpdate);
+	const recordStatus = fopUpdate?.recordKind && fopUpdate.recordKind !== 'none'
+		? {
+			kind: fopUpdate.recordKind,
+			message: fopUpdate.recordMessage || null
+		}
+		: null;
 	
 	// Build cache key - include all options (showRecords, lang, etc.)
 	const cacheKey = buildCacheKey({ fopName, includeFop: true, opts: { ...options, type: scoreboardType } });
 	
 	// Extract current athlete using shared function
 	let currentAttempt = extractCurrentAttempt(fopUpdate, lang);
+	const hasRenderableFopState = Boolean(
+		currentAttempt ||
+		fopUpdate?.fullName ||
+		fopUpdate?.sessionName ||
+		fopUpdate?.groupName ||
+		(fopUpdate?.fopState && fopUpdate.fopState !== 'INACTIVE') ||
+		sessionStatus?.isDone
+	);
 	
 	// Compute break title (group name) for break mode display
 	const mode = fopUpdate?.mode || 'WAIT';
@@ -155,6 +169,7 @@ export function getScoreboardData(scoreboardType, fopName = 'A', options = {}) {
 			sessionStatus,
 			sessionStatusMessage,
 			breakTitle,
+			recordStatus,
 			learningMode
 		};
 	}
@@ -164,6 +179,9 @@ export function getScoreboardData(scoreboardType, fopName = 'A', options = {}) {
 	
 	// Return waiting status if no athletes
 	if (athleteEntries.length === 0) {
+		const status = hasRenderableFopState ? 'ready' : 'waiting';
+		const message = hasRenderableFopState ? null : 'Waiting for competition update from OWLCMS...';
+
 		return {
 			scoreboardName: config.scoreboardName,
 			competition,
@@ -180,8 +198,8 @@ export function getScoreboardData(scoreboardType, fopName = 'A', options = {}) {
 			startOrderAthletes: [],
 			leaders,
 			stats,
-			status: 'waiting',
-			message: 'Waiting for competition update from OWLCMS...',
+			status,
+			message,
 			lastUpdate: fopUpdate?.lastUpdate || Date.now(),
 			learningMode,
 			options: { showRecords },
@@ -263,6 +281,7 @@ export function getScoreboardData(scoreboardType, fopName = 'A', options = {}) {
 		resultRows,
 		leaderRows,
 		records,
+		recordStatus,
 		status,
 		message,
 		attemptBarClass,
@@ -283,6 +302,7 @@ export function getScoreboardData(scoreboardType, fopName = 'A', options = {}) {
 		// rankedAthletes: result.rankedAthletes,             // Remove duplicate
 		leaders: result.leaders,
 		records: result.records,
+		recordStatus: result.recordStatus,
 		stats: result.stats,
 		displaySettings: result.displaySettings,
 		isBreak: result.isBreak,

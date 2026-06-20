@@ -200,7 +200,7 @@
 
 			<!-- Records Section (Below Grid, Not Part of Grid) -->
 			{#if showRecords && hasRecords}
-				<RecordsSection records={data.records} headers={headers} />
+				<RecordsSection records={data.records} headers={headers} recordStatus={data.recordStatus} />
 			{/if}
 		{/if}
 	</main>

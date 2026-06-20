@@ -2,6 +2,7 @@
 	export let records = [];
 	export const translations = {};
 	export let headers = {};
+	export let recordStatus = null;
 
 	function getAllRecordCategories(recordsData) {
 		if (!recordsData || recordsData.length === 0) return [];
@@ -32,43 +33,52 @@
 
 	$: categories = getAllRecordCategories(records);
 	$: hasRecords = records && records.length > 0;
+	$: hasRecordStatus = !!(recordStatus?.kind && recordStatus?.message);
 </script>
 
 {#if hasRecords}
 	<div class="records-section">
-		<div class="records-table-grid" style="--num-categories: {categories.length}">
-			<!-- Row 1: Category headers with title in top-left, spanning 2 rows for spacers and main headers -->
-			<div class="records-title-cell span-two">{headers?.records || '!!Records'}</div>
-			{#each categories as category}
-				<div class="records-v-spacer records-v-spacer-header span-two" aria-hidden="true"></div>
-				<div class="records-category-header">{getCategoryDisplayName(records, category)}</div>
-			{/each}
-
-			<!-- Row 2: Sub-headers (S, CJ, T) -->
-			{#each categories as _}
-				<div class="records-subheader">S</div>
-				<div class="records-subheader">CJ</div>
-				<div class="records-subheader">T</div>
-			{/each}
-
-			<!-- Data rows: one per federation -->
-			{#each records as federationData, rowIdx}
-				<div class="records-federation-cell" class:last-row={rowIdx === records.length - 1}>
-					{federationData.federation}
-				</div>
+		<div class="records-layout">
+			<div class="records-table-grid" style="--num-categories: {categories.length}">
+				<!-- Row 1: Category headers with title in top-left, spanning 2 rows for spacers and main headers -->
+				<div class="records-title-cell span-two">{headers?.records || '!!Records'}</div>
 				{#each categories as category}
-					<div class="records-v-spacer" aria-hidden="true"></div>
-					<div class="records-cell" class:highlighted={getRecordCell(federationData, category, 'S').highlight} class:last-row={rowIdx === records.length - 1}>
-						{getRecordCell(federationData, category, 'S').value ?? '-'}
-					</div>
-					<div class="records-cell" class:highlighted={getRecordCell(federationData, category, 'CJ').highlight} class:last-row={rowIdx === records.length - 1}>
-						{getRecordCell(federationData, category, 'CJ').value ?? '-'}
-					</div>
-					<div class="records-cell" class:highlighted={getRecordCell(federationData, category, 'T').highlight} class:last-row={rowIdx === records.length - 1}>
-						{getRecordCell(federationData, category, 'T').value ?? '-'}
-					</div>
+					<div class="records-v-spacer records-v-spacer-header span-two" aria-hidden="true"></div>
+					<div class="records-category-header">{getCategoryDisplayName(records, category)}</div>
 				{/each}
-			{/each}
+
+				<!-- Row 2: Sub-headers (S, CJ, T) -->
+				{#each categories as _}
+					<div class="records-subheader">S</div>
+					<div class="records-subheader">CJ</div>
+					<div class="records-subheader">T</div>
+				{/each}
+
+				<!-- Data rows: one per federation -->
+				{#each records as federationData, rowIdx}
+					<div class="records-federation-cell" class:last-row={rowIdx === records.length - 1}>
+						{federationData.federation}
+					</div>
+					{#each categories as category}
+						<div class="records-v-spacer" aria-hidden="true"></div>
+						<div class="records-cell" class:highlighted={getRecordCell(federationData, category, 'S').highlight} class:last-row={rowIdx === records.length - 1}>
+							{getRecordCell(federationData, category, 'S').value ?? '-'}
+						</div>
+						<div class="records-cell" class:highlighted={getRecordCell(federationData, category, 'CJ').highlight} class:last-row={rowIdx === records.length - 1}>
+							{getRecordCell(federationData, category, 'CJ').value ?? '-'}
+						</div>
+						<div class="records-cell" class:highlighted={getRecordCell(federationData, category, 'T').highlight} class:last-row={rowIdx === records.length - 1}>
+							{getRecordCell(federationData, category, 'T').value ?? '-'}
+						</div>
+					{/each}
+				{/each}
+			</div>
+
+			{#if hasRecordStatus}
+				<div class="record-status-panel" class:attempt={recordStatus.kind === 'attempt'} class:new={recordStatus.kind === 'new'}>
+					{recordStatus.message}
+				</div>
+			{/if}
 		</div>
 	</div>
 {/if}
@@ -78,6 +88,14 @@
 		padding: 2em 0 0 0;
 		background: #000;
 		overflow-x: auto;
+	}
+
+	.records-layout {
+		display: flex;
+		align-items: stretch;
+		gap: 0.6rem;
+		width: 100%;
+		min-width: max-content;
 	}
 
 	.records-table-grid {
@@ -94,6 +112,34 @@
 		grid-auto-rows: var(--data-row-height);
 		width: max-content;
 		overflow: hidden;
+		flex: 0 0 auto;
+	}
+
+	.record-status-panel {
+		display: flex;
+		flex: 1 1 auto;
+		align-items: center;
+		justify-content: center;
+		align-self: stretch;
+		min-width: 16rem;
+		padding: 0.75rem 1.5rem;
+		font-size: 1.8rem;
+		font-weight: 700;
+		text-align: center;
+		border: 1px solid transparent;
+		white-space: nowrap;
+	}
+
+	.record-status-panel.attempt {
+		background: #8f4f8f;
+		border-color: #8f4f8f;
+		color: #fff;
+	}
+
+	.record-status-panel.new {
+		background: #2f6b3d;
+		border-color: #2f6b3d;
+		color: #fff;
 	}
 
 	/* Title cell in top-left, spanning both header rows */
@@ -211,6 +257,11 @@
 
 	/* Responsive adjustments for landscape mode */
 	@media (max-width: 1366px) and (orientation: landscape) {
+		.record-status-panel {
+			min-width: 14rem;
+			font-size: 1.5rem;
+		}
+
 		.records-table-grid {
 			--col-lift: 3.3rem;
 			--col-spacer: 0.5rem;
@@ -229,6 +280,12 @@
 	}
 
 	@media (max-width: 1280px) and (orientation: landscape) {
+		.record-status-panel {
+			min-width: 12rem;
+			font-size: 1.3rem;
+			padding: 0.6rem 1rem;
+		}
+
 		.records-table-grid {
 			--col-lift: 3.1rem;
 			--col-spacer: 0.4rem;

@@ -3,9 +3,12 @@
   "version": "2.19.2",
   "private": true,
   "scripts": {
+    "version:generate": "node scripts/generate-version.js",
+    "predev": "node scripts/generate-version.js",
     "dev": "node node_modules/vite/bin/vite.js dev --port 8096",
+    "predev:learning": "node scripts/generate-version.js",
     "dev:learning": "cross-env LEARNING_MODE=true node node_modules/vite/bin/vite.js dev --port 8096",
-    "build": "svelte-kit sync && vite build && node scripts/copy-runtime-server-files.js",
+    "build": "node scripts/generate-version.js && svelte-kit sync && vite build && node scripts/copy-runtime-server-files.js",
     "preview": "node start-with-ws.js",
     "check": "svelte-kit sync && svelte-check --tsconfig ./jsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./jsconfig.json --watch",

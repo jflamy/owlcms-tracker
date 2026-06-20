@@ -226,10 +226,21 @@
 					latestDecisionSse = message.decision;
 					latestDecisionDisplayMode = message.displayMode;
 					if (scoreboardData) {
+						// A NEW record is announced only on the decision frame, so apply the
+						// green banner directly (no API round-trip). The "attempt" banner is
+						// deliberately NOT derived here: it reflects the CURRENT athlete's
+						// challenge, which is owned by update frames. A decision/RESET frame
+						// can echo a stale recordKind:"attempt"; honouring it would make the
+						// purple banner stick. We only act on the genuine "new" outcome and
+						// otherwise leave recordStatus to be (re)computed by update frames.
+						const recordStatus = message.decision?.recordKind === 'new'
+							? { kind: 'new', message: message.decision.recordMessage || null }
+							: scoreboardData.recordStatus;
 						scoreboardData = {
 							...scoreboardData,
 							decision: message.decision,
-							displayMode: message.displayMode
+							displayMode: message.displayMode,
+							recordStatus
 						};
 					}
 					return;
