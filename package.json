@@ -1,6 +1,6 @@
 {
   "name": "owlcms-tracker",
-  "version": "2.19.0",
+  "version": "2.19.1",
   "private": true,
   "scripts": {
     "dev": "node node_modules/vite/bin/vite.js dev --port 8096",
@@ -41,7 +41,7 @@
   },
   "type": "module",
   "dependencies": {
-    "@owlcms/tracker-core": "github:owlcms/tracker-core#1.5.11",
+    "@owlcms/tracker-core": "github:owlcms/tracker-core#1.15.12",
     "adm-zip": "^0.5.10",
     "gsap": "^3.13.0",
     "http-proxy-middleware": "^3.0.5",
