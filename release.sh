@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-REVISION="${1:-2.18.11}"
+REVISION="${1:-2.19.1}"
 set -euo pipefail
 
 # Wrapper for the npm-based release flow.
