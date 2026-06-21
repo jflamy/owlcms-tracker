@@ -62,6 +62,15 @@ function resolveTrackerCommit(existing) {
   );
 }
 
+function resolveTrackerVersion(pkg, existing) {
+  return (
+    (process.env.TRACKER_VERSION_OVERRIDE && process.env.TRACKER_VERSION_OVERRIDE.trim()) ||
+    pkg.version ||
+    existing.trackerVersion ||
+    'unknown'
+  );
+}
+
 function resolveTrackerCore() {
   // package-lock.json is copied into the Docker image, so it is the most
   // reliable source inside the container. Fall back to the installed module
@@ -92,7 +101,7 @@ function main() {
   const core = resolveTrackerCore();
 
   const info = {
-    trackerVersion: pkg.version || 'unknown',
+    trackerVersion: resolveTrackerVersion(pkg, existing),
     trackerCommit: resolveTrackerCommit(existing),
     trackerCoreVersion: core.version,
     trackerCoreCommit: core.commit,

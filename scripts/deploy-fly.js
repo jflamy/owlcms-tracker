@@ -2,13 +2,16 @@
 
 /**
  * Update @owlcms/tracker-core to a released tag, then run fly deploy.
+ * If the requested tracker-core tag does not exist yet, offer to run the
+ * tracker-core release flow first.
  *
  * Usage:
  *   npm run deploy:fly
- *   npm run deploy:fly -- 1.5.7
- *   npm run deploy:fly -- --core 1.5.7
- *   npm run deploy:fly -- 1.5.7 -- --ha=false
- *   npm run deploy:fly -- 1.5.7 --dry-run
+ *   npm run deploy:fly -- 2.19.3
+ *   npm run deploy:fly -- 2.19.3 1.15.15
+ *   npm run deploy:fly -- --version 2.19.3 --core 1.15.15
+ *   npm run deploy:fly -- 2.19.3 1.15.15 -- --ha=false
+ *   npm run deploy:fly -- 2.19.3 1.15.15 --dry-run
  *
  * After updating package files and deploying, the local npm link to
  * ../tracker-core is restored so local development keeps using the linked core.
@@ -24,19 +27,30 @@ import { runVersionChecks } from './package-shared.js';
 class UsageError extends Error {}
 
 function printUsage() {
-  console.log(`Usage: npm run deploy:fly -- [tracker-core-version] [options] [-- fly-deploy-args]
+  console.log(`Usage: npm run deploy:fly -- [tracker-version] [tracker-core-version] [options] [-- fly-deploy-args]
 
 Updates package.json and package-lock.json so Docker npm ci resolves the requested
-@owlcms/tracker-core tag, then runs fly deploy. The deploy defaults to --ha=false
-and runs 'fly scale count 1' afterward to keep the app on a single machine.
+@owlcms/tracker-core tag, then runs fly deploy. If the requested tracker-core
+tag does not exist yet, the script offers to run the tracker-core release flow
+first. The deploy defaults to --ha=false and runs 'fly scale count 1' afterward
+to keep the app on a single machine.
 
 Arguments:
-  tracker-core-version   Optional tracker-core tag, for example 1.5.7.
+  tracker-version        Optional tracker version to show on the landing page.
+                         If omitted, package.json version is used.
+  tracker-core-version   Optional tracker-core tag, for example 1.15.15.
                          If omitted, the latest semver tag is fetched from GitHub.
 
 Options:
   --core <version>       Same as the positional tracker-core-version.
   --core=<version>       Same as the positional tracker-core-version.
+  --version <version>    Override the tracker version shown on the landing page
+                         for this deploy only.
+  --version=<version>    Same as --version <version>.
+  --tracker-version <version>
+                         Same as --version <version>.
+  --tracker-version=<version>
+                         Same as --version <version>.
   --dry-run, -n          Show the tracker-core tag that would be deployed without
                          changing package files, running fly deploy, or relinking.
   --no-relink            Do not restore the local npm link to ../tracker-core
@@ -45,9 +59,10 @@ Options:
 
 Examples:
   npm run deploy:fly
-  npm run deploy:fly -- 1.5.7
-  npm run deploy:fly -- --core 1.5.7 --dry-run
-  npm run deploy:fly -- 1.5.7 -- --ha=false
+  npm run deploy:fly -- 2.19.3
+  npm run deploy:fly -- 2.19.3 1.15.15
+  npm run deploy:fly -- --version 2.19.3 --core 1.15.15 --dry-run
+  npm run deploy:fly -- 2.19.3 1.15.15 -- --ha=false
 `);
 }
 
@@ -57,6 +72,7 @@ function parseArgs(argv) {
   const flyArgs = delimiterIndex === -1 ? [] : argv.slice(delimiterIndex + 1);
 
   let trackerCoreVersion = null;
+  let trackerVersionOverride = null;
   let dryRun = false;
   let restoreLinkAfter = true;
 
@@ -75,6 +91,38 @@ function parseArgs(argv) {
 
     if (arg === '--no-relink') {
       restoreLinkAfter = false;
+      continue;
+    }
+
+    if (arg === '--version' || arg === '--tracker-version') {
+      const value = ownArgs[i + 1];
+      if (!value || value.startsWith('--')) {
+        throw new UsageError(`${arg} requires a tracker version`);
+      }
+      trackerVersionOverride = setOptionalVersion(
+        trackerVersionOverride,
+        value,
+        'tracker version override'
+      );
+      i += 1;
+      continue;
+    }
+
+    if (arg.startsWith('--version=')) {
+      trackerVersionOverride = setOptionalVersion(
+        trackerVersionOverride,
+        arg.slice('--version='.length),
+        'tracker version override'
+      );
+      continue;
+    }
+
+    if (arg.startsWith('--tracker-version=')) {
+      trackerVersionOverride = setOptionalVersion(
+        trackerVersionOverride,
+        arg.slice('--tracker-version='.length),
+        'tracker version override'
+      );
       continue;
     }
 
@@ -97,18 +145,27 @@ function parseArgs(argv) {
       throw new UsageError(`Unknown option: ${arg}`);
     }
 
+    if (!trackerVersionOverride) {
+      trackerVersionOverride = setOptionalVersion(arg, arg, 'tracker version override');
+      continue;
+    }
+
     trackerCoreVersion = setTrackerCoreVersion(trackerCoreVersion, arg);
   }
 
-  return { trackerCoreVersion, dryRun, restoreLinkAfter, flyArgs };
+  return { trackerCoreVersion, trackerVersionOverride, dryRun, restoreLinkAfter, flyArgs };
 }
 
 function setTrackerCoreVersion(currentValue, nextValue) {
+  return setOptionalVersion(currentValue, nextValue, 'tracker-core version');
+}
+
+function setOptionalVersion(currentValue, nextValue, label) {
   if (!nextValue) {
-    throw new UsageError('tracker-core version cannot be empty');
+    throw new UsageError(`${label} cannot be empty`);
   }
   if (currentValue && currentValue !== nextValue) {
-    throw new UsageError(`tracker-core version specified more than once: ${currentValue}, ${nextValue}`);
+    throw new UsageError(`${label} specified more than once: ${currentValue}, ${nextValue}`);
   }
   return nextValue;
 }
@@ -131,23 +188,34 @@ function readResolvedTrackerCore() {
   };
 }
 
-function generateVersionFile() {
+function generateVersionFile(trackerVersionOverride) {
   // Bake the version file on the host so the tracker git commit is captured.
   // The Docker build excludes .git (see .dockerignore), so the commit cannot be
   // resolved inside the container; the file is copied into the image instead.
   console.log('\n🔖 Generating build-time version info ...');
-  const result = spawnSync('node', ['scripts/generate-version.js'], { stdio: 'inherit' });
+  const env = {
+    ...process.env,
+    ...(trackerVersionOverride ? { TRACKER_VERSION_OVERRIDE: trackerVersionOverride } : {})
+  };
+  const result = spawnSync('node', ['scripts/generate-version.js'], { stdio: 'inherit', env });
   if (result.error || result.status !== 0) {
     throw new Error('Failed to generate version file (scripts/generate-version.js)');
   }
 }
 
-function runFlyDeploy(flyArgs) {
+function runFlyDeploy(flyArgs, trackerVersionOverride) {
   // This app MUST run as a single machine (in-memory competition hub). Default to
   // --ha=false so a fresh launch never gets a standby HA machine. If the caller
   // passes their own --ha flag, respect it instead.
   const hasHaFlag = flyArgs.some((arg) => arg === '--ha' || arg.startsWith('--ha='));
-  const deployArgs = hasHaFlag ? flyArgs : ['--ha=false', ...flyArgs];
+  const versionArgs = trackerVersionOverride
+    ? ['--build-arg', `TRACKER_VERSION_OVERRIDE=${trackerVersionOverride}`]
+    : [];
+  const deployArgs = [
+    ...(hasHaFlag ? [] : ['--ha=false']),
+    ...versionArgs,
+    ...flyArgs
+  ];
 
   console.log(`\n🚀 Running: fly deploy${deployArgs.length ? ` ${deployArgs.join(' ')}` : ''}`);
   const result = spawnSync('fly', ['deploy', ...deployArgs], { stdio: 'inherit' });
@@ -230,7 +298,13 @@ function restoreLocalLink() {
 }
 
 async function main() {
-  const { trackerCoreVersion, dryRun, restoreLinkAfter, flyArgs } = parseArgs(process.argv.slice(2));
+  const {
+    trackerCoreVersion,
+    trackerVersionOverride,
+    dryRun,
+    restoreLinkAfter,
+    flyArgs
+  } = parseArgs(process.argv.slice(2));
 
   if (dryRun) {
     const selectedVersion = await runVersionChecks({
@@ -246,6 +320,7 @@ async function main() {
     console.log(`   tracker-core tag to deploy:  ${selectedVersion}`);
     console.log(`   currently pinned version:    ${current.version}`);
     console.log(`   currently pinned commit:     ${current.commit}`);
+    console.log(`   landing page version:        ${trackerVersionOverride || 'package.json version'}`);
     return;
   }
 
@@ -253,7 +328,7 @@ async function main() {
     const selectedVersion = await runVersionChecks({
       requestedVersion: trackerCoreVersion,
       promptOnAuto: false,
-      allowRelease: false,
+      allowRelease: true,
       updatePackageJson: true,
       updatePackageLockFile: true
     });
@@ -264,9 +339,10 @@ async function main() {
     console.log(`   package version:      ${resolved.version}`);
     console.log(`   resolved dependency:  ${resolved.resolved}`);
     console.log(`   resolved commit:      ${resolved.commit}`);
+    console.log(`   landing page version: ${trackerVersionOverride || 'package.json version'}`);
 
-    generateVersionFile();
-    runFlyDeploy(flyArgs);
+    generateVersionFile(trackerVersionOverride);
+    runFlyDeploy(flyArgs, trackerVersionOverride);
     enforceSingleMachine(extractAppArgs(flyArgs));
   } finally {
     if (restoreLinkAfter) {

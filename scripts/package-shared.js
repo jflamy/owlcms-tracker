@@ -24,6 +24,32 @@ export function promptConfirmation(message) {
   });
 }
 
+function getTrackerCoreDirtyStatus() {
+  try {
+    return execSync('git status --porcelain', {
+      cwd: '../tracker-core',
+      encoding: 'utf8'
+    }).trim();
+  } catch (error) {
+    throw new Error(`Failed to check tracker-core working tree: ${error.message}`);
+  }
+}
+
+function trackerCoreDirtyPaths(statusText) {
+  return statusText
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const arrowIndex = line.indexOf('->');
+      if (arrowIndex !== -1) {
+        return line.slice(arrowIndex + 2).trim();
+      }
+
+      return line.substring(2).trim();
+    });
+}
+
 export function fetchLatestGitHubTag(owner, repo) {
   return new Promise((resolve, reject) => {
     const options = {
@@ -135,6 +161,18 @@ export async function resolveTrackerCoreVersion({
     if (!allowRelease) {
       throw new Error(`tracker-core version '${trackerCoreVersion}' does not exist`);
     }
+
+    const dirtyStatus = getTrackerCoreDirtyStatus();
+    const dirtyPaths = trackerCoreDirtyPaths(dirtyStatus);
+    const onlyReleaseNotesDirty =
+      dirtyPaths.length === 1 && dirtyPaths[0] === 'ReleaseNotes.md';
+
+    if (dirtyStatus && !onlyReleaseNotesDirty) {
+      throw new Error(
+        `tracker-core version '${trackerCoreVersion}' does not exist and ../tracker-core has uncommitted changes:\n${dirtyStatus}\n\nCommit or stash those changes before retrying deploy:fly.`
+      );
+    }
+
     const runRelease = await promptConfirmation(`tracker-core@${trackerCoreVersion} not found. Run tracker-core release now?`);
     if (!runRelease) {
       throw new Error(`tracker-core version '${trackerCoreVersion}' not found`);

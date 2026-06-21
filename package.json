@@ -8,7 +8,8 @@
     "dev": "node node_modules/vite/bin/vite.js dev --port 8096",
     "predev:learning": "node scripts/generate-version.js",
     "dev:learning": "cross-env LEARNING_MODE=true node node_modules/vite/bin/vite.js dev --port 8096",
-    "build": "node scripts/generate-version.js && svelte-kit sync && vite build && node scripts/copy-runtime-server-files.js",
+    "build:bundle": "svelte-kit sync && vite build && node scripts/copy-runtime-server-files.js",
+    "build": "node scripts/generate-version.js && npm run build:bundle",
     "preview": "node start-with-ws.js",
     "check": "svelte-kit sync && svelte-check --tsconfig ./jsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./jsconfig.json --watch",
@@ -44,7 +45,7 @@
   },
   "type": "module",
   "dependencies": {
-    "@owlcms/tracker-core": "github:owlcms/tracker-core#1.15.14",
+    "@owlcms/tracker-core": "github:owlcms/tracker-core#1.15.15",
     "adm-zip": "^0.5.10",
     "gsap": "^3.13.0",
     "http-proxy-middleware": "^3.0.5",
