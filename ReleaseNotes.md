@@ -5,6 +5,8 @@
 
 ##### Release log
 
+- 2.19.5: Show snatch and cj ranks for 3-medal events; fixed the leader from previous sessions header.
+
 - 2.19.4: Hide the record block on scoreboards during breaks and ceremonies and done (no current athlete)
 
 - 2.19.3: Fix behavior and use translation when announcer goes to "No Session" and starts a new one

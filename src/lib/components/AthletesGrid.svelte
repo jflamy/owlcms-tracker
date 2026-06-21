@@ -7,6 +7,44 @@
 	export let showLeaders = false;
 	export let hasLeaders = false;
 	export let data = {};
+
+	$: displaySettings = data.displaySettings || {};
+	$: showLiftRanks = displaySettings.showLiftRanks === true;
+	$: showTotalRank = displaySettings.showTotalRank !== false;
+	$: snatchGroupSpan = showLiftRanks ? 5 : 4;
+	$: snatchSpacerCol = 6;
+	$: snatchAttempt1Col = 7;
+	$: snatchAttempt2Col = 8;
+	$: snatchAttempt3Col = 9;
+	$: snatchBestCol = 10;
+	$: snatchRankCol = showLiftRanks ? 11 : null;
+	$: middleSpacerCol = showLiftRanks ? 12 : 11;
+	$: cjAttempt1Col = showLiftRanks ? 13 : 12;
+	$: cjAttempt2Col = showLiftRanks ? 14 : 13;
+	$: cjAttempt3Col = showLiftRanks ? 15 : 14;
+	$: cjBestCol = showLiftRanks ? 16 : 15;
+	$: cjRankCol = showLiftRanks ? 17 : null;
+	$: totalSpacerCol = showLiftRanks ? 18 : 16;
+	$: totalCol = showLiftRanks ? 19 : 17;
+	$: totalRankCol = showLiftRanks ? 20 : 18;
+	$: gridTemplateColumns = [
+		'var(--col-start)',
+		'var(--col-name)',
+		'var(--col-cat)',
+		'var(--col-born)',
+		'var(--col-team)',
+		'var(--col-gap)',
+		'repeat(3, var(--col-attempt))',
+		'var(--col-best)',
+		...(showLiftRanks ? ['var(--col-rank)'] : []),
+		'var(--col-gap)',
+		'repeat(3, var(--col-attempt))',
+		'var(--col-best)',
+		...(showLiftRanks ? ['var(--col-rank)'] : []),
+		'var(--col-gap)',
+		'var(--col-total)',
+		...(showTotalRank ? ['var(--col-rank)'] : [])
+	].join(' ');
 	
 	// Helper functions (same as in parent component)
 	export function shouldRenderFlag(url) {
@@ -79,36 +117,46 @@
 	}
 </script>
 
-<div class="scoreboard-grid" role="grid">
+<div class="scoreboard-grid" role="grid" style:grid-template-columns={gridTemplateColumns}>
 	<div class="grid-row header header-primary" role="row">
-		<div class="cell header col-start span-two" role="columnheader">{headers.start || '!!Start'}</div>
-		<div class="cell header col-name span-two" role="columnheader">{headers.name || '!!Name'}</div>
-		<div class="cell header col-cat span-two" role="columnheader">{headers.category || '!!Cat.'}</div>
-		<div class="cell header col-born span-two" role="columnheader">{headers.birth || '!!Born'}</div>
-		<div class="cell header col-team span-two" role="columnheader">{headers.team || '!!Team'}</div>
-		<div class="cell header v-spacer v-spacer-snatch span-two" aria-hidden="true"></div>
-		<div class="cell header col-group col-group-snatch" role="columnheader">{headers.snatch || '!!Snatch'}</div>
-		<div class="cell header v-spacer v-spacer-middle span-two" aria-hidden="true"></div>
-		<div class="cell header col-group col-group-cj" role="columnheader">{@html headers.cleanJerk || '!!Clean &amp; Jerk'}</div>
-		<div class="cell header v-spacer v-spacer-total span-two" aria-hidden="true"></div>
-		<div class="cell header col-total span-two" role="columnheader">{headers.total || '!!Total'}</div>
-		<div class="cell header col-rank span-two" role="columnheader">{headers.rank || '!!Rank'}</div>
+		<div class="cell header col-start span-two" role="columnheader" style:grid-column="1">{headers.start || '!!Start'}</div>
+		<div class="cell header col-name span-two" role="columnheader" style:grid-column="2">{headers.name || '!!Name'}</div>
+		<div class="cell header col-cat span-two" role="columnheader" style:grid-column="3">{headers.category || '!!Cat.'}</div>
+		<div class="cell header col-born span-two" role="columnheader" style:grid-column="4">{headers.birth || '!!Born'}</div>
+		<div class="cell header col-team span-two" role="columnheader" style:grid-column="5">{headers.team || '!!Team'}</div>
+		<div class="cell header v-spacer v-spacer-snatch span-two" aria-hidden="true" style:grid-column={String(snatchSpacerCol)}></div>
+		<div class="cell header col-group col-group-snatch" role="columnheader" style={`grid-column: ${snatchAttempt1Col} / span ${snatchGroupSpan};`}>{headers.snatch || '!!Snatch'}</div>
+		<div class="cell header v-spacer v-spacer-middle span-two" aria-hidden="true" style:grid-column={String(middleSpacerCol)}></div>
+		<div class="cell header col-group col-group-cj" role="columnheader" style={`grid-column: ${cjAttempt1Col} / span ${snatchGroupSpan};`}>{@html headers.cleanJerk || '!!Clean &amp; Jerk'}</div>
+		<div class="cell header v-spacer v-spacer-total span-two" aria-hidden="true" style:grid-column={String(totalSpacerCol)}></div>
+		<div class="cell header col-total span-two" role="columnheader" style:grid-column={String(totalCol)}>{headers.total || '!!Total'}</div>
+		{#if showTotalRank}
+			<div class="cell header col-rank span-two" role="columnheader" style:grid-column={String(totalRankCol)}>{headers.rank || '!!Rank'}</div>
+		{/if}
 	</div>
 	<div class="grid-row header header-secondary" role="row">
-		<div class="cell header col-name-portrait" role="columnheader">{headers.name || '!!Name'}</div>
-		<div class="cell header v-spacer v-spacer-snatch" aria-hidden="true"></div>
-		<div class="cell header col-attempt snatch-1" role="columnheader">1</div>
-		<div class="cell header col-attempt snatch-2" role="columnheader">2</div>
-		<div class="cell header col-attempt snatch-3" role="columnheader">3</div>
-		<div class="cell header col-best snatch-best" role="columnheader">{headers.best || '!!✔'}</div>
-		<div class="cell header v-spacer v-spacer-middle" aria-hidden="true"></div>
-		<div class="cell header col-attempt cj-1" role="columnheader">1</div>
-		<div class="cell header col-attempt cj-2" role="columnheader">2</div>
-		<div class="cell header col-attempt cj-3" role="columnheader">3</div>
-		<div class="cell header col-best cj-best" role="columnheader">{headers.best || '!!✓'}</div>
-		<div class="cell header v-spacer v-spacer-total" aria-hidden="true"></div>
-		<div class="cell header col-total-portrait" role="columnheader">{headers.total || '!!Total'}</div>
-		<div class="cell header col-rank-portrait" role="columnheader">{headers.rank || '!!Rank'}</div>
+		<div class="cell header col-name-portrait" role="columnheader" style:grid-column="2">{headers.name || '!!Name'}</div>
+		<div class="cell header v-spacer v-spacer-snatch" aria-hidden="true" style:grid-column={String(snatchSpacerCol)}></div>
+		<div class="cell header col-attempt snatch-1" role="columnheader" style:grid-column={String(snatchAttempt1Col)}>1</div>
+		<div class="cell header col-attempt snatch-2" role="columnheader" style:grid-column={String(snatchAttempt2Col)}>2</div>
+		<div class="cell header col-attempt snatch-3" role="columnheader" style:grid-column={String(snatchAttempt3Col)}>3</div>
+		<div class="cell header col-best snatch-best" role="columnheader" style:grid-column={String(snatchBestCol)}>{headers.best || '!!✔'}</div>
+		{#if showLiftRanks}
+			<div class="cell header col-rank snatch-rank" role="columnheader" style:grid-column={String(snatchRankCol)}>{headers.rank || '!!Rank'}</div>
+		{/if}
+		<div class="cell header v-spacer v-spacer-middle" aria-hidden="true" style:grid-column={String(middleSpacerCol)}></div>
+		<div class="cell header col-attempt cj-1" role="columnheader" style:grid-column={String(cjAttempt1Col)}>1</div>
+		<div class="cell header col-attempt cj-2" role="columnheader" style:grid-column={String(cjAttempt2Col)}>2</div>
+		<div class="cell header col-attempt cj-3" role="columnheader" style:grid-column={String(cjAttempt3Col)}>3</div>
+		<div class="cell header col-best cj-best" role="columnheader" style:grid-column={String(cjBestCol)}>{headers.best || '!!✓'}</div>
+		{#if showLiftRanks}
+			<div class="cell header col-rank cj-rank" role="columnheader" style:grid-column={String(cjRankCol)}>{headers.rank || '!!Rank'}</div>
+		{/if}
+		<div class="cell header v-spacer v-spacer-total" aria-hidden="true" style:grid-column={String(totalSpacerCol)}></div>
+		<div class="cell header col-total-portrait" role="columnheader" style:grid-column={String(totalCol)}>{headers.total || '!!Total'}</div>
+		{#if showTotalRank}
+			<div class="cell header col-rank-portrait" role="columnheader" style:grid-column={String(totalRankCol)}>{headers.rank || '!!Rank'}</div>
+		{/if}
 	</div>
 
 	{#each allAthletes as athlete}
@@ -144,6 +192,9 @@
 					<span class="attempt-value">{displayAttempt(athlete.sattempts?.[2])}</span>
 				</div>
 				<div class="cell best" role="gridcell">{athlete.bestSnatch || '-'}</div>
+				{#if showLiftRanks}
+					<div class="cell rank" role="gridcell">{athlete.snatchRank || '-'}</div>
+				{/if}
 				<div class="cell v-spacer" aria-hidden="true"></div>
 				<div class="cell attempt {getAttemptClass(athlete.cattempts?.[0])}" role="gridcell">
 					<span class="attempt-value">{displayAttempt(athlete.cattempts?.[0])}</span>
@@ -155,9 +206,14 @@
 					<span class="attempt-value">{displayAttempt(athlete.cattempts?.[2])}</span>
 				</div>
 				<div class="cell best" role="gridcell">{athlete.bestCleanJerk || '-'}</div>
+				{#if showLiftRanks}
+					<div class="cell rank" role="gridcell">{athlete.cleanJerkRank || '-'}</div>
+				{/if}
 				<div class="cell v-spacer" aria-hidden="true"></div>
 				<div class="cell total" role="gridcell">{athlete.total || '-'}</div>
-				<div class="cell rank" role="gridcell">{athlete.totalRank || '-'}</div>
+				{#if showTotalRank}
+					<div class="cell rank" role="gridcell">{athlete.totalRank || '-'}</div>
+				{/if}
 			</div>
 		{/if}
 	{/each}
@@ -204,6 +260,9 @@
 						<span class="attempt-value">{displayAttempt(leader.sattempts?.[2])}</span>
 					</div>
 					<div class="cell best" role="gridcell">{leader.bestSnatch || '-'}</div>
+					{#if showLiftRanks}
+						<div class="cell rank" role="gridcell">{leader.snatchRank || '-'}</div>
+					{/if}
 					<div class="cell v-spacer" aria-hidden="true"></div>
 					<div class="cell attempt {getAttemptClass(leader.cattempts?.[0])}" role="gridcell">
 						<span class="attempt-value">{displayAttempt(leader.cattempts?.[0])}</span>
@@ -215,9 +274,14 @@
 						<span class="attempt-value">{displayAttempt(leader.cattempts?.[2])}</span>
 					</div>
 					<div class="cell best" role="gridcell">{leader.bestCleanJerk || '-'}</div>
+					{#if showLiftRanks}
+						<div class="cell rank" role="gridcell">{leader.cleanJerkRank || '-'}</div>
+					{/if}
 					<div class="cell v-spacer" aria-hidden="true"></div>
 					<div class="cell total" role="gridcell">{leader.total || '-'}</div>
-					<div class="cell rank" role="gridcell">{leader.totalRank || '-'}</div>
+					{#if showTotalRank}
+						<div class="cell rank" role="gridcell">{leader.totalRank || '-'}</div>
+					{/if}
 				</div>
 			{/if}
 		{/each}
@@ -228,8 +292,8 @@
 	.scoreboard-grid {
 		--col-start: 4.9rem;
 		--col-name: minmax(14rem, 2.5fr);
-		--col-cat: 14ch;
-		--col-born: 14ch;
+		--col-cat: max-content;
+		--col-born: max-content;
 		--col-team: minmax(8rem, 1.8fr);
 		--col-gap: 0.65rem;
 		--col-attempt: 4.4rem;
@@ -244,21 +308,6 @@
 		display: grid;
 		width: 100%;
 		flex: 1;
-		grid-template-columns:
-			var(--col-start)
-			var(--col-name)
-			var(--col-cat)
-			var(--col-born)
-			var(--col-team)
-			var(--col-gap)
-			repeat(3, var(--col-attempt))
-			var(--col-best)
-			var(--col-gap)
-			repeat(3, var(--col-attempt))
-			var(--col-best)
-			var(--col-gap)
-			var(--col-total)
-			var(--col-rank);
 		/* Use the same variables for row heights and sticky positioning to avoid gaps */
 		grid-template-rows: var(--header-primary-height) var(--header-secondary-height) var(--template-rows);
 		row-gap: 0;
@@ -397,9 +446,21 @@
 
 	.cell.cat {
 		justify-content: center;
-		padding: 0;
+		padding-left: 1ch;
+		padding-right: 1ch;
 		text-align: center;
 		white-space: nowrap;
+	}
+
+	.cell.born {
+		padding-left: 1ch;
+		padding-right: 1ch;
+	}
+
+	.header-primary .col-cat,
+	.header-primary .col-born {
+		padding-left: 1ch;
+		padding-right: 1ch;
 	}
 
 	.cell.start-num {
@@ -533,35 +594,6 @@
 		text-align: left;
 	}
 
-	/* Column positioning for headers */
-	.header-primary .col-start { grid-column: 1; }
-	.header-primary .col-name { grid-column: 2; }
-	.header-primary .col-cat { grid-column: 3; }
-	.header-primary .col-born { grid-column: 4; }
-	.header-primary .col-team { grid-column: 5; }
-	.header-primary .v-spacer-snatch { grid-column: 6; }
-	.header-primary .col-group-snatch { grid-column: 7 / span 4; }
-	.header-primary .v-spacer-middle { grid-column: 11; }
-	.header-primary .col-group-cj { grid-column: 12 / span 4; }
-	.header-primary .v-spacer-total { grid-column: 16; }
-	.header-primary .col-total { grid-column: 17; }
-	.header-primary .col-rank { grid-column: 18; }
-
-	.header-secondary .col-name-portrait { grid-column: 2; }
-	.header-secondary .v-spacer-snatch { grid-column: 6; }
-	.header-secondary .snatch-1 { grid-column: 7; }
-	.header-secondary .snatch-2 { grid-column: 8; }
-	.header-secondary .snatch-3 { grid-column: 9; }
-	.header-secondary .snatch-best { grid-column: 10; }
-	.header-secondary .v-spacer-middle { grid-column: 11; }
-	.header-secondary .cj-1 { grid-column: 12; }
-	.header-secondary .cj-2 { grid-column: 13; }
-	.header-secondary .cj-3 { grid-column: 14; }
-	.header-secondary .cj-best { grid-column: 15; }
-	.header-secondary .v-spacer-total { grid-column: 16; }
-	.header-secondary .col-total-portrait { grid-column: 17; }
-	.header-secondary .col-rank-portrait { grid-column: 18; }
-
 	.header-secondary .col-name-portrait,
 	.header-secondary .col-total-portrait,
 	.header-secondary .col-rank-portrait {
@@ -586,8 +618,8 @@
 			--col-start: 4.5rem;
 			--col-name: minmax(12rem, 2.3fr);
 			--col-team: minmax(7.5rem, 1.7fr);
-			--col-cat: 12ch;
-			--col-born: 12ch;
+			--col-cat: max-content;
+			--col-born: max-content;
 			--col-attempt: 4rem;
 			--col-best: 4rem;
 			--col-total: 4.5rem;
@@ -606,8 +638,8 @@
 			--col-start: 4rem;
 			--col-name: minmax(11rem, 2.1fr);
 			--col-team: minmax(7rem, 1.5fr);
-			--col-cat: 10ch;
-			--col-born: 10ch;
+			--col-cat: max-content;
+			--col-born: max-content;
 			--col-attempt: 3.6rem;
 			--col-best: 3.6rem;
 			--col-total: 4.2rem;
