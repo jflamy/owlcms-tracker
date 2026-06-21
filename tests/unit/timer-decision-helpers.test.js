@@ -135,6 +135,78 @@ describe('Timer and Decision Helpers', () => {
 	});
 
 	describe('computeDisplayMode - SESSION_DONE break', () => {
+		it('keeps a stopped timer visible until down and hidden after reset', () => {
+			const stoppedFopUpdate = {
+				mode: 'CURRENT_ATHLETE',
+				fopState: 'TIME_STOPPED',
+				athleteTimerEventType: 'StopTime',
+				athleteMillisRemaining: 57060,
+				timeAllowed: 60000
+			};
+			const stoppedTimers = extractTimers(stoppedFopUpdate, 'en');
+			const stoppedDecision = extractDecisionState(stoppedFopUpdate);
+			const stoppedDisplay = computeDisplayMode(stoppedTimers.timer, stoppedTimers.breakTimer, stoppedDecision);
+
+			expect(stoppedTimers.timer.timeRemaining).toBe(57060);
+			expect(stoppedDisplay.displayMode).toBe('athlete');
+
+			const downFopUpdate = {
+				...stoppedFopUpdate,
+				fopState: 'DOWN_SIGNAL_VISIBLE',
+				decisionEventType: 'DOWN_SIGNAL',
+				decisionsVisible: 'false',
+				down: 'true'
+			};
+			const downTimers = extractTimers(downFopUpdate, 'en');
+			const downDecision = extractDecisionState(downFopUpdate);
+			const downDisplay = computeDisplayMode(downTimers.timer, downTimers.breakTimer, downDecision);
+
+			expect(downTimers.timer.timeRemaining).toBe(57060);
+			expect(downDisplay.displayMode).toBe('decision');
+
+			const resetFopUpdate = {
+				...stoppedFopUpdate,
+				fopState: 'DECISION_VISIBLE',
+				decisionEventType: 'RESET',
+				decisionsVisible: 'false',
+				down: 'false'
+			};
+			const resetTimers = extractTimers(resetFopUpdate, 'en');
+			const resetDecision = extractDecisionState(resetFopUpdate);
+			const resetDisplay = computeDisplayMode(resetTimers.timer, resetTimers.breakTimer, resetDecision);
+
+			expect(resetTimers.timer.timeRemaining).toBe(57060);
+			expect(resetDisplay.displayMode).toBe('none');
+		});
+
+		it('shows a Clean & Jerk countdown break even when prior decision fields are still present', () => {
+			const fopUpdate = {
+				mode: 'LIFT_COUNTDOWN',
+				fopState: 'BREAK',
+				fullName: 'Session M1 – Time before Clean & Jerk',
+				liftTypeKey: 'Clean_and_Jerk',
+				breakTimerEventType: 'BreakStarted',
+				breakType: 'FIRST_CJ',
+				break: 'true',
+				breakMillisRemaining: 600000,
+				breakStartTimeMillis: Date.now(),
+				athleteTimerEventType: 'SetTime',
+				athleteMillisRemaining: 60000,
+				decisionEventType: 'FULL_DECISION',
+				decisionsVisible: 'true',
+				down: 'true'
+			};
+
+			const { timer, breakTimer } = extractTimers(fopUpdate, 'en');
+			const decision = extractDecisionState(fopUpdate);
+			const { displayMode } = computeDisplayMode(timer, breakTimer, decision);
+
+			expect(decision.visible).toBe(false);
+			expect(timer.visible).toBe(false);
+			expect(breakTimer.visible).toBe(true);
+			expect(displayMode).toBe('break');
+		});
+
 		it('displays nothing (none) during SESSION_DONE', () => {
 			const timer = { visible: false, isActive: true };
 			const breakTimer = { visible: false, isActive: true };

@@ -73,6 +73,8 @@ export function createTimer() {
 	function updateTimer(timerData) {
 		if (!timerData) {
 			currentTimerData = null;
+			timerStartTime = null;
+			timerInitialRemaining = 0;
 			timerSeconds = 0;
 			notifySubscribers();
 			return;
@@ -82,6 +84,8 @@ export function createTimer() {
 
 		// If timer is stopped, show the time without counting down
 		if (timerData.state === 'stopped') {
+			timerStartTime = null;
+			timerInitialRemaining = 0;
 			// Clamp negative values to 0 (time expired)
 			timerSeconds = Math.max(0, Math.ceil((timerData.timeRemaining || 0) / 1000));
 			notifySubscribers();
@@ -90,6 +94,8 @@ export function createTimer() {
 
 		// If timer is set (but not running), show the time without counting down
 		if (timerData.state === 'set') {
+			timerStartTime = null;
+			timerInitialRemaining = 0;
 			// Clamp negative values to 0 (time expired)
 			timerSeconds = Math.max(0, Math.ceil((timerData.timeRemaining || 0) / 1000));
 			notifySubscribers();
@@ -165,6 +171,8 @@ export function createTimer() {
 			timerInterval = null;
 		}
 		currentTimerData = null;
+		timerStartTime = null;
+		timerInitialRemaining = 0;
 	}
 
 	/**

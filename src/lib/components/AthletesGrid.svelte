@@ -597,7 +597,7 @@
 
 	.header-secondary .col-name-portrait,
 	.header-secondary .col-total-portrait,
-	.header-secondary .col-rank-portrait:not(.total-rank) {
+	.header-secondary .col-rank-portrait {
 		visibility: hidden;
 		pointer-events: none;
 		padding: 0;
