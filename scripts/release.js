@@ -207,6 +207,9 @@ try {
 
 // Trigger GitHub Actions workflow using gh CLI
 console.log(`\n▶️  Triggering release workflow for version ${version}...`);
+// Captured BEFORE dispatch so we can tell the newly triggered run apart from any
+// pre-existing run (avoids latching onto a stale/previous run).
+let prevRunId = '';
 try {
   // Ensure we don't trigger a workflow from a dirty working tree.
   assertCleanWorkingTree({ allowedDirty: [] });
@@ -225,13 +228,14 @@ try {
     process.exit(1);
   }
 
+  // Baseline: most recent run for this workflow before we dispatch a new one.
+  prevRunId = getLatestRunId();
+
   // Trigger the workflow on the pushed branch ref
   const submodulesArg = includeSubmodules ? ' -f includeSubmodules=true' : ' -f includeSubmodules=false';
   const trackerCoreArg = trackerCoreVersion ? ` -f trackerCoreVersion=${trackerCoreVersion}` : '';
   execSync(`gh workflow run release.yaml --ref ${branch} -f revision=${version}${trackerCoreArg}${submodulesArg}`, { stdio: 'inherit' });
   console.log('✓ Workflow triggered');
-  console.log('⏳ Waiting 15 seconds for GitHub to queue the run...');
-  sleepSync(15000);
 } catch (error) {
   console.error('⚠️  Failed to trigger workflow via gh CLI');
   console.error(`Error: ${error.message}`);
@@ -248,26 +252,44 @@ function sleepSync(ms) {
   Atomics.wait(int32, 0, 0, ms);
 }
 
-// Get the most recent run ID for release.yaml workflow
-console.log('\n👀 Watching GitHub Actions run (via gh)...');
-let runId;
-try {
-  const runsJson = execSync('gh run list --workflow=release.yaml --limit=1 --json databaseId', { encoding: 'utf8' });
-  const runs = JSON.parse(runsJson);
-  if (runs.length > 0) {
-    runId = runs[0].databaseId;
+// Return the databaseId of the most recent release.yaml run, or '' if none/error.
+function getLatestRunId() {
+  try {
+    const out = execSync('gh run list --workflow=release.yaml --limit=1 --json databaseId', { encoding: 'utf8' });
+    const runs = JSON.parse(out);
+    return runs.length > 0 ? String(runs[0].databaseId) : '';
+  } catch {
+    return '';
   }
-} catch (e) {
-  console.error('⚠️  Could not get run ID - view manually at:');
+}
+
+// Poll for the newly triggered run instead of relying on a fixed sleep.
+// Accept only a run that is queued/in_progress AND different from the pre-dispatch
+// baseline, so we never watch a stale/previous run.
+console.log('\n⏳ Waiting for the new GitHub Actions run to appear...');
+let runId = '';
+for (let attempt = 0; attempt < 60; attempt++) {
+  try {
+    const out = execSync('gh run list --workflow=release.yaml --limit=1 --json databaseId,status', { encoding: 'utf8' });
+    const runs = JSON.parse(out);
+    const candidate = runs.find((r) => r.status === 'queued' || r.status === 'in_progress');
+    if (candidate && String(candidate.databaseId) !== prevRunId) {
+      runId = String(candidate.databaseId);
+      break;
+    }
+  } catch {
+    // Transient query failure; retry on the next iteration.
+  }
+  sleepSync(3000);
+}
+
+if (!runId) {
+  console.error('⚠️  Could not find the newly triggered run - view manually at:');
   console.error('    https://github.com/owlcms/owlcms-tracker/actions');
   process.exit(1);
 }
 
-if (!runId) {
-  console.error('⚠️  No workflow runs found - view manually at:');
-  console.error('    https://github.com/owlcms/owlcms-tracker/actions');
-  process.exit(1);
-}
+console.log(`\n👀 Watching GitHub Actions run ${runId} (via gh)...`);
 
 try {
   execSync(`gh run watch ${runId} --exit-status`, { stdio: 'inherit' });
