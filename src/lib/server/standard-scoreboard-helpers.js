@@ -13,7 +13,7 @@ import { extractRecordsFromUpdate } from '$lib/server/records-extractor.js';
 import { getFlagUrl } from '$lib/server/flag-resolver.js';
 import { buildCacheKey, registerCache } from '$lib/server/cache-utils.js';
 import { extractTimerAndDecisionState } from '$lib/server/timer-decision-helpers.js';
-import { computeAttemptBarVisibility } from '$lib/server/attempt-bar-visibility.js';
+import { computeAttemptBarVisibility, hasCurrentAthlete } from '$lib/server/attempt-bar-visibility.js';
 import { formatMessage } from '@owlcms/tracker-core/utils';
 
 // Import hub-bound presentation helpers from shared module
@@ -124,8 +124,12 @@ export function getScoreboardData(scoreboardType, fopName = 'A', options = {}) {
 	// Get athlete entries based on data source
 	let athleteEntries = getAthleteEntries(config.dataSource, fopName, fopUpdate);
 	
-	const records = extractRecordsFromUpdate(fopUpdate);
-	const recordStatus = fopUpdate?.recordKind && fopUpdate.recordKind !== 'none'
+	const mode = fopUpdate?.mode || 'WAIT';
+	const inBreakState = isBreakMode(mode) || fopUpdate?.break === 'true' || fopUpdate?.break === true || fopUpdate?.fopState === 'BREAK';
+	const hasLiveCurrentAthlete = !inBreakState && hasCurrentAthlete(fopUpdate, sessionStatus);
+	const records = hasLiveCurrentAthlete ? extractRecordsFromUpdate(fopUpdate) : [];
+	const hasLiveRecordAttempt = fopUpdate?.recordKind !== 'attempt' || hasLiveCurrentAthlete;
+	const recordStatus = fopUpdate?.recordKind && fopUpdate.recordKind !== 'none' && hasLiveRecordAttempt
 		? {
 			kind: fopUpdate.recordKind,
 			message: fopUpdate.recordMessage || null
@@ -147,7 +151,6 @@ export function getScoreboardData(scoreboardType, fopName = 'A', options = {}) {
 	);
 	
 	// Compute break title (group name) for break mode display
-	const mode = fopUpdate?.mode || 'WAIT';
 	const breakTitle = isBreakMode(mode) ? inferGroupName(fopUpdate, lang) : null;
 	
 	// Compute sessionStatusMessage
@@ -186,6 +189,10 @@ export function getScoreboardData(scoreboardType, fopName = 'A', options = {}) {
 	// Check cache
 	if (scoreboardCache.has(cacheKey)) {
 		const cached = scoreboardCache.get(cacheKey);
+		// Overlay ALL volatile (per-update) fields on the cached grid. These reflect the
+		// current FOP state and must never be served from the cached copy. attemptBarClass
+		// is volatile too: the cache key has no state version, so without this overlay a
+		// cached entry could show a stale attempt bar after the FOP goes INACTIVE.
 		return {
 			...cached,
 			currentAttempt,
@@ -196,7 +203,9 @@ export function getScoreboardData(scoreboardType, fopName = 'A', options = {}) {
 			sessionStatus,
 			sessionStatusMessage,
 			breakTitle,
+			records,
 			recordStatus,
+			attemptBarClass,
 			learningMode
 		};
 	}
