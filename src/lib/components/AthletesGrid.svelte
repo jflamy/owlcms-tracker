@@ -43,7 +43,7 @@
 		...(showLiftRanks ? ['var(--col-rank)'] : []),
 		'var(--col-gap)',
 		'var(--col-total)',
-		...(showTotalRank ? ['var(--col-rank)'] : [])
+		...(showTotalRank ? ['var(--col-total-rank)'] : [])
 	].join(' ');
 	
 	// Helper functions (same as in parent component)
@@ -131,7 +131,7 @@
 		<div class="cell header v-spacer v-spacer-total span-two" aria-hidden="true" style:grid-column={String(totalSpacerCol)}></div>
 		<div class="cell header col-total span-two" role="columnheader" style:grid-column={String(totalCol)}>{headers.total || '!!Total'}</div>
 		{#if showTotalRank}
-			<div class="cell header col-rank span-two" role="columnheader" style:grid-column={String(totalRankCol)}>{headers.rank || '!!Rank'}</div>
+			<div class="cell header col-rank total-rank span-two" role="columnheader" style:grid-column={String(totalRankCol)}>{headers.rank || '!!Rank'}</div>
 		{/if}
 	</div>
 	<div class="grid-row header header-secondary" role="row">
@@ -155,7 +155,7 @@
 		<div class="cell header v-spacer v-spacer-total" aria-hidden="true" style:grid-column={String(totalSpacerCol)}></div>
 		<div class="cell header col-total-portrait" role="columnheader" style:grid-column={String(totalCol)}>{headers.total || '!!Total'}</div>
 		{#if showTotalRank}
-			<div class="cell header col-rank-portrait" role="columnheader" style:grid-column={String(totalRankCol)}>{headers.rank || '!!Rank'}</div>
+			<div class="cell header col-rank-portrait total-rank" role="columnheader" style:grid-column={String(totalRankCol)}>{headers.rank || '!!Rank'}</div>
 		{/if}
 	</div>
 
@@ -212,7 +212,7 @@
 				<div class="cell v-spacer" aria-hidden="true"></div>
 				<div class="cell total" role="gridcell">{athlete.total || '-'}</div>
 				{#if showTotalRank}
-					<div class="cell rank" role="gridcell">{athlete.totalRank || '-'}</div>
+					<div class="cell rank total-rank" role="gridcell">{athlete.totalRank || '-'}</div>
 				{/if}
 			</div>
 		{/if}
@@ -280,7 +280,7 @@
 					<div class="cell v-spacer" aria-hidden="true"></div>
 					<div class="cell total" role="gridcell">{leader.total || '-'}</div>
 					{#if showTotalRank}
-						<div class="cell rank" role="gridcell">{leader.totalRank || '-'}</div>
+						<div class="cell rank total-rank" role="gridcell">{leader.totalRank || '-'}</div>
 					{/if}
 				</div>
 			{/if}
@@ -300,6 +300,7 @@
 		--col-best: 4.4rem;
 		--col-total: 4.9rem;
 		--col-rank: 4.9rem;
+		--col-total-rank: var(--col-total);
 		/* Header row heights: keep these in sync with grid-template-rows and sticky offsets */
 		--header-primary-vpad: 0.25rem; /* vertical padding for primary header cells */
 		--header-primary-height: calc(1rem + (var(--header-primary-vpad) * 2));
@@ -596,7 +597,7 @@
 
 	.header-secondary .col-name-portrait,
 	.header-secondary .col-total-portrait,
-	.header-secondary .col-rank-portrait {
+	.header-secondary .col-rank-portrait:not(.total-rank) {
 		visibility: hidden;
 		pointer-events: none;
 		padding: 0;
@@ -717,8 +718,10 @@
 		.header-primary .col-born,
 		.header-primary .col-start,
 		.header-primary .col-cat,
-		.header-primary .col-rank,
+		.header-primary .col-rank:not(.total-rank),
 		.header-secondary .col-best,
+		.header-secondary .snatch-rank,
+		.header-secondary .cj-rank,
 
 		.header-secondary .col-rank-portrait,
 		.grid-row.data-row > .team-name,
@@ -726,13 +729,31 @@
 		.grid-row.data-row > .best,
 		.grid-row.data-row > .start-num,
 		.grid-row.data-row > .cat,
-		.grid-row.data-row > .rank,
+		.grid-row.data-row > .rank:not(.total-rank),
 		.grid-row.leader-row > .team-name,
 		.grid-row.leader-row > .born,
 		.grid-row.leader-row > .best,
 		.grid-row.leader-row > .start-num,
 		.grid-row.leader-row > .cat,
-		.grid-row.leader-row > .rank {
+		.grid-row.leader-row > .rank:not(.total-rank) {
+			visibility: hidden;
+			width: 0;
+			padding: 0;
+			border: none;
+			overflow: hidden;
+		}
+	}
+
+	/* Phones portrait (< 768px): hide total rank — not enough room */
+	@media (max-width: 767px) and (orientation: portrait) {
+		.scoreboard-grid {
+			--col-total-rank: 0;
+		}
+
+		.header-primary .col-rank.total-rank,
+		.header-secondary .col-rank-portrait.total-rank,
+		.grid-row.data-row > .rank.total-rank,
+		.grid-row.leader-row > .rank.total-rank {
 			visibility: hidden;
 			width: 0;
 			padding: 0;
@@ -757,6 +778,34 @@
 
 		.header-secondary > .cell {
 			font-size: 0.95rem;
+		}
+
+		.cell.leaders-title-cell {
+			font-size: 0.95rem;
+			padding: 1rem 0 0.2rem 0;
+		}
+	}
+
+	/* iPad Pro 12.9" portrait (≥ 1024px): restore snatch/CJ ranks */
+	@media (min-width: 1024px) and (orientation: portrait) {
+		.scoreboard-grid {
+			--col-rank: 4rem;
+		}
+
+		.header-secondary .snatch-rank,
+		.header-secondary .cj-rank,
+		.grid-row.data-row > .rank:not(.total-rank),
+		.grid-row.leader-row > .rank:not(.total-rank) {
+			visibility: visible;
+			width: auto;
+			padding: 0.3rem 0.2rem;
+			border: 1px solid #555;
+			overflow: visible;
+		}
+
+		.header-secondary .snatch-rank,
+		.header-secondary .cj-rank {
+			padding: var(--header-secondary-vpad) 0.15rem;
 		}
 	}
 
@@ -788,6 +837,11 @@
 			padding: 0;
 			line-height: 0.7;
 		}
+
+		.cell.leaders-title-cell {
+			font-size: 0.75rem;
+			padding: 0.5rem 0 0.1rem 0;
+		}
 	}
 
 	/* Standard phones portrait (390px - iPhone 15/16): Minimal layout */
@@ -817,6 +871,11 @@
 			font-size: 0.5rem;
 			padding: 0;
 			line-height: 0.65;
+		}
+
+		.cell.leaders-title-cell {
+			font-size: 0.7rem;
+			padding: 0.4rem 0 0.08rem 0;
 		}
 	}
 </style>
