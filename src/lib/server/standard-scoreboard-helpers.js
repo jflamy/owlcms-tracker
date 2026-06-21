@@ -38,6 +38,30 @@ function resolveFlagUrl(source, teamName = source?.teamName) {
 	return propagated || (teamName ? getFlagUrl(teamName, true) : null);
 }
 
+function hasFeatureSwitch(databaseState, featureName) {
+	const featureSwitches = databaseState?.config?.featureSwitches;
+	if (typeof featureSwitches === 'string') {
+		return featureSwitches
+			.split(',')
+			.map(entry => entry.trim())
+			.filter(Boolean)
+			.includes(featureName);
+	}
+
+	if (Array.isArray(featureSwitches)) {
+		return featureSwitches.includes(featureName);
+	}
+
+	return false;
+}
+
+function getLeadersHeader(databaseState, lang) {
+	const translationKey = hasFeatureSwitch(databaseState, 'medalistsAsLeaders')
+		? 'Leaders'
+		: 'Leaders.PreviousGroups';
+	return competitionHub.translate(translationKey, lang);
+}
+
 /**
  * Configuration for standard scoreboard types
  */
@@ -174,7 +198,7 @@ export function getScoreboardData(scoreboardType, fopName = 'A', options = {}) {
 		total: competitionHub.translate('Total', lang),
 		rank: competitionHub.translate('Rank', lang),
 		best: competitionHub.translate('Scoreboard.Best', lang),
-		leaders: competitionHub.translate('Leaders', lang),
+		leaders: getLeadersHeader(databaseState, lang),
 		records: competitionHub.translate('Scoreboard.records', lang),
 		waitingNextSession: competitionHub.translate('Scoreboard.WaitingNextGroup', lang)
 	};
