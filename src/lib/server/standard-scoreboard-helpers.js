@@ -156,6 +156,33 @@ export function getScoreboardData(scoreboardType, fopName = 'A', options = {}) {
 		sessionStatusMessage = (fopUpdate.fullName || '').replace(/&ndash;/g, '\u2013').replace(/&mdash;/g, '\u2014');
 	}
 
+	// Compute attempt bar visibility based on session state.
+	const attemptBarClass = computeAttemptBarVisibility(fopUpdate);
+
+	// Calculate headers (pre-translated using hub's translate method with automatic !Key fallback)
+	const headers = {
+		start: competitionHub.translate('Scoreboard.Start', lang),
+		name: competitionHub.translate('Name', lang),
+		category: competitionHub.translate('Scoreboard.Category', lang),
+		birth: competitionHub.translate('Scoreboard.Birth', lang),
+		team: competitionHub.translate('Team', lang),
+		snatch: competitionHub.translate('Snatch', lang),
+		cleanJerk: competitionHub.translate('Clean_and_Jerk', lang),
+		total: competitionHub.translate('Total', lang),
+		rank: competitionHub.translate('Rank', lang),
+		best: competitionHub.translate('Scoreboard.Best', lang),
+		leaders: competitionHub.translate('Leaders', lang),
+		records: competitionHub.translate('Scoreboard.records', lang),
+		waitingNextSession: competitionHub.translate('Scoreboard.WaitingNextGroup', lang)
+	};
+
+	// Pre-translated strings for the client-side inactivity timeout overlay
+	const inactivity = {
+		title: competitionHub.translate('PublicResults.sessionExpiredTitle', lang),
+		text: competitionHub.translate('PublicResults.sessionExpiredText', lang),
+		reload: competitionHub.translate('PublicResults.sessionExpiredLabel', lang).replace('{0}', '').trim()
+	};
+
 	// Check cache
 	if (scoreboardCache.has(cacheKey)) {
 		const cached = scoreboardCache.get(cacheKey);
@@ -200,11 +227,14 @@ export function getScoreboardData(scoreboardType, fopName = 'A', options = {}) {
 			stats,
 			status,
 			message,
+			attemptBarClass,
 			lastUpdate: fopUpdate?.lastUpdate || Date.now(),
 			learningMode,
 			options: { showRecords },
 			resultRows: 0,
-			leaderRows: 0
+			leaderRows: 0,
+			headers,
+			inactivity
 		};
 	}
 	
@@ -229,33 +259,6 @@ export function getScoreboardData(scoreboardType, fopName = 'A', options = {}) {
 	
 	const { resultRows, leaderRows, gridTemplateRows } = calculateGridLayout(athletesWithFlags, leaders);
 	
-	// Compute attempt bar visibility based on session state
-	const attemptBarClass = computeAttemptBarVisibility(fopUpdate);
-
-	// Calculate headers (pre-translated using hub's translate method with automatic !Key fallback)
-	const headers = {
-		start: competitionHub.translate('Scoreboard.Start', lang),
-		name: competitionHub.translate('Name', lang),
-		category: competitionHub.translate('Scoreboard.Category', lang),
-		birth: competitionHub.translate('Scoreboard.Birth', lang),
-		team: competitionHub.translate('Team', lang),
-		snatch: competitionHub.translate('Snatch', lang),
-		cleanJerk: competitionHub.translate('Clean_and_Jerk', lang),
-		total: competitionHub.translate('Total', lang),
-		rank: competitionHub.translate('Rank', lang),
-		best: competitionHub.translate('Scoreboard.Best', lang),
-		leaders: competitionHub.translate('Leaders', lang),
-		records: competitionHub.translate('Scoreboard.records', lang),
-		waitingNextSession: competitionHub.translate('Scoreboard.WaitingNextGroup', lang)
-	};
-
-	// Pre-translated strings for the client-side inactivity timeout overlay
-	const inactivity = {
-		title: competitionHub.translate('PublicResults.sessionExpiredTitle', lang),
-		text: competitionHub.translate('PublicResults.sessionExpiredText', lang),
-		reload: competitionHub.translate('PublicResults.sessionExpiredLabel', lang).replace('{0}', '').trim()
-	};
-
 	const result = {
 		scoreboardName: config.scoreboardName,
 		competition,

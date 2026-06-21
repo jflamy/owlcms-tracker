@@ -5,6 +5,10 @@
 
 ##### Release log
 
+- 2.19.4: Fix behavior and use translation when announcer goes to "No Session" and starts a new one
+
+- 2.19.3: Handle record attempt + new records on scoreboards
+
 - 2.19.2: Handle before intro - intro - before snatch transition correctly in the scoreboards
 
 - 2.19.1: fix scoreboard timer wonky behavior between stop and decision

@@ -250,8 +250,8 @@
 	}
 
 	.records-cell.highlighted {
-		background: #2a4a2a;
-		color: #4ade80;
+		background: #8f4f8f;
+		color: #fff;
 		font-weight: bold;
 	}
 

@@ -185,7 +185,7 @@
 			</div>
 		{:else if data.attemptBarClass === 'hide-because-null-session'}
 			<div class="waiting">
-				<p>!!Waiting for next session</p>
+				<p>{headers.waitingNextSession}</p>
 			</div>
 		{:else}
 			<div class="grid-container" class:no-vfill={!vFill} style="--template-rows: {computedGridTemplateRows}">
