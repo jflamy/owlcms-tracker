@@ -5,6 +5,8 @@
 
 ##### Release log
 
+- 2.19.4: Hide the record block on scoreboards during breaks and ceremonies and done (no current athlete)
+
 - 2.19.3: Fix behavior and use translation when announcer goes to "No Session" and starts a new one
 
 - 2.19.3: Handle record attempt + new records on scoreboards
