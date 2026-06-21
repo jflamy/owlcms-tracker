@@ -105,6 +105,9 @@ jobs:
         with:
           context: .
           push: true
+          build-args: |
+            TRACKER_VERSION_OVERRIDE=${{ env.REVISION }}
+            TRACKER_COMMIT=${{ github.sha }}
           tags: |
             ${{ vars.DOCKER_REG }}/owlcms/tracker:${{ env.REVISION }}
             ${{ vars.DOCKER_REG }}/owlcms/tracker:latest

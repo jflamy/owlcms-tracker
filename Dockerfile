@@ -27,6 +27,7 @@ COPY . .
 # releases are unaffected because the release workflow never passes this arg.
 ARG KEEP_PLUGINS=""
 ARG TRACKER_VERSION_OVERRIDE=""
+ARG TRACKER_COMMIT=""
 RUN if [ -n "$KEEP_PLUGINS" ]; then \
       keep=" $(echo "$KEEP_PLUGINS" | tr ',' ' ') " && \
       echo "Pruning plugins, keeping:$keep" && \
@@ -45,7 +46,8 @@ RUN if [ -n "$KEEP_PLUGINS" ]; then \
 # Increase Node.js heap size to prevent OOM during build
 ENV NODE_OPTIONS="--max-old-space-size=4096"
 ENV TRACKER_VERSION_OVERRIDE="$TRACKER_VERSION_OVERRIDE"
-RUN npm run build:bundle
+ENV TRACKER_COMMIT="$TRACKER_COMMIT"
+RUN node scripts/generate-version.js && npm run build:bundle
 
 # Remove pre-compressed static files (server-side only, not needed)
 RUN find build/client -name '*.gz' -delete && find build/client -name '*.br' -delete
