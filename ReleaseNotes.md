@@ -5,6 +5,8 @@
 
 ##### Release log
 
+- 2.20.1: Countdown timers resync correctly on reload during a break (anchor to the server's absolute end time instead of a cached remaining-time snapshot)
+
 - 2.20.0: Use improved tracker-core for initial resource load and spurious connection handling
 
 - 2.19.6: Fixes for vertical layout and more scoreboard timer robustness.
