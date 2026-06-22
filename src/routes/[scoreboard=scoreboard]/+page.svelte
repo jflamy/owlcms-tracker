@@ -15,12 +15,8 @@
 	let scoreboardError = null;
 	let unsubscribeSSE = null;
 
-	// Track direct SSE payloads so in-flight API fetches cannot overwrite newer
-	// timer/decision event state with an older snapshot.
-	let lastTimerSseTime = 0;
-	let latestTimerSse = null;
-	let latestTimerDisplayMode = null;
-	let latestBreakTimerFromSse = null; // Rebuilt from flat breakState/breakRemaining/breakVisible fields
+	// Track direct decision SSE payloads so in-flight API fetches cannot overwrite
+	// newer decision event state with an older snapshot.
 	let lastDecisionSseTime = 0;
 	let latestDecisionSse = null;
 	let latestDecisionDisplayMode = null;
@@ -97,7 +93,7 @@
 		if (!shouldQuery()) {
 			return;
 		}
-		// Capture timestamp before the async fetch so we can detect if a timer SSE
+		// Capture timestamp before the async fetch so we can detect if a decision SSE
 		// arrived while we were waiting for the response.
 		const fetchStart = Date.now();
 		try {
@@ -107,24 +103,12 @@
 			if (result.success) {
 				// console.log('[Scoreboard] API returned:', result.data?.currentAttempt?.weight || result.data?.weight || 'no weight');
 				let nextData = result.data;
-				const timerSseIsNewer = lastTimerSseTime > fetchStart && latestTimerSse != null;
 				const decisionSseIsNewer = lastDecisionSseTime > fetchStart && latestDecisionSse != null;
 
-				if (timerSseIsNewer) {
-					nextData = { ...nextData, timer: latestTimerSse };
-					if (latestBreakTimerFromSse != null) {
-						nextData = { ...nextData, breakTimer: latestBreakTimerFromSse };
-					}
-				}
 				if (decisionSseIsNewer) {
 					nextData = { ...nextData, decision: latestDecisionSse };
-				}
-				if (timerSseIsNewer || decisionSseIsNewer) {
-					const latestDisplayMode = timerSseIsNewer && (!decisionSseIsNewer || lastTimerSseTime >= lastDecisionSseTime)
-						? latestTimerDisplayMode
-						: latestDecisionDisplayMode;
-					if (latestDisplayMode != null) {
-						nextData = { ...nextData, displayMode: latestDisplayMode };
+					if (latestDecisionDisplayMode != null) {
+						nextData = { ...nextData, displayMode: latestDecisionDisplayMode };
 					}
 				}
 
@@ -197,22 +181,11 @@
 				// Handle timer events directly (no API fetch)
 				// Server provides displayMode computed with full FOP context
 				if (message.type === 'timer' && message.fop === data.fopName) {
-					lastTimerSseTime = Date.now();
-					latestTimerSse = message.timer;
-					latestTimerDisplayMode = message.displayMode;
-					// The timer SSE embeds break timer state as flat fields (breakState,
-					// breakRemaining, breakVisible) inside message.timer. Rebuild the
-					// breakTimer object so CountdownTimer gets the live remaining value
-					// rather than the stale API-fetched snapshot (e.g. 0:00 before_introduction).
-					const tmsg = message.timer;
-					latestBreakTimerFromSse = scoreboardData?.breakTimer != null
-						? { ...scoreboardData.breakTimer, state: tmsg.breakState, timeRemaining: tmsg.breakRemaining, visible: tmsg.breakVisible }
-						: { state: tmsg.breakState, timeRemaining: tmsg.breakRemaining, visible: tmsg.breakVisible };
 					if (scoreboardData) {
 						scoreboardData = {
 							...scoreboardData,
 							timer: message.timer,
-							breakTimer: latestBreakTimerFromSse,
+							breakTimer: message.breakTimer ?? scoreboardData.breakTimer,
 							displayMode: message.displayMode
 						};
 					}

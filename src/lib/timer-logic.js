@@ -107,7 +107,15 @@ export function createTimer() {
 			// If timer just started, record the start time
 			if (timerStartTime === null) {
 				timerStartTime = Date.now();
-				timerInitialRemaining = Math.max(0, timerData.timeRemaining || timerData.duration || 0);
+				// Prefer the absolute end anchor when available: timeRemaining is a
+				// snapshot that the API response cache freezes between OWLCMS messages,
+				// so on reload it can be stale. endTimeMillis is the wall-clock instant
+				// the timer hits zero and stays correct across cache hits.
+				if (timerData.endTimeMillis && timerData.endTimeMillis > 0) {
+					timerInitialRemaining = Math.max(0, timerData.endTimeMillis - Date.now());
+				} else {
+					timerInitialRemaining = Math.max(0, timerData.timeRemaining || timerData.duration || 0);
+				}
 			}
 
 			// Calculate elapsed time and remaining time (client-side only, no server needed)
@@ -125,7 +133,7 @@ export function createTimer() {
 	function syncWithServer(timerData) {
 		if (!timerData) return;
 
-		const currentState = `${timerData.state}-${timerData.timeRemaining}-${timerData.duration ?? timerData.timeAllowed ?? ''}-${timerData.initialWarningMillis ?? timerData.athleteInitialWarningMillis ?? ''}-${timerData.finalWarningMillis ?? timerData.athleteFinalWarningMillis ?? ''}`;
+		const currentState = `${timerData.state}-${timerData.timeRemaining}-${timerData.endTimeMillis ?? ''}-${timerData.duration ?? timerData.timeAllowed ?? ''}-${timerData.initialWarningMillis ?? timerData.athleteInitialWarningMillis ?? ''}-${timerData.finalWarningMillis ?? timerData.athleteFinalWarningMillis ?? ''}`;
 		if (currentState !== lastTimerState) {
 			lastTimerState = currentState;
 

@@ -23,7 +23,7 @@
     let isWarning = false;
     let display = '0:00';
     let displayText = null;  // Backend-provided text override (e.g., "STOP", "STOPP")
-    
+
     // Internal countdown state
     let timerInterval = null;
     let startTime = null;
@@ -44,7 +44,7 @@
             display = displayText;
             return;
         }
-        
+
         if (!isRunning || startTime === null) {
             // Not running - show static time
             display = formatTime(seconds);
@@ -59,6 +59,10 @@
         display = formatTime(seconds);
     }
 
+    // Reseed the countdown from the server-computed remaining value. Called on mount
+    // and whenever timerData changes - this is the "resync on reload" point: the
+    // shared helper has already recomputed remaining = start anchor + wall clock,
+    // so the client only counts down from that authoritative value.
     function syncWithServer(data) {
         if (!data) return;
 
@@ -68,14 +72,23 @@
         displayText = data.displayText || null;
 
         // Create a state key to detect actual changes
-        const stateKey = `${data.state}-${data.timeRemaining}-${data.duration ?? data.timeAllowed ?? ''}-${data.initialWarningMillis ?? data.athleteInitialWarningMillis ?? ''}-${data.finalWarningMillis ?? data.athleteFinalWarningMillis ?? ''}-${data.displayText || ''}`;
+        const stateKey = `${data.state}-${data.timeRemaining}-${data.endTimeMillis ?? ''}-${data.duration ?? data.timeAllowed ?? ''}-${data.initialWarningMillis ?? data.athleteInitialWarningMillis ?? ''}-${data.finalWarningMillis ?? data.athleteFinalWarningMillis ?? ''}-${data.displayText || ''}`;
         if (stateKey === lastSyncedState) return;
         lastSyncedState = stateKey;
 
         if (data.state === 'running') {
             // Start or re-sync countdown with server's computed remaining time
             startTime = Date.now();
-            initialRemaining = Math.max(0, data.timeRemaining || 0);
+            // Prefer the absolute end anchor when available: data.timeRemaining is a
+            // snapshot that the API response cache freezes between OWLCMS messages, so
+            // on reload it can be stale (e.g. show the full break duration). endTimeMillis
+            // is the wall-clock instant the timer hits zero and stays correct, letting the
+            // client recompute the true remaining time at the moment it (re)syncs.
+            if (data.endTimeMillis && data.endTimeMillis > 0) {
+                initialRemaining = Math.max(0, data.endTimeMillis - Date.now());
+            } else {
+                initialRemaining = Math.max(0, data.timeRemaining || 0);
+            }
             isRunning = true;
         } else {
             // Stopped or set - show static time

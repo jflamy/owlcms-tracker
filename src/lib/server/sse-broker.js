@@ -69,6 +69,7 @@ class SSEBroker {
         type: 'timer',
         fop: eventData.fop,
         timer: eventData.timer,
+        breakTimer: eventData.breakTimer,
         displayMode: eventData.displayMode,
         timestamp: eventData.timestamp
       });
