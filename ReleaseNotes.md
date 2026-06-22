@@ -5,6 +5,10 @@
 
 ##### Release log
 
+- 2.20.0: Use improved tracker-core for initial resource load and spurious connection handling
+
+- 2.19.6: Fixes for vertical layout and more scoreboard timer robustness.
+
 - 2.19.5: Show snatch and cj ranks for 3-medal events; fixed the leader from previous sessions header.
 
 - 2.19.4: Hide the record block on scoreboards during breaks and ceremonies and done (no current athlete)
