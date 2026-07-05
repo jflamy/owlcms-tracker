@@ -26,6 +26,24 @@ export default {
 			description: 'Optional comma-separated championship names. Blank shows all active championships.'
 		},
 		{
+			key: 'onlyTotalPoints',
+			label: 'Only Use Total Points',
+			type: 'boolean',
+			default: false,
+			group: 'display',
+			description: 'For point-based team scoring, count only total points instead of combining snatch, clean & jerk, and total points.'
+		},
+		{
+			key: 'teamLimit',
+			label: 'Teams Shown',
+			type: 'number',
+			default: 0,
+			min: 0,
+			max: 100,
+			group: 'display',
+			description: 'Only show the top N teams. 0 means show all teams.'
+		},
+		{
 			key: 'pageSize',
 			label: 'Rows Per Page',
 			type: 'number',

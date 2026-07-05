@@ -97,7 +97,7 @@
 									{#if currentPage.mode === 'score'}
 										<th>{currentPage.headers.liveScore}</th>
 										<th>{currentPage.headers.confirmedScore}</th>
-									{:else if currentPage.rows[0]?.isMultiMedals}
+								{:else if currentPage.rows[0]?.isMultiMedals && !currentPage.onlyTotalPoints}
 										<th>{currentPage.headers.snatchPoints}</th>
 										<th>{currentPage.headers.cjPoints}</th>
 										<th>{currentPage.headers.totalPoints}</th>
@@ -123,7 +123,7 @@
 										{#if currentPage.mode === 'score'}
 											<td class="value-cell">{formatScore(row.liveScore)}</td>
 											<td class="value-cell confirmed">{formatScore(row.confirmedScore)}</td>
-										{:else if row.isMultiMedals}
+									{:else if row.isMultiMedals && !currentPage.onlyTotalPoints}
 											<td class="value-cell">{formatPoints(row.snatchPoints)}</td>
 											<td class="value-cell">{formatPoints(row.cjPoints)}</td>
 											<td class="value-cell">{formatPoints(row.totalPoints)}</td>

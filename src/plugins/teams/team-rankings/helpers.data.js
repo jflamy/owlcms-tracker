@@ -189,22 +189,22 @@ function getScoreMode(sectionType, championship) {
 
 function getSectionDenominator(sectionType, championship, rosterSize) {
 	if (sectionType === 'M') {
-		return positiveCap(championship?.mensBestN) ?? rosterSize;
+		return Math.min(positiveCap(championship?.mensBestN) ?? rosterSize, rosterSize);
 	}
 
 	if (sectionType === 'F') {
-		return positiveCap(championship?.womensBestN) ?? rosterSize;
+		return Math.min(positiveCap(championship?.womensBestN) ?? rosterSize, rosterSize);
 	}
 
 	const mixedBestN = positiveCap(championship?.mixedBestN);
 	if (mixedBestN != null) {
-		return mixedBestN;
+		return Math.min(mixedBestN, rosterSize);
 	}
 
 	const menCap = positiveCap(championship?.mixedMensBestN);
 	const womenCap = positiveCap(championship?.mixedWomensBestN);
 	if (menCap != null || womenCap != null) {
-		return (menCap ?? 0) + (womenCap ?? 0);
+		return Math.min((menCap ?? 0) + (womenCap ?? 0), rosterSize);
 	}
 
 	return rosterSize;
@@ -398,7 +398,7 @@ function buildHeaders(locale) {
 
 function createCandidate(athlete, participation, championship, competitionDate, doneSessions, scoringConfig) {
 	const teamName = resolveTeamName(athlete);
-	if (!teamName) {
+	if (!teamName || teamName.trim().toLowerCase() === 'unaffiliated') {
 		return null;
 	}
 
@@ -467,7 +467,7 @@ function buildSectionCandidates(databaseState, championshipName, championship, s
 	return candidates;
 }
 
-function buildTeamRows(sectionCandidates, sectionType, championship, mode) {
+function buildTeamRows(sectionCandidates, sectionType, championship, mode, onlyTotalPoints = false) {
 	const teamMap = new Map();
 
 	for (const candidate of sectionCandidates) {
@@ -487,7 +487,7 @@ function buildTeamRows(sectionCandidates, sectionType, championship, mode) {
 
 		if (mode === 'points') {
 			const selectedCandidates = selectCandidates(pointOrder, sectionType, championship);
-			const doneEligibleCount = candidates.filter((candidate) => candidate.groupDone).length;
+			const doneSelectedCount = selectedCandidates.filter((candidate) => candidate.groupDone).length;
 			const pointTotals = selectedCandidates.reduce((totals, candidate) => {
 				if (!candidate.groupDone) {
 					return totals;
@@ -497,7 +497,7 @@ function buildTeamRows(sectionCandidates, sectionType, championship, mode) {
 				totals.snatchPoints += values.snatchPoints;
 				totals.cjPoints += values.cjPoints;
 				totals.totalPoints += values.totalPoints;
-				totals.confirmedPoints += championship?.snatchCJTotalMedals ? values.combinedPoints : values.totalPoints;
+				totals.confirmedPoints += onlyTotalPoints || !championship?.snatchCJTotalMedals ? values.totalPoints : values.combinedPoints;
 				return totals;
 			}, {
 				snatchPoints: 0,
@@ -509,7 +509,7 @@ function buildTeamRows(sectionCandidates, sectionType, championship, mode) {
 			rows.push({
 				teamName,
 				flagUrl: candidates[0]?.flagUrl || null,
-				countNumerator: doneEligibleCount,
+				countNumerator: doneSelectedCount,
 				countDenominator,
 				isMultiMedals: championship?.snatchCJTotalMedals === true,
 				confirmedPoints: pointTotals.confirmedPoints,
@@ -581,7 +581,9 @@ function buildPagesForSection(sectionRows, championshipName, sectionType, locale
 
 	const sectionInfo = SECTION_CONFIG[sectionType];
 	const pageSize = Math.max(1, parseNumber(options?.pageSize) || DEFAULT_PAGE_SIZE);
-	const pageCount = Math.ceil(sectionRows.length / pageSize);
+	const teamLimit = Math.max(0, parseNumber(options?.teamLimit) || 0);
+	const limitedRows = teamLimit > 0 ? sectionRows.slice(0, teamLimit) : sectionRows;
+	const pageCount = Math.ceil(limitedRows.length / pageSize);
 	const mode = sectionRows[0]?.liveScore != null ? 'score' : 'points';
 	const sectionLabel = `${championshipName} ${sectionInfo.label}`;
 	const headers = buildHeaders(locale);
@@ -596,7 +598,8 @@ function buildPagesForSection(sectionRows, championshipName, sectionType, locale
 		pageCount,
 		headers,
 		mode,
-		rows: sectionRows.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize)
+		onlyTotalPoints: options?.onlyTotalPoints === true,
+		rows: limitedRows.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize)
 	}));
 }
 
@@ -635,7 +638,9 @@ export function getScoreboardData(_fopName = '*', options = {}) {
 				pageSize: Math.max(1, parseNumber(options?.pageSize) || DEFAULT_PAGE_SIZE),
 				pagePauseMs: Math.max(500, parseNumber(options?.pagePauseMs) || 5000),
 				sweepDurationMs: Math.max(200, parseNumber(options?.sweepDurationMs) || 1200),
-				championships: []
+				championships: [],
+				teamLimit: Math.max(0, parseNumber(options?.teamLimit) || 0),
+				onlyTotalPoints: options?.onlyTotalPoints === true || String(options?.onlyTotalPoints).toLowerCase() === 'true'
 			},
 			pages: []
 		};
@@ -647,7 +652,9 @@ export function getScoreboardData(_fopName = '*', options = {}) {
 		pageSize: Math.max(1, parseNumber(options?.pageSize) || DEFAULT_PAGE_SIZE),
 		pagePauseMs: Math.max(500, parseNumber(options?.pagePauseMs) || 5000),
 		sweepDurationMs: Math.max(200, parseNumber(options?.sweepDurationMs) || 1200),
-		championships: parseChampionshipFilter(options?.championships)
+		championships: parseChampionshipFilter(options?.championships),
+		teamLimit: Math.max(0, parseNumber(options?.teamLimit) || 0),
+		onlyTotalPoints: options?.onlyTotalPoints === true || String(options?.onlyTotalPoints).toLowerCase() === 'true'
 	};
 
 	const cacheKey = JSON.stringify({
@@ -661,7 +668,9 @@ export function getScoreboardData(_fopName = '*', options = {}) {
 			pageSize: normalizedOptions.pageSize,
 			pagePauseMs: normalizedOptions.pagePauseMs,
 			sweepDurationMs: normalizedOptions.sweepDurationMs,
-			championships: normalizedOptions.championships ? [...normalizedOptions.championships] : null
+			championships: normalizedOptions.championships ? [...normalizedOptions.championships] : null,
+			teamLimit: normalizedOptions.teamLimit,
+			onlyTotalPoints: normalizedOptions.onlyTotalPoints
 		}
 	});
 
@@ -690,7 +699,7 @@ export function getScoreboardData(_fopName = '*', options = {}) {
 			}
 
 			const mode = getScoreMode(sectionType, championship);
-			const rows = buildTeamRows(candidates, sectionType, championship, mode);
+			const rows = buildTeamRows(candidates, sectionType, championship, mode, normalizedOptions.onlyTotalPoints);
 			pages.push(...buildPagesForSection(rows, championshipName, sectionType, locale, normalizedOptions));
 		}
 
@@ -704,7 +713,7 @@ export function getScoreboardData(_fopName = '*', options = {}) {
 		}
 
 		const mixedMode = getScoreMode('MF', championship);
-		const mixedRows = buildTeamRows(mixedCandidates, 'MF', championship, mixedMode);
+		const mixedRows = buildTeamRows(mixedCandidates, 'MF', championship, mixedMode, normalizedOptions.onlyTotalPoints);
 		pages.push(...buildPagesForSection(mixedRows, championshipName, 'MF', locale, normalizedOptions));
 	}
 
@@ -722,7 +731,9 @@ export function getScoreboardData(_fopName = '*', options = {}) {
 			pageSize: normalizedOptions.pageSize,
 			pagePauseMs: normalizedOptions.pagePauseMs,
 			sweepDurationMs: normalizedOptions.sweepDurationMs,
-			championships: selectedChampionshipNames
+			championships: selectedChampionshipNames,
+			teamLimit: normalizedOptions.teamLimit,
+			onlyTotalPoints: normalizedOptions.onlyTotalPoints
 		},
 		pages,
 		lastUpdate: databaseState?.lastUpdate || Date.now()
