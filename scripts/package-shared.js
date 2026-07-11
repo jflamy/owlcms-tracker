@@ -6,7 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import https from 'https';
 import readline from 'readline';
-import { execSync } from 'child_process';
+import { execSync, spawnSync } from 'child_process';
 import { pathToFileURL } from 'url';
 import { gt, valid } from 'semver';
 
@@ -25,14 +25,20 @@ export function promptConfirmation(message) {
 }
 
 function getTrackerCoreDirtyStatus() {
-  try {
-    return execSync('git status --porcelain', {
-      cwd: '../tracker-core',
-      encoding: 'utf8'
-    }).trim();
-  } catch (error) {
-    throw new Error(`Failed to check tracker-core working tree: ${error.message}`);
+  const result = spawnSync('git', ['status', '--porcelain'], {
+    cwd: '../tracker-core',
+    encoding: 'utf8',
+    shell: false
+  });
+
+  if (result.error) {
+    throw new Error(`Failed to check tracker-core working tree: ${result.error.message}`);
   }
+  if (result.status !== 0) {
+    throw new Error(`Failed to check tracker-core working tree: ${(result.stderr || '').trim() || 'git status failed'}`);
+  }
+
+  return result.stdout.trim();
 }
 
 function trackerCoreDirtyPaths(statusText) {
