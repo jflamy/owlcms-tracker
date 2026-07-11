@@ -5,6 +5,8 @@
 
 ##### Release log
 
+- 2.20.3: Correctly use case-sensitive asset URLs (e.g. for flags)
+
 - 2.20.2: Team rankings can now be limited to top N teams, and can be forced to only show total points.
 
 - 2.20.1: Countdown timers resync correctly on reload during a break (anchor to the server's absolute end time instead of a cached remaining-time snapshot)

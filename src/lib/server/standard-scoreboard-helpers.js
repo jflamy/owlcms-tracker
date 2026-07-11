@@ -34,8 +34,7 @@ const scoreboardCache = new Map();
 registerCache(scoreboardCache);
 
 function resolveFlagUrl(source, teamName = source?.teamName) {
-	const propagated = source?.flagUrl || source?.flagURL;
-	return propagated || (teamName ? getFlagUrl(teamName, true) : null);
+	return teamName ? getFlagUrl(teamName, true) : null;
 }
 
 function hasFeatureSwitch(databaseState, featureName) {
