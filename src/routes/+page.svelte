@@ -805,9 +805,6 @@
                 <div class="option-field" class:disabled-option={isOptionDisabled(option, scoreboardOptions[modalScoreboard.type][modalFop])}>
                   <label for="{modalScoreboard.type}-{modalFop}-{option.key}">
                     {option.label}
-                    {#if option.description}
-                      <span class="option-help" title={option.description}>ⓘ</span>
-                    {/if}
                   </label>
 
                   {#if option.type === 'select'}
@@ -850,6 +847,10 @@
                       bind:value={scoreboardOptions[modalScoreboard.type][modalFop][option.key]}
                       disabled={isOptionDisabled(option, scoreboardOptions[modalScoreboard.type][modalFop])}
                     />
+                  {/if}
+
+                  {#if option.description}
+                    <p class="option-description">{option.description}</p>
                   {/if}
                 </div>
               {/each}
@@ -1478,11 +1479,11 @@
     font-weight: 500;
   }
   
-  .option-help {
-    font-size: 0.75rem;
-    color: #667eea;
-    cursor: help;
-    font-weight: bold;
+  .option-description {
+    margin: -0.15rem 0 0;
+    color: #cbd5e0;
+    font-size: 0.8rem;
+    line-height: 1.35;
   }
   
   .option-field select,
