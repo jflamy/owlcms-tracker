@@ -5,6 +5,10 @@
 
 ##### Release log
 
+- 2.21.0: Added a Celebrations plugin to show a OWLCMS scoreboard + videos on good/bad/record lifts
+
+- 2.21.0: Helper texts shown under the fields.
+
 - 2.20.3: Correctly use case-sensitive asset URLs (e.g. for flags)
 
 - 2.20.2: Team rankings can now be limited to top N teams, and can be forced to only show total points.
