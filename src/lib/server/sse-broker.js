@@ -79,6 +79,7 @@ class SSEBroker {
       this.broadcast({
         type: 'decision',
         fop: eventData.fop,
+		data: eventData.data,
         decision: eventData.decision,
         displayMode: eventData.displayMode,
         timestamp: eventData.timestamp

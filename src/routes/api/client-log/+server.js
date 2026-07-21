@@ -27,6 +27,14 @@ function compactObject(values) {
 function sanitizeDetails(details = {}) {
   return compactObject({
     action: normalizeText(details?.action, 80),
+  clipKind: normalizeText(details?.clipKind, 40),
+  fop: normalizeText(details?.fop, 80),
+  fopState: normalizeText(details?.fopState, 80),
+  decisionType: normalizeText(details?.decisionType, 80),
+  decisionVisible: typeof details?.decisionVisible === 'boolean' ? details.decisionVisible : null,
+  overlayVisibility: normalizeText(details?.overlayVisibility, 40),
+  overlayZIndex: normalizeText(details?.overlayZIndex, 40),
+  videoVisible: typeof details?.videoVisible === 'boolean' ? details.videoVisible : null,
     mode: normalizeText(details?.mode, 24),
     cameraNumber: Number.isInteger(details?.cameraNumber) ? details.cameraNumber : null,
     playbackRate: normalizeNumber(details?.playbackRate),

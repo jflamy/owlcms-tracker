@@ -19,6 +19,7 @@
 	// newer decision event state with an older snapshot.
 	let lastDecisionSseTime = 0;
 	let latestDecisionSse = null;
+	let latestDecisionFopUpdate = null;
 	let latestDecisionDisplayMode = null;
 	
 	// Check if this plugin manages its own SSE or doesn't need live updates
@@ -52,6 +53,31 @@
 	}
 
 	$: apiUrl = buildApiUrl();
+
+	function reportCelebrationsDecisionSse(message) {
+		if (!browser || data.scoreboardType !== 'celebrations') return;
+
+		const decision = message.decision || {};
+		void fetch('/api/client-log', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({
+				source: 'celebrations',
+				category: 'decision.sse',
+				message: 'Received decision SSE event.',
+				details: {
+					action: 'decision_sse_received',
+					fop: message.fop,
+					fopState: message.data?.fopState || '',
+					decisionType: decision.type || '',
+					decisionVisible: decision.visible === true,
+					athlete: decision.athleteName || '',
+					attempt: Number.parseInt(decision.attemptNumber, 10) || null
+				}
+			}),
+			keepalive: true
+		}).catch((error) => console.warn('[Celebrations] Could not report decision SSE trace:', error));
+	}
 
 	// Hidden-tab grace period: when the tab is hidden we keep querying the API for
 	// a short while so a quick tab switch does not make the scoreboard fall behind.
@@ -106,7 +132,11 @@
 				const decisionSseIsNewer = lastDecisionSseTime > fetchStart && latestDecisionSse != null;
 
 				if (decisionSseIsNewer) {
-					nextData = { ...nextData, decision: latestDecisionSse };
+					nextData = {
+						...nextData,
+						decision: latestDecisionSse,
+						fopUpdate: latestDecisionFopUpdate ?? nextData.fopUpdate
+					};
 					if (latestDecisionDisplayMode != null) {
 						nextData = { ...nextData, displayMode: latestDecisionDisplayMode };
 					}
@@ -195,8 +225,10 @@
 				// Handle decision events directly (no API fetch)
 				// Server provides displayMode computed with full FOP context
 				if (message.type === 'decision' && message.fop === data.fopName) {
+					reportCelebrationsDecisionSse(message);
 					lastDecisionSseTime = Date.now();
 					latestDecisionSse = message.decision;
+					latestDecisionFopUpdate = message.data ?? null;
 					latestDecisionDisplayMode = message.displayMode;
 					if (scoreboardData) {
 						// A NEW record is announced only on the decision frame, so apply the
@@ -211,6 +243,7 @@
 							: scoreboardData.recordStatus;
 						scoreboardData = {
 							...scoreboardData,
+							fopUpdate: message.data ?? scoreboardData.fopUpdate,
 							decision: message.decision,
 							displayMode: message.displayMode,
 							recordStatus
