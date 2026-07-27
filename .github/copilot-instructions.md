@@ -21,51 +21,40 @@ You are helping build a **SvelteKit application** that displays the state of an 
 
 This instructions file provides **AI context only**. For detailed technical information, always refer to the comprehensive documentation in the `/docs` folder.
 
-## ���️ Development Environment
+## 🛠️ Development Environment
 
-**Operating System:** Windows with bash shell (Git Bash or WSL)
-- When generating terminal commands, use bash syntax
-- File paths use Windows format (`c:\Dev\...`) but commands are bash-style- **CRITICAL:** Git Bash has limitations with heredocs - see section below
+**Shell:** bash — Git Bash on Windows, bash/zsh on macOS and Linux.
+Always generate commands in POSIX/bash syntax that run unchanged on every platform.
+
+**Cross-platform rules:**
+- Use forward slashes and paths **relative to the repo root** (`scripts/build-zip.js`),
+  never absolute machine paths (`c:\Dev\...`, `/Users/you/...`)
+- Prefer the npm scripts in `package.json` over ad-hoc OS-specific commands
+- Quote glob patterns (`ls "*.bat"`), since zsh aborts on unmatched globs while bash does not
+- Python is `python3` on macOS/Linux and often `python` on Windows — prefer Node.js
+  one-liners so the command works everywhere
+- Avoid `sed -i`: GNU requires `sed -i`, BSD/macOS requires `sed -i ''`. Use Node.js instead
+- Avoid heredocs — they behave inconsistently across shells and corrupt files in Git Bash
 
 ------
 
-## 🚨 Git Bash Shell Limitations
+## 🚨 Editing Files From the Terminal
 
-### DO NOT use heredocs with inline code
+Prefer the editor's file tools over shell redirection for any file modification.
 
-**❌ WRONG - This will corrupt files:**
+**❌ Avoid heredocs to write source files** — fragile across shells, and known to
+silently corrupt content under Git Bash:
 ```bash
 cat > file.js << 'EOF'
 const x = 'value';
 EOF
 ```
 
-**❌ WRONG - Python heredocs also fail:**
-```bash
-python - <<'PY'
-import sys
-print("hello")
-PY
-```
+### ✅ Preferred alternatives
 
-**Why it fails:**
-- Git Bash on Windows has issues with heredoc parsing
-- Results in corrupted files with mangled content
-- Particularly dangerous with search-and-replace operations
+**Option 1: Use the `create_file` / edit tools** (always first choice)
 
-### ✅ CORRECT Alternatives
-
-**Option 1: Create external script file first**
-```bash
-# Create the script file separately
-cat > /tmp/script.py
-# Then paste content manually or use text editor
-
-# Run it
-python /tmp/script.py
-```
-
-**Option 2: Use Node.js for simple replacements**
+**Option 2: Node.js one-liner for simple replacements** (portable everywhere)
 ```bash
 node -e "
 const fs = require('fs');
@@ -75,23 +64,12 @@ fs.writeFileSync('file.js', text);
 "
 ```
 
-**Option 3: Create .cjs script file (for ESM projects)**
+**Option 3: A committed `.cjs` script (this project is ESM)**
 ```bash
-# Save script to file first
-cat > fix_script.cjs
-# Add content via editor or create_file tool
-
-# Run it
-node fix_script.cjs
+node scripts/fix_script.cjs
 ```
 
-**Option 4: Use sed for simple replacements**
-```bash
-# Single replacement (be careful with special characters)
-sed -i 's/console\.log(/logger.log(/g' file.js
-```
-
-**REMEMBER:** 
+**REMEMBER:**
 - Always prefer creating files via the `create_file` tool
 - For complex multi-line scripts, create the file first, then execute
 - Test on a backup copy before modifying important files
@@ -128,7 +106,7 @@ Browsers
 
 ------
 
-## ��� OWLCMS Configuration & Endpoints
+## 🔌 OWLCMS Configuration & Endpoints
 
 **OWLCMS Configuration Required:**
 
@@ -158,7 +136,7 @@ Set to: `ws://localhost:8095/ws` (or your tracker host with `ws://` or `wss://` 
 
 ------
 
-## ��� Project Structure (Current)
+## 📂 Project Structure (Current)
 
 ```
 src/
@@ -208,7 +186,7 @@ tests/                      # Test scripts and utilities
 
 ------
 
-## ��� Creating Scoreboards with AI Assistance
+## 🤖 Creating Scoreboards with AI Assistance
 
 ### Workflow for Novice Developer
 
@@ -235,7 +213,7 @@ tests/                      # Test scripts and utilities
 
 ------
 
-## ���️ Division of Responsibilities
+## 🗂️ Division of Responsibilities
 
 ### OWLCMS (Authoritative Source)
 - ✅ **ALL** competition business logic (rankings, lifting order, Sinclair, validation)

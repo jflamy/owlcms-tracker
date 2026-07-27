@@ -1,8 +1,13 @@
-# Create Your Own Scoreboard with AI Assistance
+# Create Your Own Plugin with AI Assistance
 
-This guide shows you how to create custom scoreboards **using an AI coding agent** like GitHub Copilot. You don't need to be a programmer—just describe what you want, and the agent will generate the code.
+This guide shows you how to create custom plugins **using an AI coding agent** like GitHub Copilot. You don't need to be a programmer—just describe what you want, and the agent will generate the code.
 
-> **The Goal:** You describe your scoreboard in plain English, and the AI creates it for you. Then you iterate by describing changes until it's exactly what you need.
+Plugins are not limited to scoreboards. The same structure is used for every category under
+`src/plugins/`: scoreboards, team displays, attempt boards, printable documents
+(start books, results books), video overlays, OBS/LED wall sources, jury replays and
+ceremonies. The examples below use scoreboards because they are the simplest starting point.
+
+> **The Goal:** You describe your plugin in plain English, and the AI creates it for you. Then you iterate by describing changes until it's exactly what you need.
 
 ---
 
@@ -30,7 +35,25 @@ Download and install VS Code from: https://code.visualstudio.com/
 2. Install the **GitHub Copilot** extension in VS Code
 3. Install the **GitHub Copilot Chat** extension for agent mode
 
-### 4. Clone This Repository
+### 4. Install Git (and a bash shell)
+
+All commands and utility scripts in this project are written for **bash**, so you need a
+bash shell on every platform.
+
+- **Windows:** install [Git for Windows](https://git-scm.com/download/win). This provides
+  both `git` and **Git Bash**, the shell used throughout this guide.
+  GitHub Desktop is *not* a substitute — its bundled Git is internal to the app and does
+  not give you a usable shell.
+- **macOS:** `git` comes with the Xcode Command Line Tools (`xcode-select --install`);
+  the built-in Terminal already runs a bash-compatible shell.
+- **Linux:** install `git` with your package manager.
+
+Verify:
+```bash
+git --version
+```
+
+### 5. Clone This Repository
 
 ```bash
 git clone https://github.com/owlcms/owlcms-tracker.git
@@ -38,7 +61,7 @@ cd owlcms-tracker
 npm install
 ```
 
-### 5. Open in VS Code
+### 6. Open in VS Code
 
 ```bash
 code .
@@ -46,19 +69,17 @@ code .
 
 ---
 
-## Running the Tracker for Development
+## Running Tracker for Development
 
 ### Method 1: VS Code Launch Menu
 
-**This workspace is pre-configured for VS Code with Git Bash as the default shell.**
-
 1. Open the project in VS Code
-2. Go to **Run and Debug** (Ctrl+Shift+D) or click the play icon in the sidebar
+2. Go to **Run and Debug** (Ctrl+Shift+D / Cmd+Shift+D) or click the play icon in the sidebar
 3. Select one of the configurations from the dropdown:
    - **"OWLCMS Tracker - Production Mode"** - Normal operation
    - **"OWLCMS Tracker - Learning Mode"** - Captures all incoming messages to `samples/` directory (see [Learning Mode](#learning-mode) below)
-4. Press **F5** (or click the green play button) to start
-5. The integrated terminal will open automatically using Git Bash
+4. Click the green play button at the top
+5. The integrated terminal will open automatically
 
 ### Method 2: Command Line
 
@@ -76,7 +97,8 @@ The app will be available at **http://localhost:8096**
 
 ## Learning Mode
 
-Learning mode is useful when developing custom scoreboards. It captures every WebSocket message from OWLCMS so you can understand the data structure and build your scoreboard logic accordingly.
+Learning mode is useful when developing custom code. It captures every WebSocket message from OWLCMS so you can understand the data structure and build your scoreboard logic accordingly.
+You can also tell your Copilot agent to go look at the `sample` folder for the actual data received.
 
 **Enable Learning Mode:**
 - VS Code: Use "OWLCMS Tracker - Learning Mode" launch configuration
@@ -96,11 +118,11 @@ Learning mode is useful when developing custom scoreboards. It captures every We
 
 ---
 
-## Configure OWLCMS (One-time Setup)
+## Configure OWLCMS to call Tracker
 
 ### Method 1
 
-Use the control panel; on the OWLCMS Tab, in the options dropdown, enable the connection to Tracker
+Use the control panel - see [Using Tracker](https://jflamy.github.io/owlcms4/#/Tracker)
 
 ### Method 2
 Before creating scoreboards, configure OWLCMS to send data:
@@ -161,56 +183,6 @@ npm run dev
 Open: `http://localhost:8096/qpoints-scoreboard?fop=A`
 
 You should see the same display as the team scoreboard.
-
----
-
-## Example 2: Change the Scoring System
-
-Now let's modify the copied scoreboard to use a different scoring system.
-
-### Step 1: Point the Agent at the Definition
-
-**Your prompt:**
-
-> I want to replace Sinclair scoring with QPoints in the qpoints-scoreboard plugin.
-> 
-> QPoints was developed by Dr. Marianne Huebner (Michigan State University) as an alternative to Sinclair for comparing lifters across weight categories. 
-> 
-> Read the official definition here:
-> https://msu.edu/~hueblerm/qpoints/
-> 
-> The formula uses regression coefficients derived from world records:
-> - QPoints = Total × Coefficient(bodyweight, gender)
-> - Coefficients are published in tables on the Huebner website
-> 
-> Please:
-> 1. Fetch the coefficient tables from the Huebner website or use the published values
-> 2. Add a `calculateQPoints(total, bodyWeight, gender)` function to helpers.data.js
-> 3. Replace all references to `sinclair` with `qpoints`
-> 4. Update the display to show QPoints instead of Sinclair
-> 5. Sort teams by total QPoints score
-
-**What the agent does:**
-1. Opens `src/plugins/qpoints-scoreboard/helpers.data.js`
-2. Reads the Huebner coefficient tables (or you paste them into the prompt)
-3. Adds the QPoints calculation function with proper coefficients
-4. Modifies the athlete processing to compute QPoints
-5. Updates `page.svelte` to display QPoints
-6. Changes the team sorting to use QPoints
-
-### Step 2: Refine with Coefficient Tables
-
-If the agent needs the exact coefficients, paste them from the Huebner website:
-
-**Your prompt:**
-
-> Here are the QPoints coefficients from https://msu.edu/~huebner/qpoints/
-> 
-> [Paste the coefficient table here]
-> 
-> Use linear interpolation for bodyweights between table values.
-
-The agent will implement the calculation with the official coefficients.
 
 ---
 
