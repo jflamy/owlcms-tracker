@@ -52,7 +52,8 @@ export async function load() {
 	// Get available locales from loaded translations
 	// Prefer hub locales; fall back to English so dropdown is never empty even if translations arrive late
 	const hubLocales = competitionHub.getAvailableLocales();
-	const availableLocales = hubLocales.length > 0 ? hubLocales : ['en'];
+	const availableLocales = (hubLocales.length > 0 ? hubLocales : ['en'])
+		.filter((locale) => locale !== 'es_419');
 
 	// Filter locales to BCP-47-ish strings to avoid RangeError in Intl.DisplayNames (allow _ as OWLCMS uses en_US style)
 	const sanitizedLocales = availableLocales.filter((loc) => typeof loc === 'string' && /^[A-Za-z0-9_-]+$/.test(loc));
