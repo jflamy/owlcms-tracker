@@ -5,6 +5,10 @@
 
 ##### Release log
 
+- 2.21.1: Documentation and scripts update
+
+- 2.21.1: Fetch logos even if database is empty.
+
 - 2.21.0: Added a Celebrations plugin to show a OWLCMS scoreboard + videos on good/bad/record lifts
 
 - 2.21.0: Helper texts shown under the fields.
