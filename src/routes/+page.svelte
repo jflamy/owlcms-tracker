@@ -353,12 +353,12 @@
 
         // Accept several event types that indicate competition data is available.
         // OWLCMS/hub may send 'state_update', 'competition_initialized', 'init', or 'fop_update'.
-        const okTypes = ['state_update', 'competition_initialized', 'init', 'fop_update'];
+        const okTypes = ['state_update', 'competition_initialized', 'init', 'fop_update', 'hub_ready'];
 
         const hasFops = Array.isArray(body?.fops) && body.fops.length > 0;
         const hasCompetition = !!body?.competition;
 
-        if (okTypes.includes(msg?.type) && (hasFops || hasCompetition || msg?.type === 'fop_update')) {
+        if (okTypes.includes(msg?.type) && (hasFops || hasCompetition || msg?.type === 'fop_update' || msg?.type === 'hub_ready')) {
           // We are receiving valid hub data; clear any previously shown protocol error.
           protocolError = null;
           markConfirmed();
@@ -1025,6 +1025,7 @@
   }
   
   .documents-section .scoreboards-grid {
+    grid-template-columns: repeat(auto-fit, minmax(280px, max-content));
     margin-top: 0.75rem;
   }
 
@@ -1058,6 +1059,14 @@
     background: rgba(255, 255, 255, 0.08);
     border-color: rgba(255, 255, 255, 0.2);
   }
+
+  .document-card .fop-link {
+    flex: 0 0 auto;
+  }
+
+  .document-card .description {
+    max-width: 280px;
+  }
   
   .fop-list {
     display: flex;
@@ -1070,9 +1079,10 @@
     align-items: center;
     gap: 0.5rem;
   }
-  
+
   .fop-link {
     flex: 1;
+    min-width: 0;
     display: block;
     padding: 0.75rem 1.5rem;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
