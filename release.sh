@@ -1,4 +1,4 @@
-n#!/usr/bin/env bash
+#!/usr/bin/env bash
 REVISION="${1:-2.21.1}"
 set -euo pipefail
 
