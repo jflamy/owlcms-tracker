@@ -135,7 +135,7 @@ if (!/^\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?(\+[a-zA-Z0-9.]+)?$/.test(version)) {
 console.log(`📦 Preparing release ${version}...\n`);
 
 // Safety: release must start from a clean working tree, except for files that the script will modify/commit.
-assertCleanWorkingTree({ allowedDirty: ['ReleaseNotes.md', 'package.json', 'package-lock.json'] });
+assertCleanWorkingTree({ allowedDirty: ['ReleaseNotes.md', 'package.json', 'package-lock.json', 'release.sh'] });
 
 // Check for existing tag/release BEFORE modifying any files
 if (remoteTagExists(version) || remoteReleaseExists(version)) {
@@ -189,7 +189,7 @@ try {
 // Commit and push
 console.log('\n💾 Committing changes...');
 try {
-  execSync('git add package.json package-lock.json ReleaseNotes.md', { stdio: 'inherit' });
+  execSync('git add package.json package-lock.json ReleaseNotes.md release.sh', { stdio: 'inherit' });
   execSync(`git commit -m "chore: update tracker-core to ${trackerCoreVersion} for release ${version}"`, { stdio: 'inherit' });
   console.log('✓ Committed');
 } catch (error) {
