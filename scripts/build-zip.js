@@ -91,9 +91,13 @@ Selectors:
 Examples:
   npm run zip -- --standard
   npm run zip -- 2.17.2 --standard --include-category remote-control
-  npm run zip -- 2.18.0 --name documents --include-category documents
+      add remote-control to the standard kit
+  npm run zip -- 2.18.0 --name comp --include-categories documents,jury
+      only include documents and jury categories
   npm run zip -- 2.17.2 --include "France - Équipes"
-  npm run zip -- 2.17.2 --submodule books --submodule OBS`);
+      include according to the display name
+  npm run zip -- 2.17.2 --submodule books --submodule OBS
+      include these two submodules`);
 }
 
 function pad2(value) {
