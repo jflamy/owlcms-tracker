@@ -57,18 +57,17 @@ function printUsage() {
   console.log(`Usage: npm run zip -- [version] [tracker-core-version] [selectors]
 
 The first -- is required by npm. It passes the version and selector options to this script.
-The version becomes the ZIP filename with timestamp metadata by default, for example dist/owlcms-tracker_2.18.0+2026-05-12.14h37.zip.
-Use --name to add package metadata before the timestamp, for example dist/owlcms-tracker_2.18.0+documents.2026-05-12.14h37.zip.
+The version becomes the ZIP filename by default, for example dist/owlcms-tracker_2.18.0.zip.
+Use --timestamp to append timestamp metadata, for example dist/owlcms-tracker_2.18.0+2026-05-12.14h37.zip.
 
 Package name metadata:
   --name <metadata>
-      Add metadata to the ZIP version name before the automatic timestamp. Metadata is
+      Add metadata to the ZIP version name. Metadata is
       sanitized for Windows filenames and control panel install parsing. Underscores become
       hyphens because the control panel extracts the version after the last underscore.
 
-    --no-timestamp
-      Do not add automatic timestamp metadata. This is used by release builds so the
-      package filename is exactly owlcms-tracker_<version>.zip.
+    --timestamp
+      Add timestamp metadata after any --name metadata.
 
 Selectors:
   --standard
@@ -158,7 +157,7 @@ function addPackageMetadata(version, metadataValues, { includeTimestamp = true }
 }
 
 function validateSelectorArgs(parsed) {
-  const allowedFlags = new Set(['--standard', '--no-timestamp', '--help']);
+  const allowedFlags = new Set(['--standard', '--timestamp', '--help']);
   const allowedOptions = new Set([
     '--include',
     '--include-category',
@@ -207,7 +206,7 @@ async function main() {
   const positional = parsed.positional;
   const baseVersion = positional[0] || DEFAULT_TRACKER_VERSION;
   const packageNameMetadata = parseCsvOption(parsed.options.get('--name') || []);
-  const includeTimestamp = !parsed.flags.has('--no-timestamp');
+  const includeTimestamp = parsed.flags.has('--timestamp');
   const VERSION = addPackageMetadata(baseVersion, packageNameMetadata, { includeTimestamp });
   const trackerCoreRequested = positional[1]; // Optional
 

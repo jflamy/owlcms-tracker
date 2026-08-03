@@ -82,7 +82,7 @@
   - Selection is additive.
   - Extensions must be selected explicitly with --include or --include-type
   - Selecting an extension automatically pulls in its base plugin.
-  - Zip filenames created with `npm run zip` include timestamp metadata by default, for example `owlcms-tracker_2.18.0+2026-05-12.14h37.zip`; release builds use `--no-timestamp` to create the stable asset name `owlcms-tracker_<version>.zip`.
+  - Zip filenames created with `npm run zip` use a stable asset name by default, for example `owlcms-tracker_2.18.0.zip`; pass `--timestamp` to append timestamp metadata.
   - `--name <metadata>` appends control-panel-preserved package metadata before the timestamp, for example `owlcms-tracker_2.18.0+documents.2026-05-12.14h37.zip`.
 
 - 2.17.2: improvements to the jury plugin to better display the recording/trimming status. Requires replays 2.3.4
