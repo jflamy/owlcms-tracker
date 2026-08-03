@@ -1,72 +1,46 @@
 # OWLCMS Tracker Release Notes
 <!-- markdownlint-disable -->
 
-> #### ⚠ To use Tracker, you need to use version 64 or newer of OWLCMS (see Installing Locally below)
+> #### ⚠ It is recommended to update OWLCMS when updating Tracker.
 
 ##### Release log
 
+- 2.21.2: npm run zip: --timestamp now required to add a timestamp to the semver metadata.
 - 2.21.1: Documentation and scripts update
-
 - 2.21.1: Fetch logos even if database is empty.
-
 - 2.21.0: Added a Celebrations plugin to show a OWLCMS scoreboard + videos on good/bad/record lifts
-
 - 2.21.0: Helper texts shown under the fields.
-
+<br>
 - 2.20.3: Correctly use case-sensitive asset URLs (e.g. for flags)
-
 - 2.20.2: Team rankings can now be limited to top N teams, and can be forced to only show total points.
-
 - 2.20.1: Countdown timers resync correctly on reload during a break (anchor to the server's absolute end time instead of a cached remaining-time snapshot)
-
 - 2.20.0: Use improved tracker-core for initial resource load and spurious connection handling
-
+<br>
 - 2.19.6: Fixes for vertical layout and more scoreboard timer robustness.
-
 - 2.19.5: Show snatch and cj ranks for 3-medal events; fixed the leader from previous sessions header.
-
 - 2.19.4: Hide the record block on scoreboards during breaks and ceremonies and done (no current athlete)
-
 - 2.19.3: Fix behavior and use translation when announcer goes to "No Session" and starts a new one
-
 - 2.19.3: Handle record attempt + new records on scoreboards
-
 - 2.19.2: Handle before intro - intro - before snatch transition correctly in the scoreboards
-
 - 2.19.1: fix scoreboard timer wonky behavior between stop and decision
-
 - 2.19.0: scoreboards correctly track closed tabs and log number of connected users.
-
+<br>
 - 2.18.12: Idle scoreboard tabs now release their server SSE stream after a 5 min hidden grace period, and a hidden or quiet (30 min) flushes everything else about the session and prompts the user to reload.
-
 - 2.18.11: Authentication fixes; keys are systematically compared.  Empty key on tracker disables authentication
-
 - 2.18.10: logging cleanup to allow at-a-glance status of a simulation feeding tracker
-
 - 2.18.9: Standard scoreboards were not behaving correctly on large sessions (or on smaller devices like phones); also portrait mode fixes
-
 - 2.18.9: Scoreboards in the default bundle were hiding the down signal too early
-
 - 2.18.8: Cosmetic: Use the more general label "Open" for opening a plugin from the Options page.
-
 - 2.18.7: Removed an unfinished partial implementation of plugins that would run on server startup. To be redone with better use cases.
-
 - 2.18.6: Plugin option defaults can now be saved from the options modal via a built-in "Save as Defaults" button. Overrides are persisted as `config-override.json5` (JSON5 with comments and trailing commas). The legacy `config-override.js` format is no longer loaded; re-save defaults from the modal to migrate. 
-
 - 2.18.6: Fixes a bug where comma-separated string defaults (e.g. `'S,J,U,V'`) were truncated when handling defaults
-
 - 2.18.5: moved plugin-specific unit tests down to their plugin or submodule.
-
 - 2.18.4: Stale provisional records that do not match the current event are no longer included in the results book
-
 - 2.18.3: Flag files for countries and North America provinces/states/territories now are mapped from full name to 2-letter juridiction or 3-letter IOC Code (Ontario can be found under ON.svg and Australia under AUS.svg). 
-
 - 2.18.2: Packaged plugins can now provide editable `config-override.js` files for runtime option defaults.
   - Custom zip packaging copies hand-authored override files and generates missing ones for selected plugins with options.
   - OBS packages include override files for install-specific host, path, platform, and scene defaults.
-
 - 2.18.1: Add timestamps to packaged zips since the version number shown is that of tracker and not of the included plugins
-
 - 2.18.0: Include a marker file that indicates that a non-standard build was created using npm run zip.
   - the file includes the plugins included, to provide correct warnings or errors when updating/importing
 - 2.18.0: reviewed the "npm run zip" command options for packaging a custom tracker
