@@ -48,7 +48,8 @@ export async function load() {
 	// Get competition info
 	const databaseState = competitionHub.getDatabaseState();
 	const competitionName = databaseState?.competition?.name || 'OWLCMS Competition';
-	
+		// Exposed generically so plugin options can reference any OWLCMS competition setting.
+		const competitionSettings = databaseState?.competition || {};
 	// Get available locales from loaded translations
 	// Prefer hub locales; fall back to English so dropdown is never empty even if translations arrive late
 	const hubLocales = competitionHub.getAvailableLocales();
@@ -135,6 +136,7 @@ export async function load() {
 		landingPageCategories,
 		fops: availableFOPs,
 		competitionName,
+			competitionSettings,
 		hasData: availableFOPs.length > 0,
 		hasConfirmedFops: confirmedFopsAvailable,
 		availableLocales,

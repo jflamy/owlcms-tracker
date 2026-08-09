@@ -195,16 +195,25 @@
     );
     const ungrouped = options.filter((option) => !option.group);
 
-    return groupNames
-      .map((groupName, index) => ({
+    // Ungrouped options get their own "General" tab, placed first
+    const tabs = [];
+    if (ungrouped.length > 0) {
+      tabs.push({
+        groupName: 'options',
+        groupLabel: 'general',
+        options: ungrouped
+      });
+    }
+
+    groupNames.forEach((groupName) => {
+      tabs.push({
         groupName,
         groupLabel: groupLabels[groupName] || groupName || 'Options',
-        options: [
-          ...(index === 0 ? ungrouped : []),
-          ...options.filter((option) => option.group === groupName)
-        ]
-      }))
-      .filter((tab) => tab.options.length > 0);
+        options: options.filter((option) => option.group === groupName)
+      });
+    });
+
+    return tabs.filter((tab) => tab.options.length > 0);
   }
 
   function getTabPanelClass(groupName) {
@@ -412,11 +421,29 @@
   }
 
   function isOptionDisabled(option, currentOptions) {
-    // Only 'allAthletes' can disable other fields
+    // 'allAthletes' can disable other fields
     if (option.disabledBy === 'allAthletes') {
        return !!currentOptions?.allAthletes;
     }
+    // Generic: 'disabledBy: <otherOptionKey>' disables when that option is falsy
+    if (option.disabledBy) {
+      return !currentOptions?.[option.disabledBy];
+    }
     return false;
+  }
+
+  // When a boolean option is disabled by a (falsy) controlling option, show the
+  // value that will effectively apply instead of the stored override value.
+  function effectiveBooleanValue(option, currentOptions) {
+    const stored = currentOptions?.[option.key];
+    if (option.disabledBy && !currentOptions?.[option.disabledBy] && option.effectiveWhenDisabled !== undefined) {
+      const effective = option.effectiveWhenDisabled;
+      if (typeof effective === 'boolean') return effective;
+      if (effective?.competitionSetting) {
+        return !!data.competitionSettings?.[effective.competitionSetting];
+      }
+    }
+    return stored;
   }
 
   let showPdfModal = false;
@@ -818,15 +845,26 @@
                       {/each}
                     </select>
                   {:else if option.type === 'boolean'}
+                    {@const opts = scoreboardOptions[modalScoreboard.type][modalFop]}
+                    {@const isDisabled = isOptionDisabled(option, opts)}
+                    {@const boolValue = effectiveBooleanValue(option, opts)}
                     <div class="checkbox-wrapper">
-                      <input 
-                        type="checkbox" 
-                        id="{modalScoreboard.type}-{modalFop}-{option.key}"
-                        bind:checked={scoreboardOptions[modalScoreboard.type][modalFop][option.key]}
-                        disabled={isOptionDisabled(option, scoreboardOptions[modalScoreboard.type][modalFop])}
-                      />
+                      {#if isDisabled}
+                        <input 
+                          type="checkbox" 
+                          id="{modalScoreboard.type}-{modalFop}-{option.key}"
+                          checked={boolValue}
+                          disabled
+                        />
+                      {:else}
+                        <input 
+                          type="checkbox" 
+                          id="{modalScoreboard.type}-{modalFop}-{option.key}"
+                          bind:checked={scoreboardOptions[modalScoreboard.type][modalFop][option.key]}
+                        />
+                      {/if}
                       <label for="{modalScoreboard.type}-{modalFop}-{option.key}" class="checkbox-label">
-                          {scoreboardOptions[modalScoreboard.type][modalFop][option.key]
+                          {boolValue
                             ? getModalText(modalScoreboard, 'booleanTrue', 'Yes')
                             : getModalText(modalScoreboard, 'booleanFalse', 'No')}
                       </label>
