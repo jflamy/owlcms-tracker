@@ -71,11 +71,13 @@ export async function load({ params, url }) {
 			await refreshDatabaseForDocuments();
 		}
 		
-		// Get live data from plugin helpers (includes current config with overrides)
+		// Get live data from plugin helpers (includes current config with overrides).
+		// Go through processData so that config.requires resources (flags/logos/gamx)
+		// are pulled from OWLCMS before the helper runs.
 		let liveData = null;
 		if (scoreboard.dataHelper) {
 			try {
-				liveData = await scoreboard.dataHelper(fopName, options);
+				liveData = await scoreboardRegistry.processData(type, fopName, options);
 			} catch (err) {
 				console.warn(`[Scoreboard Route] Failed to get live data for ${type}:`, err.message);
 			}
