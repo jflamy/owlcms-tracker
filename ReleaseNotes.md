@@ -5,6 +5,7 @@
 
 ## 2.21
 
+- 2.21.3: Fix lazy loading of gamx tables
 - 2.21.2: `npm run zip`: `--timestamp` is now required to add a timestamp to the semver metadata.
 - 2.21.1: Documentation and scripts update.
 - 2.21.1: Fetch logos even if database is empty.
