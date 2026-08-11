@@ -21,6 +21,15 @@
   $: languageNames = data.languageNames || {};
   $: availableLocales = data.availableLocales || [];
 
+  const AUDIO_INPUT_KIND_NAMES = {
+    auto: 'Auto-detect from OBS host',
+    wasapi_input_capture: 'Windows (WASAPI)',
+    coreaudio_input_capture: 'macOS (CoreAudio)',
+    pulse_input_capture: 'Linux (PulseAudio / PipeWire-Pulse)',
+    pipewire_audio_input_capture: 'Linux (PipeWire)',
+    alsa_input_capture: 'Linux (ALSA)'
+  };
+
   function getDisplayName(option, optionKey) {
     // If this is a language option, use the language name translations
     if (optionKey === 'language' && languageNames[option]) {
@@ -29,6 +38,9 @@
     // Scene template: show filename or "None" for empty
     if (optionKey === 'sceneTemplate') {
       return option === '' ? 'None (manual OBS configuration)' : option;
+    }
+    if (optionKey === 'audioInputKind') {
+      return AUDIO_INPUT_KIND_NAMES[option] || option;
     }
     return option;
   }
