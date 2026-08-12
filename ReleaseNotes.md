@@ -3,6 +3,10 @@
 
 > #### ⚠ It is recommended to update OWLCMS to the latest stable version when updating Tracker.
 
+## 2.22
+
+- 2.22.0: Additiona documents plugin to compute the number of medals needed before a meet.
+
 ## 2.21
 
 - 2.21.3: Fix lazy loading of gamx tables
