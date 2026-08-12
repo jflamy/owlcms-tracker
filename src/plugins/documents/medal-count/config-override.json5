@@ -1,0 +1,27 @@
+// Runtime default overrides for this plugin.
+// The tracker reads only options[].default from this file.
+// JSON5 syntax: comments and trailing commas are allowed.
+{
+  "options": [
+    {
+      "key": "language",
+      "default": "fr_CA"
+    },
+    {
+      "key": "medalsOverride",
+      "default": false
+    },
+    {
+      "key": "medalsSnatch",
+      "default": false
+    },
+    {
+      "key": "medalsCleanJerk",
+      "default": false
+    },
+    {
+      "key": "medalsTotal",
+      "default": true
+    }
+  ]
+}

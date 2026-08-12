@@ -325,7 +325,7 @@ export function getScoreboardData(fopName = '*', options = {}) {
 			competitionName,
 			locationLine: buildLocationLine(competition),
 			title: labels.title,
-			fileTitle: `Medal Count - ${competitionName}`
+			fileTitle: competitionName ? `${labels.title} - ${competitionName}` : labels.title
 		},
 		sessions,
 		grandTotal,

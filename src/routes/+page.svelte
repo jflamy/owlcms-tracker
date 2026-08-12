@@ -30,6 +30,66 @@
     alsa_input_capture: 'Linux (ALSA)'
   };
 
+  // Select choices supplied at runtime by a plugin action (e.g. the mic list
+  // OBS reports): { [pluginType]: { [fop]: { [optionKey]: [{value,label}] } } }
+  let runtimeOptionChoices = {};
+  let refreshingOptionKeys = new Set();
+
+  function mergeOptionChoices(pluginType, fop, choices) {
+    if (!choices || typeof choices !== 'object') return;
+    const byType = runtimeOptionChoices[pluginType] || {};
+    const byFop = byType[fop] || {};
+    runtimeOptionChoices = {
+      ...runtimeOptionChoices,
+      [pluginType]: { ...byType, [fop]: { ...byFop, ...choices } }
+    };
+  }
+
+  function getOptionChoices(option) {
+    const runtime = runtimeOptionChoices[modalScoreboard?.type]?.[modalFop]?.[option.key];
+    if (Array.isArray(runtime) && runtime.length) {
+      const current = scoreboardOptions[modalScoreboard.type]?.[modalFop]?.[option.key];
+      const hasGroupedChoices = runtime.some((choice) => choice && typeof choice === 'object' && Array.isArray(choice.options));
+
+      if (hasGroupedChoices) {
+        const normalized = runtime.map((group) => ({
+          group: group.group || 'Options',
+          options: Array.isArray(group.options) ? group.options.map((choice) => ({
+            value: choice.value,
+            label: choice.label || choice.value
+          })) : []
+        }));
+
+        if (current && !normalized.some((group) => group.options.some((choice) => choice.value === current))) {
+          normalized.push({
+            group: 'Selected value',
+            options: [{ value: current, label: `${current} (not detected)` }]
+          });
+        }
+        return normalized;
+      }
+
+      // Keep a value configured elsewhere selectable even if this host lacks it.
+      if (current && !runtime.some((choice) => choice.value === current)) {
+        return [...runtime, { value: current, label: `${current} (not detected)` }];
+      }
+      return runtime;
+    }
+    return (option.options || []).map((opt) => ({ value: opt, label: getDisplayName(opt, option.key) }));
+  }
+
+  async function refreshOptionChoices(option) {
+    if (!modalScoreboard || !option?.refreshAction) return;
+    refreshingOptionKeys = new Set(refreshingOptionKeys).add(option.key);
+    try {
+      await callPluginAction(modalScoreboard.type, option.refreshAction, modalFop, { silent: true });
+    } finally {
+      const next = new Set(refreshingOptionKeys);
+      next.delete(option.key);
+      refreshingOptionKeys = next;
+    }
+  }
+
   function getDisplayName(option, optionKey) {
     // If this is a language option, use the language name translations
     if (optionKey === 'language' && languageNames[option]) {
@@ -177,6 +237,10 @@
     const optionTabs = getOptionTabs(scoreboard);
     activeOptionTab = optionTabs[0]?.groupName || null;
     showModal = true;
+
+    for (const option of scoreboard.options || []) {
+      if (option.refreshAction) refreshOptionChoices(option);
+    }
   }
   
   function closeModal() {
@@ -486,7 +550,10 @@
 
   async function saveOptionDefaults() {
     if (!modalScoreboard) return;
-    const result = await callPluginAction(modalScoreboard.type, 'saveOptions', modalFop);
+    const optionSnapshot = { ...(scoreboardOptions[modalScoreboard.type]?.[modalFop] || {}) };
+    const result = await callPluginAction(modalScoreboard.type, 'saveOptions', modalFop, {
+      optionValues: optionSnapshot
+    });
     if (result?.success) {
       await invalidateAll();
       defaultsInitialized = false;
@@ -499,9 +566,9 @@
    * @param {string} action - The action to call (e.g., 'configureOBS')
    * @param {string} fop - The FOP name
    */
-  async function callPluginAction(pluginType, action, fop, { download = false } = {}) {
+  async function callPluginAction(pluginType, action, fop, { download = false, silent = false, optionValues = null } = {}) {
     const optionKey = getOptionContextKey(fop);
-    const options = scoreboardOptions[pluginType]?.[optionKey] || {};
+    const options = optionValues || scoreboardOptions[pluginType]?.[optionKey] || {};
     const params = new URLSearchParams();
     
     params.append('plugin', pluginType);
@@ -538,7 +605,16 @@
       }
 
       const result = await response.json();
-      
+
+      mergeOptionChoices(pluginType, optionKey, result.optionChoices);
+
+      if (silent) {
+        if (!result.success) {
+          console.warn(`[Options] ${pluginType}.${action} failed: ${result.message || result.error || 'unknown error'}`);
+        }
+        return result;
+      }
+
       if (result.success) {
         alert(`✅ ${result.message || 'Action completed successfully'}`);
       } else {
@@ -546,7 +622,7 @@
       }
       return result;
     } catch (error) {
-      alert(`❌ Error: ${error.message}`);
+      if (!silent) alert(`❌ Error: ${error.message}`);
       return { success: false, message: error.message };
     }
   }
@@ -841,21 +917,49 @@
           {#if activeTab}
             <div class={getTabPanelClass(activeTab.groupName)} role="tabpanel">
               {#each activeTab.options as option}
+                {#if !option.hidden}
                 <div class="option-field" class:disabled-option={isOptionDisabled(option, scoreboardOptions[modalScoreboard.type][modalFop])}>
                   <label for="{modalScoreboard.type}-{modalFop}-{option.key}">
                     {option.label}
                   </label>
 
                   {#if option.type === 'select'}
-                    <select 
+                    <div class="select-row" class:with-refresh={option.refreshAction}>
+                      <select
+                        id="{modalScoreboard.type}-{modalFop}-{option.key}"
+                        bind:value={scoreboardOptions[modalScoreboard.type][modalFop][option.key]}
+                        disabled={isOptionDisabled(option, scoreboardOptions[modalScoreboard.type][modalFop])}
+                      >
+                        {#each getOptionChoices(option) as choice}
+                          {#if choice && typeof choice === 'object' && Array.isArray(choice.options)}
+                            <optgroup label={choice.group || 'Options'}>
+                              {#each choice.options as nested}
+                                <option value={nested.value}>{nested.label}</option>
+                              {/each}
+                            </optgroup>
+                          {:else}
+                            <option value={choice.value}>{choice.label}</option>
+                          {/if}
+                        {/each}
+                      </select>
+                      {#if option.refreshAction}
+                        <button
+                          type="button"
+                          class="refresh-option-btn"
+                          title="Re-read the list from OBS"
+                          disabled={refreshingOptionKeys.has(option.key)}
+                          on:click={() => refreshOptionChoices(option)}
+                        >
+                          {refreshingOptionKeys.has(option.key) ? '…' : '⟳'}
+                        </button>
+                      {/if}
+                    </div>
+                  {:else if option.type === 'hidden'}
+                    <input
+                      type="hidden"
                       id="{modalScoreboard.type}-{modalFop}-{option.key}"
                       bind:value={scoreboardOptions[modalScoreboard.type][modalFop][option.key]}
-                      disabled={isOptionDisabled(option, scoreboardOptions[modalScoreboard.type][modalFop])}
-                    >
-                      {#each (option.options || []) as opt}
-                        <option value={opt}>{getDisplayName(opt, option.key)}</option>
-                      {/each}
-                    </select>
+                    />
                   {:else if option.type === 'boolean'}
                     {@const opts = scoreboardOptions[modalScoreboard.type][modalFop]}
                     {@const isDisabled = isOptionDisabled(option, opts)}
@@ -903,6 +1007,7 @@
                     <p class="option-description">{option.description}</p>
                   {/if}
                 </div>
+                {/if}
               {/each}
             </div>
           {/if}
@@ -1572,6 +1677,37 @@
     outline: none;
     border-color: #667eea;
     background: rgba(255, 255, 255, 0.1);
+  }
+
+  .select-row {
+    display: flex;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+
+  .select-row select {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .refresh-option-btn {
+    padding: 0 0.85rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    color: #e5e7eb;
+    font-size: 1rem;
+    cursor: pointer;
+  }
+
+  .refresh-option-btn:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: #667eea;
+  }
+
+  .refresh-option-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
   }
   
   .checkbox-wrapper {

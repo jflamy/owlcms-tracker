@@ -3,7 +3,7 @@
 
 	export let data = {};
 
-	$: pageTitle = appendPdfTimestamp(data.header?.fileTitle || 'Medal Count');
+	$: pageTitle = appendPdfTimestamp(data.header?.fileTitle || data.labels?.title);
 	$: labels = data.labels || {};
 	$: sessions = data.sessions || [];
 	$: grandTotal = data.grandTotal || { categories: 0, gold: 0, silver: 0, bronze: 0, medals: 0 };
