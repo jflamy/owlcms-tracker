@@ -10,3 +10,7 @@
 	path = src/plugins/OBS
 	url = https://github.com/owlcms/tracker-obs.git
 	branch = master
+[submodule "src/plugins/video-overlays/ohio-wso-lower-third"]
+	path = src/plugins/video-overlays/ohio-wso-lower-third
+	url = ../ohio-wso-lower-third
+	branch = master
