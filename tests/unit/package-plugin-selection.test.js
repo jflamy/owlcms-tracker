@@ -55,6 +55,7 @@ describe('Zip packaging plugin selection', () => {
   const hasBooks = existsSync('src/plugins/books/iwf-startbook/config.js') && existsSync('src/plugins/books/iwf-results/config.js');
   const hasOBS = existsSync('src/plugins/OBS/streaming/config.js');
   const hasFranceTeamsExtension = existsSync('extensions/France/\u00e9quipes/config.js') && existsSync('src/plugins/teams/team-scoreboard/config.js');
+  const hasOhioLowerThirdSubmodule = existsSync('src/plugins/video-overlays/ohio-wso-lower-third/.git');
 
   it.skipIf(!(hasBooks && hasOBS))('maps categories to their backing plugin submodules', () => {
     const explicitPluginSelection = resolveSelectedPlugins({
@@ -67,7 +68,7 @@ describe('Zip packaging plugin selection', () => {
       allowedExtensionDirs: []
     });
 
-    expect(Array.from(explicitPluginSelection.selectedPluginSubmoduleTopLevels).sort()).toEqual(['OBS', 'books']);
+    expect(Array.from(explicitPluginSelection.selectedPluginSubmoduleRoots).sort()).toEqual(['OBS', 'books']);
     expect(shouldCopyWorkspaceEntry('src/plugins/books/iwf-startbook/config.js', false, selection)).toBe(true);
     expect(shouldCopyWorkspaceEntry('src/plugins/OBS/streaming/config.js', false, selection)).toBe(true);
     expect(shouldCopyWorkspaceEntry('src/plugins/scoreboards/lifting-order/config.js', false, selection)).toBe(false);
@@ -107,6 +108,18 @@ describe('Zip packaging plugin selection', () => {
 
     expect(Array.from(explicitPluginSelection.selectedExtensionSubmoduleTopLevels)).toContain('France');
     expect(Array.from(explicitPluginSelection.selectedStandardPluginPaths)).toContain('teams/team-scoreboard');
+  });
+
+  it.skipIf(!hasOhioLowerThirdSubmodule)('keeps standard plugins and includes nested submodule plugins in standard builds', () => {
+    const selection = computeBuildSelection({
+      selectedSubmodules: [],
+      explicitPluginSelection: resolveSelectedPlugins(),
+      includeStandard: true,
+      allowedExtensionDirs: []
+    });
+
+    expect(shouldCopyWorkspaceEntry('src/plugins/video-overlays/lower-third/config.js', false, selection)).toBe(true);
+    expect(shouldCopyWorkspaceEntry('src/plugins/video-overlays/ohio-wso-lower-third/config.js', false, selection)).toBe(true);
   });
 
   it('marks any build other than plain standard as custom', () => {

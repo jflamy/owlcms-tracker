@@ -16,13 +16,16 @@
   box-sizing: border-box;
 }
 
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+html, body {
   margin: 0;
   padding: 0;
-  background-color: var(--background-color);
+  background: transparent !important;
   color: var(--text-color);
   line-height: 1.6;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -156,11 +159,11 @@ tr:hover {
   .container {
     padding: 0.5rem;
   }
-  
+
   table {
     font-size: 0.875rem;
   }
-  
+
   th, td {
     padding: 0.5rem;
   }
@@ -170,7 +173,7 @@ tr:hover {
   table {
     font-size: 0.75rem;
   }
-  
+
   th, td {
     padding: 0.25rem;
   }

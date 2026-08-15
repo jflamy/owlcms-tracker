@@ -267,10 +267,12 @@ function readGitSubmodules(gitmodulesPath = '.gitmodules') {
     const submodulePath = submodulePathRaw.trim();
     let type = 'other';
     let topLevel = null;
+    let pluginRoot = null;
 
     if (submodulePath.startsWith('src/plugins/')) {
       type = 'plugin';
-      topLevel = submodulePath.split(/[\\/]/)[2] || null;
+      pluginRoot = submodulePath.replace(/^src[\\/]plugins[\\/]/, '').replace(/\\/g, '/');
+      topLevel = pluginRoot.split('/')[0] || null;
     } else if (submodulePath.startsWith('extensions/')) {
       type = 'extension';
       topLevel = submodulePath.split(/[\\/]/)[1] || null;
@@ -281,9 +283,15 @@ function readGitSubmodules(gitmodulesPath = '.gitmodules') {
       path: submodulePath,
       type,
       topLevel,
+      pluginRoot,
       baseName: path.basename(submodulePath)
     };
   });
+}
+
+function pathWithinRoot(relativePath, root) {
+  if (!relativePath || !root) return false;
+  return relativePath === root || relativePath.startsWith(`${root}/`);
 }
 
 function normalizeRequestedSubmodules(selectedSubmodules = []) {
@@ -491,7 +499,7 @@ function addPluginPathSelection(pluginPath, {
   sourcePluginPaths,
   submoduleByTopLevel,
   selectedStandardPluginPaths,
-  selectedPluginSubmoduleTopLevels,
+  selectedPluginSubmoduleRoots,
   missingPaths
 }) {
   if (!pluginPath) return;
@@ -505,7 +513,12 @@ function addPluginPathSelection(pluginPath, {
       return;
     }
 
-    selectedPluginSubmoduleTopLevels.add(owningSubmodule.topLevel);
+    if (owningSubmodule.pluginRoot) {
+      selectedPluginSubmoduleRoots.add(owningSubmodule.pluginRoot);
+      return;
+    }
+
+    selectedPluginSubmoduleRoots.add(owningSubmodule.topLevel);
     return;
   }
 
@@ -609,7 +622,7 @@ export function resolveSelectedPlugins({
   }
 
   const selectedStandardPluginPaths = new Set();
-  const selectedPluginSubmoduleTopLevels = new Set();
+  const selectedPluginSubmoduleRoots = new Set();
   const selectedExtensionSubmoduleTopLevels = new Set();
   const missingNames = [];
   const missingCategories = [];
@@ -619,7 +632,7 @@ export function resolveSelectedPlugins({
     sourcePluginPaths,
     submoduleByTopLevel,
     selectedStandardPluginPaths,
-    selectedPluginSubmoduleTopLevels,
+    selectedPluginSubmoduleRoots,
     missingPaths
   };
 
@@ -693,7 +706,7 @@ export function resolveSelectedPlugins({
   return {
     hasSelection: requestedNames.length > 0 || requestedCategories.length > 0,
     selectedStandardPluginPaths,
-    selectedPluginSubmoduleTopLevels,
+    selectedPluginSubmoduleRoots,
     selectedExtensionSubmoduleTopLevels
   };
 }
@@ -784,16 +797,16 @@ export function computeBuildSelection({
   const submodules = resolveSelectedSubmodules(selectedSubmodules);
   const pluginSelection = explicitPluginSelection || resolveSelectedPlugins();
   const explicitlySelectedSubmodules = submodules.hasSelection ? submodules.selected : [];
-  const pluginSubmoduleTopLevels = new Set(
+  const pluginSubmoduleRoots = new Set(
     submodules.all
-      .filter((submodule) => submodule.type === 'plugin' && submodule.topLevel)
-      .map((submodule) => submodule.topLevel)
+      .filter((submodule) => submodule.type === 'plugin' && (submodule.pluginRoot || submodule.topLevel))
+      .map((submodule) => submodule.pluginRoot || submodule.topLevel)
   );
-  const selectedPluginSubmoduleTopLevels = new Set([
+  const selectedPluginSubmoduleRoots = new Set([
     ...explicitlySelectedSubmodules
-      .filter((submodule) => submodule.type === 'plugin' && submodule.topLevel)
-      .map((submodule) => submodule.topLevel),
-    ...pluginSelection.selectedPluginSubmoduleTopLevels
+      .filter((submodule) => submodule.type === 'plugin' && (submodule.pluginRoot || submodule.topLevel))
+      .map((submodule) => submodule.pluginRoot || submodule.topLevel),
+    ...(pluginSelection.selectedPluginSubmoduleRoots || [])
   ]);
   const delegatedPluginIds = findDelegatedPluginIds(allowedExtensionDirs);
   const allowedStandardPluginRoots = new Set([
@@ -803,8 +816,8 @@ export function computeBuildSelection({
 
   return {
     includeStandard,
-    pluginSubmoduleTopLevels,
-    selectedPluginSubmoduleTopLevels,
+    pluginSubmoduleRoots,
+    selectedPluginSubmoduleRoots,
     allowedStandardPluginRoots,
     allowedExtensionDirs: new Set(allowedExtensionDirs),
     includeStandardExtensionFiles: true
@@ -838,10 +851,17 @@ export function shouldCopyWorkspaceEntry(relativePath, isDirectory, selection) {
       return false;
     }
 
-    const category = parts[2];
     const pluginRelativePath = parts.slice(2).join('/');
-    if (selection.pluginSubmoduleTopLevels.has(category)) {
-      return selection.selectedPluginSubmoduleTopLevels.has(category);
+    const matchingSubmoduleRoot = Array.from(selection.pluginSubmoduleRoots)
+      .find((root) => pathWithinRoot(pluginRelativePath, root));
+
+    // Submodule-managed plugin paths are included only when explicitly selected,
+    // except nested plugin submodules which are part of the standard checkout.
+    if (matchingSubmoduleRoot) {
+      if (selection.includeStandard && matchingSubmoduleRoot.includes('/')) {
+        return true;
+      }
+      return selection.selectedPluginSubmoduleRoots.has(matchingSubmoduleRoot);
     }
 
     if (selection.includeStandard) {
@@ -901,7 +921,7 @@ function linkBuildWorkspaceNodeModules(repoRoot, workspaceRoot) {
  */
 function scanPluginDependencies({ srcPluginsDir = 'src/plugins', extensionsDir = 'extensions', allowedExtensionDirs = [] } = {}) {
   const deps = new Set();
-  
+
   // Scan source plugins (nested: src/plugins/category/plugin-name/)
   if (fs.existsSync(srcPluginsDir)) {
     const categories = fs.readdirSync(srcPluginsDir);
@@ -912,7 +932,7 @@ function scanPluginDependencies({ srcPluginsDir = 'src/plugins', extensionsDir =
       }
     }
   }
-  
+
   // Scan extensions (nested structure: extensions/RepoName/plugin-name/)
   if (fs.existsSync(extensionsDir)) {
     const repos = allowedExtensionDirs ?? [];
@@ -1027,18 +1047,18 @@ async function copyOrGenerateConfigOverride({ pluginDir, buildWorkspaceDir, dist
  */
 function scanPluginDir(dir, deps) {
   if (!fs.existsSync(dir)) return;
-  
+
   const entries = fs.readdirSync(dir);
   for (const entry of entries) {
     const entryPath = path.join(dir, entry);
     if (!fs.statSync(entryPath).isDirectory()) continue;
-    
+
     const configPath = path.join(entryPath, 'config.js');
     if (!fs.existsSync(configPath)) continue;
-    
+
     try {
       const configContent = fs.readFileSync(configPath, 'utf8');
-      
+
       // Look for additionalDependencies array in the config
       const match = configContent.match(/additionalDependencies\s*:\s*\[([^\]]*)\]/);
       if (match) {
@@ -1046,7 +1066,7 @@ function scanPluginDir(dir, deps) {
           .split(',')
           .map(s => s.trim().replace(/['"]/g, ''))
           .filter(s => s.length > 0);
-        
+
         for (const dep of depsArray) {
           deps.add(dep);
           console.log(`  📎 ${entry} requires: ${dep}`);
@@ -1253,7 +1273,7 @@ OWLCMS CONFIGURATION:
 ====================
 In OWLCMS, go to:
   Prepare Competition → Language and System Settings → Connections
-  
+
 Set "URL for Video Data" to:
   ws://localhost:8096/ws
 
