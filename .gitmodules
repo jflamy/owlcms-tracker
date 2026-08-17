@@ -12,5 +12,4 @@
 	branch = master
 [submodule "src/plugins/video-overlays/ohio-wso-lower-third"]
 	path = src/plugins/video-overlays/ohio-wso-lower-third
-	url = ../ohio-wso-lower-third
-	branch = master
+        url = https://github.com/hmsiegel/ohio-wso-lower-third.git
