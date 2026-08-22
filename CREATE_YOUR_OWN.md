@@ -61,6 +61,8 @@ cd owlcms-tracker
 npm install
 ```
 
+To keep your plugins in an independent repository checked out under `src/plugins/custom/`, follow [Keeping Your Plugin Repository Independent Of Tracker](docs/INDEPENDENT_PLUGIN_REPO.md) before continuing.
+
 ### 6. Open in VS Code
 
 ```bash
