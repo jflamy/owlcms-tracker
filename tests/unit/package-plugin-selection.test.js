@@ -1,9 +1,12 @@
-import { existsSync } from 'fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import { describe, expect, it } from 'vitest';
 
 import {
   computeBuildSelection,
   isCustomBuild,
+  prepareRuntimePackageJson,
   resolveSelectedPlugins,
   shouldCopyWorkspaceEntry
 } from '../../scripts/package-shared.js';
@@ -115,5 +118,30 @@ describe('Zip packaging plugin selection', () => {
     expect(isCustomBuild({ includeStandard: true, selectedPlugins: ['Referee Assignments'] })).toBe(true);
     expect(isCustomBuild({ includeStandard: true, selectedPluginCategories: ['documents'] })).toBe(true);
     expect(isCustomBuild({ includeStandard: true, selectedSubmodules: ['books'] })).toBe(true);
+  });
+
+  it('removes development dependencies from the runtime package manifest', () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'tracker-runtime-package-'));
+    const packageJsonPath = join(tempDir, 'package.json');
+
+    try {
+      writeFileSync(packageJsonPath, JSON.stringify({
+        name: 'owlcms-tracker',
+        scripts: { preview: 'node start-with-ws.js' },
+        dependencies: { '@owlcms/tracker-core': 'github:owlcms/tracker-core#1.17.1' },
+        devDependencies: { vitest: '^4.0.13' }
+      }));
+
+      prepareRuntimePackageJson(packageJsonPath);
+
+      const runtimePackage = JSON.parse(readFileSync(packageJsonPath, 'utf8'));
+      expect(runtimePackage.devDependencies).toBeUndefined();
+      expect(runtimePackage.dependencies).toEqual({
+        '@owlcms/tracker-core': 'github:owlcms/tracker-core#1.17.1'
+      });
+      expect(runtimePackage.scripts.preview).toBe('node start-with-ws.js');
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 });

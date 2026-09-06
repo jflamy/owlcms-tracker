@@ -249,6 +249,12 @@ export function updatePackageJsonDependency(filePath, trackerCoreVersion) {
   fs.writeFileSync(filePath, JSON.stringify(pkg, null, 2) + '\n');
 }
 
+export function prepareRuntimePackageJson(filePath) {
+  const pkg = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  delete pkg.devDependencies;
+  fs.writeFileSync(filePath, JSON.stringify(pkg, null, 2) + '\n');
+}
+
 function listDirectoryNames(rootDir) {
   if (!fs.existsSync(rootDir)) return [];
 
@@ -1163,6 +1169,8 @@ export async function buildAndPackage({
       updatePackageJsonDependency(path.join(DIST_DIR, 'package.json'), trackerCoreVersion);
       console.log(`✓ Set tracker-core@${trackerCoreVersion} in packaged package.json`);
     }
+    prepareRuntimePackageJson(path.join(DIST_DIR, 'package.json'));
+    console.log('✓ Removed development dependencies from packaged package.json');
 
     // Copy build directory
     copyDir(path.join(BUILD_WORKSPACE_DIR, 'build'), path.join(DIST_DIR, 'build'));
